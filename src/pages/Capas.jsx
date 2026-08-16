@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Download, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 
@@ -178,6 +179,23 @@ export default function Capas() {
     [capas]
   );
 
+  function handleExportCsv() {
+    const headers = ['Numéro', 'Objet', 'Origine', 'Priorité', 'Statut', 'Responsable', 'Échéance', 'Créée le', 'Clôturée le'];
+    const rows = capas.map((capa) => [
+      capa.number,
+      capa.title,
+      capa.origin || '',
+      CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+      CAPA_STATUS_LABELS[capa.status] || capa.status,
+      capa.assigned?.full_name || '',
+      formatDate(capa.due_date),
+      formatDate(capa.created_at),
+      formatDate(capa.closed_at),
+    ]);
+
+    exportToCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
   function handleCreated(newCapa) {
     setCapas((prev) => [newCapa, ...prev]);
     setIsModalOpen(false);
@@ -202,14 +220,25 @@ export default function Capas() {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">CAPA</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouvelle CAPA
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={capas.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
+          >
+            <Plus size={18} />
+            Nouvelle CAPA
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-3 gap-3">
