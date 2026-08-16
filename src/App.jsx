@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard.jsx';
 import Documents from './pages/Documents.jsx';
 import DocumentDetail from './pages/DocumentDetail.jsx';
 import Capas from './pages/Capas.jsx';
+import CapaDetail from './pages/CapaDetail.jsx';
 import Trainings from './pages/Trainings.jsx';
 import Kpis from './pages/Kpis.jsx';
 import Settings from './pages/Settings.jsx';
@@ -57,6 +58,7 @@ export default function App() {
           <Route path="documents" element={<Documents />} />
           <Route path="documents/:id" element={<DocumentDetail />} />
           <Route path="capas" element={<Capas />} />
+          <Route path="capas/:id" element={<CapaDetail />} />
           <Route path="trainings" element={<Trainings />} />
           <Route path="kpis" element={<Kpis />} />
           <Route path="settings" element={<Settings />} />
