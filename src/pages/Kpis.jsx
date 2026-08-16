@@ -1,21 +1,23 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   AlertCircle,
+  ArrowLeft,
+  ArrowRight,
   BarChart3,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
   Download,
   FileText,
-  History,
   Image as ImageIcon,
   MoreVertical,
   Pencil,
   Plus,
+  Settings,
   Trash2,
   Upload,
   X,
-  XCircle,
 } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { toPng } from 'html-to-image';
@@ -37,20 +39,60 @@ const FREQUENCY_LABELS = {
 
 const SOURCE_LABELS = {
   manual: 'Saisie manuelle',
-  import_csv: 'Import CSV',
+  import: 'Import',
 };
 
 const SOURCE_STYLES = {
   manual: 'bg-slate-100 text-slate-600',
-  import_csv: 'bg-blue-100 text-blue-700',
+  import: 'bg-blue-100 text-blue-700',
 };
+
+const CALC_TYPE_OPTIONS = [
+  { value: 'ratio', label: 'Pourcentage conditionnel (ex : % de lignes conformes)' },
+  { value: 'sum', label: "Somme d'une colonne" },
+  { value: 'average', label: "Moyenne d'une colonne" },
+  { value: 'count', label: 'Nombre de lignes' },
+  { value: 'count_grouped', label: 'Répartition par catégorie' },
+];
+
+const CALC_TYPE_LABELS = Object.fromEntries(CALC_TYPE_OPTIONS.map((option) => [option.value, option.label]));
+
+const EMPTY_CONFIG_FORM = {
+  calc_type: 'ratio',
+  source_column: '',
+  filter_column: '',
+  filter_value: '',
+  group_by_column: '',
+  period_column: '',
+};
+
+function configToForm(config) {
+  return {
+    calc_type: config.calc_type,
+    source_column: config.source_column || '',
+    filter_column: config.filter_column || '',
+    filter_value: config.filter_value || '',
+    group_by_column: config.group_by_column || '',
+    period_column: config.period_column || '',
+  };
+}
+
+// Une recette est "complète" côté client selon les mêmes règles que le backend
+// (kpis.js POST .../calculation-config) — évite un aller-retour réseau pour un champ
+// manquant évident, mais le backend reste la source de vérité en cas de désaccord.
+function isConfigComplete(form) {
+  if (form.calc_type === 'ratio') return Boolean(form.filter_column && form.filter_value);
+  if (form.calc_type === 'sum' || form.calc_type === 'average') return Boolean(form.source_column);
+  if (form.calc_type === 'count_grouped') return Boolean(form.group_by_column);
+  return true; // count : aucun champ additionnel requis
+}
 
 // Nom de fichier sûr pour un téléchargement (évite les caractères qui posent problème
 // selon l'OS/le navigateur dans le nom d'un KPI éventuellement accentué).
 function sanitizeFilename(name) {
   return name
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9._-]+/g, '_');
 }
 
@@ -185,11 +227,11 @@ function KpiFormModal({ kpi, onClose, onSaved }) {
               className={inputClassName('calculation_type')}
             >
               <option value="manual">Saisie manuelle</option>
-              <option value="ratio">Calculé depuis un détail conforme/non conforme</option>
+              <option value="import">Calculé depuis un fichier importé</option>
             </select>
             <p className="mt-1 text-xs text-slate-400">
-              {form.calculation_type === 'ratio'
-                ? "Le taux est calculé automatiquement à partir d'un import CSV de lignes conformes/non conformes (ex : commandes contrôlées)."
+              {form.calculation_type === 'import'
+                ? "La valeur est calculée automatiquement à partir d'un fichier importé (CSV ou Excel), selon une recette configurable (pourcentage, somme, moyenne, comptage, répartition...)."
                 : 'Une valeur unique est saisie directement pour chaque période.'}
             </p>
             {fieldErrors.calculation_type && (
@@ -405,31 +447,9 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
   );
 }
 
-function ComplianceBadge({ isCompliant }) {
+function SourceBadge({ source }) {
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-        isCompliant ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'
-      }`}
-    >
-      {isCompliant ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-      {isCompliant ? 'Conforme' : 'Non conforme'}
-    </span>
-  );
-}
-
-// Badge discret indiquant la provenance d'une valeur ; au survol, précise quand et par qui
-// (pour un import) — batch peut être absent si l'historique des imports n'est pas encore
-// chargé, auquel cas on affiche juste le badge sans détail.
-function SourceBadge({ source, batch }) {
-  const title =
-    source === 'import_csv' && batch
-      ? `Importé le ${formatDate(batch.imported_at)} par ${batch.imported_by_user?.full_name || 'un utilisateur'} (${batch.file_name || 'fichier'})`
-      : undefined;
-
-  return (
-    <span
-      title={title}
       className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${SOURCE_STYLES[source] || SOURCE_STYLES.manual}`}
     >
       {SOURCE_LABELS[source] || source}
@@ -437,338 +457,9 @@ function SourceBadge({ source, batch }) {
   );
 }
 
-// Preuve consultable derrière un point du graphique : le détail ligne par ligne de la
-// période cliquée.
-function PeriodDetailModal({ kpi, periodDate, onClose }) {
-  const [rows, setRows] = useState(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    setRows(null);
-    setError('');
-    const queryPeriod = toInputPeriodValue(periodDate, kpi.frequency);
-    api
-      .get(`/kpis/${kpi.id}/detail`, { params: { period: queryPeriod } })
-      .then(({ data }) => setRows(data))
-      .catch(() => setError('Impossible de charger le détail de cette période.'));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kpi.id, periodDate]);
-
-  const compliantCount = rows?.filter((r) => r.is_compliant).length ?? 0;
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[85vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-900">Détail de la période</h2>
-            <p className="text-sm text-slate-500">
-              {kpi.name} — {formatPeriodShort(periodDate, kpi.frequency)}
-            </p>
-          </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        {error && (
-          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        )}
-
-        {!error && rows === null && (
-          <div className="space-y-2">
-            {[0, 1, 2].map((key) => (
-              <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
-            ))}
-          </div>
-        )}
-
-        {rows !== null && (
-          <>
-            <p className="mb-3 text-sm text-slate-600">
-              {compliantCount} conforme{compliantCount > 1 ? 's' : ''} sur {rows.length} ligne{rows.length > 1 ? 's' : ''}
-            </p>
-
-            {rows.length === 0 ? (
-              <p className="text-sm text-slate-400">Aucune ligne de détail pour cette période.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead className="text-xs uppercase tracking-wide text-slate-500">
-                    <tr>
-                      <th className="py-2 pr-3">Référence</th>
-                      <th className="py-2 pr-3">Résultat</th>
-                      <th className="py-2 pr-3">Commentaire</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {rows.map((row) => (
-                      <tr key={row.id}>
-                        <td className="py-2 pr-3 whitespace-nowrap font-medium text-slate-800">{row.item_reference}</td>
-                        <td className="py-2 pr-3">
-                          <ComplianceBadge isCompliant={row.is_compliant} />
-                        </td>
-                        <td className="py-2 pr-3 text-slate-600">{row.comment || '—'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-const CSV_TEMPLATE_HEADERS = ['item_reference', 'period', 'resultat', 'comment'];
-
-function buildCsvTemplateRows() {
-  const currentMonth = new Date().toISOString().slice(0, 7);
-  return [
-    ['CMD-EXEMPLE-001', currentMonth, 'conforme', 'Exemple de commentaire'],
-    ['CMD-EXEMPLE-002', currentMonth, 'non_conforme', 'Exemple de non-conformité'],
-  ];
-}
-
-function ImportDetailModal({ kpi, onClose, onImported }) {
-  const [file, setFile] = useState(null);
-  const [dragActive, setDragActive] = useState(false);
-  const [error, setError] = useState('');
-  const [result, setResult] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
-  const fileInputRef = useRef(null);
-
-  function handleDownloadTemplate() {
-    exportToCsv('modele-import-kpi.csv', CSV_TEMPLATE_HEADERS, buildCsvTemplateRows());
-  }
-
-  function handleFileChange(selected) {
-    if (!selected) return;
-    setFile(selected);
-    setError('');
-    setResult(null);
-  }
-
-  async function handleUpload() {
-    if (!file) return;
-    setError('');
-    setSubmitting(true);
-
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      const { data } = await api.post(`/kpis/${kpi.id}/detail-import`, formData);
-      setResult(data);
-      onImported(data.records);
-    } catch (err) {
-      setError(err.response?.data?.error || "Impossible d'importer ce fichier.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Importer le détail</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        <p className="mb-4 text-sm text-slate-500">{kpi.name}</p>
-
-        <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-          <p className="font-medium text-slate-700">Format attendu (CSV)</p>
-          <p className="mt-1">Colonnes : item_reference, period, resultat, comment</p>
-          <p className="mt-1 font-mono text-[11px] text-slate-500">
-            CMD-001,2026-08-01,conforme,RAS
-            <br />
-            CMD-002,2026-08-03,non_conforme,Pièce manquante
-          </p>
-          <p className="mt-1">
-            resultat accepte aussi "oui"/"non" ou "true"/"false". period accepte "aaaa-MM" ou "aaaa-MM-jj".
-          </p>
-          <button
-            type="button"
-            onClick={handleDownloadTemplate}
-            className="mt-2 flex items-center gap-1.5 font-medium text-primary hover:underline"
-          >
-            <Download size={14} />
-            Télécharger le modèle
-          </button>
-        </div>
-
-        {error && (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        )}
-
-        {!result && (
-          <>
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                handleFileChange(e.dataTransfer.files?.[0] ?? null);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${
-                dragActive ? 'border-primary bg-primary-50' : 'border-slate-300 hover:border-slate-400'
-              }`}
-            >
-              <Upload size={24} className="text-slate-400" />
-              {file ? (
-                <p className="text-sm font-medium text-slate-700">{file.name}</p>
-              ) : (
-                <p className="text-sm text-slate-500">Glissez-déposez un fichier CSV ici, ou cliquez pour parcourir</p>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
-                className="hidden"
-              />
-            </div>
-
-            <button
-              type="button"
-              onClick={handleUpload}
-              disabled={!file || submitting}
-              className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-            >
-              {submitting ? 'Import en cours...' : 'Importer'}
-            </button>
-          </>
-        )}
-
-        {result && (
-          <div className="space-y-4">
-            <div className="rounded-md border border-slate-200 p-3">
-              <p className="text-sm text-slate-700">
-                <span className="font-medium text-emerald-700">{result.batch.rows_valid}</span> ligne
-                {result.batch.rows_valid > 1 ? 's' : ''} importée{result.batch.rows_valid > 1 ? 's' : ''} sur{' '}
-                {result.batch.rows_total}
-                {result.batch.rows_rejected > 0 && (
-                  <>
-                    {' '}
-                    · <span className="font-medium text-red-700">{result.batch.rows_rejected}</span> rejetée
-                    {result.batch.rows_rejected > 1 ? 's' : ''}
-                  </>
-                )}
-              </p>
-            </div>
-
-            {result.rejected.length > 0 && (
-              <div>
-                <p className="mb-1 text-sm font-medium text-slate-700">Lignes rejetées</p>
-                <ul className="max-h-32 space-y-1 overflow-y-auto rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-700">
-                  {result.rejected.map((item, index) => (
-                    <li key={index}>
-                      Ligne {item.line} : {item.reason}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {result.records.length > 0 && (
-              <div>
-                <p className="mb-1 text-sm font-medium text-slate-700">Taux recalculés</p>
-                <ul className="space-y-1 text-sm text-slate-600">
-                  {result.records.map((record) => (
-                    <li key={record.id} className="flex items-center justify-between rounded-md bg-slate-50 px-3 py-1.5">
-                      <span>{formatPeriodShort(record.period_date, kpi.frequency)}</span>
-                      <span className="font-medium text-slate-800">
-                        {record.value} {kpi.unit || ''}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setFile(null);
-                  setResult(null);
-                }}
-                className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                Importer un autre fichier
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700"
-              >
-                Fermer
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ImportBatchesTable({ batches }) {
-  if (batches === null) {
-    return (
-      <div className="space-y-2">
-        {[0, 1].map((key) => (
-          <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
-        ))}
-      </div>
-    );
-  }
-
-  if (batches.length === 0) {
-    return <p className="py-3 text-sm text-slate-400">Aucun import pour l'instant.</p>;
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            <th className="py-2 pr-3">Date</th>
-            <th className="py-2 pr-3">Fichier</th>
-            <th className="py-2 pr-3">Importé par</th>
-            <th className="py-2 pr-3">Lignes</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {batches.map((batch) => (
-            <tr key={batch.id}>
-              <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(batch.imported_at)}</td>
-              <td className="py-2 pr-3 text-slate-600">{batch.file_name || '—'}</td>
-              <td className="py-2 pr-3 whitespace-nowrap text-slate-600">{batch.imported_by_user?.full_name || '—'}</td>
-              <td className="py-2 pr-3 whitespace-nowrap text-slate-600">
-                <span className="text-emerald-700">{batch.rows_valid} importées</span>
-                {batch.rows_rejected > 0 && <span className="text-red-700"> · {batch.rows_rejected} rejetées</span>}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function RecordHistoryTable({ kpi, batchesById, onEditRecord, onDeleteRecord, onViewPeriodDetail }) {
+function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
   const records = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
-  const isRatio = kpi.calculation_type === 'ratio';
+  const isImportBased = kpi.calculation_type === 'import';
 
   if (records.length === 0) {
     return <p className="py-3 text-sm text-slate-400">Aucune valeur enregistrée.</p>;
@@ -781,7 +472,7 @@ function RecordHistoryTable({ kpi, batchesById, onEditRecord, onDeleteRecord, on
           <tr>
             <th className="py-2 pr-3">Période</th>
             <th className="py-2 pr-3">Valeur</th>
-            {isRatio && <th className="py-2 pr-3">Source</th>}
+            {isImportBased && <th className="py-2 pr-3">Source</th>}
             <th className="py-2 pr-3">Commentaire</th>
             <th className="py-2 pr-3">Saisi par</th>
             <th className="py-2 pr-3 text-right">Actions</th>
@@ -790,25 +481,13 @@ function RecordHistoryTable({ kpi, batchesById, onEditRecord, onDeleteRecord, on
         <tbody className="divide-y divide-slate-100">
           {records.map((record) => (
             <tr key={record.id}>
-              <td className="py-2 pr-3 whitespace-nowrap text-slate-700">
-                {isRatio && record.source === 'import_csv' ? (
-                  <button
-                    type="button"
-                    onClick={() => onViewPeriodDetail(record.period_date)}
-                    className="underline decoration-dotted hover:text-primary"
-                  >
-                    {formatDate(record.period_date)}
-                  </button>
-                ) : (
-                  formatDate(record.period_date)
-                )}
-              </td>
+              <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(record.period_date)}</td>
               <td className="py-2 pr-3 whitespace-nowrap font-medium text-slate-800">
                 {record.value} {kpi.unit || ''}
               </td>
-              {isRatio && (
+              {isImportBased && (
                 <td className="py-2 pr-3">
-                  <SourceBadge source={record.source} batch={batchesById?.[record.import_batch_id]} />
+                  <SourceBadge source={record.source} />
                 </td>
               )}
               <td className="py-2 pr-3 text-slate-600">{record.comment || '—'}</td>
@@ -841,21 +520,723 @@ function RecordHistoryTable({ kpi, batchesById, onEditRecord, onDeleteRecord, on
   );
 }
 
-function KpiCard({
-  kpi,
-  isMenuOpen,
-  onToggleMenu,
-  onEdit,
-  onDelete,
-  onOpenRecordModal,
-  onDeleteRecord,
-  onOpenImportModal,
-  onViewPeriodDetail,
-}) {
+// Sélectionne parmi les colonnes détectées d'un import (aperçu du wizard), ou saisie libre
+// quand aucun fichier n'est chargé dans ce contexte (édition de la recette hors import) — la
+// valeur doit alors correspondre exactement à un en-tête d'un futur fichier importé.
+function ColumnField({ label, value, onChange, columns, required, placeholder }) {
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+      {columns ? (
+        <select
+          required={required}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">{placeholder || 'Sélectionner une colonne'}</option>
+          {columns.map((col) => (
+            <option key={col} value={col}>
+              {col}
+            </option>
+          ))}
+        </select>
+      ) : (
+        <input
+          type="text"
+          required={required}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="Nom exact de la colonne"
+          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        />
+      )}
+    </div>
+  );
+}
+
+// Champs dynamiques de la recette de calcul, réutilisés dans le wizard d'import (columns =
+// celles détectées à l'étape 1, avec suggestions de valeurs tirées de l'aperçu) et dans
+// l'édition seule de la recette (columns = null, saisie libre du nom de colonne).
+function CalculationConfigFields({ form, onChange, columns, sampleRows }) {
+  const filterValueSuggestions =
+    form.filter_column && sampleRows
+      ? Array.from(
+          new Set(
+            sampleRows
+              .map((row) => row[form.filter_column])
+              .filter((v) => v !== undefined && v !== null && v !== '')
+              .map(String)
+          )
+        )
+      : [];
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">Type de calcul</label>
+        <select
+          value={form.calc_type}
+          onChange={(e) => onChange({ ...form, calc_type: e.target.value })}
+          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          {CALC_TYPE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {form.calc_type === 'ratio' && (
+        <>
+          <ColumnField
+            label="Colonne à vérifier"
+            required
+            value={form.filter_column}
+            onChange={(v) => onChange({ ...form, filter_column: v })}
+            columns={columns}
+          />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Valeur recherchée</label>
+            <input
+              type="text"
+              required
+              list="kpi-filter-value-suggestions"
+              value={form.filter_value}
+              onChange={(e) => onChange({ ...form, filter_value: e.target.value })}
+              placeholder="ex : Conforme"
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+            {filterValueSuggestions.length > 0 && (
+              <datalist id="kpi-filter-value-suggestions">
+                {filterValueSuggestions.map((v) => (
+                  <option key={v} value={v} />
+                ))}
+              </datalist>
+            )}
+          </div>
+        </>
+      )}
+
+      {(form.calc_type === 'sum' || form.calc_type === 'average') && (
+        <ColumnField
+          label="Colonne à calculer"
+          required
+          value={form.source_column}
+          onChange={(v) => onChange({ ...form, source_column: v })}
+          columns={columns}
+        />
+      )}
+
+      {form.calc_type === 'count_grouped' && (
+        <ColumnField
+          label="Colonne de regroupement"
+          required
+          value={form.group_by_column}
+          onChange={(v) => onChange({ ...form, group_by_column: v })}
+          columns={columns}
+        />
+      )}
+
+      <div>
+        <ColumnField
+          label="Colonne de période (optionnel)"
+          value={form.period_column}
+          onChange={(v) => onChange({ ...form, period_column: v })}
+          columns={columns}
+          placeholder="Aucune — préciser la période manuellement"
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          Si le fichier contient une colonne de date/période, sélectionnez-la pour regrouper
+          automatiquement le calcul par période. Sinon, laissez vide : la période sera précisée
+          manuellement à chaque import.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// Rendu partagé entre l'aperçu (dry-run) et le résultat final d'un apply : mêmes champs,
+// count_grouped affichant une répartition plutôt qu'une valeur unique.
+function ImportResultSummary({ data, unit }) {
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-slate-700">
+        <span className="font-medium text-emerald-700">{data.rows_processed}</span> ligne
+        {data.rows_processed > 1 ? 's' : ''} traitée{data.rows_processed > 1 ? 's' : ''} sur {data.rows_total}
+        {data.rows_rejected > 0 && (
+          <>
+            {' '}
+            · <span className="font-medium text-red-700">{data.rows_rejected}</span> rejetée
+            {data.rows_rejected > 1 ? 's' : ''}
+          </>
+        )}
+      </p>
+
+      <div className="space-y-2">
+        {data.periods.map((period, index) => (
+          <div key={index} className="rounded-md border border-slate-200 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium text-slate-700">{period.period_label}</span>
+              {!period.grouped_counts && (
+                <span className="text-sm font-semibold text-slate-900">
+                  {period.value ?? '—'} {unit || ''}
+                </span>
+              )}
+            </div>
+
+            {period.grouped_counts && (
+              <ul className="mt-2 space-y-1 text-xs text-slate-600">
+                {Object.entries(period.grouped_counts).map(([key, count]) => (
+                  <li key={key} className="flex items-center justify-between">
+                    <span>{key}</span>
+                    <span className="font-medium text-slate-800">{count}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <p className="mt-1 text-xs text-slate-500">
+              {period.rows_total} ligne{period.rows_total > 1 ? 's' : ''}
+              {period.rows_rejected > 0 ? `, ${period.rows_rejected} rejetée${period.rows_rejected > 1 ? 's' : ''}` : ''}
+            </p>
+
+            {!period.persisted && period.skip_reason && (
+              <p className="mt-1 text-xs text-amber-600">{period.skip_reason}</p>
+            )}
+
+            {period.rejected_details?.length > 0 && (
+              <details className="mt-1">
+                <summary className="cursor-pointer text-xs font-medium text-red-600">
+                  Voir le détail des lignes rejetées
+                </summary>
+                <ul className="mt-1 space-y-0.5 text-xs text-red-600">
+                  {period.rejected_details.map((detail, i) => (
+                    <li key={i}>
+                      Ligne {detail.row_index} : {detail.reason}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Assistant d'import générique en 3 étapes : dépôt du fichier, configuration (ou réemploi)
+// de la recette de calcul avec aperçu, puis application réelle et résumé.
+function ImportWizardModal({ kpi, onClose, onImported }) {
+  const [step, setStep] = useState(1);
+  const fileInputRef = useRef(null);
+
+  const [file, setFile] = useState(null);
+  const [dragActive, setDragActive] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [importData, setImportData] = useState(null);
+
+  const [existingConfig, setExistingConfig] = useState(undefined); // undefined=chargement, null=aucune
+  const [configMode, setConfigMode] = useState('edit'); // 'reuse' | 'edit'
+  const [configForm, setConfigForm] = useState(EMPTY_CONFIG_FORM);
+  const [manualPeriod, setManualPeriod] = useState('');
+  const [configError, setConfigError] = useState('');
+  const [configWarning, setConfigWarning] = useState('');
+  const [preview, setPreview] = useState(null);
+  const [previewing, setPreviewing] = useState(false);
+  const [applying, setApplying] = useState(false);
+
+  const [result, setResult] = useState(null);
+
+  useEffect(() => {
+    api
+      .get(`/kpis/${kpi.id}/calculation-config`)
+      .then(({ data }) => {
+        setExistingConfig(data);
+        setConfigForm(configToForm(data));
+        setConfigMode('reuse');
+      })
+      .catch((err) => {
+        if (err.response?.status === 404) {
+          setExistingConfig(null);
+          setConfigMode('edit');
+        }
+      });
+  }, [kpi.id]);
+
+  function handleFileChange(selected) {
+    if (!selected) return;
+    setFile(selected);
+    setUploadError('');
+    setImportData(null);
+  }
+
+  async function uploadFile(sheetName) {
+    setUploadError('');
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('kpi_id', kpi.id);
+      if (sheetName) formData.append('sheet_name', sheetName);
+      const { data } = await api.post('/kpi-imports', formData);
+      setImportData(data);
+    } catch (err) {
+      setUploadError(err.response?.data?.error || "Impossible d'importer ce fichier.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function handleSheetChange(sheetName) {
+    if (!importData || sheetName === importData.sheet_used) return;
+    uploadFile(sheetName);
+  }
+
+  async function saveConfig() {
+    const payload = {
+      calc_type: configForm.calc_type,
+      source_column: configForm.source_column || null,
+      filter_column: configForm.filter_column || null,
+      filter_value: configForm.filter_value || null,
+      group_by_column: configForm.group_by_column || null,
+      period_column: configForm.period_column || null,
+    };
+    const { data } = await api.post(`/kpis/${kpi.id}/calculation-config`, payload);
+    setConfigWarning(data.warning || '');
+    return data;
+  }
+
+  function buildApplyBody(dryRun) {
+    const body = { dry_run: dryRun };
+    if (!configForm.period_column) {
+      body.period_date = manualPeriod ? `${manualPeriod}-01` : undefined;
+    }
+    return body;
+  }
+
+  async function handlePreview() {
+    setConfigError('');
+    setPreviewing(true);
+    setPreview(null);
+    try {
+      await saveConfig();
+      const { data } = await api.post(`/kpi-imports/${importData.import.id}/apply`, buildApplyBody(true));
+      setPreview(data);
+    } catch (err) {
+      setConfigError(err.response?.data?.error || "Impossible de calculer l'aperçu.");
+    } finally {
+      setPreviewing(false);
+    }
+  }
+
+  async function handleValidate() {
+    setConfigError('');
+    setApplying(true);
+    try {
+      await saveConfig();
+      const { data } = await api.post(`/kpi-imports/${importData.import.id}/apply`, buildApplyBody(false));
+      setResult(data);
+      onImported(data.records);
+      setStep(3);
+    } catch (err) {
+      setConfigError(err.response?.data?.error || "Impossible d'appliquer le calcul.");
+    } finally {
+      setApplying(false);
+    }
+  }
+
+  const periodReady = Boolean(configForm.period_column || manualPeriod);
+  const configComplete = configMode === 'reuse' ? true : isConfigComplete(configForm);
+  const canProceed = configComplete && periodReady;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Importer un fichier</h2>
+            <p className="text-sm text-slate-500">{kpi.name}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="mb-5 flex items-center text-xs font-medium text-slate-400">
+          {['Fichier', 'Calcul', 'Résultat'].map((label, index) => {
+            const stepNumber = index + 1;
+            const active = step === stepNumber;
+            const done = step > stepNumber;
+            return (
+              <div key={label} className="flex items-center">
+                <span
+                  className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] ${
+                    active ? 'bg-primary text-white' : done ? 'bg-emerald-500 text-white' : 'bg-slate-100 text-slate-400'
+                  }`}
+                >
+                  {done ? <Check size={12} /> : stepNumber}
+                </span>
+                <span className={`mx-1.5 ${active ? 'text-slate-700' : ''}`}>{label}</span>
+                {stepNumber < 3 && <span className="mr-1.5 h-px w-4 bg-slate-200" />}
+              </div>
+            );
+          })}
+        </div>
+
+        {step === 1 && (
+          <div>
+            {uploadError && (
+              <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{uploadError}</p>
+            )}
+
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={(e) => {
+                e.preventDefault();
+                setDragActive(false);
+                handleFileChange(e.dataTransfer.files?.[0] ?? null);
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              className={`flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${
+                dragActive ? 'border-primary bg-primary-50' : 'border-slate-300 hover:border-slate-400'
+              }`}
+            >
+              <Upload size={24} className="text-slate-400" />
+              {file ? (
+                <p className="text-sm font-medium text-slate-700">{file.name}</p>
+              ) : (
+                <p className="text-sm text-slate-500">Glissez-déposez un fichier CSV ou Excel ici, ou cliquez pour parcourir</p>
+              )}
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+            </div>
+
+            {file && !importData && (
+              <button
+                type="button"
+                onClick={() => uploadFile()}
+                disabled={uploading}
+                className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+              >
+                {uploading ? 'Analyse en cours...' : 'Analyser le fichier'}
+              </button>
+            )}
+
+            {importData?.available_sheets?.length > 1 && (
+              <div className="mt-4">
+                <label className="mb-1 block text-sm font-medium text-slate-700">Onglet à utiliser</label>
+                <select
+                  value={importData.sheet_used}
+                  onChange={(e) => handleSheetChange(e.target.value)}
+                  disabled={uploading}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  {importData.available_sheets.map((sheet) => (
+                    <option key={sheet} value={sheet}>
+                      {sheet}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {importData && (
+              <div className="mt-4">
+                <p className="text-sm font-medium text-slate-700">
+                  {importData.row_count} ligne{importData.row_count > 1 ? 's' : ''} détectée
+                  {importData.row_count > 1 ? 's' : ''}, {importData.columns.length} colonne
+                  {importData.columns.length > 1 ? 's' : ''}
+                </p>
+                <div className="mt-2 max-h-56 overflow-auto rounded-md border border-slate-200">
+                  <table className="w-full text-left text-xs">
+                    <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                      <tr>
+                        {importData.columns.map((col) => (
+                          <th key={col} className="whitespace-nowrap px-2 py-1.5 font-medium">
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {importData.sample.map((row, index) => (
+                        <tr key={index}>
+                          {importData.columns.map((col) => (
+                            <td key={col} className="whitespace-nowrap px-2 py-1.5 text-slate-600">
+                              {row[col] === null || row[col] === undefined || row[col] === '' ? '—' : String(row[col])}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setStep(2)}
+                  className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700"
+                >
+                  Continuer
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {step === 2 && (
+          <div>
+            {existingConfig === undefined ? (
+              <div className="space-y-2">
+                {[0, 1].map((key) => (
+                  <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
+                ))}
+              </div>
+            ) : (
+              <>
+                {existingConfig && configMode === 'reuse' && (
+                  <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-sm font-medium text-slate-700">Configuration existante</p>
+                    <p className="mt-1 text-sm text-slate-600">{CALC_TYPE_LABELS[existingConfig.calc_type]}</p>
+                    <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
+                      {existingConfig.filter_column && <li>Colonne à vérifier : {existingConfig.filter_column}</li>}
+                      {existingConfig.filter_value && <li>Valeur recherchée : {existingConfig.filter_value}</li>}
+                      {existingConfig.source_column && <li>Colonne à calculer : {existingConfig.source_column}</li>}
+                      {existingConfig.group_by_column && <li>Colonne de regroupement : {existingConfig.group_by_column}</li>}
+                      <li>Colonne de période : {existingConfig.period_column || 'aucune (saisie manuelle)'}</li>
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setConfigMode('edit')}
+                      className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Créer une nouvelle configuration
+                    </button>
+                  </div>
+                )}
+
+                {configMode === 'edit' && (
+                  <>
+                    {existingConfig && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfigMode('reuse');
+                          setConfigForm(configToForm(existingConfig));
+                        }}
+                        className="mb-3 text-xs font-medium text-primary hover:underline"
+                      >
+                        ← Revenir à la configuration existante
+                      </button>
+                    )}
+                    <CalculationConfigFields
+                      form={configForm}
+                      onChange={setConfigForm}
+                      columns={importData.columns}
+                      sampleRows={importData.sample}
+                    />
+                  </>
+                )}
+
+                {!configForm.period_column && (
+                  <div className="mt-4">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Période de cet import</label>
+                    <input
+                      type="month"
+                      value={manualPeriod}
+                      onChange={(e) => setManualPeriod(e.target.value)}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                    <p className="mt-1 text-xs text-slate-400">
+                      Aucune colonne de période sélectionnée : toutes les lignes de ce fichier seront rattachées à cette
+                      période unique.
+                    </p>
+                  </div>
+                )}
+
+                {configError && (
+                  <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{configError}</p>
+                )}
+                {configWarning && (
+                  <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">
+                    {configWarning}
+                  </p>
+                )}
+
+                <div className="mt-4 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="flex items-center gap-1.5 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <ArrowLeft size={16} />
+                    Retour
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePreview}
+                    disabled={previewing || !canProceed}
+                    className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {previewing ? 'Calcul...' : 'Aperçu du calcul'}
+                  </button>
+                </div>
+
+                {preview && (
+                  <div className="mt-4 rounded-md border border-slate-200 p-3">
+                    <ImportResultSummary data={preview} unit={kpi.unit} />
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleValidate}
+                  disabled={applying || !canProceed}
+                  className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+                >
+                  {applying ? 'Validation...' : "Valider l'import"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {step === 3 && result && (
+          <div>
+            <p className="mb-4 flex items-center gap-2 text-sm font-medium text-emerald-700">
+              <CheckCircle2 size={16} />
+              Import appliqué avec succès
+            </p>
+            <ImportResultSummary data={result} unit={kpi.unit} />
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-5 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              Fermer
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Édition seule de la recette de calcul, hors import — accessible depuis les paramètres du
+// KPI pour corriger la recette sans devoir redéposer un fichier.
+function CalculationConfigModal({ kpi, onClose, onSaved }) {
+  const [loading, setLoading] = useState(true);
+  const [form, setForm] = useState(EMPTY_CONFIG_FORM);
+  const [hasExisting, setHasExisting] = useState(false);
+  const [error, setError] = useState('');
+  const [warning, setWarning] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    api
+      .get(`/kpis/${kpi.id}/calculation-config`)
+      .then(({ data }) => {
+        setForm(configToForm(data));
+        setHasExisting(true);
+      })
+      .catch((err) => {
+        if (err.response?.status !== 404) setError('Impossible de charger la configuration existante.');
+      })
+      .finally(() => setLoading(false));
+  }, [kpi.id]);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setWarning('');
+    setSubmitting(true);
+    try {
+      const payload = {
+        calc_type: form.calc_type,
+        source_column: form.source_column || null,
+        filter_column: form.filter_column || null,
+        filter_value: form.filter_value || null,
+        group_by_column: form.group_by_column || null,
+        period_column: form.period_column || null,
+      };
+      const { data } = await api.post(`/kpis/${kpi.id}/calculation-config`, payload);
+      onSaved();
+      if (data.warning) {
+        setWarning(data.warning);
+      } else {
+        onClose();
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'enregistrer la configuration.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Configuration du calcul</h2>
+            <p className="text-sm text-slate-500">{kpi.name}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2">
+            {[0, 1, 2].map((key) => (
+              <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
+            ))}
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!hasExisting && (
+              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Aucune configuration enregistrée pour l'instant : elle sera utilisée au prochain import de fichier.
+              </p>
+            )}
+
+            <CalculationConfigFields form={form} onChange={setForm} columns={null} sampleRows={null} />
+
+            {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+            {warning && (
+              <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{warning}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+            >
+              {submitting ? 'Enregistrement...' : 'Enregistrer la configuration'}
+            </button>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onOpenRecordModal, onDeleteRecord, onOpenImportModal, onOpenConfigModal }) {
   const [showHistory, setShowHistory] = useState(false);
-  const [showImports, setShowImports] = useState(false);
-  const [batches, setBatches] = useState(null);
-  const [batchesLoading, setBatchesLoading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportError, setExportError] = useState('');
   const chartRef = useRef(null);
@@ -866,26 +1247,7 @@ function KpiCard({
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
   const hasEnoughForChart = records.length >= 2;
-  const isRatio = kpi.calculation_type === 'ratio';
-
-  // Partagé entre les badges de source (tooltip "importé le... par...") et l'onglet
-  // "Historique des imports" — chargé une seule fois, à la demande.
-  function loadBatchesIfNeeded() {
-    if (batches !== null || batchesLoading) return;
-    setBatchesLoading(true);
-    api
-      .get(`/kpis/${kpi.id}/import-batches`)
-      .then(({ data }) => setBatches(data))
-      .catch(() => setBatches([]))
-      .finally(() => setBatchesLoading(false));
-  }
-
-  const batchesById = Object.fromEntries((batches || []).map((batch) => [batch.id, batch]));
-
-  function handleChartClick(chartEvent) {
-    const point = chartEvent?.activePayload?.[0]?.payload;
-    if (point) onViewPeriodDetail(kpi, point.period_date);
-  }
+  const isImportBased = kpi.calculation_type === 'import';
 
   async function handleExportChartPng() {
     setExportMenuOpen(false);
@@ -985,7 +1347,7 @@ function KpiCard({
             {isMenuOpen && (
               <>
                 <div className="fixed inset-0 z-10" onClick={() => onToggleMenu(null)} />
-                <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
                   <button
                     type="button"
                     onClick={() => {
@@ -997,6 +1359,19 @@ function KpiCard({
                     <Pencil size={14} />
                     Modifier
                   </button>
+                  {isImportBased && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onOpenConfigModal(kpi);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <Settings size={14} />
+                      Configurer le calcul
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => {
@@ -1033,14 +1408,14 @@ function KpiCard({
         ) : (
           <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         )}
-        {isRatio ? (
+        {isImportBased ? (
           <button
             type="button"
             onClick={() => onOpenImportModal(kpi)}
             className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
           >
             <Upload size={14} />
-            Importer le détail
+            Importer un fichier
           </button>
         ) : (
           <button
@@ -1056,50 +1431,40 @@ function KpiCard({
 
       <div ref={chartRef} className="mt-4 h-48 bg-white">
         {hasEnoughForChart ? (
-          <>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart
-                data={records}
-                margin={{ top: 8, right: 16, bottom: 0, left: -16 }}
-                onClick={isRatio ? handleChartClick : undefined}
-                style={isRatio ? { cursor: 'pointer' } : undefined}
-              >
-                <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-                <XAxis
-                  dataKey="period_date"
-                  tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fill: MUTED_COLOR, fontSize: 11 }}
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={records} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+              <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+              <XAxis
+                dataKey="period_date"
+                tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: MUTED_COLOR, fontSize: 11 }}
+              />
+              <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
+              <Tooltip
+                formatter={(val) => [`${val} ${kpi.unit || ''}`, kpi.name]}
+                labelFormatter={(label) => formatDate(label)}
+                contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+              />
+              {hasTarget && (
+                <ReferenceLine
+                  y={kpi.target}
+                  stroke={MUTED_COLOR}
+                  strokeDasharray="4 4"
+                  label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
                 />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
-                <Tooltip
-                  formatter={(val) => [`${val} ${kpi.unit || ''}`, kpi.name]}
-                  labelFormatter={(label) => formatDate(label)}
-                  contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
-                />
-                {hasTarget && (
-                  <ReferenceLine
-                    y={kpi.target}
-                    stroke={MUTED_COLOR}
-                    strokeDasharray="4 4"
-                    label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
-                  />
-                )}
-                <Line
-                  type="monotone"
-                  dataKey="value"
-                  stroke={LINE_COLOR}
-                  strokeWidth={2}
-                  dot={{ r: 4, strokeWidth: 2, stroke: '#ffffff', fill: LINE_COLOR }}
-                  activeDot={{ r: 6 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-            {isRatio && (
-              <p className="mt-1 text-center text-xs text-slate-400">Cliquez sur un point pour voir le détail</p>
-            )}
-          </>
+              )}
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke={LINE_COLOR}
+                strokeWidth={2}
+                dot={{ r: 4, strokeWidth: 2, stroke: '#ffffff', fill: LINE_COLOR }}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         ) : (
           <div className="flex h-full items-center justify-center text-sm text-slate-400">
             Pas assez de données pour un graphique
@@ -1110,10 +1475,7 @@ function KpiCard({
       <div className="mt-3 border-t border-slate-100 pt-3">
         <button
           type="button"
-          onClick={() => {
-            setShowHistory((prev) => !prev);
-            if (isRatio) loadBatchesIfNeeded();
-          }}
+          onClick={() => setShowHistory((prev) => !prev)}
           className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
         >
           {showHistory ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -1124,37 +1486,12 @@ function KpiCard({
           <div className="mt-2">
             <RecordHistoryTable
               kpi={kpi}
-              batchesById={batchesById}
               onEditRecord={(record) => onOpenRecordModal(kpi, record)}
               onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
-              onViewPeriodDetail={(periodDate) => onViewPeriodDetail(kpi, periodDate)}
             />
           </div>
         )}
       </div>
-
-      {isRatio && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          <button
-            type="button"
-            onClick={() => {
-              setShowImports((prev) => !prev);
-              loadBatchesIfNeeded();
-            }}
-            className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-          >
-            {showImports ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            <History size={14} />
-            Historique des imports
-          </button>
-
-          {showImports && (
-            <div className="mt-2">
-              <ImportBatchesTable batches={batches} />
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }
@@ -1166,7 +1503,7 @@ export default function Kpis() {
   const [recordModal, setRecordModal] = useState(null); // { kpi, record } — record null = création
   const [formModal, setFormModal] = useState(null); // null fermé, 'new' création, objet kpi édition
   const [importModal, setImportModal] = useState(null); // le kpi en cours d'import, ou null
-  const [periodDetailModal, setPeriodDetailModal] = useState(null); // { kpi, periodDate }
+  const [configModal, setConfigModal] = useState(null); // le kpi dont on édite la recette, ou null
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
 
@@ -1341,7 +1678,7 @@ export default function Kpis() {
               onOpenRecordModal={(kpiArg, record) => setRecordModal({ kpi: kpiArg, record })}
               onDeleteRecord={handleDeleteRecord}
               onOpenImportModal={setImportModal}
-              onViewPeriodDetail={(kpiArg, periodDate) => setPeriodDetailModal({ kpi: kpiArg, periodDate })}
+              onOpenConfigModal={setConfigModal}
             />
           ))}
         </div>
@@ -1365,19 +1702,15 @@ export default function Kpis() {
       )}
 
       {importModal && (
-        <ImportDetailModal
+        <ImportWizardModal
           kpi={importModal}
           onClose={() => setImportModal(null)}
           onImported={(records) => handleImported(importModal.id, records)}
         />
       )}
 
-      {periodDetailModal && (
-        <PeriodDetailModal
-          kpi={periodDetailModal.kpi}
-          periodDate={periodDetailModal.periodDate}
-          onClose={() => setPeriodDetailModal(null)}
-        />
+      {configModal && (
+        <CalculationConfigModal kpi={configModal} onClose={() => setConfigModal(null)} onSaved={() => {}} />
       )}
     </div>
   );
