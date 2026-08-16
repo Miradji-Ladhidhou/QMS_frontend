@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { api } from '../lib/api.js';
+import NotificationBell from './NotificationBell.jsx';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -50,9 +51,12 @@ export default function Layout() {
     <div className="min-h-screen bg-slate-50 md:flex">
       <header className="flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
         <span className="text-lg font-semibold">QMS SaaS</span>
-        <button type="button" onClick={() => setIsMenuOpen(true)} aria-label="Ouvrir le menu" className="-mr-2 p-2">
-          <Menu size={24} />
-        </button>
+        <div className="flex items-center gap-1">
+          <NotificationBell variant="mobile" />
+          <button type="button" onClick={() => setIsMenuOpen(true)} aria-label="Ouvrir le menu" className="-mr-2 p-2">
+            <Menu size={24} />
+          </button>
+        </div>
       </header>
 
       {isMenuOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMenu} />}
@@ -64,9 +68,14 @@ export default function Layout() {
       >
         <div className="flex items-center justify-between px-6 py-5">
           <span className="text-xl font-semibold">QMS SaaS</span>
-          <button type="button" onClick={closeMenu} aria-label="Fermer le menu" className="p-1 md:hidden">
-            <X size={22} />
-          </button>
+          <div className="flex items-center gap-1">
+            <div className="hidden md:block">
+              <NotificationBell variant="sidebar" />
+            </div>
+            <button type="button" onClick={closeMenu} aria-label="Fermer le menu" className="p-1 md:hidden">
+              <X size={22} />
+            </button>
+          </div>
         </div>
 
         <nav className="flex-1 space-y-1 px-3">
