@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Download, Upload, X } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Check, Download, Upload, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
+import DecisionModal from '../components/DecisionModal.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -99,9 +100,12 @@ export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [doc, setDoc] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [decisionModal, setDecisionModal] = useState(null);
+  const [certificateError, setCertificateError] = useState('');
 
   async function loadDocument() {
     setLoading(true);
@@ -118,12 +122,32 @@ export default function DocumentDetail() {
 
   useEffect(() => {
     loadDocument();
+    api
+      .get('/users/me')
+      .then(({ data }) => setCurrentUser(data))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   function handleUploaded() {
     setIsModalOpen(false);
     loadDocument();
+  }
+
+  function handleDecided() {
+    setDecisionModal(null);
+    loadDocument();
+  }
+
+  async function handleViewCertificate() {
+    setCertificateError('');
+    try {
+      const response = await api.get(`/documents/${doc.id}/certificate`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank', 'noopener');
+    } catch {
+      setCertificateError('Impossible de générer le certificat.');
+    }
   }
 
   if (loading) {
@@ -139,6 +163,13 @@ export default function DocumentDetail() {
   }
 
   const currentFileUrl = getDocumentPublicUrl(doc.file_path);
+
+  const myPendingApproval =
+    doc.workflow?.status === 'pending' && currentUser
+      ? doc.workflow.approvals.find((approval) => approval.approver_id === currentUser.id && approval.decision === 'pending')
+      : null;
+
+  const isSigned = doc.status === 'approved' && doc.workflow?.status === 'approved';
 
   return (
     <div>
@@ -161,10 +192,20 @@ export default function DocumentDetail() {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <CategoryBadge category={doc.category} />
               <StatusBadge status={doc.status} />
+              {isSigned && (
+                <button
+                  type="button"
+                  onClick={handleViewCertificate}
+                  className="flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 hover:bg-emerald-200"
+                >
+                  <BadgeCheck size={14} />
+                  Signé électroniquement
+                </button>
+              )}
             </div>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             {currentFileUrl && (
               <a
                 href={currentFileUrl}
@@ -191,6 +232,62 @@ export default function DocumentDetail() {
 
         {doc.review_date && (
           <p className="mt-4 text-sm text-slate-500">Date de révision : {formatDate(doc.review_date)}</p>
+        )}
+
+        {certificateError && (
+          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            {certificateError}
+          </p>
+        )}
+
+        {myPendingApproval && (
+          <div className="mt-4 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-amber-800">Votre approbation est requise sur ce document.</p>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setDecisionModal('rejected')}
+                className="flex items-center gap-2 rounded-md border border-red-300 bg-white px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+              >
+                <XCircle size={16} />
+                Rejeter
+              </button>
+              <button
+                type="button"
+                onClick={() => setDecisionModal('approved')}
+                className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
+              >
+                <Check size={16} />
+                Approuver
+              </button>
+            </div>
+          </div>
+        )}
+
+        {doc.workflow && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
+              Approbateurs ({doc.workflow.status === 'pending' ? 'en cours' : doc.workflow.status})
+            </p>
+            <ul className="space-y-1">
+              {doc.workflow.approvals.map((approval) => (
+                <li key={approval.id} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700">{approval.approver?.full_name || 'Utilisateur'}</span>
+                  <span
+                    className={
+                      approval.decision === 'approved'
+                        ? 'text-emerald-600'
+                        : approval.decision === 'rejected'
+                          ? 'text-red-600'
+                          : 'text-slate-400'
+                    }
+                  >
+                    {approval.decision === 'approved' ? 'Approuvé' : approval.decision === 'rejected' ? 'Rejeté' : 'En attente'}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </div>
 
@@ -233,6 +330,15 @@ export default function DocumentDetail() {
 
       {isModalOpen && (
         <NewVersionModal documentId={doc.id} onClose={() => setIsModalOpen(false)} onUploaded={handleUploaded} />
+      )}
+
+      {decisionModal && (
+        <DecisionModal
+          workflowId={doc.workflow.id}
+          decision={decisionModal}
+          onClose={() => setDecisionModal(null)}
+          onDecided={handleDecided}
+        />
       )}
     </div>
   );
