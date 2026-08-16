@@ -6,7 +6,9 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  FileText,
   History,
+  Image as ImageIcon,
   MoreVertical,
   Pencil,
   Plus,
@@ -16,6 +18,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
 import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
@@ -32,11 +35,6 @@ const FREQUENCY_LABELS = {
   yearly: 'Annuel',
 };
 
-const CALCULATION_TYPE_LABELS = {
-  manual: 'Saisie manuelle',
-  ratio: 'Calculé depuis un détail conforme/non conforme',
-};
-
 const SOURCE_LABELS = {
   manual: 'Saisie manuelle',
   import_csv: 'Import CSV',
@@ -46,6 +44,15 @@ const SOURCE_STYLES = {
   manual: 'bg-slate-100 text-slate-600',
   import_csv: 'bg-blue-100 text-blue-700',
 };
+
+// Nom de fichier sûr pour un téléchargement (évite les caractères qui posent problème
+// selon l'OS/le navigateur dans le nom d'un KPI éventuellement accentué).
+function sanitizeFilename(name) {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9._-]+/g, '_');
+}
 
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
@@ -849,6 +856,9 @@ function KpiCard({
   const [showImports, setShowImports] = useState(false);
   const [batches, setBatches] = useState(null);
   const [batchesLoading, setBatchesLoading] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const chartRef = useRef(null);
   const records = [...kpi.records].sort((a, b) => (a.period_date > b.period_date ? 1 : -1));
   const lastRecord = records[records.length - 1];
   const targetDirection = kpi.target_direction || 'min';
@@ -877,6 +887,37 @@ function KpiCard({
     if (point) onViewPeriodDetail(kpi, point.period_date);
   }
 
+  async function handleExportChartPng() {
+    setExportMenuOpen(false);
+    setExportError('');
+    if (!chartRef.current) return;
+
+    try {
+      const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${sanitizeFilename(kpi.name)}-graphique.png`;
+      link.click();
+    } catch {
+      setExportError("Impossible d'exporter le graphique.");
+    }
+  }
+
+  function handleExportDataCsv() {
+    setExportMenuOpen(false);
+    const sortedRecords = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
+    exportToCsv(
+      `${sanitizeFilename(kpi.name)}-valeurs.csv`,
+      ['Période', 'Valeur', 'Source', 'Commentaire'],
+      sortedRecords.map((record) => [
+        formatDate(record.period_date),
+        record.value,
+        SOURCE_LABELS[record.source] || record.source,
+        record.comment || '',
+      ])
+    );
+  }
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
@@ -894,47 +935,87 @@ function KpiCard({
           )}
         </div>
 
-        <div className="relative shrink-0">
-          <button
-            type="button"
-            onClick={() => onToggleMenu(kpi.id)}
-            aria-label="Actions"
-            className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
-          >
-            <MoreVertical size={18} />
-          </button>
+        <div className="flex shrink-0 items-start gap-1">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setExportMenuOpen((prev) => !prev)}
+              aria-label="Exporter"
+              className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+            >
+              <Download size={18} />
+            </button>
 
-          {isMenuOpen && (
-            <>
-              <div className="fixed inset-0 z-10" onClick={() => onToggleMenu(null)} />
-              <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleMenu(null);
-                    onEdit(kpi);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                >
-                  <Pencil size={14} />
-                  Modifier
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onToggleMenu(null);
-                    onDelete(kpi);
-                  }}
-                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                >
-                  <Trash2 size={14} />
-                  Supprimer
-                </button>
-              </div>
-            </>
-          )}
+            {exportMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+                <div className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    onClick={handleExportChartPng}
+                    disabled={!hasEnoughForChart}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
+                  >
+                    <ImageIcon size={14} />
+                    Exporter le graphique (PNG)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportDataCsv}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <FileText size={14} />
+                    Exporter les données (CSV)
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => onToggleMenu(kpi.id)}
+              aria-label="Actions"
+              className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+            >
+              <MoreVertical size={18} />
+            </button>
+
+            {isMenuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => onToggleMenu(null)} />
+                <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleMenu(null);
+                      onEdit(kpi);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <Pencil size={14} />
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleMenu(null);
+                      onDelete(kpi);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <Trash2 size={14} />
+                    Supprimer
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {exportError && <p className="mt-1 text-xs text-red-600">{exportError}</p>}
 
       <div className="mt-3 flex items-center justify-between gap-2">
         {lastRecord ? (
@@ -973,7 +1054,7 @@ function KpiCard({
         )}
       </div>
 
-      <div className="mt-4 h-48">
+      <div ref={chartRef} className="mt-4 h-48 bg-white">
         {hasEnoughForChart ? (
           <>
             <ResponsiveContainer width="100%" height="100%">
@@ -1087,6 +1168,7 @@ export default function Kpis() {
   const [importModal, setImportModal] = useState(null); // le kpi en cours d'import, ou null
   const [periodDetailModal, setPeriodDetailModal] = useState(null); // { kpi, periodDate }
   const [openMenuId, setOpenMenuId] = useState(null);
+  const [generatingReport, setGeneratingReport] = useState(false);
 
   async function loadKpis() {
     setLoading(true);
@@ -1179,18 +1261,45 @@ export default function Kpis() {
     setOpenMenuId((prev) => (prev === id ? null : id));
   }
 
+  // Même schéma que le certificat de signature (DocumentDetail.jsx) : ouvre le PDF dans un
+  // nouvel onglet plutôt qu'un téléchargement forcé, pour permettre un aperçu avant impression.
+  async function handleGenerateReport() {
+    setError('');
+    setGeneratingReport(true);
+    try {
+      const response = await api.get('/kpis/report', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank', 'noopener');
+    } catch {
+      setError('Impossible de générer le rapport.');
+    } finally {
+      setGeneratingReport(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">KPIs</h1>
-        <button
-          type="button"
-          onClick={() => setFormModal('new')}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouveau KPI
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleGenerateReport}
+            disabled={generatingReport || kpis.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            <FileText size={18} />
+            {generatingReport ? 'Génération...' : 'Générer rapport PDF'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setFormModal('new')}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
+          >
+            <Plus size={18} />
+            Nouveau KPI
+          </button>
+        </div>
       </div>
 
       {error && (
