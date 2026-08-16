@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
-import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Lock, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import CategoryPermissionsPanel from './CategoryPermissionsPanel.jsx';
 
 const DEFAULT_COLOR = '#1F3864';
+const DEFAULT_FORM = { name: '', color: DEFAULT_COLOR, is_restricted: false };
 
 export default function CategoryManager() {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState({ name: '', color: DEFAULT_COLOR });
+  const [form, setForm] = useState(DEFAULT_FORM);
   const [saving, setSaving] = useState(false);
+  const [expandedPermissionsId, setExpandedPermissionsId] = useState(null);
 
   async function loadCategories() {
     setLoading(true);
@@ -31,12 +34,12 @@ export default function CategoryManager() {
 
   function startCreate() {
     setEditingId('new');
-    setForm({ name: '', color: DEFAULT_COLOR });
+    setForm(DEFAULT_FORM);
   }
 
   function startEdit(category) {
     setEditingId(category.id);
-    setForm({ name: category.name, color: category.color || DEFAULT_COLOR });
+    setForm({ name: category.name, color: category.color || DEFAULT_COLOR, is_restricted: category.is_restricted || false });
   }
 
   function cancelEdit() {
@@ -77,26 +80,39 @@ export default function CategoryManager() {
 
   function renderForm(onSubmit) {
     return (
-      <form onSubmit={onSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium text-slate-700">Nom</label>
-          <input
-            type="text"
-            required
-            value={form.name}
-            onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-          />
+      <form onSubmit={onSubmit} className="space-y-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+          <div className="flex-1">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Nom</label>
+            <input
+              type="text"
+              required
+              value={form.name}
+              onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Couleur</label>
+            <input
+              type="color"
+              value={form.color}
+              onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
+              className="h-11 w-16 rounded-md border border-slate-300"
+            />
+          </div>
         </div>
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Couleur</label>
+
+        <label className="flex items-center gap-2 text-sm text-slate-700">
           <input
-            type="color"
-            value={form.color}
-            onChange={(e) => setForm((prev) => ({ ...prev, color: e.target.value }))}
-            className="h-11 w-16 rounded-md border border-slate-300"
+            type="checkbox"
+            checked={form.is_restricted}
+            onChange={(e) => setForm((prev) => ({ ...prev, is_restricted: e.target.checked }))}
+            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
           />
-        </div>
+          Catégorie restreinte (accès limité aux utilisateurs/groupes autorisés)
+        </label>
+
         <div className="flex gap-2">
           <button
             type="submit"
@@ -157,32 +173,57 @@ export default function CategoryManager() {
                 {renderForm(handleSubmit)}
               </li>
             ) : (
-              <li key={category.id} className="flex items-center justify-between py-3">
-                <div className="flex items-center gap-3">
-                  <span
-                    className="h-4 w-4 shrink-0 rounded-full"
-                    style={{ backgroundColor: category.color || '#94A3B8' }}
-                  />
-                  <span className="text-sm font-medium text-slate-800">{category.name}</span>
-                </div>
-                <div className="flex gap-1">
+              <li key={category.id} className="py-3">
+                <div className="flex items-center justify-between gap-3">
                   <button
                     type="button"
-                    onClick={() => startEdit(category)}
-                    aria-label="Modifier"
-                    className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                    disabled={!category.is_restricted}
+                    onClick={() => setExpandedPermissionsId(expandedPermissionsId === category.id ? null : category.id)}
+                    className="flex flex-1 items-center gap-3 text-left disabled:cursor-default"
                   >
-                    <Pencil size={16} />
+                    <span
+                      className="h-4 w-4 shrink-0 rounded-full"
+                      style={{ backgroundColor: category.color || '#94A3B8' }}
+                    />
+                    <span className="text-sm font-medium text-slate-800">{category.name}</span>
+                    {category.is_restricted && (
+                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                        <Lock size={12} />
+                        Restreinte
+                      </span>
+                    )}
+                    {category.is_restricted &&
+                      (expandedPermissionsId === category.id ? (
+                        <ChevronUp size={14} className="shrink-0 text-slate-400" />
+                      ) : (
+                        <ChevronDown size={14} className="shrink-0 text-slate-400" />
+                      ))}
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(category)}
-                    aria-label="Supprimer"
-                    className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => startEdit(category)}
+                      aria-label="Modifier"
+                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                    >
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(category)}
+                      aria-label="Supprimer"
+                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
+
+                {category.is_restricted && expandedPermissionsId === category.id && (
+                  <div className="mt-3">
+                    <CategoryPermissionsPanel categoryId={category.id} />
+                  </div>
+                )}
               </li>
             )
           )}

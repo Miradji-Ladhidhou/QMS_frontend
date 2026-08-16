@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, Check, Download, Send, Upload, X, XCircle } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Check, ChevronDown, ChevronUp, Download, Lock, Send, Upload, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -121,6 +121,8 @@ export default function DocumentDetail() {
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [decisionModal, setDecisionModal] = useState(null);
   const [certificateError, setCertificateError] = useState('');
+  const [restrictedAccess, setRestrictedAccess] = useState(null);
+  const [showRestrictedList, setShowRestrictedList] = useState(false);
 
   async function loadDocument() {
     setLoading(true);
@@ -151,6 +153,21 @@ export default function DocumentDetail() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Liste des personnes/groupes autorisés sur la catégorie restreinte de ce document.
+  // Réservée aux admins et à ceux ayant can_edit côté backend (403 pour les autres) —
+  // on échoue silencieusement, sans message d'erreur, si l'utilisateur n'y a pas droit.
+  useEffect(() => {
+    if (!doc?.category?.is_restricted) {
+      setRestrictedAccess(null);
+      return;
+    }
+
+    api
+      .get(`/categories/${doc.category_id}/permissions`)
+      .then(({ data }) => setRestrictedAccess(data))
+      .catch(() => setRestrictedAccess(null));
+  }, [doc?.category_id, doc?.category?.is_restricted]);
 
   function handleUploaded() {
     setIsModalOpen(false);
@@ -222,6 +239,12 @@ export default function DocumentDetail() {
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <CategoryBadge category={doc.category} />
               <StatusBadge status={doc.status} />
+              {doc.category?.is_restricted && (
+                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  <Lock size={12} />
+                  Accès restreint
+                </span>
+              )}
               {isSigned && (
                 <button
                   type="button"
@@ -272,6 +295,35 @@ export default function DocumentDetail() {
 
         {doc.review_date && (
           <p className="mt-4 text-sm text-slate-500">Date de révision : {formatDate(doc.review_date)}</p>
+        )}
+
+        {restrictedAccess && (
+          <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
+            <button
+              type="button"
+              onClick={() => setShowRestrictedList((prev) => !prev)}
+              className="flex w-full items-center justify-between gap-2 text-sm font-medium text-amber-800"
+            >
+              <span>Personnes et groupes autorisés ({restrictedAccess.length})</span>
+              {showRestrictedList ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            </button>
+            {showRestrictedList && (
+              <ul className="mt-2 space-y-1">
+                {restrictedAccess.length === 0 ? (
+                  <li className="text-sm text-amber-700">Aucun accès accordé pour l'instant.</li>
+                ) : (
+                  restrictedAccess.map((permission) => (
+                    <li key={permission.id} className="text-sm text-amber-700">
+                      {permission.subject?.full_name || permission.subject?.name || 'Sujet supprimé'}
+                      <span className="ml-1 text-xs text-amber-600">
+                        ({permission.subject_type === 'user' ? 'utilisateur' : 'groupe'})
+                      </span>
+                    </li>
+                  ))
+                )}
+              </ul>
+            )}
+          </div>
         )}
 
         {certificateError && (

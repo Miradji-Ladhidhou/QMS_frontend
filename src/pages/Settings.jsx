@@ -4,11 +4,13 @@ import CompanySettings from '../components/CompanySettings.jsx';
 import CategoryManager from '../components/CategoryManager.jsx';
 import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
+import Groups from './Groups.jsx';
 
 const TABS = [
   { id: 'company', label: 'Entreprise' },
   { id: 'categories', label: 'Catégories' },
   { id: 'users', label: 'Utilisateurs' },
+  { id: 'groups', label: 'Groupes', adminOnly: true },
   { id: 'notifications', label: 'Notifications' },
 ];
 
@@ -30,7 +32,7 @@ export default function Settings() {
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Paramètres</h1>
 
       <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
-        {TABS.map((tab) => (
+        {TABS.filter((tab) => !tab.adminOnly || isAdmin).map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -48,6 +50,7 @@ export default function Settings() {
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
         {activeTab === 'categories' && <CategoryManager />}
         {activeTab === 'users' && <UserManager isAdmin={isAdmin} />}
+        {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'notifications' && <NotificationPreferences />}
       </div>
     </div>
