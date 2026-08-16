@@ -10,6 +10,7 @@ import {
   ChevronUp,
   Download,
   FileText,
+  History,
   Image as ImageIcon,
   MoreVertical,
   Pencil,
@@ -19,7 +20,18 @@ import {
   Upload,
   X,
 } from 'lucide-react';
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
 import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
@@ -840,7 +852,7 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
       await saveConfig();
       const { data } = await api.post(`/kpi-imports/${importData.import.id}/apply`, buildApplyBody(false));
       setResult(data);
-      onImported(data.records);
+      onImported();
       setStep(3);
     } catch (err) {
       setConfigError(err.response?.data?.error || "Impossible d'appliquer le calcul.");
@@ -1235,8 +1247,300 @@ function CalculationConfigModal({ kpi, onClose, onSaved }) {
   );
 }
 
-function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onOpenRecordModal, onDeleteRecord, onOpenImportModal, onOpenConfigModal }) {
+function ImportsHistoryTable({ imports, kpi }) {
+  if (imports === null) {
+    return (
+      <div className="space-y-2">
+        {[0, 1].map((key) => (
+          <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
+        ))}
+      </div>
+    );
+  }
+
+  if (imports.length === 0) {
+    return <p className="py-3 text-sm text-slate-400">Aucun import pour l'instant.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="py-2 pr-3">Date</th>
+            <th className="py-2 pr-3">Fichier</th>
+            <th className="py-2 pr-3">Importé par</th>
+            <th className="py-2 pr-3">Lignes</th>
+            <th className="py-2 pr-3">Périodes affectées</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {imports.map((imp) => (
+            <tr key={imp.id}>
+              <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(imp.imported_at)}</td>
+              <td className="py-2 pr-3 text-slate-600">{imp.file_name || '—'}</td>
+              <td className="py-2 pr-3 whitespace-nowrap text-slate-600">{imp.imported_by_user?.full_name || '—'}</td>
+              <td className="py-2 pr-3 whitespace-nowrap text-slate-600">{imp.row_count}</td>
+              <td className="py-2 pr-3 text-slate-600">
+                {imp.affected_periods.length > 0
+                  ? imp.affected_periods.map((p) => formatPeriodShort(p, kpi.frequency)).join(', ')
+                  : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// Vue dédiée aux KPI 'count_grouped' : pas de point de tendance (jamais persisté dans
+// kpi_records, cf. backend), donc recalculée à la volée depuis le dernier import à chaque
+// affichage plutôt que lue depuis kpi.records.
+function DistributionView({ kpi }) {
+  const [data, setData] = useState(undefined); // undefined = chargement, null = erreur/absent
+  const [error, setError] = useState('');
+  const [periodIndex, setPeriodIndex] = useState(0);
+
+  useEffect(() => {
+    setData(undefined);
+    setError('');
+    api
+      .get(`/kpis/${kpi.id}/distribution`)
+      .then(({ data }) => {
+        setData(data);
+        setPeriodIndex(Math.max(0, data.periods.length - 1));
+      })
+      .catch((err) => {
+        setData(null);
+        setError(err.response?.data?.error || 'Impossible de charger la répartition.');
+      });
+  }, [kpi.id]);
+
+  if (data === undefined) {
+    return <div className="h-48 animate-pulse rounded-md bg-slate-100" />;
+  }
+
+  if (!data || data.periods.length === 0) {
+    return (
+      <div className="flex h-48 items-center justify-center text-center text-sm text-slate-400">
+        {error || 'Aucune donnée importée pour ce KPI.'}
+      </div>
+    );
+  }
+
+  const period = data.periods[periodIndex];
+  const chartData = Object.entries(period.grouped_counts).map(([name, count]) => ({ name, count }));
+
+  return (
+    <div>
+      {data.periods.length > 1 && (
+        <select
+          value={periodIndex}
+          onChange={(e) => setPeriodIndex(Number(e.target.value))}
+          className="mb-2 rounded-md border border-slate-300 px-2 py-1 text-xs text-slate-700"
+        >
+          {data.periods.map((p, index) => (
+            <option key={index} value={index}>
+              {p.period_label}
+            </option>
+          ))}
+        </select>
+      )}
+      <div className="h-48">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+            <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={30} allowDecimals={false} />
+            <Tooltip
+              formatter={(val) => [val, kpi.calculation_config?.group_by_column || 'Nombre de lignes']}
+              contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+            />
+            <Bar dataKey="count" fill={LINE_COLOR} radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="mt-1 text-center text-xs text-slate-400">
+        {period.rows_total} ligne{period.rows_total > 1 ? 's' : ''} — {data.import.file_name || 'dernier import'}
+      </p>
+    </div>
+  );
+}
+
+// Panneau "preuve" ouvert au clic sur un point du graphique de tendance : le calcul en
+// langage clair, puis les lignes brutes de kpi_raw_rows qui l'ont produit — colonnes
+// dynamiques (clés de row_data), paginées côté backend, export CSV complet (toutes les
+// pages, pas seulement celle affichée).
+function RecordProofModal({ kpi, record, onClose }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [exporting, setExporting] = useState(false);
+  const pageSize = 20;
+
+  useEffect(() => {
+    setData(null);
+    setError('');
+    api
+      .get(`/kpis/${kpi.id}/records/${record.id}/proof`, { params: { page, page_size: pageSize } })
+      .then(({ data }) => setData(data))
+      .catch((err) => setError(err.response?.data?.error || 'Impossible de charger le détail de ce calcul.'));
+  }, [kpi.id, record.id, page]);
+
+  async function handleExportCsv() {
+    if (!data) return;
+    setExporting(true);
+    try {
+      const allRows = [];
+      let currentPage = 1;
+      let total = data.rows_total;
+      while (allRows.length < total) {
+        const { data: pageData } = await api.get(`/kpis/${kpi.id}/records/${record.id}/proof`, {
+          params: { page: currentPage, page_size: 200 },
+        });
+        if (pageData.rows.length === 0) break;
+        allRows.push(...pageData.rows);
+        total = pageData.rows_total;
+        currentPage += 1;
+      }
+      exportToCsv(
+        `${sanitizeFilename(kpi.name)}-preuve-${record.period_date}.csv`,
+        data.columns,
+        allRows.map((row) =>
+          data.columns.map((col) => (row.row_data[col] === null || row.row_data[col] === undefined ? '' : String(row.row_data[col])))
+        )
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const totalPages = data ? Math.max(1, Math.ceil(data.rows_total / data.page_size)) : 1;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Détail du calcul</h2>
+            <p className="text-sm text-slate-500">
+              {kpi.name} — {formatPeriodShort(record.period_date, kpi.frequency)}
+            </p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        {!error && !data && (
+          <div className="space-y-2">
+            {[0, 1, 2].map((key) => (
+              <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
+            ))}
+          </div>
+        )}
+
+        {data && (
+          <>
+            <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+              <p className="text-sm font-medium text-slate-700">{data.description}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Import : {data.import.file_name || 'fichier'} — {formatDate(data.import.imported_at)} par{' '}
+                {data.import.imported_by_user?.full_name || 'un utilisateur'}
+              </p>
+            </div>
+
+            <div className="mb-3 flex items-center justify-between">
+              <p className="text-xs text-slate-500">
+                {data.rows_total} ligne{data.rows_total > 1 ? 's' : ''} au total
+              </p>
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                disabled={exporting}
+                className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                <Download size={14} />
+                {exporting ? 'Export...' : 'Exporter en CSV'}
+              </button>
+            </div>
+
+            <div className="max-h-80 overflow-auto rounded-md border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="sticky top-0 bg-slate-50 text-slate-500">
+                  <tr>
+                    {data.columns.map((col) => (
+                      <th key={col} className="whitespace-nowrap px-2 py-1.5 font-medium">
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {data.rows.map((row) => (
+                    <tr key={row.row_index}>
+                      {data.columns.map((col) => (
+                        <td key={col} className="whitespace-nowrap px-2 py-1.5 text-slate-600">
+                          {row.row_data[col] === null || row.row_data[col] === undefined || row.row_data[col] === ''
+                            ? '—'
+                            : String(row.row_data[col])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {totalPages > 1 && (
+              <div className="mt-3 flex items-center justify-between text-sm">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  Précédent
+                </button>
+                <span className="text-xs text-slate-500">
+                  Page {page} sur {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+                >
+                  Suivant
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function KpiCard({
+  kpi,
+  isMenuOpen,
+  onToggleMenu,
+  onEdit,
+  onDelete,
+  onOpenRecordModal,
+  onDeleteRecord,
+  onOpenImportModal,
+  onOpenConfigModal,
+  onViewProof,
+}) {
   const [showHistory, setShowHistory] = useState(false);
+  const [showImports, setShowImports] = useState(false);
+  const [imports, setImports] = useState(null);
+  const [importsLoading, setImportsLoading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportError, setExportError] = useState('');
   const chartRef = useRef(null);
@@ -1248,6 +1552,23 @@ function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onOpenRecord
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
   const hasEnoughForChart = records.length >= 2;
   const isImportBased = kpi.calculation_type === 'import';
+  const isCountGrouped = kpi.calculation_config?.calc_type === 'count_grouped';
+  const canExportChart = isCountGrouped || hasEnoughForChart;
+
+  function loadImportsIfNeeded() {
+    if (imports !== null || importsLoading) return;
+    setImportsLoading(true);
+    api
+      .get(`/kpis/${kpi.id}/imports`)
+      .then(({ data }) => setImports(data))
+      .catch(() => setImports([]))
+      .finally(() => setImportsLoading(false));
+  }
+
+  function handleChartClick(chartEvent) {
+    const point = chartEvent?.activePayload?.[0]?.payload;
+    if (point) onViewProof(kpi, point);
+  }
 
   async function handleExportChartPng() {
     setExportMenuOpen(false);
@@ -1315,7 +1636,7 @@ function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onOpenRecord
                   <button
                     type="button"
                     onClick={handleExportChartPng}
-                    disabled={!hasEnoughForChart}
+                    disabled={!canExportChart}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
                   >
                     <ImageIcon size={14} />
@@ -1429,69 +1750,110 @@ function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onOpenRecord
         )}
       </div>
 
-      <div ref={chartRef} className="mt-4 h-48 bg-white">
-        {hasEnoughForChart ? (
-          <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={records} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
-              <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-              <XAxis
-                dataKey="period_date"
-                tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
-                axisLine={false}
-                tickLine={false}
-                tick={{ fill: MUTED_COLOR, fontSize: 11 }}
-              />
-              <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
-              <Tooltip
-                formatter={(val) => [`${val} ${kpi.unit || ''}`, kpi.name]}
-                labelFormatter={(label) => formatDate(label)}
-                contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
-              />
-              {hasTarget && (
-                <ReferenceLine
-                  y={kpi.target}
-                  stroke={MUTED_COLOR}
-                  strokeDasharray="4 4"
-                  label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
-                />
-              )}
-              <Line
-                type="monotone"
-                dataKey="value"
-                stroke={LINE_COLOR}
-                strokeWidth={2}
-                dot={{ r: 4, strokeWidth: 2, stroke: '#ffffff', fill: LINE_COLOR }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+      <div ref={chartRef} className="mt-4 bg-white">
+        {isCountGrouped ? (
+          <DistributionView kpi={kpi} />
         ) : (
-          <div className="flex h-full items-center justify-center text-sm text-slate-400">
-            Pas assez de données pour un graphique
+          <div className="h-48">
+            {hasEnoughForChart ? (
+              <>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={records}
+                    margin={{ top: 8, right: 16, bottom: 0, left: -16 }}
+                    onClick={isImportBased ? handleChartClick : undefined}
+                    style={isImportBased ? { cursor: 'pointer' } : undefined}
+                  >
+                    <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                    <XAxis
+                      dataKey="period_date"
+                      tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
+                      axisLine={false}
+                      tickLine={false}
+                      tick={{ fill: MUTED_COLOR, fontSize: 11 }}
+                    />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
+                    <Tooltip
+                      formatter={(val) => [`${val} ${kpi.unit || ''}`, kpi.name]}
+                      labelFormatter={(label) => formatDate(label)}
+                      contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+                    />
+                    {hasTarget && (
+                      <ReferenceLine
+                        y={kpi.target}
+                        stroke={MUTED_COLOR}
+                        strokeDasharray="4 4"
+                        label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
+                      />
+                    )}
+                    <Line
+                      type="monotone"
+                      dataKey="value"
+                      stroke={LINE_COLOR}
+                      strokeWidth={2}
+                      dot={{ r: 4, strokeWidth: 2, stroke: '#ffffff', fill: LINE_COLOR }}
+                      activeDot={{ r: 6 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+                {isImportBased && (
+                  <p className="mt-1 text-center text-xs text-slate-400">Cliquez sur un point pour voir le détail</p>
+                )}
+              </>
+            ) : (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                Pas assez de données pour un graphique
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      <div className="mt-3 border-t border-slate-100 pt-3">
-        <button
-          type="button"
-          onClick={() => setShowHistory((prev) => !prev)}
-          className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-        >
-          {showHistory ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          Voir l'historique
-        </button>
+      {!isCountGrouped && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <button
+            type="button"
+            onClick={() => setShowHistory((prev) => !prev)}
+            className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            {showHistory ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            Voir l'historique
+          </button>
 
-        {showHistory && (
-          <div className="mt-2">
-            <RecordHistoryTable
-              kpi={kpi}
-              onEditRecord={(record) => onOpenRecordModal(kpi, record)}
-              onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
-            />
-          </div>
-        )}
-      </div>
+          {showHistory && (
+            <div className="mt-2">
+              <RecordHistoryTable
+                kpi={kpi}
+                onEditRecord={(record) => onOpenRecordModal(kpi, record)}
+                onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {isImportBased && (
+        <div className="mt-3 border-t border-slate-100 pt-3">
+          <button
+            type="button"
+            onClick={() => {
+              setShowImports((prev) => !prev);
+              loadImportsIfNeeded();
+            }}
+            className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+          >
+            {showImports ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <History size={14} />
+            Historique des imports
+          </button>
+
+          {showImports && (
+            <div className="mt-2">
+              <ImportsHistoryTable imports={imports} kpi={kpi} />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -1504,6 +1866,7 @@ export default function Kpis() {
   const [formModal, setFormModal] = useState(null); // null fermé, 'new' création, objet kpi édition
   const [importModal, setImportModal] = useState(null); // le kpi en cours d'import, ou null
   const [configModal, setConfigModal] = useState(null); // le kpi dont on édite la recette, ou null
+  const [proofModal, setProofModal] = useState(null); // { kpi, record } — preuve derrière un point du graphique
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
 
@@ -1562,19 +1925,16 @@ export default function Kpis() {
     setFormModal(null);
   }
 
-  // Un import peut créer/mettre à jour plusieurs périodes d'un coup (une par groupe de
-  // lignes agrégées) — on fusionne chacune dans records, comme pour une saisie unique.
-  function handleImported(kpiId, updatedRecords) {
-    setKpis((prev) =>
-      prev.map((kpi) => {
-        if (kpi.id !== kpiId) return kpi;
-        const byId = new Map(kpi.records.map((r) => [r.id, r]));
-        for (const record of updatedRecords) {
-          byId.set(record.id, record);
-        }
-        return { ...kpi, records: Array.from(byId.values()) };
-      })
-    );
+  // Un import ou une config de calcul peuvent changer à la fois les records ET
+  // calculation_config (ex : premier import d'un KPI en count_grouped) — un refetch complet
+  // du KPI est plus simple et plus sûr qu'une fusion locale partielle des deux à la fois.
+  async function refreshKpi(kpiId) {
+    try {
+      const { data } = await api.get(`/kpis/${kpiId}`);
+      setKpis((prev) => prev.map((kpi) => (kpi.id === kpiId ? data : kpi)));
+    } catch {
+      // best effort — la carte garde son état précédent si le refetch échoue
+    }
   }
 
   async function handleDelete(kpi) {
@@ -1679,6 +2039,7 @@ export default function Kpis() {
               onDeleteRecord={handleDeleteRecord}
               onOpenImportModal={setImportModal}
               onOpenConfigModal={setConfigModal}
+              onViewProof={(kpiArg, record) => setProofModal({ kpi: kpiArg, record })}
             />
           ))}
         </div>
@@ -1705,12 +2066,16 @@ export default function Kpis() {
         <ImportWizardModal
           kpi={importModal}
           onClose={() => setImportModal(null)}
-          onImported={(records) => handleImported(importModal.id, records)}
+          onImported={() => refreshKpi(importModal.id)}
         />
       )}
 
       {configModal && (
-        <CalculationConfigModal kpi={configModal} onClose={() => setConfigModal(null)} onSaved={() => {}} />
+        <CalculationConfigModal kpi={configModal} onClose={() => setConfigModal(null)} onSaved={() => refreshKpi(configModal.id)} />
+      )}
+
+      {proofModal && (
+        <RecordProofModal kpi={proofModal.kpi} record={proofModal.record} onClose={() => setProofModal(null)} />
       )}
     </div>
   );
