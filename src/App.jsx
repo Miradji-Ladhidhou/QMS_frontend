@@ -10,6 +10,7 @@ import DocumentDetail from './pages/DocumentDetail.jsx';
 import Capas from './pages/Capas.jsx';
 import CapaDetail from './pages/CapaDetail.jsx';
 import Trainings from './pages/Trainings.jsx';
+import SkillMatrix from './pages/SkillMatrix.jsx';
 import Kpis from './pages/Kpis.jsx';
 import Settings from './pages/Settings.jsx';
 
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="capas" element={<Capas />} />
           <Route path="capas/:id" element={<CapaDetail />} />
           <Route path="trainings" element={<Trainings />} />
+          <Route path="trainings/matrix" element={<SkillMatrix />} />
           <Route path="kpis" element={<Kpis />} />
           <Route path="settings" element={<Settings />} />
         </Route>
