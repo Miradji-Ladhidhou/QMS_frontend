@@ -27,3 +27,20 @@ export const CAPA_PRIORITY_STYLES = {
   high: 'bg-orange-100 text-orange-700',
   critical: 'bg-red-100 text-red-700',
 };
+
+// La gravité (impact de la non-conformité) et la priorité (urgence de traitement) sont deux
+// dimensions distinctes côté données, mais partagent la même échelle à 4 niveaux.
+export const CAPA_SEVERITY_LABELS = CAPA_PRIORITY_LABELS;
+export const CAPA_SEVERITY_STYLES = CAPA_PRIORITY_STYLES;
+
+export const CAPA_EFFECTIVENESS_LABELS = {
+  null: 'Non vérifiée',
+  true: 'Efficace',
+  false: 'Non efficace',
+};
+
+export const CAPA_EFFECTIVENESS_STYLES = {
+  null: 'bg-slate-100 text-slate-700',
+  true: 'bg-emerald-100 text-emerald-700',
+  false: 'bg-red-100 text-red-700',
+};

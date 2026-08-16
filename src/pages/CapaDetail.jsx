@@ -1,9 +1,38 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Send } from 'lucide-react';
+import { ArrowLeft, Save, Send } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
+import CapaSeverityBadge from '../components/CapaSeverityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
+
+// Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
+// un <select>, seul moyen simple de distinguer "non vérifiée" d'un false explicite.
+function effectivenessToSelectValue(value) {
+  if (value === true) return 'true';
+  if (value === false) return 'false';
+  return '';
+}
+
+function selectValueToEffectiveness(value) {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return null;
+}
+
+const TREATMENT_FIELDS = ['service', 'description', 'root_cause', 'corrective_action', 'preventive_action', 'comment'];
+
+function buildTreatmentForm(capa) {
+  return {
+    service: capa.service || '',
+    description: capa.description || '',
+    root_cause: capa.root_cause || '',
+    corrective_action: capa.corrective_action || '',
+    preventive_action: capa.preventive_action || '',
+    comment: capa.comment || '',
+  };
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -25,12 +54,26 @@ export default function CapaDetail() {
   const [commentError, setCommentError] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
 
+  const [treatmentForm, setTreatmentForm] = useState(null);
+  const [savingTreatment, setSavingTreatment] = useState(false);
+  const [treatmentSaved, setTreatmentSaved] = useState(false);
+  const [treatmentError, setTreatmentError] = useState('');
+
+  const [effectivenessVerified, setEffectivenessVerified] = useState('');
+  const [effectivenessNotes, setEffectivenessNotes] = useState('');
+  const [savingEffectiveness, setSavingEffectiveness] = useState(false);
+  const [effectivenessSaved, setEffectivenessSaved] = useState(false);
+  const [effectivenessError, setEffectivenessError] = useState('');
+
   async function loadCapa() {
     setLoading(true);
     setError('');
     try {
       const { data } = await api.get(`/capas/${id}`);
       setCapa(data);
+      setTreatmentForm(buildTreatmentForm(data));
+      setEffectivenessVerified(effectivenessToSelectValue(data.effectiveness_verified));
+      setEffectivenessNotes(data.effectiveness_notes || '');
     } catch {
       setError('Impossible de charger cette CAPA.');
     } finally {
@@ -42,6 +85,49 @@ export default function CapaDetail() {
     loadCapa();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  async function handleSaveTreatment(event) {
+    event.preventDefault();
+    setTreatmentError('');
+    setTreatmentSaved(false);
+    setSavingTreatment(true);
+
+    try {
+      const payload = {};
+      for (const field of TREATMENT_FIELDS) {
+        payload[field] = treatmentForm[field] || null;
+      }
+      const { data } = await api.patch(`/capas/${id}`, payload);
+      // PATCH ne renvoie pas les commentaires de suivi (contrairement à GET /capas/:id) —
+      // on les préserve pour ne pas faire planter le rendu de la section commentaires.
+      setCapa((prev) => ({ ...prev, ...data, comments: prev.comments }));
+      setTreatmentSaved(true);
+    } catch (err) {
+      setTreatmentError(err.response?.data?.error || 'Impossible d’enregistrer ces informations.');
+    } finally {
+      setSavingTreatment(false);
+    }
+  }
+
+  async function handleSaveEffectiveness(event) {
+    event.preventDefault();
+    setEffectivenessError('');
+    setEffectivenessSaved(false);
+    setSavingEffectiveness(true);
+
+    try {
+      const { data } = await api.patch(`/capas/${id}`, {
+        effectiveness_verified: selectValueToEffectiveness(effectivenessVerified),
+        effectiveness_notes: effectivenessNotes || null,
+      });
+      setCapa((prev) => ({ ...prev, ...data, comments: prev.comments }));
+      setEffectivenessSaved(true);
+    } catch (err) {
+      setEffectivenessError(err.response?.data?.error || 'Impossible d’enregistrer la vérification.');
+    } finally {
+      setSavingEffectiveness(false);
+    }
+  }
 
   async function handleAddComment(event) {
     event.preventDefault();
@@ -89,12 +175,17 @@ export default function CapaDetail() {
           <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{capa.title}</h1>
           <p className="mt-1 text-sm text-slate-500">{capa.number}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
+            <CapaSeverityBadge severity={capa.severity} />
             <CapaPriorityBadge priority={capa.priority} />
             <CapaStatusBadge status={capa.status} />
           </div>
         </div>
 
         <dl className="mt-5 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Date</dt>
+            <dd className="mt-1 text-sm text-slate-800">{formatDate(capa.created_at)}</dd>
+          </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Origine</dt>
             <dd className="mt-1 text-sm text-slate-800">{capa.origin || '—'}</dd>
@@ -113,6 +204,147 @@ export default function CapaDetail() {
           </div>
         </dl>
       </div>
+
+      <form
+        onSubmit={handleSaveTreatment}
+        className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
+      >
+        <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Traitement de la non-conformité</h2>
+
+        {treatmentError && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            {treatmentError}
+          </p>
+        )}
+        {treatmentSaved && (
+          <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            Informations enregistrées.
+          </p>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
+            <input
+              type="text"
+              value={treatmentForm.service}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, service: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Description de la non-conformité</label>
+            <textarea
+              rows={3}
+              value={treatmentForm.description}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, description: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
+            <textarea
+              rows={2}
+              value={treatmentForm.root_cause}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, root_cause: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
+            <textarea
+              rows={2}
+              value={treatmentForm.corrective_action}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, corrective_action: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
+            <textarea
+              rows={2}
+              value={treatmentForm.preventive_action}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, preventive_action: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Commentaire</label>
+            <textarea
+              rows={2}
+              value={treatmentForm.comment}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, comment: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={savingTreatment}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            <Save size={16} />
+            {savingTreatment ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </div>
+      </form>
+
+      <form
+        onSubmit={handleSaveEffectiveness}
+        className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
+      >
+        <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Vérification d'efficacité</h2>
+
+        {effectivenessError && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            {effectivenessError}
+          </p>
+        )}
+        {effectivenessSaved && (
+          <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+            Vérification enregistrée.
+          </p>
+        )}
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Résultat</label>
+            <select
+              value={effectivenessVerified}
+              onChange={(e) => setEffectivenessVerified(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:max-w-xs"
+            >
+              <option value="">{CAPA_EFFECTIVENESS_LABELS[null]}</option>
+              <option value="true">{CAPA_EFFECTIVENESS_LABELS[true]}</option>
+              <option value="false">{CAPA_EFFECTIVENESS_LABELS[false]}</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Notes de vérification</label>
+            <textarea
+              rows={2}
+              value={effectivenessNotes}
+              onChange={(e) => setEffectivenessNotes(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={savingEffectiveness}
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            <Save size={16} />
+            {savingEffectiveness ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </div>
+      </form>
 
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Commentaires de suivi</h2>

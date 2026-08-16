@@ -2,14 +2,27 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
+import {
+  CAPA_EFFECTIVENESS_LABELS,
+  CAPA_PRIORITY_LABELS,
+  CAPA_SEVERITY_LABELS,
+  CAPA_STATUS_LABELS,
+} from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
+import CapaSeverityBadge from '../components/CapaSeverityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+// Ajoute `days` jours à la date du jour, au format yyyy-mm-dd attendu par <input type="date">.
+function addDaysToToday(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 function CounterCard({ label, value, accent }) {
@@ -21,13 +34,33 @@ function CounterCard({ label, value, accent }) {
   );
 }
 
-function NewCapaModal({ users, onClose, onCreated }) {
-  const [form, setForm] = useState({ title: '', origin: '', priority: 'medium', due_date: '', assigned_to: '' });
+function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
+  const [form, setForm] = useState({
+    title: '',
+    service: '',
+    description: '',
+    origin: '',
+    severity: 'medium',
+    priority: 'medium',
+    due_date: priorityDelays ? addDaysToToday(priorityDelays.medium) : '',
+    assigned_to: '',
+  });
+  const [dueDateTouched, setDueDateTouched] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  // Le champ Échéance se met à jour tout seul en fonction de la priorité et du délai
+  // paramétré (Paramètres > CAPA), tant que l'utilisateur ne l'a pas modifié à la main.
+  function handlePriorityChange(priority) {
+    setForm((prev) => ({
+      ...prev,
+      priority,
+      due_date: !dueDateTouched && priorityDelays ? addDaysToToday(priorityDelays[priority]) : prev.due_date,
+    }));
   }
 
   async function handleSubmit(event) {
@@ -38,6 +71,9 @@ function NewCapaModal({ users, onClose, onCreated }) {
     try {
       const payload = {
         title: form.title,
+        service: form.service || undefined,
+        description: form.description || undefined,
+        severity: form.severity,
         priority: form.priority,
         origin: form.origin || undefined,
         due_date: form.due_date || undefined,
@@ -79,6 +115,27 @@ function NewCapaModal({ users, onClose, onCreated }) {
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
+            <input
+              type="text"
+              placeholder="Production, Qualité, Logistique..."
+              value={form.service}
+              onChange={(e) => updateField('service', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Description de la non-conformité</label>
+            <textarea
+              rows={3}
+              value={form.description}
+              onChange={(e) => updateField('description', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Origine</label>
             <input
               type="text"
@@ -89,27 +146,50 @@ function NewCapaModal({ users, onClose, onCreated }) {
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
-            <select
-              value={form.priority}
-              onChange={(e) => updateField('priority', e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
+              <select
+                value={form.severity}
+                onChange={(e) => updateField('severity', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                {Object.entries(CAPA_SEVERITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
+              <select
+                value={form.priority}
+                onChange={(e) => handlePriorityChange(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Échéance</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Échéance
+              {!dueDateTouched && <span className="ml-1 font-normal text-slate-400">(suggérée selon la priorité)</span>}
+            </label>
             <input
               type="date"
               value={form.due_date}
-              onChange={(e) => updateField('due_date', e.target.value)}
+              onChange={(e) => {
+                setDueDateTouched(true);
+                updateField('due_date', e.target.value);
+              }}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
@@ -147,6 +227,7 @@ export default function Capas() {
   const navigate = useNavigate();
   const [capas, setCapas] = useState([]);
   const [users, setUsers] = useState([]);
+  const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -156,9 +237,14 @@ export default function Capas() {
     setLoading(true);
     setError('');
     try {
-      const [capasRes, usersRes] = await Promise.all([api.get('/capas'), api.get('/users')]);
+      const [capasRes, usersRes, delaysRes] = await Promise.all([
+        api.get('/capas'),
+        api.get('/users'),
+        api.get('/capas/priority-delays'),
+      ]);
       setCapas(capasRes.data);
       setUsers(usersRes.data);
+      setPriorityDelays(delaysRes.data);
     } catch {
       setError('Impossible de charger les CAPA.');
     } finally {
@@ -180,17 +266,39 @@ export default function Capas() {
   );
 
   function handleExportCsv() {
-    const headers = ['Numéro', 'Objet', 'Origine', 'Priorité', 'Statut', 'Responsable', 'Échéance', 'Créée le', 'Clôturée le'];
+    const headers = [
+      'Numéro',
+      'Date',
+      'Service',
+      'Description de la non-conformité',
+      'Gravité',
+      'Priorité',
+      'Délai de traitement',
+      'Cause identifiée',
+      'Action corrective',
+      'Action préventive',
+      'Responsable',
+      'Statut',
+      'Vérification efficacité',
+      'Date clôture',
+      'Commentaire',
+    ];
     const rows = capas.map((capa) => [
       capa.number,
-      capa.title,
-      capa.origin || '',
-      CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
-      CAPA_STATUS_LABELS[capa.status] || capa.status,
-      capa.assigned?.full_name || '',
-      formatDate(capa.due_date),
       formatDate(capa.created_at),
+      capa.service || '',
+      capa.description || '',
+      CAPA_SEVERITY_LABELS[capa.severity] || capa.severity,
+      CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+      formatDate(capa.due_date),
+      capa.root_cause || '',
+      capa.corrective_action || '',
+      capa.preventive_action || '',
+      capa.assigned?.full_name || '',
+      CAPA_STATUS_LABELS[capa.status] || capa.status,
+      CAPA_EFFECTIVENESS_LABELS[capa.effectiveness_verified] || '',
       formatDate(capa.closed_at),
+      capa.comment || '',
     ]);
 
     exportToCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
@@ -274,10 +382,13 @@ export default function Capas() {
                   <div>
                     <p className="font-medium text-slate-900">{capa.title}</p>
                     <p className="text-sm text-slate-500">
-                      {capa.number} · {capa.origin || 'Origine non précisée'}
+                      {capa.number} · {capa.service || 'Service non précisé'}
                     </p>
                   </div>
-                  <CapaPriorityBadge priority={capa.priority} />
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <CapaSeverityBadge severity={capa.severity} />
+                    <CapaPriorityBadge priority={capa.priority} />
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <CapaStatusBadge status={capa.status} />
@@ -306,7 +417,8 @@ export default function Capas() {
                 <tr>
                   <th className="px-4 py-3">Numéro</th>
                   <th className="px-4 py-3">Objet</th>
-                  <th className="px-4 py-3">Origine</th>
+                  <th className="px-4 py-3">Service</th>
+                  <th className="px-4 py-3">Gravité</th>
                   <th className="px-4 py-3">Priorité</th>
                   <th className="px-4 py-3">Échéance</th>
                   <th className="px-4 py-3">Statut</th>
@@ -321,7 +433,10 @@ export default function Capas() {
                   >
                     <td className="px-4 py-3 font-medium text-slate-800">{capa.number}</td>
                     <td className="px-4 py-3 text-slate-700">{capa.title}</td>
-                    <td className="px-4 py-3 text-slate-600">{capa.origin || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{capa.service || '—'}</td>
+                    <td className="px-4 py-3">
+                      <CapaSeverityBadge severity={capa.severity} />
+                    </td>
                     <td className="px-4 py-3">
                       <CapaPriorityBadge priority={capa.priority} />
                     </td>
@@ -352,7 +467,14 @@ export default function Capas() {
         </>
       )}
 
-      {isModalOpen && <NewCapaModal users={users} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />}
+      {isModalOpen && (
+        <NewCapaModal
+          users={users}
+          priorityDelays={priorityDelays}
+          onClose={() => setIsModalOpen(false)}
+          onCreated={handleCreated}
+        />
+      )}
     </div>
   );
 }

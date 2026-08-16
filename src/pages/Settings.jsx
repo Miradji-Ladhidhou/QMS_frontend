@@ -4,6 +4,7 @@ import CompanySettings from '../components/CompanySettings.jsx';
 import CategoryManager from '../components/CategoryManager.jsx';
 import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
+import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
 import Groups from './Groups.jsx';
 
 const TABS = [
@@ -11,6 +12,7 @@ const TABS = [
   { id: 'categories', label: 'Catégories' },
   { id: 'users', label: 'Utilisateurs' },
   { id: 'groups', label: 'Groupes', adminOnly: true },
+  { id: 'capa', label: 'CAPA', adminOnly: true },
   { id: 'notifications', label: 'Notifications' },
 ];
 
@@ -51,6 +53,7 @@ export default function Settings() {
         {activeTab === 'categories' && <CategoryManager />}
         {activeTab === 'users' && <UserManager isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
+        {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}
         {activeTab === 'notifications' && <NotificationPreferences />}
       </div>
     </div>
