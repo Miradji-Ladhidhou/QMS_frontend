@@ -6,9 +6,11 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Documents from './pages/Documents.jsx';
+import DocumentDetail from './pages/DocumentDetail.jsx';
 import Capas from './pages/Capas.jsx';
 import Trainings from './pages/Trainings.jsx';
 import Kpis from './pages/Kpis.jsx';
+import Settings from './pages/Settings.jsx';
 
 function ProtectedRoute({ session, children }) {
   if (!session) {
@@ -53,9 +55,11 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="documents" element={<Documents />} />
+          <Route path="documents/:id" element={<DocumentDetail />} />
           <Route path="capas" element={<Capas />} />
           <Route path="trainings" element={<Trainings />} />
           <Route path="kpis" element={<Kpis />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
       </Routes>
     </BrowserRouter>

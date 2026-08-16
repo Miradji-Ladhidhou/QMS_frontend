@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { BarChart3, ClipboardList, FileText, GraduationCap, LayoutDashboard, LogOut, Menu, X } from 'lucide-react';
+import { BarChart3, ClipboardList, FileText, GraduationCap, LayoutDashboard, LogOut, Menu, Settings, X } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 
 const NAV_ITEMS = [
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/capas', label: 'CAPA', icon: ClipboardList },
   { to: '/trainings', label: 'Formations', icon: GraduationCap },
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
+  { to: '/settings', label: 'Paramètres', icon: Settings },
 ];
 
 export default function Layout() {
