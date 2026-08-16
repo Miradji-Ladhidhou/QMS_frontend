@@ -1,9 +1,14 @@
 import { useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { supabase } from './lib/supabase.js';
+import Layout from './components/Layout.jsx';
 import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import Documents from './pages/Documents.jsx';
+import Capas from './pages/Capas.jsx';
+import Trainings from './pages/Trainings.jsx';
+import Kpis from './pages/Kpis.jsx';
 
 function ProtectedRoute({ session, children }) {
   if (!session) {
@@ -39,13 +44,19 @@ export default function App() {
         <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/register" element={session ? <Navigate to="/" replace /> : <Register />} />
         <Route
-          path="/*"
+          path="/"
           element={
             <ProtectedRoute session={session}>
-              <Dashboard />
+              <Layout />
             </ProtectedRoute>
           }
-        />
+        >
+          <Route index element={<Dashboard />} />
+          <Route path="documents" element={<Documents />} />
+          <Route path="capas" element={<Capas />} />
+          <Route path="trainings" element={<Trainings />} />
+          <Route path="kpis" element={<Kpis />} />
+        </Route>
       </Routes>
     </BrowserRouter>
   );
