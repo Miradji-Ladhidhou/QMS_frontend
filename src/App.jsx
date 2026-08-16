@@ -13,6 +13,7 @@ import Trainings from './pages/Trainings.jsx';
 import SkillMatrix from './pages/SkillMatrix.jsx';
 import Kpis from './pages/Kpis.jsx';
 import Settings from './pages/Settings.jsx';
+import MyApprovals from './pages/MyApprovals.jsx';
 
 function ProtectedRoute({ session, children }) {
   if (!session) {
@@ -64,6 +65,7 @@ export default function App() {
           <Route path="trainings/matrix" element={<SkillMatrix />} />
           <Route path="kpis" element={<Kpis />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="my-approvals" element={<MyApprovals />} />
         </Route>
       </Routes>
     </BrowserRouter>

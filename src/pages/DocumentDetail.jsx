@@ -1,11 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, Check, Download, Upload, X, XCircle } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Check, Download, Send, Upload, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
+import ApprovalStatusBadge from '../components/ApprovalStatusBadge.jsx';
 import DecisionModal from '../components/DecisionModal.jsx';
+import SubmitForApprovalModal from '../components/SubmitForApprovalModal.jsx';
+
+const AUDIT_ACTION_LABELS = {
+  submitted_for_approval: 'Soumis pour approbation',
+  approval_decided_approved: 'Approbation validée',
+  approval_decided_rejected: 'Approbation rejetée',
+  downloaded: 'Téléchargé',
+  status_changed_manually: 'Statut modifié manuellement',
+  certificate_generated: 'Certificat généré',
+};
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -101,9 +112,13 @@ export default function DocumentDetail() {
   const navigate = useNavigate();
   const [doc, setDoc] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [auditLog, setAuditLog] = useState([]);
+  const [activeTab, setActiveTab] = useState('details');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [decisionModal, setDecisionModal] = useState(null);
   const [certificateError, setCertificateError] = useState('');
 
@@ -111,8 +126,12 @@ export default function DocumentDetail() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get(`/documents/${id}`);
+      const [{ data }, { data: logData }] = await Promise.all([
+        api.get(`/documents/${id}`),
+        api.get(`/documents/${id}/audit-log`),
+      ]);
       setDoc(data);
+      setAuditLog(logData);
     } catch {
       setError('Impossible de charger ce document.');
     } finally {
@@ -126,11 +145,20 @@ export default function DocumentDetail() {
       .get('/users/me')
       .then(({ data }) => setCurrentUser(data))
       .catch(() => {});
+    api
+      .get('/users')
+      .then(({ data }) => setUsers(data))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   function handleUploaded() {
     setIsModalOpen(false);
+    loadDocument();
+  }
+
+  function handleSubmittedForApproval() {
+    setIsSubmitModalOpen(false);
     loadDocument();
   }
 
@@ -170,6 +198,8 @@ export default function DocumentDetail() {
       : null;
 
   const isSigned = doc.status === 'approved' && doc.workflow?.status === 'approved';
+  const canSubmitForApproval = doc.status === 'draft' && currentUser && doc.created_by === currentUser.id;
+  const otherUsers = users.filter((user) => user.id !== currentUser?.id);
 
   return (
     <div>
@@ -216,6 +246,16 @@ export default function DocumentDetail() {
                 <Download size={16} />
                 Télécharger
               </a>
+            )}
+            {canSubmitForApproval && (
+              <button
+                type="button"
+                onClick={() => setIsSubmitModalOpen(true)}
+                className="flex items-center gap-2 rounded-md border border-primary px-3 py-2 text-sm font-medium text-primary hover:bg-primary-50"
+              >
+                <Send size={16} />
+                Soumettre pour approbation
+              </button>
             )}
             <button
               type="button"
@@ -269,21 +309,11 @@ export default function DocumentDetail() {
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">
               Approbateurs ({doc.workflow.status === 'pending' ? 'en cours' : doc.workflow.status})
             </p>
-            <ul className="space-y-1">
+            <ul className="space-y-1.5">
               {doc.workflow.approvals.map((approval) => (
                 <li key={approval.id} className="flex items-center justify-between text-sm">
                   <span className="text-slate-700">{approval.approver?.full_name || 'Utilisateur'}</span>
-                  <span
-                    className={
-                      approval.decision === 'approved'
-                        ? 'text-emerald-600'
-                        : approval.decision === 'rejected'
-                          ? 'text-red-600'
-                          : 'text-slate-400'
-                    }
-                  >
-                    {approval.decision === 'approved' ? 'Approuvé' : approval.decision === 'rejected' ? 'Rejeté' : 'En attente'}
-                  </span>
+                  <ApprovalStatusBadge decision={approval.decision} />
                 </li>
               ))}
             </ul>
@@ -291,45 +321,99 @@ export default function DocumentDetail() {
         )}
       </div>
 
-      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-        <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Historique des versions</h2>
-
-        {doc.versions.length === 0 ? (
-          <p className="text-sm text-slate-500">Aucune version archivée pour l'instant.</p>
-        ) : (
-          <ul className="divide-y divide-slate-100">
-            {doc.versions.map((version) => {
-              const versionUrl = getDocumentPublicUrl(version.file_path);
-              return (
-                <li key={version.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="text-sm font-medium text-slate-800">
-                      v{version.version}
-                      {version.changed_by_user?.full_name ? ` · ${version.changed_by_user.full_name}` : ''}
-                    </p>
-                    <p className="text-xs text-slate-500">{formatDateTime(version.created_at)}</p>
-                    {version.change_note && <p className="mt-1 text-sm text-slate-600">{version.change_note}</p>}
-                  </div>
-                  {versionUrl && (
-                    <a
-                      href={versionUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex shrink-0 items-center gap-2 self-start rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:self-auto"
-                    >
-                      <Download size={14} />
-                      Télécharger
-                    </a>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        )}
+      <div className="mt-4 flex gap-1 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => setActiveTab('details')}
+          className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'details' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Détails
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('history')}
+          className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'history' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          Historique
+        </button>
       </div>
+
+      {activeTab === 'details' ? (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+          <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Historique des versions</h2>
+
+          {doc.versions.length === 0 ? (
+            <p className="text-sm text-slate-500">Aucune version archivée pour l'instant.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {doc.versions.map((version) => {
+                const versionUrl = getDocumentPublicUrl(version.file_path);
+                return (
+                  <li key={version.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">
+                        v{version.version}
+                        {version.changed_by_user?.full_name ? ` · ${version.changed_by_user.full_name}` : ''}
+                      </p>
+                      <p className="text-xs text-slate-500">{formatDateTime(version.created_at)}</p>
+                      {version.change_note && <p className="mt-1 text-sm text-slate-600">{version.change_note}</p>}
+                    </div>
+                    {versionUrl && (
+                      <a
+                        href={versionUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex shrink-0 items-center gap-2 self-start rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:self-auto"
+                      >
+                        <Download size={14} />
+                        Télécharger
+                      </a>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      ) : (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+          <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Journal d'audit</h2>
+
+          {auditLog.length === 0 ? (
+            <p className="text-sm text-slate-500">Aucun évènement enregistré pour l'instant.</p>
+          ) : (
+            <ul className="divide-y divide-slate-100">
+              {auditLog.map((entry) => (
+                <li key={entry.id} className="py-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-slate-800">
+                      {AUDIT_ACTION_LABELS[entry.action] || entry.action}
+                    </span>
+                    <span className="shrink-0 text-xs text-slate-500">{formatDateTime(entry.created_at)}</span>
+                  </div>
+                  <p className="text-xs text-slate-500">{entry.user?.full_name || 'Système'}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {isModalOpen && (
         <NewVersionModal documentId={doc.id} onClose={() => setIsModalOpen(false)} onUploaded={handleUploaded} />
+      )}
+
+      {isSubmitModalOpen && (
+        <SubmitForApprovalModal
+          documentId={doc.id}
+          users={otherUsers}
+          onClose={() => setIsSubmitModalOpen(false)}
+          onSubmitted={handleSubmittedForApproval}
+        />
       )}
 
       {decisionModal && (

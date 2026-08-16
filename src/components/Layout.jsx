@@ -1,7 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { BarChart3, ClipboardList, FileText, GraduationCap, LayoutDashboard, LogOut, Menu, Settings, X } from 'lucide-react';
+import {
+  BarChart3,
+  CheckSquare,
+  ClipboardList,
+  FileText,
+  GraduationCap,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  Settings,
+  X,
+} from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
+import { api } from '../lib/api.js';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -9,12 +21,21 @@ const NAV_ITEMS = [
   { to: '/capas', label: 'CAPA', icon: ClipboardList },
   { to: '/trainings', label: 'Formations', icon: GraduationCap },
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
+  { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   { to: '/settings', label: 'Paramètres', icon: Settings },
 ];
 
 export default function Layout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    api
+      .get('/workflows/mine')
+      .then(({ data }) => setPendingApprovalsCount(data.length))
+      .catch(() => {});
+  }, []);
 
   function closeMenu() {
     setIsMenuOpen(false);
@@ -62,7 +83,12 @@ export default function Layout() {
               }
             >
               <Icon size={20} />
-              {label}
+              <span className="flex-1">{label}</span>
+              {to === '/my-approvals' && pendingApprovalsCount > 0 && (
+                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
+                  {pendingApprovalsCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>
