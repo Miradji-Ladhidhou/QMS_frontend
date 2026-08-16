@@ -19,6 +19,13 @@ function addDaysToToday(days) {
   return date.toISOString().slice(0, 10);
 }
 
+// Délai de traitement (en jours) paramétré pour le niveau de gravité de cette CAPA
+// (Paramètres > CAPA). null tant que la config n'est pas chargée ou pour une gravité
+// inconnue — ne jamais planter l'affichage sur une valeur manquante.
+function getDelayDays(priority, priorityDelays) {
+  return priorityDelays?.[priority] ?? null;
+}
+
 function CounterCard({ label, value, accent }) {
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -156,7 +163,11 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Échéance
-              {!dueDateTouched && <span className="ml-1 font-normal text-slate-400">(suggérée selon la gravité)</span>}
+              {!dueDateTouched && (
+                <span className="ml-1 font-normal text-slate-400">
+                  (délai de traitement suggéré : {getDelayDays(form.priority, priorityDelays) ?? '—'} jours)
+                </span>
+              )}
             </label>
             <input
               type="date"
@@ -247,7 +258,8 @@ export default function Capas() {
       'Service',
       'Description de la non-conformité',
       'Gravité',
-      'Délai de traitement',
+      'Délai de traitement (jours)',
+      'Échéance',
       'Cause identifiée',
       'Action corrective',
       'Action préventive',
@@ -263,6 +275,7 @@ export default function Capas() {
       capa.service || '',
       capa.description || '',
       CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+      getDelayDays(capa.priority, priorityDelays) ?? '',
       formatDate(capa.due_date),
       capa.root_cause || '',
       capa.corrective_action || '',
@@ -364,6 +377,9 @@ export default function Capas() {
                   <CapaStatusBadge status={capa.status} />
                   <span className="text-sm text-slate-500">Échéance : {formatDate(capa.due_date)}</span>
                 </div>
+                <p className="mt-1 text-xs text-slate-400">
+                  Délai de traitement : {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
+                </p>
                 <select
                   value={capa.status}
                   disabled={updatingId === capa.id}
@@ -389,6 +405,7 @@ export default function Capas() {
                   <th className="px-4 py-3">Objet</th>
                   <th className="px-4 py-3">Service</th>
                   <th className="px-4 py-3">Gravité</th>
+                  <th className="px-4 py-3">Délai de traitement</th>
                   <th className="px-4 py-3">Échéance</th>
                   <th className="px-4 py-3">Statut</th>
                 </tr>
@@ -405,6 +422,9 @@ export default function Capas() {
                     <td className="px-4 py-3 text-slate-600">{capa.service || '—'}</td>
                     <td className="px-4 py-3">
                       <CapaPriorityBadge priority={capa.priority} />
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
                     </td>
                     <td className="px-4 py-3 text-slate-600">{formatDate(capa.due_date)}</td>
                     <td className="px-4 py-3">

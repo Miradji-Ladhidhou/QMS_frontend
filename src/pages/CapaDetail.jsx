@@ -38,6 +38,12 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
 
+// Délai de traitement (en jours) paramétré pour le niveau de gravité de cette CAPA
+// (Paramètres > CAPA) — voir Capas.jsx pour le même calcul côté liste.
+function getDelayDays(priority, priorityDelays) {
+  return priorityDelays?.[priority] ?? null;
+}
+
 function formatDateTime(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleString('fr-FR');
@@ -47,6 +53,7 @@ export default function CapaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [capa, setCapa] = useState(null);
+  const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -82,6 +89,10 @@ export default function CapaDetail() {
 
   useEffect(() => {
     loadCapa();
+    api
+      .get('/capas/priority-delays')
+      .then(({ data }) => setPriorityDelays(data))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -191,6 +202,12 @@ export default function CapaDetail() {
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Responsable assigné</dt>
             <dd className="mt-1 text-sm text-slate-800">{capa.assigned?.full_name || 'Non assigné'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Délai de traitement</dt>
+            <dd className="mt-1 text-sm text-slate-800">
+              {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
+            </dd>
           </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Échéance</dt>
