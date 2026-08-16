@@ -9,7 +9,7 @@ export function getKpiStatus(lastValue, target, targetDirection = 'min') {
 export const KPI_STATUS_STYLES = {
   good: 'text-emerald-700',
   bad: 'text-red-700',
-  neutral: 'text-slate-900',
+  neutral: 'text-slate-400',
 };
 
 export const KPI_STATUS_LABELS = {

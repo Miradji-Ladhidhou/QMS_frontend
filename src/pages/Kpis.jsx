@@ -3,6 +3,8 @@ import {
   AlertCircle,
   BarChart3,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   MoreVertical,
   Pencil,
   Plus,
@@ -25,12 +27,36 @@ const FREQUENCY_LABELS = {
   yearly: 'Annuel',
 };
 
-function formatDateShort(dateStr) {
-  return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
-}
-
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+// Format court de la période, adapté à la fréquence du KPI, pour l'axe X du graphique
+// et l'en-tête du tableau d'historique.
+function formatPeriodShort(dateStr, frequency) {
+  const date = new Date(dateStr);
+  switch (frequency) {
+    case 'monthly':
+      return date.toLocaleDateString('fr-FR', { month: 'short', year: '2-digit' });
+    case 'quarterly':
+      return `T${Math.floor(date.getMonth() / 3) + 1} ${date.getFullYear()}`;
+    case 'yearly':
+      return String(date.getFullYear());
+    case 'weekly':
+    case 'daily':
+    default:
+      return date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' });
+  }
+}
+
+// <input type="month"> attend "yyyy-MM", <input type="date"> attend "yyyy-MM-dd".
+function toInputPeriodValue(periodDate, frequency) {
+  return frequency === 'monthly' ? periodDate.slice(0, 7) : periodDate;
+}
+
+// L'API attend toujours une date complète — un mois saisi est ramené à son 1er jour.
+function fromInputPeriodValue(inputValue, frequency) {
+  return frequency === 'monthly' ? `${inputValue}-01` : inputValue;
 }
 
 // express-validator renvoie { error, details: [{ path, msg }] } sur un 400 —
@@ -39,83 +65,6 @@ function fieldErrorsFromResponse(err) {
   const details = err.response?.data?.details;
   if (!Array.isArray(details)) return {};
   return Object.fromEntries(details.map((detail) => [detail.path, detail.msg]));
-}
-
-function ValueModal({ kpi, onClose, onRecorded }) {
-  const [periodDate, setPeriodDate] = useState(new Date().toISOString().slice(0, 10));
-  const [value, setValue] = useState('');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError('');
-    setSubmitting(true);
-
-    try {
-      const { data } = await api.post(`/kpis/${kpi.id}/records`, {
-        period_date: periodDate,
-        value: Number(value),
-      });
-      onRecorded(data);
-    } catch (err) {
-      setError(err.response?.data?.error || "Impossible d'enregistrer cette valeur.");
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Nouvelle valeur</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        <p className="mb-4 text-sm text-slate-500">{kpi.name}</p>
-
-        {error && (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Période</label>
-            <input
-              type="date"
-              required
-              value={periodDate}
-              onChange={(e) => setPeriodDate(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Valeur {kpi.unit ? `(${kpi.unit})` : ''}</label>
-            <input
-              type="number"
-              step="any"
-              required
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-          >
-            {submitting ? 'Enregistrement...' : 'Enregistrer'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
 }
 
 function KpiFormModal({ kpi, onClose, onSaved }) {
@@ -275,13 +224,203 @@ function KpiFormModal({ kpi, onClose, onSaved }) {
   );
 }
 
-function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onRecordClick }) {
+// Sert à la fois la saisie d'une nouvelle valeur et la modification d'une valeur
+// existante (depuis l'historique, ou après un conflit de période en création).
+function RecordModal({ kpi, record, onClose, onSaved }) {
+  const [activeRecord, setActiveRecord] = useState(record);
+  const isEditing = Boolean(activeRecord);
+  const inputType = kpi.frequency === 'monthly' ? 'month' : 'date';
+
+  const [periodDate, setPeriodDate] = useState(
+    toInputPeriodValue(record?.period_date || new Date().toISOString().slice(0, 10), kpi.frequency)
+  );
+  const [value, setValue] = useState(record ? String(record.value) : '');
+  const [comment, setComment] = useState(record?.comment || '');
+  const [error, setError] = useState('');
+  const [showConflictAction, setShowConflictAction] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setShowConflictAction(false);
+    setSubmitting(true);
+
+    const payload = {
+      period_date: fromInputPeriodValue(periodDate, kpi.frequency),
+      value: Number(value),
+      comment: comment || null,
+    };
+
+    try {
+      const { data } = isEditing
+        ? await api.patch(`/kpis/${kpi.id}/records/${activeRecord.id}`, payload)
+        : await api.post(`/kpis/${kpi.id}/records`, payload);
+      onSaved(data, isEditing);
+    } catch (err) {
+      if (!isEditing && err.response?.status === 409) {
+        setError('Une valeur existe déjà pour cette période.');
+        setShowConflictAction(true);
+      } else {
+        setError(err.response?.data?.error || `Impossible ${isEditing ? 'de modifier' : "d'enregistrer"} cette valeur.`);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleSwitchToEdit() {
+    const targetPeriod = fromInputPeriodValue(periodDate, kpi.frequency);
+    const existing = kpi.records.find((r) => r.period_date === targetPeriod);
+    if (!existing) return;
+
+    setActiveRecord(existing);
+    setValue(String(existing.value));
+    setComment(existing.comment || '');
+    setError('');
+    setShowConflictAction(false);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">{isEditing ? 'Modifier la valeur' : 'Nouvelle valeur'}</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-slate-500">{kpi.name}</p>
+
+        {error && (
+          <div className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+            <p>{error}</p>
+            {showConflictAction && (
+              <button
+                type="button"
+                onClick={handleSwitchToEdit}
+                className="mt-2 font-medium text-red-700 underline hover:text-red-800"
+              >
+                Modifier la valeur existante pour cette période
+              </button>
+            )}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Période</label>
+            <input
+              type={inputType}
+              required
+              disabled={isEditing}
+              value={periodDate}
+              onChange={(e) => setPeriodDate(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Valeur {kpi.unit ? `(${kpi.unit})` : ''}</label>
+            <input
+              type="number"
+              step="any"
+              required
+              value={value}
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Commentaire</label>
+            <textarea
+              rows={2}
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Enregistrement...' : isEditing ? 'Enregistrer' : 'Ajouter'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
+  const records = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
+
+  if (records.length === 0) {
+    return <p className="py-3 text-sm text-slate-400">Aucune valeur enregistrée.</p>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left text-sm">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
+          <tr>
+            <th className="py-2 pr-3">Période</th>
+            <th className="py-2 pr-3">Valeur</th>
+            <th className="py-2 pr-3">Commentaire</th>
+            <th className="py-2 pr-3">Saisi par</th>
+            <th className="py-2 pr-3 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {records.map((record) => (
+            <tr key={record.id}>
+              <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(record.period_date)}</td>
+              <td className="py-2 pr-3 whitespace-nowrap font-medium text-slate-800">
+                {record.value} {kpi.unit || ''}
+              </td>
+              <td className="py-2 pr-3 text-slate-600">{record.comment || '—'}</td>
+              <td className="py-2 pr-3 whitespace-nowrap text-slate-600">{record.recorded_by_user?.full_name || '—'}</td>
+              <td className="py-2 pr-3 text-right">
+                <div className="flex justify-end gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onEditRecord(record)}
+                    aria-label="Modifier"
+                    className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDeleteRecord(record)}
+                    aria-label="Supprimer"
+                    className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onOpenRecordModal, onDeleteRecord }) {
+  const [showHistory, setShowHistory] = useState(false);
   const records = [...kpi.records].sort((a, b) => (a.period_date > b.period_date ? 1 : -1));
   const lastRecord = records[records.length - 1];
   const targetDirection = kpi.target_direction || 'min';
   const status = getKpiStatus(lastRecord?.value, kpi.target, targetDirection);
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
+  const hasEnoughForChart = records.length >= 2;
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -356,26 +495,26 @@ function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onRecordClic
             )}
           </div>
         ) : (
-          <span className="text-sm text-slate-400">Aucune valeur enregistrée.</span>
+          <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         )}
         <button
           type="button"
-          onClick={() => onRecordClick(kpi)}
+          onClick={() => onOpenRecordModal(kpi, null)}
           className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
         >
           <Plus size={14} />
-          Saisir
+          Saisir une valeur
         </button>
       </div>
 
-      {records.length > 0 && (
-        <div className="mt-4 h-48">
+      <div className="mt-4 h-48">
+        {hasEnoughForChart ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={records} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
               <CartesianGrid stroke={GRID_COLOR} vertical={false} />
               <XAxis
                 dataKey="period_date"
-                tickFormatter={formatDateShort}
+                tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: MUTED_COLOR, fontSize: 11 }}
@@ -404,8 +543,33 @@ function KpiCard({ kpi, isMenuOpen, onToggleMenu, onEdit, onDelete, onRecordClic
               />
             </LineChart>
           </ResponsiveContainer>
-        </div>
-      )}
+        ) : (
+          <div className="flex h-full items-center justify-center text-sm text-slate-400">
+            Pas assez de données pour un graphique
+          </div>
+        )}
+      </div>
+
+      <div className="mt-3 border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={() => setShowHistory((prev) => !prev)}
+          className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
+        >
+          {showHistory ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          Voir l'historique
+        </button>
+
+        {showHistory && (
+          <div className="mt-2">
+            <RecordHistoryTable
+              kpi={kpi}
+              onEditRecord={(record) => onOpenRecordModal(kpi, record)}
+              onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -414,7 +578,7 @@ export default function Kpis() {
   const [kpis, setKpis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [recordingKpi, setRecordingKpi] = useState(null);
+  const [recordModal, setRecordModal] = useState(null); // { kpi, record } — record null = création
   const [formModal, setFormModal] = useState(null); // null fermé, 'new' création, objet kpi édition
   const [openMenuId, setOpenMenuId] = useState(null);
 
@@ -435,11 +599,32 @@ export default function Kpis() {
     loadKpis();
   }, []);
 
-  function handleRecorded(record) {
+  function handleRecordSaved(kpiId, record, isEditing) {
     setKpis((prev) =>
-      prev.map((kpi) => (kpi.id === recordingKpi.id ? { ...kpi, records: [...kpi.records, record] } : kpi))
+      prev.map((kpi) => {
+        if (kpi.id !== kpiId) return kpi;
+        const records = isEditing
+          ? kpi.records.map((r) => (r.id === record.id ? record : r))
+          : [...kpi.records, record];
+        return { ...kpi, records };
+      })
     );
-    setRecordingKpi(null);
+    setRecordModal(null);
+  }
+
+  async function handleDeleteRecord(kpi, record) {
+    if (!window.confirm(`Supprimer la valeur du ${formatDate(record.period_date)} ?`)) return;
+
+    try {
+      await api.delete(`/kpis/${kpi.id}/records/${record.id}`);
+      setKpis((prev) =>
+        prev.map((item) =>
+          item.id === kpi.id ? { ...item, records: item.records.filter((r) => r.id !== record.id) } : item
+        )
+      );
+    } catch {
+      setError('Impossible de supprimer cette valeur.');
+    }
   }
 
   function handleSaved(data, isEditing) {
@@ -523,14 +708,20 @@ export default function Kpis() {
               onToggleMenu={toggleMenu}
               onEdit={setFormModal}
               onDelete={handleDelete}
-              onRecordClick={setRecordingKpi}
+              onOpenRecordModal={(kpiArg, record) => setRecordModal({ kpi: kpiArg, record })}
+              onDeleteRecord={handleDeleteRecord}
             />
           ))}
         </div>
       )}
 
-      {recordingKpi && (
-        <ValueModal kpi={recordingKpi} onClose={() => setRecordingKpi(null)} onRecorded={handleRecorded} />
+      {recordModal && (
+        <RecordModal
+          kpi={recordModal.kpi}
+          record={recordModal.record}
+          onClose={() => setRecordModal(null)}
+          onSaved={(data, isEditing) => handleRecordSaved(recordModal.kpi.id, data, isEditing)}
+        />
       )}
 
       {formModal && (
