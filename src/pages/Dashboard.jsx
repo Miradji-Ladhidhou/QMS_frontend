@@ -117,10 +117,10 @@ export default function Dashboard() {
   }, []);
 
   const statCards = [
-    { key: 'documents', label: 'Documents', value: stats.documents, icon: FileText, accent: 'bg-blue-100 text-blue-700' },
-    { key: 'openCapas', label: 'CAPA ouvertes', value: stats.openCapas, icon: ClipboardList, accent: 'bg-orange-100 text-orange-700' },
-    { key: 'trainings', label: 'Formations actives', value: stats.trainings, icon: GraduationCap, accent: 'bg-emerald-100 text-emerald-700' },
-    { key: 'kpis', label: 'KPIs suivis', value: stats.kpis, icon: BarChart3, accent: 'bg-purple-100 text-purple-700' },
+    { id: 'documents', label: 'Documents', value: stats.documents, icon: FileText, accent: 'bg-blue-100 text-blue-700' },
+    { id: 'openCapas', label: 'CAPA ouvertes', value: stats.openCapas, icon: ClipboardList, accent: 'bg-orange-100 text-orange-700' },
+    { id: 'trainings', label: 'Formations actives', value: stats.trainings, icon: GraduationCap, accent: 'bg-emerald-100 text-emerald-700' },
+    { id: 'kpis', label: 'KPIs suivis', value: stats.kpis, icon: BarChart3, accent: 'bg-purple-100 text-purple-700' },
   ];
 
   return (
@@ -137,7 +137,7 @@ export default function Dashboard() {
       <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
         {loading
           ? [0, 1, 2, 3].map((key) => <StatSkeleton key={key} />)
-          : statCards.map((card) => <StatCard key={card.key} {...card} />)}
+          : statCards.map((card) => <StatCard key={card.id} {...card} />)}
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 lg:grid-cols-3">
