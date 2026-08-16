@@ -1,11 +1,28 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Plus, Search, X } from 'lucide-react';
+import { Download, Loader2, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
+import SearchSnippet from '../components/SearchSnippet.jsx';
+
+const SEARCH_DEBOUNCE_MS = 300;
+
+function MatchLocationBadge({ location }) {
+  if (!location) return null;
+
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+        location === 'title' ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+      }`}
+    >
+      {location === 'title' ? 'Trouvé dans le titre' : 'Trouvé dans le contenu'}
+    </span>
+  );
+}
 
 function DocumentModal({ categories, onClose, onCreated }) {
   const [form, setForm] = useState({ number: '', title: '', description: '', category_id: '', review_date: '' });
@@ -142,6 +159,9 @@ export default function Documents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchResults, setSearchResults] = useState(null);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -164,15 +184,68 @@ export default function Documents() {
     loadData();
   }, []);
 
+  // Recherche plein texte côté serveur, avec debounce pour ne pas spammer l'API à chaque frappe
+  useEffect(() => {
+    const term = search.trim();
+
+    if (!term) {
+      setSearchResults(null);
+      setSearchError('');
+      setSearching(false);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setSearching(true);
+
+    const timeoutId = setTimeout(async () => {
+      try {
+        const { data } = await api.get('/documents/search', { params: { q: term } });
+        if (!cancelled) {
+          setSearchResults(data);
+          setSearchError('');
+        }
+      } catch {
+        if (!cancelled) {
+          setSearchError('La recherche a échoué.');
+          setSearchResults([]);
+        }
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, SEARCH_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
+  }, [search]);
+
+  // Réconcilie les résultats de recherche (id, extrait, localisation) avec les documents déjà chargés
+  const searchResultDocuments = useMemo(() => {
+    if (!searchResults) return null;
+
+    const byId = new Map(documents.map((doc) => [doc.id, doc]));
+
+    return searchResults
+      .map((result) => {
+        const doc = byId.get(result.id);
+        if (!doc) return null;
+        return { ...doc, snippet: result.snippet, match_location: result.match_location };
+      })
+      .filter(Boolean);
+  }, [searchResults, documents]);
+
+  const isSearchActive = searchResultDocuments !== null;
+
   const filteredDocuments = useMemo(() => {
-    const term = search.trim().toLowerCase();
-    return documents.filter((doc) => {
-      const matchesSearch = !term || doc.title.toLowerCase().includes(term) || doc.number.toLowerCase().includes(term);
+    const base = searchResultDocuments ?? documents;
+    return base.filter((doc) => {
       const matchesStatus = !statusFilter || doc.status === statusFilter;
       const matchesCategory = !categoryFilter || doc.category_id === categoryFilter;
-      return matchesSearch && matchesStatus && matchesCategory;
+      return matchesStatus && matchesCategory;
     });
-  }, [documents, search, statusFilter, categoryFilter]);
+  }, [documents, searchResultDocuments, statusFilter, categoryFilter]);
 
   function handleDownload(event, doc) {
     event.stopPropagation();
@@ -206,11 +279,14 @@ export default function Documents() {
           <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
-            placeholder="Rechercher par titre ou numéro..."
+            placeholder="Rechercher dans le titre, la description ou le contenu..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-md border border-slate-300 py-2.5 pl-9 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            className="w-full rounded-md border border-slate-300 py-2.5 pl-9 pr-9 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
           />
+          {searching && (
+            <Loader2 size={18} className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+          )}
         </div>
 
         <select
@@ -240,8 +316,10 @@ export default function Documents() {
         </select>
       </div>
 
-      {error && (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      {(error || searchError) && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+          {error || searchError}
+        </p>
       )}
 
       {loading ? (
@@ -251,7 +329,11 @@ export default function Documents() {
           ))}
         </div>
       ) : filteredDocuments.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">Aucun document ne correspond à ces critères.</p>
+        <p className="mt-6 text-sm text-slate-500">
+          {isSearchActive
+            ? `Aucun résultat pour « ${search.trim()} ».`
+            : 'Aucun document ne correspond à ces critères.'}
+        </p>
       ) : (
         <>
           <div className="mt-4 space-y-3 md:hidden">
@@ -281,7 +363,9 @@ export default function Documents() {
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <CategoryBadge category={doc.category} />
                   <StatusBadge status={doc.status} />
+                  <MatchLocationBadge location={doc.match_location} />
                 </div>
+                <SearchSnippet snippet={doc.snippet} />
               </div>
             ))}
           </div>
@@ -302,7 +386,13 @@ export default function Documents() {
                 {filteredDocuments.map((doc) => (
                   <tr key={doc.id} onClick={() => navigate(`/documents/${doc.id}`)} className="cursor-pointer hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-800">{doc.number}</td>
-                    <td className="px-4 py-3 text-slate-700">{doc.title}</td>
+                    <td className="max-w-sm px-4 py-3 text-slate-700">
+                      <div className="flex items-center gap-2">
+                        {doc.title}
+                        <MatchLocationBadge location={doc.match_location} />
+                      </div>
+                      <SearchSnippet snippet={doc.snippet} />
+                    </td>
                     <td className="px-4 py-3">
                       <CategoryBadge category={doc.category} />
                     </td>
