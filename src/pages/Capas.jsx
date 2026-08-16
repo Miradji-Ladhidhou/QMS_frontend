@@ -2,15 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
-import {
-  CAPA_EFFECTIVENESS_LABELS,
-  CAPA_PRIORITY_LABELS,
-  CAPA_SEVERITY_LABELS,
-  CAPA_STATUS_LABELS,
-} from '../lib/capaStatus.js';
+import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
-import CapaSeverityBadge from '../components/CapaSeverityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 
 function formatDate(dateStr) {
@@ -40,7 +34,6 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
     service: '',
     description: '',
     origin: '',
-    severity: 'medium',
     priority: 'medium',
     due_date: priorityDelays ? addDaysToToday(priorityDelays.medium) : '',
     assigned_to: '',
@@ -53,7 +46,7 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  // Le champ Échéance se met à jour tout seul en fonction de la priorité et du délai
+  // Le champ Échéance se met à jour tout seul en fonction de la gravité et du délai
   // paramétré (Paramètres > CAPA), tant que l'utilisateur ne l'a pas modifié à la main.
   function handlePriorityChange(priority) {
     setForm((prev) => ({
@@ -73,7 +66,6 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
         title: form.title,
         service: form.service || undefined,
         description: form.description || undefined,
-        severity: form.severity,
         priority: form.priority,
         origin: form.origin || undefined,
         due_date: form.due_date || undefined,
@@ -146,42 +138,25 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
-              <select
-                value={form.severity}
-                onChange={(e) => updateField('severity', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                {Object.entries(CAPA_SEVERITY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
-              <select
-                value={form.priority}
-                onChange={(e) => handlePriorityChange(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
+            <select
+              value={form.priority}
+              onChange={(e) => handlePriorityChange(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               Échéance
-              {!dueDateTouched && <span className="ml-1 font-normal text-slate-400">(suggérée selon la priorité)</span>}
+              {!dueDateTouched && <span className="ml-1 font-normal text-slate-400">(suggérée selon la gravité)</span>}
             </label>
             <input
               type="date"
@@ -272,7 +247,6 @@ export default function Capas() {
       'Service',
       'Description de la non-conformité',
       'Gravité',
-      'Priorité',
       'Délai de traitement',
       'Cause identifiée',
       'Action corrective',
@@ -288,7 +262,6 @@ export default function Capas() {
       formatDate(capa.created_at),
       capa.service || '',
       capa.description || '',
-      CAPA_SEVERITY_LABELS[capa.severity] || capa.severity,
       CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
       formatDate(capa.due_date),
       capa.root_cause || '',
@@ -385,10 +358,7 @@ export default function Capas() {
                       {capa.number} · {capa.service || 'Service non précisé'}
                     </p>
                   </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1">
-                    <CapaSeverityBadge severity={capa.severity} />
-                    <CapaPriorityBadge priority={capa.priority} />
-                  </div>
+                  <CapaPriorityBadge priority={capa.priority} />
                 </div>
                 <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                   <CapaStatusBadge status={capa.status} />
@@ -419,7 +389,6 @@ export default function Capas() {
                   <th className="px-4 py-3">Objet</th>
                   <th className="px-4 py-3">Service</th>
                   <th className="px-4 py-3">Gravité</th>
-                  <th className="px-4 py-3">Priorité</th>
                   <th className="px-4 py-3">Échéance</th>
                   <th className="px-4 py-3">Statut</th>
                 </tr>
@@ -434,9 +403,6 @@ export default function Capas() {
                     <td className="px-4 py-3 font-medium text-slate-800">{capa.number}</td>
                     <td className="px-4 py-3 text-slate-700">{capa.title}</td>
                     <td className="px-4 py-3 text-slate-600">{capa.service || '—'}</td>
-                    <td className="px-4 py-3">
-                      <CapaSeverityBadge severity={capa.severity} />
-                    </td>
                     <td className="px-4 py-3">
                       <CapaPriorityBadge priority={capa.priority} />
                     </td>

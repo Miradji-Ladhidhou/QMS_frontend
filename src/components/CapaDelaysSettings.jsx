@@ -45,7 +45,7 @@ export default function CapaDelaysSettings() {
     <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
       <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Délais de traitement des CAPA</h2>
       <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-        Nombre de jours après la création pour suggérer l'échéance, selon la priorité.
+        Nombre de jours après la création pour suggérer l'échéance, selon la gravité.
       </p>
 
       {error && (

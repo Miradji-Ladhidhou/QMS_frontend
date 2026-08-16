@@ -4,7 +4,6 @@ import { ArrowLeft, Save, Send } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
-import CapaSeverityBadge from '../components/CapaSeverityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
@@ -175,7 +174,6 @@ export default function CapaDetail() {
           <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{capa.title}</h1>
           <p className="mt-1 text-sm text-slate-500">{capa.number}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <CapaSeverityBadge severity={capa.severity} />
             <CapaPriorityBadge priority={capa.priority} />
             <CapaStatusBadge status={capa.status} />
           </div>
