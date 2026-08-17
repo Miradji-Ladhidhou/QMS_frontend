@@ -16,6 +16,7 @@ import Qqoqccp from './pages/Qqoqccp.jsx';
 import QqoqccpDetail from './pages/QqoqccpDetail.jsx';
 import Settings from './pages/Settings.jsx';
 import MyApprovals from './pages/MyApprovals.jsx';
+import SuperAdmin from './pages/SuperAdmin.jsx';
 
 function ProtectedRoute({ session, children }) {
   if (!session) {
@@ -50,6 +51,14 @@ export default function App() {
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/register" element={session ? <Navigate to="/" replace /> : <Register />} />
+        <Route
+          path="/super-admin"
+          element={
+            <ProtectedRoute session={session}>
+              <SuperAdmin />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/"
           element={

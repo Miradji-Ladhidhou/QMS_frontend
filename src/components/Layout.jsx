@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   CheckSquare,
@@ -11,10 +11,12 @@ import {
   LogOut,
   Menu,
   Settings,
+  ShieldCheck,
   X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { api } from '../lib/api.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 import NotificationBell from './NotificationBell.jsx';
 
 const NAV_ITEMS = [
@@ -29,6 +31,7 @@ const NAV_ITEMS = [
 ];
 
 export default function Layout() {
+  const currentUser = useCurrentUser();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
@@ -104,7 +107,17 @@ export default function Layout() {
           ))}
         </nav>
 
-        <div className="px-3 pb-6 pt-3">
+        <div className="space-y-1 px-3 pb-6 pt-3">
+          {currentUser?.is_super_admin && (
+            <Link
+              to="/super-admin"
+              onClick={closeMenu}
+              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <ShieldCheck size={20} />
+              Super Admin
+            </Link>
+          )}
           <button
             type="button"
             onClick={handleLogout}
