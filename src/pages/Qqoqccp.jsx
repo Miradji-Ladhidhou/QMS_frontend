@@ -1,0 +1,153 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, X } from 'lucide-react';
+import { api } from '../lib/api.js';
+import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
+
+function formatDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+function NewAnalysisModal({ onClose, onCreated }) {
+  const [title, setTitle] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const { data } = await api.post('/qqoqccp', { title });
+      onCreated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible de créer l'analyse.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-sm sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Nouvelle analyse</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <input
+              type="text"
+              required
+              autoFocus
+              placeholder="Ex : Rupture de stock composant X"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Création...' : "Créer l'analyse"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+export default function Qqoqccp() {
+  const navigate = useNavigate();
+  const [analyses, setAnalyses] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  useEffect(() => {
+    api
+      .get('/qqoqccp')
+      .then(({ data }) => setAnalyses(data))
+      .catch(() => setError('Impossible de charger les analyses QQOQCCP.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  function handleCreated(analysis) {
+    setIsModalOpen(false);
+    navigate(`/qqoqccp/${analysis.id}`);
+  }
+
+  return (
+    <div>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">QQOQCCP</h1>
+        <button
+          type="button"
+          onClick={() => setIsModalOpen(true)}
+          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+        >
+          <Plus size={18} />
+          Nouvelle analyse
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+
+      {loading ? (
+        <div className="mt-4 space-y-3">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
+          ))}
+        </div>
+      ) : analyses.length === 0 ? (
+        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+          <p className="text-base font-medium text-slate-700">Aucune analyse QQOQCCP pour l'instant</p>
+          <p className="mt-1 max-w-sm text-sm text-slate-500">
+            Créez votre première analyse pour structurer un problème avec la méthode Qui/Quoi/Où/Quand/Comment/Combien/Pourquoi.
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            <Plus size={18} />
+            Nouvelle analyse
+          </button>
+        </div>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {analyses.map((analysis) => (
+            <div
+              key={analysis.id}
+              onClick={() => navigate(`/qqoqccp/${analysis.id}`)}
+              className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium text-slate-900">{analysis.title}</p>
+                <p className="text-sm text-slate-500">{formatDate(analysis.created_at)}</p>
+              </div>
+              <QqoqccpStatusBadge status={analysis.status} />
+            </div>
+          ))}
+        </div>
+      )}
+
+      {isModalOpen && <NewAnalysisModal onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />}
+    </div>
+  );
+}

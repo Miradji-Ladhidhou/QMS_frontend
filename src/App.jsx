@@ -12,6 +12,8 @@ import CapaDetail from './pages/CapaDetail.jsx';
 import Trainings from './pages/Trainings.jsx';
 import SkillMatrix from './pages/SkillMatrix.jsx';
 import Kpis from './pages/Kpis.jsx';
+import Qqoqccp from './pages/Qqoqccp.jsx';
+import QqoqccpDetail from './pages/QqoqccpDetail.jsx';
 import Settings from './pages/Settings.jsx';
 import MyApprovals from './pages/MyApprovals.jsx';
 
@@ -64,6 +66,8 @@ export default function App() {
           <Route path="trainings" element={<Trainings />} />
           <Route path="trainings/matrix" element={<SkillMatrix />} />
           <Route path="kpis" element={<Kpis />} />
+          <Route path="qqoqccp" element={<Qqoqccp />} />
+          <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
           <Route path="settings" element={<Settings />} />
           <Route path="my-approvals" element={<MyApprovals />} />
         </Route>

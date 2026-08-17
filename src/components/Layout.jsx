@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   GraduationCap,
+  HelpCircle,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -22,6 +23,7 @@ const NAV_ITEMS = [
   { to: '/capas', label: 'CAPA', icon: ClipboardList },
   { to: '/trainings', label: 'Formations', icon: GraduationCap },
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
+  { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   { to: '/settings', label: 'Paramètres', icon: Settings },
 ];
