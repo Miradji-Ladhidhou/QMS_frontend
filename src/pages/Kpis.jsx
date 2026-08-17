@@ -206,6 +206,27 @@ function isConfigComplete(form) {
   return true; // count : les conditions restent optionnelles
 }
 
+// Détaille ce qui manque encore pour activer "Valider l'import" — un bouton désactivé sans
+// aucune explication est une impasse pour l'utilisateur, donc on énumère explicitement les
+// mêmes règles que isConfigComplete plutôt que de le laisser deviner.
+function configIssues(form) {
+  const issues = [];
+  const incompleteCount = form.filters.filter((f) => !isFilterComplete(f)).length;
+  if (incompleteCount > 0) {
+    issues.push(`${incompleteCount} condition${incompleteCount > 1 ? 's' : ''} incomplète${incompleteCount > 1 ? 's' : ''} (colonne et valeur requises)`);
+  }
+  if (form.calc_type === 'ratio' && form.filters.length === 0) {
+    issues.push('au moins une condition est requise pour un calcul en pourcentage');
+  }
+  if (['sum', 'average', 'min', 'max'].includes(form.calc_type) && !form.source_column) {
+    issues.push('la colonne à calculer est requise');
+  }
+  if (form.calc_type === 'count_grouped' && !form.group_by_column) {
+    issues.push('la colonne de regroupement est requise');
+  }
+  return issues;
+}
+
 // Nom de fichier sûr pour un téléchargement (évite les caractères qui posent problème
 // selon l'OS/le navigateur dans le nom d'un KPI éventuellement accentué).
 function sanitizeFilename(name) {
@@ -727,7 +748,9 @@ function FilterBuilder({ filters, filterLogic, onChange, columns, sampleRows, re
                 <select
                   value={filter.column}
                   onChange={(e) => updateFilter(index, { column: e.target.value })}
-                  className="rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={`rounded-md border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                    filter.column ? 'border-slate-300' : 'border-amber-300'
+                  }`}
                 >
                   <option value="">Colonne</option>
                   {columns.map((col) => (
@@ -742,7 +765,9 @@ function FilterBuilder({ filters, filterLogic, onChange, columns, sampleRows, re
                   value={filter.column}
                   onChange={(e) => updateFilter(index, { column: e.target.value })}
                   placeholder="Colonne"
-                  className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  className={`w-28 rounded-md border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                    filter.column ? 'border-slate-300' : 'border-amber-300'
+                  }`}
                 />
               )}
               <select
@@ -764,7 +789,9 @@ function FilterBuilder({ filters, filterLogic, onChange, columns, sampleRows, re
                     value={filter.value}
                     onChange={(e) => updateFilter(index, { value: e.target.value })}
                     placeholder="Valeur"
-                    className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    className={`min-w-0 flex-1 rounded-md border px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary ${
+                      filter.value ? 'border-slate-300' : 'border-amber-300'
+                    }`}
                   />
                   {suggestions.length > 0 && (
                     <datalist id={`kpi-filter-suggestions-${index}`}>
@@ -1059,6 +1086,10 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   const periodReady = Boolean(configForm.period_column || manualPeriod);
   const configComplete = configMode === 'reuse' ? true : isConfigComplete(configForm);
   const canProceed = configComplete && periodReady;
+  const blockingIssues = [
+    ...(configMode === 'reuse' ? [] : configIssues(configForm)),
+    ...(periodReady ? [] : ['la période est requise (colonne détectée ou date saisie manuellement)']),
+  ];
 
   // Aperçu live : recalcule à chaque changement de champ via /evaluate, qui n'enregistre
   // rien (ni la recette, ni de valeur) — contrairement à l'ancienne version qui exigeait de
@@ -1371,6 +1402,12 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
                     </p>
                     {livePreview && <ImportResultSummary data={livePreview} unit={kpi.unit} />}
                   </div>
+                )}
+
+                {!canProceed && blockingIssues.length > 0 && (
+                  <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                    Pour valider, corrigez : {blockingIssues.join(' · ')}.
+                  </p>
                 )}
 
                 <div className="mt-4 flex gap-2">
