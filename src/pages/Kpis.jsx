@@ -1876,8 +1876,8 @@ function KpiCard({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <p className="font-medium text-slate-900">{kpi.name}</p>
+        <div className="min-w-0">
+          <p className="break-words font-medium text-slate-900">{kpi.name}</p>
           {hasTarget && (
             <p className="text-sm text-slate-500">
               Objectif : {targetDirection === 'max' ? '≤' : '≥'} {kpi.target} {kpi.unit || ''}
@@ -1985,15 +1985,15 @@ function KpiCard({
 
       {exportError && <p className="mt-1 text-xs text-red-600">{exportError}</p>}
 
-      <div className="mt-3 flex items-center justify-between gap-2">
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {averageValue !== null ? (
-          <div className="flex items-center gap-2">
-            <span className={`text-2xl font-semibold ${KPI_STATUS_STYLES[status]}`}>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <span className={`whitespace-nowrap text-2xl font-semibold ${KPI_STATUS_STYLES[status]}`}>
               {averageValue} {kpi.unit || ''}
             </span>
-            <span className="text-xs text-slate-400">(moyenne)</span>
+            <span className="whitespace-nowrap text-xs text-slate-400">(moyenne)</span>
             {StatusIcon && (
-              <span className={`flex items-center gap-1 text-xs font-medium ${KPI_STATUS_STYLES[status]}`}>
+              <span className={`flex items-center gap-1 whitespace-nowrap text-xs font-medium ${KPI_STATUS_STYLES[status]}`}>
                 <StatusIcon size={14} />
                 {KPI_STATUS_LABELS[status]}
               </span>
