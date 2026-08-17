@@ -5,6 +5,7 @@ import CategoryManager from '../components/CategoryManager.jsx';
 import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
 import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
+import ProfileSettings from '../components/ProfileSettings.jsx';
 import Groups from './Groups.jsx';
 
 const TABS = [
@@ -13,6 +14,7 @@ const TABS = [
   { id: 'users', label: 'Utilisateurs' },
   { id: 'groups', label: 'Groupes', adminOnly: true },
   { id: 'capa', label: 'CAPA', adminOnly: true },
+  { id: 'profile', label: 'Mon profil' },
   { id: 'notifications', label: 'Notifications' },
 ];
 
@@ -20,11 +22,15 @@ export default function Settings() {
   const [currentUser, setCurrentUser] = useState(null);
   const [activeTab, setActiveTab] = useState('company');
 
-  useEffect(() => {
+  function loadCurrentUser() {
     api
       .get('/users/me')
       .then(({ data }) => setCurrentUser(data))
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadCurrentUser();
   }, []);
 
   const isAdmin = currentUser?.role === 'owner' || currentUser?.role === 'admin';
@@ -51,9 +57,14 @@ export default function Settings() {
       <div className="mt-4">
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
         {activeTab === 'categories' && <CategoryManager />}
-        {activeTab === 'users' && <UserManager isAdmin={isAdmin} />}
+        {activeTab === 'users' && (
+          <UserManager currentUser={currentUser} isAdmin={isAdmin} onOwnershipTransferred={loadCurrentUser} />
+        )}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}
+        {activeTab === 'profile' && currentUser && (
+          <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />
+        )}
         {activeTab === 'notifications' && <NotificationPreferences />}
       </div>
     </div>
