@@ -167,7 +167,17 @@ export default function Landing() {
       </main>
 
       <footer className="border-t border-slate-100 py-8">
-        <div className="mx-auto max-w-6xl px-4 text-sm text-slate-400 sm:px-6">© 2026 QMS SaaS</div>
+        <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 text-sm text-slate-400 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+          <span>© 2026 QMS SaaS</span>
+          <div className="flex gap-4">
+            <Link to="/legal/cgu" className="hover:text-slate-600">
+              CGU
+            </Link>
+            <Link to="/legal/confidentialite" className="hover:text-slate-600">
+              Confidentialité
+            </Link>
+          </div>
+        </div>
       </footer>
     </div>
   );

@@ -7,6 +7,9 @@ import Login from './pages/Login.jsx';
 import Register from './pages/Register.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
+import LegalTerms from './pages/LegalTerms.jsx';
+import LegalPrivacy from './pages/LegalPrivacy.jsx';
+import CookieNotice from './components/CookieNotice.jsx';
 import Dashboard from './pages/Dashboard.jsx';
 import Documents from './pages/Documents.jsx';
 import DocumentDetail from './pages/DocumentDetail.jsx';
@@ -47,11 +50,14 @@ export default function App() {
   // chemin interne existant (/documents, /capas/:id, etc.) n'est modifié par ce choix.
   return (
     <BrowserRouter>
+      <CookieNotice />
       {session ? (
         <Routes>
           <Route path="/login" element={<Navigate to="/" replace />} />
           <Route path="/register" element={<Navigate to="/" replace />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/legal/cgu" element={<LegalTerms />} />
+          <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
           <Route path="/super-admin" element={<SuperAdmin />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
@@ -75,6 +81,8 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/legal/cgu" element={<LegalTerms />} />
+          <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
           <Route path="/" element={<Landing />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

@@ -113,7 +113,19 @@ export default function Register() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-sm text-slate-600">
+        <p className="mt-6 text-center text-xs text-slate-400">
+          En créant un compte, vous acceptez les{' '}
+          <Link to="/legal/cgu" className="text-slate-500 hover:underline">
+            CGU
+          </Link>{' '}
+          et la{' '}
+          <Link to="/legal/confidentialite" className="text-slate-500 hover:underline">
+            politique de confidentialité
+          </Link>
+          .
+        </p>
+
+        <p className="mt-4 text-center text-sm text-slate-600">
           Déjà un compte ?{' '}
           <Link to="/login" className="text-primary font-medium hover:underline">
             Se connecter
