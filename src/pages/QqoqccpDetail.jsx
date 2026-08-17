@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, Check, ClipboardPlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
@@ -264,8 +264,6 @@ function CapaAdjustmentForm({
 export default function QqoqccpDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const isCapaFlow = searchParams.get('flow') === 'capa';
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -277,7 +275,8 @@ export default function QqoqccpDetail() {
   const timers = useRef({});
   const savedTimers = useRef({});
 
-  // Formulaire d'ajustement avant l'ouverture de la CAPA (flow=capa uniquement)
+  // Formulaire d'ajustement avant l'ouverture de la CAPA — disponible pour toute analyse,
+  // pas seulement celles démarrées depuis "Diagnostic guidé" (Capas.jsx).
   const [showCapaForm, setShowCapaForm] = useState(false);
   const [capaForm, setCapaForm] = useState(null);
   const [priorityTouched, setPriorityTouched] = useState(false);
@@ -311,10 +310,10 @@ export default function QqoqccpDetail() {
     []
   );
 
-  // Chargés uniquement dans le parcours "flow=capa" : responsables assignables et délais de
-  // traitement par priorité (Paramètres > CAPA), nécessaires au formulaire d'ajustement.
+  // Responsables assignables et délais de traitement par priorité (Paramètres > CAPA),
+  // nécessaires au formulaire d'ajustement — chargés d'emblée, le bouton "Passer à
+  // l'ouverture de la CAPA" pouvant apparaître sur n'importe quelle analyse.
   useEffect(() => {
-    if (!isCapaFlow) return;
     api
       .get('/users')
       .then(({ data }) => setUsers(data))
@@ -323,7 +322,7 @@ export default function QqoqccpDetail() {
       .get('/capas/priority-delays')
       .then(({ data }) => setPriorityDelays(data))
       .catch(() => {});
-  }, [isCapaFlow]);
+  }, []);
 
   // Si les délais arrivent après l'ouverture du formulaire (course avec le clic), ou que la
   // priorité change, recalcule l'échéance suggérée — sauf si l'utilisateur l'a déjà modifiée.
@@ -460,6 +459,36 @@ export default function QqoqccpDetail() {
     }
   }
 
+  // Une CAPA déjà liée (voir GET /qqoqccp/:id, embed "capa" ajouté en B4) pointe vers elle au
+  // lieu de proposer d'en recréer une deuxième par erreur — le lien n'est jamais réinitialisé.
+  function renderCapaAction() {
+    if (showCapaForm) return null;
+
+    if (analysis.capa) {
+      return (
+        <button
+          type="button"
+          onClick={() => navigate(`/capas/${analysis.capa.id}`)}
+          className="mt-4 flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-4 py-2.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+        >
+          <ClipboardCheck size={18} />
+          Voir la CAPA liée — {analysis.capa.number}
+        </button>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={handleOpenCapaForm}
+        className="mt-4 flex items-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+      >
+        <ClipboardPlus size={18} />
+        Passer à l'ouverture de la CAPA
+      </button>
+    );
+  }
+
   if (loading) {
     return <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
@@ -562,17 +591,8 @@ export default function QqoqccpDetail() {
       </div>
 
       {/* Sous les 7 questions quand pas encore de proposition IA (voir l'autre occurrence
-          sous le résultat IA plus bas) — flow=capa uniquement. */}
-      {isCapaFlow && !hasSuggestion && !showCapaForm && (
-        <button
-          type="button"
-          onClick={handleOpenCapaForm}
-          className="mt-4 flex items-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
-        >
-          <ClipboardPlus size={18} />
-          Passer à l'ouverture de la CAPA
-        </button>
-      )}
+          sous le résultat IA plus bas). */}
+      {!hasSuggestion && renderCapaAction()}
 
       {hasSuggestion && (
         <div className="mt-6 rounded-xl border-2 border-dashed border-purple-300 bg-purple-50/40 p-5">
@@ -616,16 +636,7 @@ export default function QqoqccpDetail() {
         </div>
       )}
 
-      {isCapaFlow && hasSuggestion && !showCapaForm && (
-        <button
-          type="button"
-          onClick={handleOpenCapaForm}
-          className="mt-4 flex items-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
-        >
-          <ClipboardPlus size={18} />
-          Passer à l'ouverture de la CAPA
-        </button>
-      )}
+      {hasSuggestion && renderCapaAction()}
 
       {showCapaForm && capaForm && (
         <CapaAdjustmentForm
