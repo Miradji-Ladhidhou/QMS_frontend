@@ -986,11 +986,14 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   const [step, setStep] = useState(1);
   const fileInputRef = useRef(null);
 
+  const [sourceMode, setSourceMode] = useState('new'); // 'new' | 'reuse'
   const [file, setFile] = useState(null);
   const [dragActive, setDragActive] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [importData, setImportData] = useState(null);
+  const [recentImports, setRecentImports] = useState(null); // null = pas encore chargé
+  const [loadingRecent, setLoadingRecent] = useState(false);
 
   const [existingConfig, setExistingConfig] = useState(undefined); // undefined=chargement, null=aucune
   const [configMode, setConfigMode] = useState('edit'); // 'reuse' | 'edit'
@@ -1045,6 +1048,30 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
 
   function handleDownloadTemplate() {
     exportToCsv('modele-import-kpi.csv', TEMPLATE_HEADERS, buildTemplateRows());
+  }
+
+  function loadRecentImports() {
+    if (recentImports !== null || loadingRecent) return;
+    setLoadingRecent(true);
+    api
+      .get('/kpi-imports', { params: { limit: 20 } })
+      .then(({ data }) => setRecentImports(data))
+      .catch(() => setRecentImports([]))
+      .finally(() => setLoadingRecent(false));
+  }
+
+  async function handleSelectExistingImport(importId) {
+    setUploadError('');
+    setUploading(true);
+    try {
+      const { data } = await api.get(`/kpi-imports/${importId}`);
+      setImportData(data);
+      setSuggested(false);
+    } catch (err) {
+      setUploadError(err.response?.data?.error || "Impossible de charger cet import.");
+    } finally {
+      setUploading(false);
+    }
   }
 
   async function uploadFile(sheetName) {
@@ -1126,7 +1153,10 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
     try {
       const { data: savedConfig } = await api.post(`/kpis/${kpi.id}/calculation-config`, configPayload());
       setConfigWarning(savedConfig.warning || '');
-      const body = { dry_run: false };
+      // kpi_id toujours précisé explicitement : l'import réutilisé peut appartenir à un
+      // autre KPI (cf. "Réutiliser un import"), l'apply ne doit jamais retomber sur son
+      // propriétaire d'origine par défaut.
+      const body = { dry_run: false, kpi_id: kpi.id };
       if (!configForm.period_column) {
         body.period_date = manualPeriod ? `${manualPeriod}-01` : undefined;
       }
@@ -1177,18 +1207,27 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
 
         {step === 1 && (
           <div>
-            <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-              <p className="text-xs text-slate-500">
-                Pas encore de fichier prêt ? Téléchargez un modèle et adaptez-le : gardez seulement les colonnes utiles
-                à votre calcul.
-              </p>
+            <div className="mb-3 flex gap-4 border-b border-slate-200">
               <button
                 type="button"
-                onClick={handleDownloadTemplate}
-                className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                onClick={() => setSourceMode('new')}
+                className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium ${
+                  sourceMode === 'new' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
               >
-                <Download size={14} />
-                Modèle
+                Nouveau fichier
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSourceMode('reuse');
+                  loadRecentImports();
+                }}
+                className={`-mb-px border-b-2 px-1 pb-2 text-sm font-medium ${
+                  sourceMode === 'reuse' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Réutiliser un import
               </button>
             </div>
 
@@ -1196,63 +1235,121 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
               <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{uploadError}</p>
             )}
 
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDragActive(false);
-                handleFileChange(e.dataTransfer.files?.[0] ?? null);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              className={`flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${
-                dragActive ? 'border-primary bg-primary-50' : 'border-slate-300 hover:border-slate-400'
-              }`}
-            >
-              <Upload size={24} className="text-slate-400" />
-              {file ? (
-                <p className="text-sm font-medium text-slate-700">{file.name}</p>
-              ) : (
-                <p className="text-sm text-slate-500">Glissez-déposez un fichier CSV ou Excel ici, ou cliquez pour parcourir</p>
-              )}
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
-                onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
-                className="hidden"
-              />
-            </div>
+            {sourceMode === 'new' && (
+              <>
+                <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-xs text-slate-500">
+                    Pas encore de fichier prêt ? Téléchargez un modèle et adaptez-le : gardez seulement les colonnes
+                    utiles à votre calcul.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleDownloadTemplate}
+                    className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+                  >
+                    <Download size={14} />
+                    Modèle
+                  </button>
+                </div>
 
-            {file && !importData && (
-              <button
-                type="button"
-                onClick={() => uploadFile()}
-                disabled={uploading}
-                className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-              >
-                {uploading ? 'Analyse en cours...' : 'Analyser le fichier'}
-              </button>
+                <div
+                  onDragOver={(e) => {
+                    e.preventDefault();
+                    setDragActive(true);
+                  }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    setDragActive(false);
+                    handleFileChange(e.dataTransfer.files?.[0] ?? null);
+                  }}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`flex cursor-pointer flex-col items-center gap-2 rounded-md border-2 border-dashed px-4 py-8 text-center transition-colors ${
+                    dragActive ? 'border-primary bg-primary-50' : 'border-slate-300 hover:border-slate-400'
+                  }`}
+                >
+                  <Upload size={24} className="text-slate-400" />
+                  {file ? (
+                    <p className="text-sm font-medium text-slate-700">{file.name}</p>
+                  ) : (
+                    <p className="text-sm text-slate-500">Glissez-déposez un fichier CSV ou Excel ici, ou cliquez pour parcourir</p>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                    onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
+                    className="hidden"
+                  />
+                </div>
+
+                {file && !importData && (
+                  <button
+                    type="button"
+                    onClick={() => uploadFile()}
+                    disabled={uploading}
+                    className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+                  >
+                    {uploading ? 'Analyse en cours...' : 'Analyser le fichier'}
+                  </button>
+                )}
+
+                {importData?.available_sheets?.length > 1 && (
+                  <div className="mt-4">
+                    <label className="mb-1 block text-sm font-medium text-slate-700">Onglet à utiliser</label>
+                    <select
+                      value={importData.sheet_used}
+                      onChange={(e) => handleSheetChange(e.target.value)}
+                      disabled={uploading}
+                      className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    >
+                      {importData.available_sheets.map((sheet) => (
+                        <option key={sheet} value={sheet}>
+                          {sheet}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </>
             )}
 
-            {importData?.available_sheets?.length > 1 && (
-              <div className="mt-4">
-                <label className="mb-1 block text-sm font-medium text-slate-700">Onglet à utiliser</label>
-                <select
-                  value={importData.sheet_used}
-                  onChange={(e) => handleSheetChange(e.target.value)}
-                  disabled={uploading}
-                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                >
-                  {importData.available_sheets.map((sheet) => (
-                    <option key={sheet} value={sheet}>
-                      {sheet}
-                    </option>
-                  ))}
-                </select>
+            {sourceMode === 'reuse' && (
+              <div>
+                {loadingRecent && (
+                  <div className="space-y-2">
+                    {[0, 1, 2].map((key) => (
+                      <div key={key} className="h-16 animate-pulse rounded-md bg-slate-100" />
+                    ))}
+                  </div>
+                )}
+
+                {!loadingRecent && recentImports?.length === 0 && (
+                  <p className="py-6 text-center text-sm text-slate-400">Aucun import récent dans votre organisation.</p>
+                )}
+
+                {!loadingRecent && recentImports?.length > 0 && (
+                  <div className="max-h-72 space-y-2 overflow-y-auto">
+                    {recentImports.map((imp) => (
+                      <button
+                        key={imp.id}
+                        type="button"
+                        onClick={() => handleSelectExistingImport(imp.id)}
+                        disabled={uploading}
+                        className={`block w-full rounded-md border p-3 text-left hover:bg-slate-50 disabled:opacity-60 ${
+                          importData?.import?.id === imp.id ? 'border-primary bg-primary-50' : 'border-slate-200'
+                        }`}
+                      >
+                        <p className="text-sm font-medium text-slate-800">{imp.file_name || 'Fichier sans nom'}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {formatDate(imp.imported_at)} · {imp.row_count} ligne{imp.row_count > 1 ? 's' : ''}
+                          {imp.kpi?.name ? ` · déposé pour "${imp.kpi.name}"` : ''}
+                        </p>
+                        <p className="mt-1 truncate text-xs text-slate-400">{(imp.detected_columns || []).join(', ')}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
