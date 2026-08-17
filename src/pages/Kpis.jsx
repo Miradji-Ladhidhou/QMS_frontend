@@ -60,14 +60,83 @@ const SOURCE_STYLES = {
 };
 
 const CALC_TYPE_OPTIONS = [
-  { value: 'ratio', label: 'Pourcentage conditionnel (ex : % de lignes conformes)' },
-  { value: 'sum', label: "Somme d'une colonne" },
-  { value: 'average', label: "Moyenne d'une colonne" },
+  { value: 'ratio', label: 'Pourcentage (ex : % conforme)' },
+  { value: 'sum', label: 'Somme' },
+  { value: 'average', label: 'Moyenne' },
   { value: 'count', label: 'Nombre de lignes' },
   { value: 'count_grouped', label: 'Répartition par catégorie' },
 ];
 
 const CALC_TYPE_LABELS = Object.fromEntries(CALC_TYPE_OPTIONS.map((option) => [option.value, option.label]));
+
+const TEMPLATE_HEADERS = ['Référence', 'Résultat', 'Valeur', 'Catégorie', 'Période'];
+
+function buildTemplateRows() {
+  const month = new Date().toISOString().slice(0, 7);
+  return [
+    ['ITEM-001', 'Conforme', '120', 'Support', month],
+    ['ITEM-002', 'Non conforme', '95', 'Logistique', month],
+    ['ITEM-003', 'Conforme', '140', 'Support', month],
+  ];
+}
+
+// Jetons reconnus comme valeur "positive"/"négative" d'une colonne binaire (conformité,
+// oui/non...), pour deviner une recette de type ratio sans que l'utilisateur ait à tout
+// configurer à la main quand son fichier a déjà cette forme la plus courante.
+const POSITIVE_TOKENS = new Set(['conforme', 'oui', 'yes', 'ok', 'true', 'vrai', '1']);
+const NEGATIVE_TOKENS = new Set(['non conforme', 'non-conforme', 'non_conforme', 'non', 'no', 'ko', 'false', 'faux', '0']);
+
+function normalizeToken(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isNumericValue(value) {
+  if (value === null || value === undefined || value === '') return false;
+  const str = String(value).trim().replace(',', '.');
+  return str !== '' && !Number.isNaN(Number(str));
+}
+
+// Colonne "période" probable, repérée par son nom (date, mois, période, année...) plutôt
+// que son contenu — plus fiable qu'analyser 5 lignes d'échantillon pour ça.
+function looksLikePeriodColumnName(name) {
+  const normalized = name
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .toLowerCase();
+  return /date|periode|mois|annee|year|month/.test(normalized);
+}
+
+function detectPeriodColumn(columns) {
+  return columns.find(looksLikePeriodColumnName) || '';
+}
+
+// Devine une recette de calcul plausible à partir des colonnes détectées et d'un échantillon
+// de lignes — un point de départ à vérifier/ajuster, jamais appliqué sans que l'utilisateur
+// ne voie et ne valide le formulaire pré-rempli.
+function detectCalcSuggestion(columns, sampleRows, periodColumn) {
+  const candidates = columns.filter((c) => c !== periodColumn);
+
+  for (const column of candidates) {
+    const values = sampleRows.map((row) => normalizeToken(row[column])).filter(Boolean);
+    if (values.length === 0) continue;
+    const distinct = new Set(values);
+    const hasPositive = [...distinct].some((v) => POSITIVE_TOKENS.has(v));
+    const allBinary = [...distinct].every((v) => POSITIVE_TOKENS.has(v) || NEGATIVE_TOKENS.has(v));
+    if (hasPositive && allBinary) {
+      const originalPositiveValue = sampleRows.map((row) => row[column]).find((v) => POSITIVE_TOKENS.has(normalizeToken(v)));
+      return { calc_type: 'ratio', filter_column: column, filter_value: String(originalPositiveValue) };
+    }
+  }
+
+  for (const column of candidates) {
+    const values = sampleRows.map((row) => row[column]).filter((v) => v !== null && v !== undefined && v !== '');
+    if (values.length > 0 && values.every(isNumericValue)) {
+      return { calc_type: 'average', source_column: column };
+    }
+  }
+
+  return null;
+}
 
 const EMPTY_CONFIG_FORM = {
   calc_type: 'ratio',
@@ -760,6 +829,7 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   const [preview, setPreview] = useState(null);
   const [previewing, setPreviewing] = useState(false);
   const [applying, setApplying] = useState(false);
+  const [suggested, setSuggested] = useState(false);
 
   const [result, setResult] = useState(null);
 
@@ -779,11 +849,31 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
       });
   }, [kpi.id]);
 
+  // Pré-remplit la recette dès que le fichier est analysé, quand ce KPI n'a encore aucune
+  // configuration : la colonne de période est repérée par son nom, et une recette de type
+  // ratio/moyenne est proposée si une colonne s'y prête clairement — l'utilisateur garde la
+  // main pour tout ajuster, mais part d'un formulaire déjà rempli plutôt que vide.
+  useEffect(() => {
+    if (!importData || existingConfig === undefined || existingConfig) return;
+    const periodColumn = detectPeriodColumn(importData.columns);
+    const calcSuggestion = detectCalcSuggestion(importData.columns, importData.sample, periodColumn);
+    const guess = { ...(periodColumn ? { period_column: periodColumn } : {}), ...(calcSuggestion || {}) };
+    if (Object.keys(guess).length > 0) {
+      setSuggested(true);
+      setConfigForm((prev) => ({ ...prev, ...guess }));
+    }
+  }, [importData, existingConfig]);
+
   function handleFileChange(selected) {
     if (!selected) return;
     setFile(selected);
     setUploadError('');
     setImportData(null);
+    setSuggested(false);
+  }
+
+  function handleDownloadTemplate() {
+    exportToCsv('modele-import-kpi.csv', TEMPLATE_HEADERS, buildTemplateRows());
   }
 
   async function uploadFile(sheetName) {
@@ -901,6 +991,21 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
 
         {step === 1 && (
           <div>
+            <div className="mb-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
+              <p className="text-xs text-slate-500">
+                Pas encore de fichier prêt ? Téléchargez un modèle et adaptez-le : gardez seulement les colonnes utiles
+                à votre calcul.
+              </p>
+              <button
+                type="button"
+                onClick={handleDownloadTemplate}
+                className="flex shrink-0 items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+              >
+                <Download size={14} />
+                Modèle
+              </button>
+            </div>
+
             {uploadError && (
               <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{uploadError}</p>
             )}
@@ -1054,6 +1159,11 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
                       >
                         ← Revenir à la configuration existante
                       </button>
+                    )}
+                    {suggested && (
+                      <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                        Configuration pré-remplie automatiquement d'après votre fichier — vérifiez et ajustez si besoin.
+                      </p>
                     )}
                     <CalculationConfigFields
                       form={configForm}
