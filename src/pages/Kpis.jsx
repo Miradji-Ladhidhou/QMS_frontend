@@ -1008,19 +1008,16 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   const [result, setResult] = useState(null);
 
   useEffect(() => {
-    api
-      .get(`/kpis/${kpi.id}/calculation-config`)
-      .then(({ data }) => {
+    api.get(`/kpis/${kpi.id}/calculation-config`).then(({ data }) => {
+      if (data) {
         setExistingConfig(data);
         setConfigForm(configToForm(data));
         setConfigMode('reuse');
-      })
-      .catch((err) => {
-        if (err.response?.status === 404) {
-          setExistingConfig(null);
-          setConfigMode('edit');
-        }
-      });
+      } else {
+        setExistingConfig(null);
+        setConfigMode('edit');
+      }
+    });
   }, [kpi.id]);
 
   // Pré-remplit la recette dès que le fichier est analysé, quand ce KPI n'a encore aucune
@@ -1468,12 +1465,12 @@ function CalculationConfigModal({ kpi, onClose, onSaved }) {
     api
       .get(`/kpis/${kpi.id}/calculation-config`)
       .then(({ data }) => {
-        setForm(configToForm(data));
-        setHasExisting(true);
+        if (data) {
+          setForm(configToForm(data));
+          setHasExisting(true);
+        }
       })
-      .catch((err) => {
-        if (err.response?.status !== 404) setError('Impossible de charger la configuration existante.');
-      })
+      .catch(() => setError('Impossible de charger la configuration existante.'))
       .finally(() => setLoading(false));
   }, [kpi.id]);
 
