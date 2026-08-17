@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, Check, ClipboardPlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 
@@ -27,9 +28,244 @@ function buildForm(analysis) {
   return form;
 }
 
+// Mêmes helpers que Capas.jsx (NewCapaModal) pour l'échéance suggérée selon la priorité —
+// voir Paramètres > CAPA pour les délais configurés par tenant (GET /capas/priority-delays).
+function addDaysToToday(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function getDelayDays(priority, priorityDelays) {
+  return priorityDelays?.[priority] ?? null;
+}
+
+function AiSuggestedBadge() {
+  return (
+    <span className="ml-2 inline-flex items-center gap-1 rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-medium text-purple-700">
+      <Sparkles size={10} />
+      Suggéré par l'IA
+    </span>
+  );
+}
+
+// Formulaire d'ajustement révélé par "Passer à l'ouverture de la CAPA" (flow=capa) — reprend
+// la synthèse/les causes/actions IA comme point de départ modifiable, jamais figé.
+function CapaAdjustmentForm({
+  form,
+  users,
+  priorityDelays,
+  priorityTouched,
+  severityTouched,
+  dueDateTouched,
+  suggestedActions,
+  selectedActionIndex,
+  onFieldChange,
+  onPriorityChange,
+  onSeverityChange,
+  onDueDateChange,
+  onSelectAction,
+  onSelectCustomAction,
+  onSubmit,
+  submitting,
+  error,
+}) {
+  return (
+    <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5">
+      <h2 className="flex items-center gap-2 text-base font-semibold text-slate-900">
+        <ClipboardPlus size={18} className="text-primary" />
+        Ouvrir la CAPA
+      </h2>
+      <p className="mt-1 text-sm text-slate-500">
+        Les valeurs ci-dessous sont pré-remplies à partir de l'analyse — ajustez-les avant de créer la CAPA.
+      </p>
+
+      {error && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+
+      <form onSubmit={onSubmit} className="mt-4 space-y-4">
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+          <input
+            type="text"
+            required
+            value={form.title}
+            onChange={(e) => onFieldChange('title', e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
+          <input
+            type="text"
+            placeholder="Production, Qualité, Logistique..."
+            value={form.service}
+            onChange={(e) => onFieldChange('service', e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 flex flex-wrap items-center text-sm font-medium text-slate-700">
+              Priorité
+              {!priorityTouched && form.priority && <AiSuggestedBadge />}
+            </label>
+            <select
+              value={form.priority}
+              onChange={(e) => onPriorityChange(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 flex flex-wrap items-center text-sm font-medium text-slate-700">
+              Gravité
+              {!severityTouched && form.severity && <AiSuggestedBadge />}
+            </label>
+            <select
+              value={form.severity}
+              onChange={(e) => onSeverityChange(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Cause racine</label>
+          <textarea
+            rows={3}
+            value={form.root_cause}
+            onChange={(e) => onFieldChange('root_cause', e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
+
+          {suggestedActions.length > 0 && (
+            <div className="mb-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {suggestedActions.map((action, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  onClick={() => onSelectAction(i)}
+                  className={`rounded-lg border p-3 text-left text-sm transition-colors ${
+                    selectedActionIndex === i
+                      ? 'border-primary bg-primary/5'
+                      : 'border-slate-200 bg-white hover:bg-slate-50'
+                  }`}
+                >
+                  <p className="font-medium text-slate-900">{action.title}</p>
+                  {action.description && <p className="mt-0.5 line-clamp-2 text-xs text-slate-500">{action.description}</p>}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={onSelectCustomAction}
+                className={`rounded-lg border border-dashed p-3 text-left text-sm transition-colors ${
+                  selectedActionIndex === 'custom'
+                    ? 'border-primary bg-primary/5 text-primary'
+                    : 'border-slate-300 text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                Écrire ma propre action
+              </button>
+            </div>
+          )}
+
+          <textarea
+            rows={3}
+            placeholder="Que va-t-on faire pour corriger le problème ?"
+            value={form.corrective_action}
+            onChange={(e) => onFieldChange('corrective_action', e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
+          <textarea
+            rows={2}
+            placeholder="Comment éviter que cela se reproduise ?"
+            value={form.preventive_action}
+            onChange={(e) => onFieldChange('preventive_action', e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Responsable assigné</label>
+          <select
+            value={form.assigned_to}
+            onChange={(e) => onFieldChange('assigned_to', e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          >
+            <option value="">Non assigné</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">
+            Échéance
+            {!dueDateTouched && (
+              <span className="ml-1 font-normal text-slate-400">
+                (suggéré : {getDelayDays(form.priority, priorityDelays) ?? '—'} jours)
+              </span>
+            )}
+          </label>
+          <input
+            type="date"
+            value={form.due_date}
+            onChange={(e) => onDueDateChange(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </div>
+
+        <button
+          type="submit"
+          disabled={submitting}
+          className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+        >
+          {submitting ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Création...
+            </>
+          ) : (
+            'Ouvrir la CAPA'
+          )}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function QqoqccpDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isCapaFlow = searchParams.get('flow') === 'capa';
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,6 +276,18 @@ export default function QqoqccpDetail() {
   const [generateError, setGenerateError] = useState('');
   const timers = useRef({});
   const savedTimers = useRef({});
+
+  // Formulaire d'ajustement avant l'ouverture de la CAPA (flow=capa uniquement)
+  const [showCapaForm, setShowCapaForm] = useState(false);
+  const [capaForm, setCapaForm] = useState(null);
+  const [priorityTouched, setPriorityTouched] = useState(false);
+  const [severityTouched, setSeverityTouched] = useState(false);
+  const [dueDateTouched, setDueDateTouched] = useState(false);
+  const [selectedActionIndex, setSelectedActionIndex] = useState(null);
+  const [users, setUsers] = useState([]);
+  const [priorityDelays, setPriorityDelays] = useState(null);
+  const [capaError, setCapaError] = useState('');
+  const [creatingCapa, setCreatingCapa] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -62,6 +310,31 @@ export default function QqoqccpDetail() {
     },
     []
   );
+
+  // Chargés uniquement dans le parcours "flow=capa" : responsables assignables et délais de
+  // traitement par priorité (Paramètres > CAPA), nécessaires au formulaire d'ajustement.
+  useEffect(() => {
+    if (!isCapaFlow) return;
+    api
+      .get('/users')
+      .then(({ data }) => setUsers(data))
+      .catch(() => {});
+    api
+      .get('/capas/priority-delays')
+      .then(({ data }) => setPriorityDelays(data))
+      .catch(() => {});
+  }, [isCapaFlow]);
+
+  // Si les délais arrivent après l'ouverture du formulaire (course avec le clic), ou que la
+  // priorité change, recalcule l'échéance suggérée — sauf si l'utilisateur l'a déjà modifiée.
+  useEffect(() => {
+    if (!showCapaForm || dueDateTouched || !priorityDelays || !capaForm) return;
+    const days = getDelayDays(capaForm.priority, priorityDelays);
+    if (days) {
+      setCapaForm((prev) => (prev ? { ...prev, due_date: addDaysToToday(days) } : prev));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [priorityDelays, showCapaForm]);
 
   function handleFieldChange(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -97,6 +370,93 @@ export default function QqoqccpDetail() {
       setGenerateError(err.response?.data?.error || 'Impossible de générer une proposition IA.');
     } finally {
       setGenerating(false);
+    }
+  }
+
+  function handleOpenCapaForm() {
+    const suggested = analysis.ai_suggested_actions?.overall_priority || 'medium';
+    const causes = analysis.ai_suggested_actions?.root_causes || [];
+    const delayDays = getDelayDays(suggested, priorityDelays);
+
+    setCapaForm({
+      title: analysis.title,
+      service: '',
+      priority: suggested,
+      severity: suggested,
+      root_cause: causes.length > 0 ? causes.map((cause) => `- ${cause}`).join('\n') : '',
+      corrective_action: '',
+      preventive_action: '',
+      assigned_to: '',
+      due_date: delayDays ? addDaysToToday(delayDays) : '',
+    });
+    setPriorityTouched(false);
+    setSeverityTouched(false);
+    setDueDateTouched(false);
+    setSelectedActionIndex(null);
+    setCapaError('');
+    setShowCapaForm(true);
+  }
+
+  function updateCapaField(field, value) {
+    setCapaForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleCapaPriorityChange(value) {
+    setPriorityTouched(true);
+    setCapaForm((prev) => {
+      const days = getDelayDays(value, priorityDelays);
+      return {
+        ...prev,
+        priority: value,
+        due_date: !dueDateTouched && days ? addDaysToToday(days) : prev.due_date,
+      };
+    });
+  }
+
+  function handleCapaSeverityChange(value) {
+    setSeverityTouched(true);
+    updateCapaField('severity', value);
+  }
+
+  function handleCapaDueDateChange(value) {
+    setDueDateTouched(true);
+    updateCapaField('due_date', value);
+  }
+
+  function handleSelectSuggestedAction(index) {
+    setSelectedActionIndex(index);
+    const action = analysis.ai_suggested_actions.suggested_actions[index];
+    updateCapaField('corrective_action', action.description ? `${action.title}\n\n${action.description}` : action.title);
+  }
+
+  function handleSelectCustomAction() {
+    setSelectedActionIndex('custom');
+    updateCapaField('corrective_action', '');
+  }
+
+  async function handleCreateCapa(event) {
+    event.preventDefault();
+    setCapaError('');
+    setCreatingCapa(true);
+
+    try {
+      const payload = {
+        title: capaForm.title,
+        service: capaForm.service || undefined,
+        priority: capaForm.priority,
+        severity: capaForm.severity,
+        root_cause: capaForm.root_cause || undefined,
+        corrective_action: capaForm.corrective_action || undefined,
+        preventive_action: capaForm.preventive_action || undefined,
+        assigned_to: capaForm.assigned_to || undefined,
+        due_date: capaForm.due_date || undefined,
+      };
+      const { data } = await api.post(`/qqoqccp/${id}/create-capa`, payload);
+      navigate(`/capas/${data.id}`);
+    } catch (err) {
+      setCapaError(err.response?.data?.error || 'Impossible de créer la CAPA.');
+    } finally {
+      setCreatingCapa(false);
     }
   }
 
@@ -201,6 +561,19 @@ export default function QqoqccpDetail() {
         {generateError && <p className="mt-2 text-sm text-red-600">{generateError}</p>}
       </div>
 
+      {/* Sous les 7 questions quand pas encore de proposition IA (voir l'autre occurrence
+          sous le résultat IA plus bas) — flow=capa uniquement. */}
+      {isCapaFlow && !hasSuggestion && !showCapaForm && (
+        <button
+          type="button"
+          onClick={handleOpenCapaForm}
+          className="mt-4 flex items-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+        >
+          <ClipboardPlus size={18} />
+          Passer à l'ouverture de la CAPA
+        </button>
+      )}
+
       {hasSuggestion && (
         <div className="mt-6 rounded-xl border-2 border-dashed border-purple-300 bg-purple-50/40 p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
@@ -241,6 +614,39 @@ export default function QqoqccpDetail() {
             </div>
           )}
         </div>
+      )}
+
+      {isCapaFlow && hasSuggestion && !showCapaForm && (
+        <button
+          type="button"
+          onClick={handleOpenCapaForm}
+          className="mt-4 flex items-center gap-2 rounded-md border border-primary px-4 py-2.5 text-sm font-medium text-primary transition-colors hover:bg-primary/5"
+        >
+          <ClipboardPlus size={18} />
+          Passer à l'ouverture de la CAPA
+        </button>
+      )}
+
+      {showCapaForm && capaForm && (
+        <CapaAdjustmentForm
+          form={capaForm}
+          users={users}
+          priorityDelays={priorityDelays}
+          priorityTouched={priorityTouched}
+          severityTouched={severityTouched}
+          dueDateTouched={dueDateTouched}
+          suggestedActions={suggestedActions}
+          selectedActionIndex={selectedActionIndex}
+          onFieldChange={updateCapaField}
+          onPriorityChange={handleCapaPriorityChange}
+          onSeverityChange={handleCapaSeverityChange}
+          onDueDateChange={handleCapaDueDateChange}
+          onSelectAction={handleSelectSuggestedAction}
+          onSelectCustomAction={handleSelectCustomAction}
+          onSubmit={handleCreateCapa}
+          submitting={creatingCapa}
+          error={capaError}
+        />
       )}
     </div>
   );
