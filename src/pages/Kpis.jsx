@@ -63,11 +63,44 @@ const CALC_TYPE_OPTIONS = [
   { value: 'ratio', label: 'Pourcentage (ex : % conforme)' },
   { value: 'sum', label: 'Somme' },
   { value: 'average', label: 'Moyenne' },
+  { value: 'min', label: 'Minimum' },
+  { value: 'max', label: 'Maximum' },
   { value: 'count', label: 'Nombre de lignes' },
   { value: 'count_grouped', label: 'Répartition par catégorie' },
 ];
 
 const CALC_TYPE_LABELS = Object.fromEntries(CALC_TYPE_OPTIONS.map((option) => [option.value, option.label]));
+
+const FILTER_OPERATOR_OPTIONS = [
+  { value: 'equals', label: 'est égal à' },
+  { value: 'not_equals', label: 'est différent de' },
+  { value: 'contains', label: 'contient' },
+  { value: 'not_contains', label: 'ne contient pas' },
+  { value: 'greater_than', label: 'est supérieur à' },
+  { value: 'greater_or_equal', label: 'est supérieur ou égal à' },
+  { value: 'less_than', label: 'est inférieur à' },
+  { value: 'less_or_equal', label: 'est inférieur ou égal à' },
+  { value: 'is_empty', label: 'est vide' },
+  { value: 'is_not_empty', label: "n'est pas vide" },
+];
+
+const OPERATORS_WITHOUT_VALUE = new Set(['is_empty', 'is_not_empty']);
+const FILTER_OPERATOR_LABELS = Object.fromEntries(FILTER_OPERATOR_OPTIONS.map((o) => [o.value, o.label]));
+
+function describeFiltersShort(filters, logic) {
+  if (!filters || filters.length === 0) return null;
+  const parts = filters.map((f) => {
+    const opLabel = FILTER_OPERATOR_LABELS[f.operator] || f.operator;
+    return OPERATORS_WITHOUT_VALUE.has(f.operator) ? `"${f.column}" ${opLabel}` : `"${f.column}" ${opLabel} "${f.value}"`;
+  });
+  return parts.join(logic === 'any' ? ' OU ' : ' ET ');
+}
+
+function isFilterComplete(filter) {
+  if (!filter.column || !filter.operator) return false;
+  if (OPERATORS_WITHOUT_VALUE.has(filter.operator)) return true;
+  return filter.value !== undefined && filter.value !== null && filter.value !== '';
+}
 
 const TEMPLATE_HEADERS = ['Référence', 'Résultat', 'Valeur', 'Catégorie', 'Période'];
 
@@ -124,7 +157,11 @@ function detectCalcSuggestion(columns, sampleRows, periodColumn) {
     const allBinary = [...distinct].every((v) => POSITIVE_TOKENS.has(v) || NEGATIVE_TOKENS.has(v));
     if (hasPositive && allBinary) {
       const originalPositiveValue = sampleRows.map((row) => row[column]).find((v) => POSITIVE_TOKENS.has(normalizeToken(v)));
-      return { calc_type: 'ratio', filter_column: column, filter_value: String(originalPositiveValue) };
+      return {
+        calc_type: 'ratio',
+        filters: [{ column, operator: 'equals', value: String(originalPositiveValue) }],
+        filter_logic: 'all',
+      };
     }
   }
 
@@ -141,8 +178,8 @@ function detectCalcSuggestion(columns, sampleRows, periodColumn) {
 const EMPTY_CONFIG_FORM = {
   calc_type: 'ratio',
   source_column: '',
-  filter_column: '',
-  filter_value: '',
+  filters: [],
+  filter_logic: 'all',
   group_by_column: '',
   period_column: '',
 };
@@ -151,8 +188,8 @@ function configToForm(config) {
   return {
     calc_type: config.calc_type,
     source_column: config.source_column || '',
-    filter_column: config.filter_column || '',
-    filter_value: config.filter_value || '',
+    filters: config.filters || [],
+    filter_logic: config.filter_logic || 'all',
     group_by_column: config.group_by_column || '',
     period_column: config.period_column || '',
   };
@@ -162,10 +199,11 @@ function configToForm(config) {
 // (kpis.js POST .../calculation-config) — évite un aller-retour réseau pour un champ
 // manquant évident, mais le backend reste la source de vérité en cas de désaccord.
 function isConfigComplete(form) {
-  if (form.calc_type === 'ratio') return Boolean(form.filter_column && form.filter_value);
-  if (form.calc_type === 'sum' || form.calc_type === 'average') return Boolean(form.source_column);
+  if (form.filters.some((f) => !isFilterComplete(f))) return false;
+  if (form.calc_type === 'ratio') return form.filters.length > 0;
+  if (['sum', 'average', 'min', 'max'].includes(form.calc_type)) return Boolean(form.source_column);
   if (form.calc_type === 'count_grouped') return Boolean(form.group_by_column);
-  return true; // count : aucun champ additionnel requis
+  return true; // count : les conditions restent optionnelles
 }
 
 // Nom de fichier sûr pour un téléchargement (évite les caractères qui posent problème
@@ -636,22 +674,151 @@ function ColumnField({ label, value, onChange, columns, required, placeholder })
   );
 }
 
+// Une ou plusieurs conditions (colonne/opérateur/valeur), combinables en ET/OU — utilisées
+// pour restreindre les lignes prises en compte par n'importe quel type de calcul (pas
+// seulement le pourcentage). columns=null (édition hors import) bascule la colonne en
+// saisie libre plutôt qu'un select.
+function FilterBuilder({ filters, filterLogic, onChange, columns, sampleRows, required }) {
+  function updateFilter(index, patch) {
+    onChange({ filters: filters.map((f, i) => (i === index ? { ...f, ...patch } : f)), filter_logic: filterLogic });
+  }
+  function addFilter() {
+    onChange({ filters: [...filters, { column: '', operator: 'equals', value: '' }], filter_logic: filterLogic });
+  }
+  function removeFilter(index) {
+    onChange({ filters: filters.filter((_, i) => i !== index), filter_logic: filterLogic });
+  }
+
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">
+        Conditions {required ? '' : '(optionnel)'}
+      </label>
+
+      {filters.length === 0 && (
+        <p className="mb-2 text-xs text-slate-400">
+          {required ? 'Ajoutez au moins une condition.' : 'Sans condition, toutes les lignes de la période sont prises en compte.'}
+        </p>
+      )}
+
+      <div className="space-y-2">
+        {filters.map((filter, index) => {
+          const suggestions =
+            filter.column && sampleRows
+              ? Array.from(
+                  new Set(
+                    sampleRows
+                      .map((row) => row[filter.column])
+                      .filter((v) => v !== undefined && v !== null && v !== '')
+                      .map(String)
+                  )
+                )
+              : [];
+          const needsValue = !OPERATORS_WITHOUT_VALUE.has(filter.operator);
+
+          return (
+            <div key={index} className="flex flex-wrap items-center gap-1.5 rounded-md border border-slate-200 p-2">
+              {index > 0 && (
+                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-slate-500">
+                  {filterLogic === 'any' ? 'ou' : 'et'}
+                </span>
+              )}
+              {columns ? (
+                <select
+                  value={filter.column}
+                  onChange={(e) => updateFilter(index, { column: e.target.value })}
+                  className="rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">Colonne</option>
+                  {columns.map((col) => (
+                    <option key={col} value={col}>
+                      {col}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={filter.column}
+                  onChange={(e) => updateFilter(index, { column: e.target.value })}
+                  placeholder="Colonne"
+                  className="w-28 rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              )}
+              <select
+                value={filter.operator}
+                onChange={(e) => updateFilter(index, { operator: e.target.value })}
+                className="rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                {FILTER_OPERATOR_OPTIONS.map((op) => (
+                  <option key={op.value} value={op.value}>
+                    {op.label}
+                  </option>
+                ))}
+              </select>
+              {needsValue && (
+                <>
+                  <input
+                    type="text"
+                    list={`kpi-filter-suggestions-${index}`}
+                    value={filter.value}
+                    onChange={(e) => updateFilter(index, { value: e.target.value })}
+                    placeholder="Valeur"
+                    className="min-w-0 flex-1 rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                  {suggestions.length > 0 && (
+                    <datalist id={`kpi-filter-suggestions-${index}`}>
+                      {suggestions.map((v) => (
+                        <option key={v} value={v} />
+                      ))}
+                    </datalist>
+                  )}
+                </>
+              )}
+              <button
+                type="button"
+                onClick={() => removeFilter(index)}
+                aria-label="Supprimer la condition"
+                className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={addFilter}
+          className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+          <Plus size={14} />
+          Ajouter une condition
+        </button>
+        {filters.length > 1 && (
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <span>Combiner :</span>
+            <select
+              value={filterLogic}
+              onChange={(e) => onChange({ filters, filter_logic: e.target.value })}
+              className="rounded-md border border-slate-300 px-1.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="all">Toutes (ET)</option>
+              <option value="any">Au moins une (OU)</option>
+            </select>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // Champs dynamiques de la recette de calcul, réutilisés dans le wizard d'import (columns =
 // celles détectées à l'étape 1, avec suggestions de valeurs tirées de l'aperçu) et dans
 // l'édition seule de la recette (columns = null, saisie libre du nom de colonne).
 function CalculationConfigFields({ form, onChange, columns, sampleRows }) {
-  const filterValueSuggestions =
-    form.filter_column && sampleRows
-      ? Array.from(
-          new Set(
-            sampleRows
-              .map((row) => row[form.filter_column])
-              .filter((v) => v !== undefined && v !== null && v !== '')
-              .map(String)
-          )
-        )
-      : [];
-
   return (
     <div className="space-y-4">
       <div>
@@ -669,38 +836,7 @@ function CalculationConfigFields({ form, onChange, columns, sampleRows }) {
         </select>
       </div>
 
-      {form.calc_type === 'ratio' && (
-        <>
-          <ColumnField
-            label="Colonne à vérifier"
-            required
-            value={form.filter_column}
-            onChange={(v) => onChange({ ...form, filter_column: v })}
-            columns={columns}
-          />
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Valeur recherchée</label>
-            <input
-              type="text"
-              required
-              list="kpi-filter-value-suggestions"
-              value={form.filter_value}
-              onChange={(e) => onChange({ ...form, filter_value: e.target.value })}
-              placeholder="ex : Conforme"
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-            {filterValueSuggestions.length > 0 && (
-              <datalist id="kpi-filter-value-suggestions">
-                {filterValueSuggestions.map((v) => (
-                  <option key={v} value={v} />
-                ))}
-              </datalist>
-            )}
-          </div>
-        </>
-      )}
-
-      {(form.calc_type === 'sum' || form.calc_type === 'average') && (
+      {['sum', 'average', 'min', 'max'].includes(form.calc_type) && (
         <ColumnField
           label="Colonne à calculer"
           required
@@ -719,6 +855,15 @@ function CalculationConfigFields({ form, onChange, columns, sampleRows }) {
           columns={columns}
         />
       )}
+
+      <FilterBuilder
+        filters={form.filters}
+        filterLogic={form.filter_logic}
+        onChange={(patch) => onChange({ ...form, ...patch })}
+        columns={columns}
+        sampleRows={sampleRows}
+        required={form.calc_type === 'ratio'}
+      />
 
       <div>
         <ColumnField
@@ -826,10 +971,12 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   const [manualPeriod, setManualPeriod] = useState('');
   const [configError, setConfigError] = useState('');
   const [configWarning, setConfigWarning] = useState('');
-  const [preview, setPreview] = useState(null);
-  const [previewing, setPreviewing] = useState(false);
   const [applying, setApplying] = useState(false);
   const [suggested, setSuggested] = useState(false);
+
+  const [livePreview, setLivePreview] = useState(null);
+  const [livePreviewLoading, setLivePreviewLoading] = useState(false);
+  const [livePreviewError, setLivePreviewError] = useState('');
 
   const [result, setResult] = useState(null);
 
@@ -898,49 +1045,64 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
     uploadFile(sheetName);
   }
 
-  async function saveConfig() {
-    const payload = {
+  function configPayload() {
+    return {
       calc_type: configForm.calc_type,
       source_column: configForm.source_column || null,
-      filter_column: configForm.filter_column || null,
-      filter_value: configForm.filter_value || null,
+      filters: configForm.filters,
+      filter_logic: configForm.filter_logic,
       group_by_column: configForm.group_by_column || null,
       period_column: configForm.period_column || null,
     };
-    const { data } = await api.post(`/kpis/${kpi.id}/calculation-config`, payload);
-    setConfigWarning(data.warning || '');
-    return data;
   }
 
-  function buildApplyBody(dryRun) {
-    const body = { dry_run: dryRun };
-    if (!configForm.period_column) {
-      body.period_date = manualPeriod ? `${manualPeriod}-01` : undefined;
-    }
-    return body;
-  }
+  const periodReady = Boolean(configForm.period_column || manualPeriod);
+  const configComplete = configMode === 'reuse' ? true : isConfigComplete(configForm);
+  const canProceed = configComplete && periodReady;
 
-  async function handlePreview() {
-    setConfigError('');
-    setPreviewing(true);
-    setPreview(null);
-    try {
-      await saveConfig();
-      const { data } = await api.post(`/kpi-imports/${importData.import.id}/apply`, buildApplyBody(true));
-      setPreview(data);
-    } catch (err) {
-      setConfigError(err.response?.data?.error || "Impossible de calculer l'aperçu.");
-    } finally {
-      setPreviewing(false);
+  // Aperçu live : recalcule à chaque changement de champ via /evaluate, qui n'enregistre
+  // rien (ni la recette, ni de valeur) — contrairement à l'ancienne version qui exigeait de
+  // sauvegarder la recette avant de pouvoir cliquer "Aperçu". Débounce léger pour ne pas
+  // spammer l'API à chaque frappe dans le champ "Valeur".
+  useEffect(() => {
+    if (step !== 2 || !importData || !canProceed) {
+      setLivePreview(null);
+      setLivePreviewError('');
+      return undefined;
     }
-  }
+
+    const timer = setTimeout(() => {
+      setLivePreviewLoading(true);
+      setLivePreviewError('');
+      const body = { ...configPayload() };
+      if (!configForm.period_column) {
+        body.period_date = manualPeriod ? `${manualPeriod}-01` : undefined;
+      }
+      api
+        .post(`/kpi-imports/${importData.import.id}/evaluate`, body)
+        .then(({ data }) => setLivePreview(data))
+        .catch((err) => {
+          setLivePreview(null);
+          setLivePreviewError(err.response?.data?.error || "Impossible de calculer l'aperçu.");
+        })
+        .finally(() => setLivePreviewLoading(false));
+    }, 450);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, importData, configForm, manualPeriod, canProceed]);
 
   async function handleValidate() {
     setConfigError('');
     setApplying(true);
     try {
-      await saveConfig();
-      const { data } = await api.post(`/kpi-imports/${importData.import.id}/apply`, buildApplyBody(false));
+      const { data: savedConfig } = await api.post(`/kpis/${kpi.id}/calculation-config`, configPayload());
+      setConfigWarning(savedConfig.warning || '');
+      const body = { dry_run: false };
+      if (!configForm.period_column) {
+        body.period_date = manualPeriod ? `${manualPeriod}-01` : undefined;
+      }
+      const { data } = await api.post(`/kpi-imports/${importData.import.id}/apply`, body);
       setResult(data);
       onImported();
       setStep(3);
@@ -950,10 +1112,6 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
       setApplying(false);
     }
   }
-
-  const periodReady = Boolean(configForm.period_column || manualPeriod);
-  const configComplete = configMode === 'reuse' ? true : isConfigComplete(configForm);
-  const canProceed = configComplete && periodReady;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
@@ -1130,10 +1288,11 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
                     <p className="text-sm font-medium text-slate-700">Configuration existante</p>
                     <p className="mt-1 text-sm text-slate-600">{CALC_TYPE_LABELS[existingConfig.calc_type]}</p>
                     <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
-                      {existingConfig.filter_column && <li>Colonne à vérifier : {existingConfig.filter_column}</li>}
-                      {existingConfig.filter_value && <li>Valeur recherchée : {existingConfig.filter_value}</li>}
                       {existingConfig.source_column && <li>Colonne à calculer : {existingConfig.source_column}</li>}
                       {existingConfig.group_by_column && <li>Colonne de regroupement : {existingConfig.group_by_column}</li>}
+                      {describeFiltersShort(existingConfig.filters, existingConfig.filter_logic) && (
+                        <li>Conditions : {describeFiltersShort(existingConfig.filters, existingConfig.filter_logic)}</li>
+                      )}
                       <li>Colonne de période : {existingConfig.period_column || 'aucune (saisie manuelle)'}</li>
                     </ul>
                     <button
@@ -1199,6 +1358,21 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
                   </p>
                 )}
 
+                {livePreviewError && (
+                  <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                    {livePreviewError}
+                  </p>
+                )}
+
+                {canProceed && (livePreviewLoading || livePreview) && (
+                  <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                      Aperçu {livePreviewLoading && '— calcul en cours...'}
+                    </p>
+                    {livePreview && <ImportResultSummary data={livePreview} unit={kpi.unit} />}
+                  </div>
+                )}
+
                 <div className="mt-4 flex gap-2">
                   <button
                     type="button"
@@ -1210,28 +1384,13 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
                   </button>
                   <button
                     type="button"
-                    onClick={handlePreview}
-                    disabled={previewing || !canProceed}
-                    className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    onClick={handleValidate}
+                    disabled={applying || !canProceed}
+                    className="flex-1 rounded-md bg-primary py-2.5 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
                   >
-                    {previewing ? 'Calcul...' : 'Aperçu du calcul'}
+                    {applying ? 'Validation...' : "Valider l'import"}
                   </button>
                 </div>
-
-                {preview && (
-                  <div className="mt-4 rounded-md border border-slate-200 p-3">
-                    <ImportResultSummary data={preview} unit={kpi.unit} />
-                  </div>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleValidate}
-                  disabled={applying || !canProceed}
-                  className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-                >
-                  {applying ? 'Validation...' : "Valider l'import"}
-                </button>
               </>
             )}
           </div>
@@ -1290,8 +1449,8 @@ function CalculationConfigModal({ kpi, onClose, onSaved }) {
       const payload = {
         calc_type: form.calc_type,
         source_column: form.source_column || null,
-        filter_column: form.filter_column || null,
-        filter_value: form.filter_value || null,
+        filters: form.filters,
+        filter_logic: form.filter_logic,
         group_by_column: form.group_by_column || null,
         period_column: form.period_column || null,
       };
