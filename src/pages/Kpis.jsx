@@ -1814,9 +1814,12 @@ function KpiCard({
   const [exportError, setExportError] = useState('');
   const chartRef = useRef(null);
   const records = [...kpi.records].sort((a, b) => (a.period_date > b.period_date ? 1 : -1));
-  const lastRecord = records[records.length - 1];
+  // La valeur mise en avant sur la carte est la moyenne de toutes les périodes enregistrées,
+  // pas la dernière valeur du graphique — plus représentative que le dernier point seul,
+  // qui peut être un pic isolé. Le graphique en dessous continue d'afficher chaque période.
+  const averageValue = records.length > 0 ? Number((records.reduce((sum, r) => sum + r.value, 0) / records.length).toFixed(2)) : null;
   const targetDirection = kpi.target_direction || 'min';
-  const status = getKpiStatus(lastRecord?.value, kpi.target, targetDirection);
+  const status = getKpiStatus(averageValue, kpi.target, targetDirection);
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
   const hasEnoughForChart = records.length >= 2;
@@ -1983,11 +1986,12 @@ function KpiCard({
       {exportError && <p className="mt-1 text-xs text-red-600">{exportError}</p>}
 
       <div className="mt-3 flex items-center justify-between gap-2">
-        {lastRecord ? (
+        {averageValue !== null ? (
           <div className="flex items-center gap-2">
             <span className={`text-2xl font-semibold ${KPI_STATUS_STYLES[status]}`}>
-              {lastRecord.value} {kpi.unit || ''}
+              {averageValue} {kpi.unit || ''}
             </span>
+            <span className="text-xs text-slate-400">(moyenne)</span>
             {StatusIcon && (
               <span className={`flex items-center gap-1 text-xs font-medium ${KPI_STATUS_STYLES[status]}`}>
                 <StatusIcon size={14} />

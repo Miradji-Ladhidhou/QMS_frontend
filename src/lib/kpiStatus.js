@@ -1,8 +1,8 @@
-export function getKpiStatus(lastValue, target, targetDirection = 'min') {
-  if (lastValue === null || lastValue === undefined || target === null || target === undefined) {
+export function getKpiStatus(value, target, targetDirection = 'min') {
+  if (value === null || value === undefined || target === null || target === undefined) {
     return 'neutral';
   }
-  const meetsTarget = targetDirection === 'max' ? lastValue <= target : lastValue >= target;
+  const meetsTarget = targetDirection === 'max' ? value <= target : value >= target;
   return meetsTarget ? 'good' : 'bad';
 }
 
