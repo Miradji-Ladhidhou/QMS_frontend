@@ -24,6 +24,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Legend,
   Line,
   LineChart,
   ReferenceLine,
@@ -40,6 +41,9 @@ import { exportToCsv } from '../lib/csvExport.js';
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
 const MUTED_COLOR = '#94a3b8';
+// Ordre catégoriel fixe (jamais recyclé par index) pour distinguer plusieurs séries sur un
+// même graphique — la 1ère couleur reste LINE_COLOR pour ne rien changer au cas mono-série.
+const SERIES_COLORS = ['#1F3864', '#E69F00', '#009E73', '#CC79A7', '#0072B2', '#D55E00'];
 
 const FREQUENCY_LABELS = {
   daily: 'Quotidien',
@@ -158,6 +162,7 @@ function detectCalcSuggestion(columns, sampleRows, periodColumn) {
     if (hasPositive && allBinary) {
       const originalPositiveValue = sampleRows.map((row) => row[column]).find((v) => POSITIVE_TOKENS.has(normalizeToken(v)));
       return {
+        label: String(originalPositiveValue),
         calc_type: 'ratio',
         filters: [{ column, operator: 'equals', value: String(originalPositiveValue) }],
         filter_logic: 'all',
@@ -168,7 +173,7 @@ function detectCalcSuggestion(columns, sampleRows, periodColumn) {
   for (const column of candidates) {
     const values = sampleRows.map((row) => row[column]).filter((v) => v !== null && v !== undefined && v !== '');
     if (values.length > 0 && values.every(isNumericValue)) {
-      return { calc_type: 'average', source_column: column };
+      return { label: `Moyenne ${column}`, calc_type: 'average', source_column: column };
     }
   }
 
@@ -176,6 +181,7 @@ function detectCalcSuggestion(columns, sampleRows, periodColumn) {
 }
 
 const EMPTY_CONFIG_FORM = {
+  label: '',
   calc_type: 'ratio',
   source_column: '',
   filters: [],
@@ -186,6 +192,7 @@ const EMPTY_CONFIG_FORM = {
 
 function configToForm(config) {
   return {
+    label: config.label || '',
     calc_type: config.calc_type,
     source_column: config.source_column || '',
     filters: config.filters || [],
@@ -196,9 +203,10 @@ function configToForm(config) {
 }
 
 // Une recette est "complète" côté client selon les mêmes règles que le backend
-// (kpis.js POST .../calculation-config) — évite un aller-retour réseau pour un champ
-// manquant évident, mais le backend reste la source de vérité en cas de désaccord.
+// (kpis.js POST .../series) — évite un aller-retour réseau pour un champ manquant évident,
+// mais le backend reste la source de vérité en cas de désaccord.
 function isConfigComplete(form) {
+  if (!form.label.trim()) return false;
   if (form.filters.some((f) => !isFilterComplete(f))) return false;
   if (form.calc_type === 'ratio') return form.filters.length > 0;
   if (['sum', 'average', 'min', 'max'].includes(form.calc_type)) return Boolean(form.source_column);
@@ -211,6 +219,9 @@ function isConfigComplete(form) {
 // mêmes règles que isConfigComplete plutôt que de le laisser deviner.
 function configIssues(form) {
   const issues = [];
+  if (!form.label.trim()) {
+    issues.push('le nom de la série est requis');
+  }
   const incompleteCount = form.filters.filter((f) => !isFilterComplete(f)).length;
   if (incompleteCount > 0) {
     issues.push(`${incompleteCount} condition${incompleteCount > 1 ? 's' : ''} incomplète${incompleteCount > 1 ? 's' : ''} (colonne et valeur requises)`);
@@ -600,6 +611,9 @@ function SourceBadge({ source }) {
 function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
   const records = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
   const isImportBased = kpi.calculation_type === 'import';
+  const seriesConfigs = kpi.calculation_configs || [];
+  const showSeriesColumn = seriesConfigs.length > 1;
+  const labelByConfigId = Object.fromEntries(seriesConfigs.map((c) => [c.id, c.label]));
 
   if (records.length === 0) {
     return <p className="py-3 text-sm text-slate-400">Aucune valeur enregistrée.</p>;
@@ -611,6 +625,7 @@ function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
         <thead className="text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <th className="py-2 pr-3">Période</th>
+            {showSeriesColumn && <th className="py-2 pr-3">Série</th>}
             <th className="py-2 pr-3">Valeur</th>
             {isImportBased && <th className="py-2 pr-3">Source</th>}
             <th className="py-2 pr-3">Commentaire</th>
@@ -622,6 +637,11 @@ function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
           {records.map((record) => (
             <tr key={record.id}>
               <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(record.period_date)}</td>
+              {showSeriesColumn && (
+                <td className="py-2 pr-3 whitespace-nowrap text-slate-600">
+                  {record.config_id ? labelByConfigId[record.config_id] || '—' : '—'}
+                </td>
+              )}
               <td className="py-2 pr-3 whitespace-nowrap font-medium text-slate-800">
                 {record.value} {kpi.unit || ''}
               </td>
@@ -849,6 +869,21 @@ function CalculationConfigFields({ form, onChange, columns, sampleRows }) {
   return (
     <div className="space-y-4">
       <div>
+        <label className="mb-1 block text-sm font-medium text-slate-700">Nom de la série</label>
+        <input
+          type="text"
+          value={form.label}
+          onChange={(e) => onChange({ ...form, label: e.target.value })}
+          placeholder="ex : Conforme, Non conforme, Délai moyen..."
+          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        />
+        <p className="mt-1 text-xs text-slate-400">
+          Le nom affiché sur le graphique et dans la légende — utile pour comparer plusieurs
+          séries sur le même KPI (ex : "Conforme" et "Non conforme" côte à côte).
+        </p>
+      </div>
+
+      <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">Type de calcul</label>
         <select
           value={form.calc_type}
@@ -995,8 +1030,11 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   const [recentImports, setRecentImports] = useState(null); // null = pas encore chargé
   const [loadingRecent, setLoadingRecent] = useState(false);
 
-  const [existingConfig, setExistingConfig] = useState(undefined); // undefined=chargement, null=aucune
-  const [configMode, setConfigMode] = useState('edit'); // 'reuse' | 'edit'
+  // Un KPI peut porter plusieurs séries (ex : "Conforme" et "Non conforme" comparées sur le
+  // même graphique) : existingSeries liste celles déjà enregistrées, selectedSeriesId indique
+  // laquelle le formulaire édite ('new' = en créer une supplémentaire).
+  const [existingSeries, setExistingSeries] = useState(undefined); // undefined=chargement
+  const [selectedSeriesId, setSelectedSeriesId] = useState('new');
   const [configForm, setConfigForm] = useState(EMPTY_CONFIG_FORM);
   const [manualPeriod, setManualPeriod] = useState('');
   const [configError, setConfigError] = useState('');
@@ -1011,24 +1049,30 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   const [result, setResult] = useState(null);
 
   useEffect(() => {
-    api.get(`/kpis/${kpi.id}/calculation-config`).then(({ data }) => {
-      if (data) {
-        setExistingConfig(data);
-        setConfigForm(configToForm(data));
-        setConfigMode('reuse');
-      } else {
-        setExistingConfig(null);
-        setConfigMode('edit');
-      }
+    api.get(`/kpis/${kpi.id}/series`).then(({ data }) => {
+      setExistingSeries(data);
+      setSelectedSeriesId('new');
     });
   }, [kpi.id]);
 
-  // Pré-remplit la recette dès que le fichier est analysé, quand ce KPI n'a encore aucune
-  // configuration : la colonne de période est repérée par son nom, et une recette de type
-  // ratio/moyenne est proposée si une colonne s'y prête clairement — l'utilisateur garde la
-  // main pour tout ajuster, mais part d'un formulaire déjà rempli plutôt que vide.
+  function selectSeries(id) {
+    setSelectedSeriesId(id);
+    setConfigError('');
+    if (id === 'new') {
+      setConfigForm(EMPTY_CONFIG_FORM);
+      setSuggested(false);
+    } else {
+      const series = existingSeries.find((s) => s.id === id);
+      if (series) setConfigForm(configToForm(series));
+    }
+  }
+
+  // Pré-remplit la recette dès que le fichier est analysé, pour une nouvelle série : la
+  // colonne de période est repérée par son nom, et une recette de type ratio/moyenne est
+  // proposée si une colonne s'y prête clairement — l'utilisateur garde la main pour tout
+  // ajuster, mais part d'un formulaire déjà rempli plutôt que vide.
   useEffect(() => {
-    if (!importData || existingConfig === undefined || existingConfig) return;
+    if (!importData || selectedSeriesId !== 'new' || suggested) return;
     const periodColumn = detectPeriodColumn(importData.columns);
     const calcSuggestion = detectCalcSuggestion(importData.columns, importData.sample, periodColumn);
     const guess = { ...(periodColumn ? { period_column: periodColumn } : {}), ...(calcSuggestion || {}) };
@@ -1036,7 +1080,7 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
       setSuggested(true);
       setConfigForm((prev) => ({ ...prev, ...guess }));
     }
-  }, [importData, existingConfig]);
+  }, [importData, selectedSeriesId, suggested]);
 
   function handleFileChange(selected) {
     if (!selected) return;
@@ -1098,6 +1142,7 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
 
   function configPayload() {
     return {
+      label: configForm.label,
       calc_type: configForm.calc_type,
       source_column: configForm.source_column || null,
       filters: configForm.filters,
@@ -1108,10 +1153,10 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   }
 
   const periodReady = Boolean(configForm.period_column || manualPeriod);
-  const configComplete = configMode === 'reuse' ? true : isConfigComplete(configForm);
+  const configComplete = isConfigComplete(configForm);
   const canProceed = configComplete && periodReady;
   const blockingIssues = [
-    ...(configMode === 'reuse' ? [] : configIssues(configForm)),
+    ...configIssues(configForm),
     ...(periodReady ? [] : ['la période est requise (colonne détectée ou date saisie manuellement)']),
   ];
 
@@ -1151,12 +1196,12 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
     setConfigError('');
     setApplying(true);
     try {
-      const { data: savedConfig } = await api.post(`/kpis/${kpi.id}/calculation-config`, configPayload());
+      const isNewSeries = selectedSeriesId === 'new';
+      const { data: savedConfig } = isNewSeries
+        ? await api.post(`/kpis/${kpi.id}/series`, configPayload())
+        : await api.patch(`/kpis/${kpi.id}/series/${selectedSeriesId}`, configPayload());
       setConfigWarning(savedConfig.warning || '');
-      // kpi_id toujours précisé explicitement : l'import réutilisé peut appartenir à un
-      // autre KPI (cf. "Réutiliser un import"), l'apply ne doit jamais retomber sur son
-      // propriétaire d'origine par défaut.
-      const body = { dry_run: false, kpi_id: kpi.id };
+      const body = { dry_run: false, config_id: savedConfig.id };
       if (!configForm.period_column) {
         body.period_date = manualPeriod ? `${manualPeriod}-01` : undefined;
       }
@@ -1400,7 +1445,7 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
 
         {step === 2 && (
           <div>
-            {existingConfig === undefined ? (
+            {existingSeries === undefined ? (
               <div className="space-y-2">
                 {[0, 1].map((key) => (
                   <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
@@ -1408,55 +1453,54 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
               </div>
             ) : (
               <>
-                {existingConfig && configMode === 'reuse' && (
-                  <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-sm font-medium text-slate-700">Configuration existante</p>
-                    <p className="mt-1 text-sm text-slate-600">{CALC_TYPE_LABELS[existingConfig.calc_type]}</p>
-                    <ul className="mt-1 space-y-0.5 text-xs text-slate-500">
-                      {existingConfig.source_column && <li>Colonne à calculer : {existingConfig.source_column}</li>}
-                      {existingConfig.group_by_column && <li>Colonne de regroupement : {existingConfig.group_by_column}</li>}
-                      {describeFiltersShort(existingConfig.filters, existingConfig.filter_logic) && (
-                        <li>Conditions : {describeFiltersShort(existingConfig.filters, existingConfig.filter_logic)}</li>
-                      )}
-                      <li>Colonne de période : {existingConfig.period_column || 'aucune (saisie manuelle)'}</li>
-                    </ul>
-                    <button
-                      type="button"
-                      onClick={() => setConfigMode('edit')}
-                      className="mt-3 w-full rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                    >
-                      Créer une nouvelle configuration
-                    </button>
+                {existingSeries.length > 0 && (
+                  <div className="mb-4">
+                    <p className="mb-2 text-sm font-medium text-slate-700">Série à calculer</p>
+                    <div className="space-y-2">
+                      {existingSeries.map((series) => (
+                        <button
+                          key={series.id}
+                          type="button"
+                          onClick={() => selectSeries(series.id)}
+                          className={`block w-full rounded-md border p-3 text-left ${
+                            selectedSeriesId === series.id ? 'border-primary bg-primary-50' : 'border-slate-200 hover:bg-slate-50'
+                          }`}
+                        >
+                          <p className="text-sm font-medium text-slate-800">{series.label}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">
+                            {CALC_TYPE_LABELS[series.calc_type]}
+                            {describeFiltersShort(series.filters, series.filter_logic)
+                              ? ` — ${describeFiltersShort(series.filters, series.filter_logic)}`
+                              : ''}
+                          </p>
+                        </button>
+                      ))}
+                      <button
+                        type="button"
+                        onClick={() => selectSeries('new')}
+                        className={`flex w-full items-center gap-1.5 rounded-md border border-dashed p-3 text-left text-sm font-medium ${
+                          selectedSeriesId === 'new' ? 'border-primary bg-primary-50 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <Plus size={14} />
+                        Nouvelle série
+                      </button>
+                    </div>
                   </div>
                 )}
 
-                {configMode === 'edit' && (
-                  <>
-                    {existingConfig && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setConfigMode('reuse');
-                          setConfigForm(configToForm(existingConfig));
-                        }}
-                        className="mb-3 text-xs font-medium text-primary hover:underline"
-                      >
-                        ← Revenir à la configuration existante
-                      </button>
-                    )}
-                    {suggested && (
-                      <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
-                        Configuration pré-remplie automatiquement d'après votre fichier — vérifiez et ajustez si besoin.
-                      </p>
-                    )}
-                    <CalculationConfigFields
-                      form={configForm}
-                      onChange={setConfigForm}
-                      columns={importData.columns}
-                      sampleRows={importData.sample}
-                    />
-                  </>
+                {suggested && selectedSeriesId === 'new' && (
+                  <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
+                    Configuration pré-remplie automatiquement d'après votre fichier — vérifiez et ajustez si besoin.
+                  </p>
                 )}
+
+                <CalculationConfigFields
+                  form={configForm}
+                  onChange={setConfigForm}
+                  columns={importData.columns}
+                  sampleRows={importData.sample}
+                />
 
                 {!configForm.period_column && (
                   <div className="mt-4">
@@ -1548,28 +1592,47 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
   );
 }
 
-// Édition seule de la recette de calcul, hors import — accessible depuis les paramètres du
-// KPI pour corriger la recette sans devoir redéposer un fichier.
-function CalculationConfigModal({ kpi, onClose, onSaved }) {
+// Gestion des séries de calcul d'un KPI, hors import — accessible depuis les paramètres du
+// KPI pour créer/modifier/supprimer des séries sans devoir redéposer un fichier. Un KPI peut
+// porter plusieurs séries (ex : "Conforme" et "Non conforme"), chacune avec sa propre recette,
+// affichées ensemble sur le même graphique.
+function SeriesManagerModal({ kpi, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
+  const [series, setSeries] = useState([]);
+  const [editingId, setEditingId] = useState(null); // null = liste, 'new' = création, sinon id édité
   const [form, setForm] = useState(EMPTY_CONFIG_FORM);
-  const [hasExisting, setHasExisting] = useState(false);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  function loadSeries() {
+    setLoading(true);
+    api
+      .get(`/kpis/${kpi.id}/series`)
+      .then(({ data }) => setSeries(data))
+      .catch(() => setError('Impossible de charger les séries.'))
+      .finally(() => setLoading(false));
+  }
 
   useEffect(() => {
-    api
-      .get(`/kpis/${kpi.id}/calculation-config`)
-      .then(({ data }) => {
-        if (data) {
-          setForm(configToForm(data));
-          setHasExisting(true);
-        }
-      })
-      .catch(() => setError('Impossible de charger la configuration existante.'))
-      .finally(() => setLoading(false));
+    loadSeries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kpi.id]);
+
+  function startCreate() {
+    setEditingId('new');
+    setForm(EMPTY_CONFIG_FORM);
+    setError('');
+    setWarning('');
+  }
+
+  function startEdit(s) {
+    setEditingId(s.id);
+    setForm(configToForm(s));
+    setError('');
+    setWarning('');
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -1578,6 +1641,7 @@ function CalculationConfigModal({ kpi, onClose, onSaved }) {
     setSubmitting(true);
     try {
       const payload = {
+        label: form.label,
         calc_type: form.calc_type,
         source_column: form.source_column || null,
         filters: form.filters,
@@ -1585,26 +1649,51 @@ function CalculationConfigModal({ kpi, onClose, onSaved }) {
         group_by_column: form.group_by_column || null,
         period_column: form.period_column || null,
       };
-      const { data } = await api.post(`/kpis/${kpi.id}/calculation-config`, payload);
+      const { data } =
+        editingId === 'new'
+          ? await api.post(`/kpis/${kpi.id}/series`, payload)
+          : await api.patch(`/kpis/${kpi.id}/series/${editingId}`, payload);
       onSaved();
+      loadSeries();
       if (data.warning) {
         setWarning(data.warning);
       } else {
-        onClose();
+        setEditingId(null);
       }
     } catch (err) {
-      setError(err.response?.data?.error || "Impossible d'enregistrer la configuration.");
+      setError(err.response?.data?.error || "Impossible d'enregistrer la série.");
     } finally {
       setSubmitting(false);
     }
   }
+
+  async function handleDelete(s) {
+    if (!window.confirm(`Supprimer la série "${s.label}" ? Les valeurs qu'elle a calculées seront supprimées avec elle.`)) {
+      return;
+    }
+    setError('');
+    setDeletingId(s.id);
+    try {
+      await api.delete(`/kpis/${kpi.id}/series/${s.id}`);
+      onSaved();
+      loadSeries();
+    } catch {
+      setError('Impossible de supprimer cette série.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  const isFormView = editingId !== null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Configuration du calcul</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {isFormView ? (editingId === 'new' ? 'Nouvelle série' : 'Modifier la série') : 'Séries de calcul'}
+            </h2>
             <p className="text-sm text-slate-500">{kpi.name}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -1614,17 +1703,19 @@ function CalculationConfigModal({ kpi, onClose, onSaved }) {
 
         {loading ? (
           <div className="space-y-2">
-            {[0, 1, 2].map((key) => (
-              <div key={key} className="h-8 animate-pulse rounded-md bg-slate-100" />
+            {[0, 1].map((key) => (
+              <div key={key} className="h-14 animate-pulse rounded-md bg-slate-100" />
             ))}
           </div>
-        ) : (
+        ) : isFormView ? (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!hasExisting && (
-              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                Aucune configuration enregistrée pour l'instant : elle sera utilisée au prochain import de fichier.
-              </p>
-            )}
+            <button
+              type="button"
+              onClick={() => setEditingId(null)}
+              className="text-xs font-medium text-primary hover:underline"
+            >
+              ← Retour à la liste
+            </button>
 
             <CalculationConfigFields form={form} onChange={setForm} columns={null} sampleRows={null} />
 
@@ -1638,9 +1729,65 @@ function CalculationConfigModal({ kpi, onClose, onSaved }) {
               disabled={submitting}
               className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
             >
-              {submitting ? 'Enregistrement...' : 'Enregistrer la configuration'}
+              {submitting ? 'Enregistrement...' : 'Enregistrer la série'}
             </button>
           </form>
+        ) : (
+          <div>
+            {series.length === 0 ? (
+              <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Aucune série enregistrée pour l'instant.
+              </p>
+            ) : (
+              <div className="mb-4 space-y-2">
+                {series.map((s) => (
+                  <div key={s.id} className="rounded-md border border-slate-200 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="break-words text-sm font-medium text-slate-800">{s.label}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                          {CALC_TYPE_LABELS[s.calc_type]}
+                          {describeFiltersShort(s.filters, s.filter_logic)
+                            ? ` — ${describeFiltersShort(s.filters, s.filter_logic)}`
+                            : ''}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(s)}
+                          aria-label="Modifier"
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(s)}
+                          disabled={deletingId === s.id}
+                          aria-label="Supprimer"
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+            <button
+              type="button"
+              onClick={startCreate}
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <Plus size={16} />
+              Nouvelle série
+            </button>
+          </div>
         )}
       </div>
     </div>
@@ -1925,6 +2072,35 @@ function RecordProofModal({ kpi, record, onClose }) {
   );
 }
 
+// Point de données custom : recharts appelle ce rendu pour chaque index le long d'une Line,
+// même quand cette série n'a pas de valeur à cette période (trous entre séries qui ne
+// partagent pas exactement les mêmes périodes) — d'où la garde sur `value`.
+function SeriesDot({ cx, cy, payload, seriesLabel, color, clickable, onSelect }) {
+  if (cx === undefined || cy === undefined) return null;
+  const value = payload?.[seriesLabel];
+  if (value === undefined || value === null) return null;
+  const record = payload.__records?.[seriesLabel];
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      strokeWidth={2}
+      stroke="#ffffff"
+      fill={color}
+      style={clickable && record ? { cursor: 'pointer' } : undefined}
+      onClick={
+        clickable && record
+          ? (event) => {
+              event.stopPropagation();
+              onSelect(record);
+            }
+          : undefined
+      }
+    />
+  );
+}
+
 function KpiCard({
   kpi,
   isMenuOpen,
@@ -1945,6 +2121,48 @@ function KpiCard({
   const [exportError, setExportError] = useState('');
   const chartRef = useRef(null);
   const records = [...kpi.records].sort((a, b) => (a.period_date > b.period_date ? 1 : -1));
+  const seriesConfigs = kpi.calculation_configs || [];
+  const seriesById = new Map(seriesConfigs.map((c) => [c.id, c]));
+  // Une valeur éditée à la main se détache de sa série (config_id remis à null côté backend) :
+  // on lui garde une étiquette générique, distincte des noms de série réels s'il y en a
+  // plusieurs (sinon le libellé "Valeur" suffit, comme avant le multi-série).
+  const manualLabel = seriesConfigs.length > 1 ? 'Valeur manuelle' : 'Valeur';
+  function labelForRecord(record) {
+    if (record.config_id) return seriesById.get(record.config_id)?.label || 'Série';
+    return manualLabel;
+  }
+  const configLabels = seriesConfigs.map((c) => c.label);
+  const presentLabels = new Set(records.map(labelForRecord));
+  // Ordre fixe : d'abord les séries dans leur ordre de création (couleur stable d'un
+  // rendu à l'autre), puis les libellés hors-série (ex. saisie manuelle) à la fin.
+  const orderedLabels = [
+    ...configLabels.filter((label) => presentLabels.has(label)),
+    ...[...presentLabels].filter((label) => !configLabels.includes(label)),
+  ];
+  const showMultiSeries = orderedLabels.length > 1;
+
+  // Pivote les enregistrements (une ligne par valeur) en un point par période, avec une
+  // colonne par série — c'est le format attendu par recharts pour tracer plusieurs `<Line>`
+  // sur un même graphique. `__records` garde la ligne d'origine pour le clic → preuve.
+  const chartDataByPeriod = new Map();
+  records.forEach((record) => {
+    const key = record.period_date;
+    if (!chartDataByPeriod.has(key)) chartDataByPeriod.set(key, { period_date: key, __records: {} });
+    const entry = chartDataByPeriod.get(key);
+    const label = labelForRecord(record);
+    entry[label] = record.value;
+    entry.__records[label] = record;
+  });
+  const chartData = Array.from(chartDataByPeriod.values());
+
+  const averagesByLabel = orderedLabels.map((label, i) => {
+    const values = records.filter((r) => labelForRecord(r) === label).map((r) => r.value);
+    return {
+      label,
+      color: SERIES_COLORS[i % SERIES_COLORS.length],
+      average: values.length > 0 ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)) : null,
+    };
+  });
   // La valeur mise en avant sur la carte est la moyenne de toutes les périodes enregistrées,
   // pas la dernière valeur du graphique — plus représentative que le dernier point seul,
   // qui peut être un pic isolé. Le graphique en dessous continue d'afficher chaque période.
@@ -1953,9 +2171,9 @@ function KpiCard({
   const status = getKpiStatus(averageValue, kpi.target, targetDirection);
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
-  const hasEnoughForChart = records.length >= 2;
+  const hasEnoughForChart = chartData.length >= 2;
   const isImportBased = kpi.calculation_type === 'import';
-  const isCountGrouped = kpi.calculation_config?.calc_type === 'count_grouped';
+  const isCountGrouped = seriesConfigs.length === 1 && seriesConfigs[0].calc_type === 'count_grouped';
   const canExportChart = isCountGrouped || hasEnoughForChart;
 
   function loadImportsIfNeeded() {
@@ -1968,9 +2186,8 @@ function KpiCard({
       .finally(() => setImportsLoading(false));
   }
 
-  function handleChartClick(chartEvent) {
-    const point = chartEvent?.activePayload?.[0]?.payload;
-    if (point) onViewProof(kpi, point);
+  function handleSeriesPointClick(record) {
+    if (record) onViewProof(kpi, record);
   }
 
   async function handleExportChartPng() {
@@ -2093,7 +2310,7 @@ function KpiCard({
                       className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
                     >
                       <Settings size={14} />
-                      Configurer le calcul
+                      Séries de calcul
                     </button>
                   )}
                   <button
@@ -2117,7 +2334,22 @@ function KpiCard({
       {exportError && <p className="mt-1 text-xs text-red-600">{exportError}</p>}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        {averageValue !== null ? (
+        {averageValue === null ? (
+          <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
+        ) : showMultiSeries ? (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {averagesByLabel.map(({ label, color, average }) => (
+              <div key={label} className="flex items-center gap-1.5">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                <span className="whitespace-nowrap text-xs text-slate-500">{label}</span>
+                <span className="whitespace-nowrap text-sm font-semibold text-slate-900">
+                  {average !== null ? `${average} ${kpi.unit || ''}` : '—'}
+                </span>
+              </div>
+            ))}
+            <span className="whitespace-nowrap text-xs text-slate-400">(moyennes)</span>
+          </div>
+        ) : (
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <span className={`whitespace-nowrap text-2xl font-semibold ${KPI_STATUS_STYLES[status]}`}>
               {averageValue} {kpi.unit || ''}
@@ -2130,8 +2362,6 @@ function KpiCard({
               </span>
             )}
           </div>
-        ) : (
-          <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         )}
         {isImportBased ? (
           <button
@@ -2162,12 +2392,7 @@ function KpiCard({
             {hasEnoughForChart ? (
               <>
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={records}
-                    margin={{ top: 8, right: 16, bottom: 0, left: -16 }}
-                    onClick={isImportBased ? handleChartClick : undefined}
-                    style={isImportBased ? { cursor: 'pointer' } : undefined}
-                  >
+                  <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
                     <CartesianGrid stroke={GRID_COLOR} vertical={false} />
                     <XAxis
                       dataKey="period_date"
@@ -2178,7 +2403,7 @@ function KpiCard({
                     />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
                     <Tooltip
-                      formatter={(val) => [`${val} ${kpi.unit || ''}`, kpi.name]}
+                      formatter={(val, name) => [`${val} ${kpi.unit || ''}`, name]}
                       labelFormatter={(label) => formatDate(label)}
                       contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
                     />
@@ -2190,14 +2415,32 @@ function KpiCard({
                         label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
                       />
                     )}
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      stroke={LINE_COLOR}
-                      strokeWidth={2}
-                      dot={{ r: 4, strokeWidth: 2, stroke: '#ffffff', fill: LINE_COLOR }}
-                      activeDot={{ r: 6 }}
-                    />
+                    {orderedLabels.map((label, i) => {
+                      const color = SERIES_COLORS[i % SERIES_COLORS.length];
+                      return (
+                        <Line
+                          key={label}
+                          type="monotone"
+                          dataKey={label}
+                          name={label}
+                          stroke={color}
+                          strokeWidth={2}
+                          connectNulls={false}
+                          dot={(dotProps) => (
+                            <SeriesDot
+                              key={`${label}-${dotProps.payload.period_date}`}
+                              {...dotProps}
+                              seriesLabel={label}
+                              color={color}
+                              clickable={isImportBased}
+                              onSelect={handleSeriesPointClick}
+                            />
+                          )}
+                          activeDot={{ r: 6 }}
+                        />
+                      );
+                    })}
+                    {showMultiSeries && <Legend wrapperStyle={{ fontSize: 11 }} />}
                   </LineChart>
                 </ResponsiveContainer>
                 {isImportBased && (
@@ -2475,7 +2718,7 @@ export default function Kpis() {
       )}
 
       {configModal && (
-        <CalculationConfigModal kpi={configModal} onClose={() => setConfigModal(null)} onSaved={() => refreshKpi(configModal.id)} />
+        <SeriesManagerModal kpi={configModal} onClose={() => setConfigModal(null)} onSaved={() => refreshKpi(configModal.id)} />
       )}
 
       {proofModal && (
