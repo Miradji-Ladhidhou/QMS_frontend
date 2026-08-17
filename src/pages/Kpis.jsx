@@ -7,9 +7,13 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   Download,
   FileText,
+  Folder,
+  FolderInput,
+  FolderPlus,
   History,
   Image as ImageIcon,
   MoreVertical,
@@ -287,7 +291,7 @@ function fieldErrorsFromResponse(err) {
   return Object.fromEntries(details.map((detail) => [detail.path, detail.msg]));
 }
 
-function KpiFormModal({ kpi, onClose, onSaved }) {
+function KpiFormModal({ kpi, folderId, onClose, onSaved }) {
   const isEditing = Boolean(kpi);
   const [form, setForm] = useState({
     name: kpi?.name || '',
@@ -329,6 +333,12 @@ function KpiFormModal({ kpi, onClose, onSaved }) {
       frequency: form.frequency || null,
       calculation_type: form.calculation_type,
     };
+    // Le déplacement d'un KPI existant passe par l'action dédiée "Déplacer" (menu de la
+    // carte), pas par ce formulaire — seule la création place le KPI dans le dossier
+    // actuellement parcouru.
+    if (!isEditing) {
+      payload.folder_id = folderId || null;
+    }
 
     try {
       const { data } = isEditing
@@ -2107,6 +2117,7 @@ function KpiCard({
   onToggleMenu,
   onEdit,
   onDelete,
+  onMove,
   onOpenRecordModal,
   onDeleteRecord,
   onOpenImportModal,
@@ -2317,6 +2328,17 @@ function KpiCard({
                     type="button"
                     onClick={() => {
                       onToggleMenu(null);
+                      onMove(kpi);
+                    }}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <FolderInput size={14} />
+                    Déplacer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onToggleMenu(null);
                       onDelete(kpi);
                     }}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
@@ -2426,7 +2448,7 @@ function KpiCard({
                           stroke={color}
                           strokeWidth={2}
                           connectNulls={false}
-                          dot={(dotProps) => (
+                          dot={({ key: _key, ...dotProps }) => (
                             <SeriesDot
                               key={`${label}-${dotProps.payload.period_date}`}
                               {...dotProps}
@@ -2505,6 +2527,279 @@ function KpiCard({
   );
 }
 
+// Fil d'Ariane de navigation dans les dossiers de KPI — réutilisé tel quel dans la page
+// principale et dans le sélecteur de destination de MoveKpiModal.
+function FolderBreadcrumb({ breadcrumb, onNavigate }) {
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-1 text-sm text-slate-500">
+      <button
+        type="button"
+        onClick={() => onNavigate(null)}
+        className={`rounded px-1 hover:text-primary hover:underline ${
+          breadcrumb.length === 0 ? 'font-medium text-slate-900' : ''
+        }`}
+      >
+        Tous les KPI
+      </button>
+      {breadcrumb.map((folder, i) => (
+        <span key={folder.id} className="flex items-center gap-1">
+          <ChevronRight size={14} className="shrink-0 text-slate-300" />
+          <button
+            type="button"
+            onClick={() => onNavigate(folder.id)}
+            className={`rounded px-1 hover:text-primary hover:underline ${
+              i === breadcrumb.length - 1 ? 'font-medium text-slate-900' : ''
+            }`}
+          >
+            {folder.name}
+          </button>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function FolderTile({ folder, onOpen, onRename, onDelete }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <div className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/40 hover:shadow-md">
+      <button type="button" onClick={onOpen} className="flex w-full flex-col items-start gap-2 text-left">
+        <Folder size={26} className="text-primary" />
+        <span className="line-clamp-2 break-words pr-6 text-sm font-medium text-slate-900">{folder.name}</span>
+      </button>
+
+      <div className="absolute right-2 top-2">
+        <button
+          type="button"
+          onClick={() => setMenuOpen((prev) => !prev)}
+          aria-label="Actions"
+          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+        >
+          <MoreVertical size={16} />
+        </button>
+
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onRename();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+              >
+                <Pencil size={14} />
+                Renommer
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete();
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+              >
+                <Trash2 size={14} />
+                Supprimer
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Création (folder === 'new') ou renommage (folder === l'objet dossier) — même formulaire,
+// le dossier parent est toujours celui actuellement parcouru, jamais choisi ici.
+function FolderFormModal({ folder, parentId, onClose, onSaved }) {
+  const isEditing = Boolean(folder && folder !== 'new');
+  const [name, setName] = useState(isEditing ? folder.name : '');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data } = isEditing
+        ? await api.patch(`/kpi-folders/${folder.id}`, { name })
+        : await api.post('/kpi-folders', { name, parent_id: parentId || undefined });
+      onSaved(data, isEditing);
+    } catch (err) {
+      setError(err.response?.data?.error || `Impossible ${isEditing ? 'de renommer' : 'de créer'} le dossier.`);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-sm sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">{isEditing ? 'Renommer le dossier' : 'Nouveau dossier'}</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Nom</label>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              {submitting ? 'Enregistrement...' : isEditing ? 'Renommer' : 'Créer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Sélecteur de dossier de destination pour déplacer un KPI existant — même principe de
+// navigation (dossiers cliquables + fil d'Ariane) que la page principale, en plus compact.
+function MoveKpiModal({ kpi, onClose, onMoved }) {
+  const [pickerFolderId, setPickerFolderId] = useState(kpi.folder_id || null);
+  const [breadcrumb, setBreadcrumb] = useState([]);
+  const [folders, setFolders] = useState([]);
+  const [loadingFolders, setLoadingFolders] = useState(true);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadingFolders(true);
+    Promise.all([
+      api.get('/kpi-folders', { params: { parent_id: pickerFolderId || 'root' } }),
+      pickerFolderId ? api.get(`/kpi-folders/${pickerFolderId}/breadcrumb`) : Promise.resolve({ data: [] }),
+    ])
+      .then(([foldersRes, breadcrumbRes]) => {
+        if (cancelled) return;
+        setFolders(foldersRes.data);
+        setBreadcrumb(breadcrumbRes.data);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setFolders([]);
+          setBreadcrumb([]);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFolders(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerFolderId]);
+
+  const alreadyHere = (kpi.folder_id || null) === (pickerFolderId || null);
+
+  async function handleConfirm() {
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data } = await api.patch(`/kpis/${kpi.id}`, { folder_id: pickerFolderId });
+      onMoved(data);
+    } catch {
+      setError('Impossible de déplacer ce KPI.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="flex max-h-[85vh] w-full flex-col rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-2 flex items-center justify-between">
+          <div className="min-w-0">
+            <h2 className="text-lg font-semibold text-slate-900">Déplacer</h2>
+            <p className="truncate text-sm text-slate-500">{kpi.name}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="shrink-0 p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={setPickerFolderId} />
+
+        <div className="mt-3 flex-1 overflow-y-auto rounded-md border border-slate-100">
+          {loadingFolders ? (
+            <p className="py-6 text-center text-sm text-slate-400">Chargement...</p>
+          ) : folders.length === 0 ? (
+            <p className="py-6 text-center text-sm text-slate-400">Aucun sous-dossier ici.</p>
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {folders.map((folder) => (
+                <button
+                  key={folder.id}
+                  type="button"
+                  onClick={() => setPickerFolderId(folder.id)}
+                  className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-sm text-slate-700 hover:bg-slate-50"
+                >
+                  <Folder size={16} className="shrink-0 text-primary" />
+                  <span className="truncate">{folder.name}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="mt-4 flex gap-2 border-t border-slate-100 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={submitting || alreadyHere}
+            className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+          >
+            {submitting ? 'Déplacement...' : alreadyHere ? 'Déjà ici' : 'Déplacer ici'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Kpis() {
   const [kpis, setKpis] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -2516,12 +2811,22 @@ export default function Kpis() {
   const [proofModal, setProofModal] = useState(null); // { kpi, record } — preuve derrière un point du graphique
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
+  // Indépendant du dossier parcouru : le bouton rapport porte sur TOUS les KPI du tenant
+  // (voir GET /kpis/report), donc ne doit pas se désactiver juste parce qu'un dossier vide
+  // est affiché. Optimiste tant que non chargé, pour éviter un flash désactivé au montage.
+  const [hasAnyKpi, setHasAnyKpi] = useState(true);
+  const [currentFolderId, setCurrentFolderId] = useState(null); // null = racine
+  const [breadcrumb, setBreadcrumb] = useState([]); // ancêtres du dossier courant, racine → courant
+  const [folders, setFolders] = useState([]); // sous-dossiers directs du dossier courant
+  const [foldersLoading, setFoldersLoading] = useState(true);
+  const [folderModal, setFolderModal] = useState(null); // null fermé, 'new' création, objet dossier édition
+  const [moveModal, setMoveModal] = useState(null); // le kpi en cours de déplacement, ou null
 
-  async function loadKpis() {
+  async function loadKpis(folderId) {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get('/kpis');
+      const { data } = await api.get('/kpis', { params: { folder_id: folderId || 'root' } });
       setKpis(data);
     } catch {
       setError('Impossible de charger les KPIs.');
@@ -2530,9 +2835,82 @@ export default function Kpis() {
     }
   }
 
+  async function loadFolders(folderId) {
+    setFoldersLoading(true);
+    try {
+      const { data } = await api.get('/kpi-folders', { params: { parent_id: folderId || 'root' } });
+      setFolders(data);
+    } catch {
+      setFolders([]);
+    } finally {
+      setFoldersLoading(false);
+    }
+  }
+
+  async function loadBreadcrumb(folderId) {
+    if (!folderId) {
+      setBreadcrumb([]);
+      return;
+    }
+    try {
+      const { data } = await api.get(`/kpi-folders/${folderId}/breadcrumb`);
+      setBreadcrumb(data);
+    } catch {
+      setBreadcrumb([]);
+    }
+  }
+
   useEffect(() => {
-    loadKpis();
+    loadKpis(currentFolderId);
+    loadFolders(currentFolderId);
+    loadBreadcrumb(currentFolderId);
+  }, [currentFolderId]);
+
+  useEffect(() => {
+    api
+      .get('/kpis')
+      .then(({ data }) => setHasAnyKpi(data.length > 0))
+      .catch(() => {});
   }, []);
+
+  function navigateToFolder(folderId) {
+    setOpenMenuId(null);
+    setCurrentFolderId(folderId);
+  }
+
+  function handleFolderSaved(folder, isEditingFolder) {
+    setFolders((prev) => {
+      const next = isEditingFolder ? prev.map((f) => (f.id === folder.id ? folder : f)) : [...prev, folder];
+      return [...next].sort((a, b) => a.name.localeCompare(b.name));
+    });
+    setFolderModal(null);
+  }
+
+  async function handleDeleteFolder(folder) {
+    if (
+      !window.confirm(
+        `Supprimer le dossier "${folder.name}" et tous ses sous-dossiers ? Les KPI qu'ils contiennent ne seront pas supprimés : ils reviendront à la racine.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await api.delete(`/kpi-folders/${folder.id}`);
+      setFolders((prev) => prev.filter((f) => f.id !== folder.id));
+    } catch {
+      setError('Impossible de supprimer ce dossier.');
+    }
+  }
+
+  function handleKpiMoved(updatedKpi) {
+    setKpis((prev) =>
+      (updatedKpi.folder_id || null) === (currentFolderId || null)
+        ? prev.map((k) => (k.id === updatedKpi.id ? { ...k, ...updatedKpi } : k))
+        : prev.filter((k) => k.id !== updatedKpi.id)
+    );
+    setMoveModal(null);
+  }
 
   function handleRecordSaved(kpiId, record, isEditing) {
     setKpis((prev) =>
@@ -2568,6 +2946,7 @@ export default function Kpis() {
       setKpis((prev) => prev.map((kpi) => (kpi.id === data.id ? { ...kpi, ...data } : kpi)));
     } else {
       setKpis((prev) => [...prev, { ...data, records: [] }]);
+      setHasAnyKpi(true);
     }
     setFormModal(null);
   }
@@ -2629,7 +3008,7 @@ export default function Kpis() {
           <button
             type="button"
             onClick={handleGenerateReport}
-            disabled={generatingReport || kpis.length === 0}
+            disabled={generatingReport || !hasAnyKpi}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
             <FileText size={18} />
@@ -2646,50 +3025,81 @@ export default function Kpis() {
         </div>
       </div>
 
+      <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} />
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : kpis.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <BarChart3 size={40} className="text-slate-300" />
-          <p className="mt-4 text-base font-medium text-slate-700">Aucun KPI configuré</p>
-          <p className="mt-1 max-w-sm text-sm text-slate-500">
-            Créez votre premier indicateur pour commencer à suivre vos performances.
-          </p>
-          <button
-            type="button"
-            onClick={() => setFormModal('new')}
-            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          >
-            <Plus size={18} />
-            Nouveau KPI
-          </button>
-        </div>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {kpis.map((kpi) => (
-            <KpiCard
-              key={kpi.id}
-              kpi={kpi}
-              isMenuOpen={openMenuId === kpi.id}
-              onToggleMenu={toggleMenu}
-              onEdit={setFormModal}
-              onDelete={handleDelete}
-              onOpenRecordModal={(kpiArg, record) => setRecordModal({ kpi: kpiArg, record })}
-              onDeleteRecord={handleDeleteRecord}
-              onOpenImportModal={setImportModal}
-              onOpenConfigModal={setConfigModal}
-              onViewProof={(kpiArg, record) => setProofModal({ kpi: kpiArg, record })}
-            />
-          ))}
-        </div>
+        <>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            {folders.map((folder) => (
+              <FolderTile
+                key={folder.id}
+                folder={folder}
+                onOpen={() => navigateToFolder(folder.id)}
+                onRename={() => setFolderModal(folder)}
+                onDelete={() => handleDeleteFolder(folder)}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => setFolderModal('new')}
+              className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
+            >
+              <FolderPlus size={26} />
+              <span className="text-sm font-medium">Nouveau dossier</span>
+            </button>
+          </div>
+
+          {kpis.length === 0 && folders.length === 0 ? (
+            <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <BarChart3 size={40} className="text-slate-300" />
+              <p className="mt-4 text-base font-medium text-slate-700">
+                {currentFolderId ? 'Ce dossier est vide' : 'Aucun KPI configuré'}
+              </p>
+              <p className="mt-1 max-w-sm text-sm text-slate-500">
+                Créez votre premier indicateur pour commencer à suivre vos performances.
+              </p>
+              <button
+                type="button"
+                onClick={() => setFormModal('new')}
+                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Plus size={18} />
+                Nouveau KPI
+              </button>
+            </div>
+          ) : kpis.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-500">Aucun KPI directement dans ce dossier.</p>
+          ) : (
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {kpis.map((kpi) => (
+                <KpiCard
+                  key={kpi.id}
+                  kpi={kpi}
+                  isMenuOpen={openMenuId === kpi.id}
+                  onToggleMenu={toggleMenu}
+                  onEdit={setFormModal}
+                  onDelete={handleDelete}
+                  onMove={setMoveModal}
+                  onOpenRecordModal={(kpiArg, record) => setRecordModal({ kpi: kpiArg, record })}
+                  onDeleteRecord={handleDeleteRecord}
+                  onOpenImportModal={setImportModal}
+                  onOpenConfigModal={setConfigModal}
+                  onViewProof={(kpiArg, record) => setProofModal({ kpi: kpiArg, record })}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {recordModal && (
@@ -2704,6 +3114,7 @@ export default function Kpis() {
       {formModal && (
         <KpiFormModal
           kpi={formModal === 'new' ? null : formModal}
+          folderId={currentFolderId}
           onClose={() => setFormModal(null)}
           onSaved={handleSaved}
         />
@@ -2720,6 +3131,17 @@ export default function Kpis() {
       {configModal && (
         <SeriesManagerModal kpi={configModal} onClose={() => setConfigModal(null)} onSaved={() => refreshKpi(configModal.id)} />
       )}
+
+      {folderModal && (
+        <FolderFormModal
+          folder={folderModal}
+          parentId={currentFolderId}
+          onClose={() => setFolderModal(null)}
+          onSaved={handleFolderSaved}
+        />
+      )}
+
+      {moveModal && <MoveKpiModal kpi={moveModal} onClose={() => setMoveModal(null)} onMoved={handleKpiMoved} />}
 
       {proofModal && (
         <RecordProofModal kpi={proofModal.kpi} record={proofModal.record} onClose={() => setProofModal(null)} />
