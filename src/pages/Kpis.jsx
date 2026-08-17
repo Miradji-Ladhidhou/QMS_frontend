@@ -41,6 +41,8 @@ import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
 import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
+import { isManagerRole } from '../lib/roles.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
@@ -618,7 +620,7 @@ function SourceBadge({ source }) {
   );
 }
 
-function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
+function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   const records = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
   const isImportBased = kpi.calculation_type === 'import';
   const seriesConfigs = kpi.calculation_configs || [];
@@ -640,7 +642,7 @@ function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
             {isImportBased && <th className="py-2 pr-3">Source</th>}
             <th className="py-2 pr-3">Commentaire</th>
             <th className="py-2 pr-3">Saisi par</th>
-            <th className="py-2 pr-3 text-right">Actions</th>
+            {canManage && <th className="py-2 pr-3 text-right">Actions</th>}
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -662,26 +664,28 @@ function RecordHistoryTable({ kpi, onEditRecord, onDeleteRecord }) {
               )}
               <td className="py-2 pr-3 text-slate-600">{record.comment || '—'}</td>
               <td className="py-2 pr-3 whitespace-nowrap text-slate-600">{record.recorded_by_user?.full_name || '—'}</td>
-              <td className="py-2 pr-3 text-right">
-                <div className="flex justify-end gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onEditRecord(record)}
-                    aria-label="Modifier"
-                    className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
-                  >
-                    <Pencil size={14} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDeleteRecord(record)}
-                    aria-label="Supprimer"
-                    className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </td>
+              {canManage && (
+                <td className="py-2 pr-3 text-right">
+                  <div className="flex justify-end gap-1">
+                    <button
+                      type="button"
+                      onClick={() => onEditRecord(record)}
+                      aria-label="Modifier"
+                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                    >
+                      <Pencil size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteRecord(record)}
+                      aria-label="Supprimer"
+                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </td>
+              )}
             </tr>
           ))}
         </tbody>
@@ -1027,7 +1031,7 @@ function ImportResultSummary({ data, unit }) {
 
 // Assistant d'import générique en 3 étapes : dépôt du fichier, configuration (ou réemploi)
 // de la recette de calcul avec aperçu, puis application réelle et résumé.
-function ImportWizardModal({ kpi, onClose, onImported }) {
+function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   const [step, setStep] = useState(1);
   const fileInputRef = useRef(null);
 
@@ -1463,7 +1467,10 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
               </div>
             ) : (
               <>
-                {existingSeries.length > 0 && (
+                {/* Le choix de réutiliser/modifier une série existante passe par un PATCH,
+                    réservé à owner/admin/manager (voir kpis.js) — un member ne voit que la
+                    création d'une nouvelle série, toujours autorisée. */}
+                {canManage && existingSeries.length > 0 && (
                   <div className="mb-4">
                     <p className="mb-2 text-sm font-medium text-slate-700">Série à calculer</p>
                     <div className="space-y-2">
@@ -1606,7 +1613,7 @@ function ImportWizardModal({ kpi, onClose, onImported }) {
 // KPI pour créer/modifier/supprimer des séries sans devoir redéposer un fichier. Un KPI peut
 // porter plusieurs séries (ex : "Conforme" et "Non conforme"), chacune avec sa propre recette,
 // affichées ensemble sur le même graphique.
-function SeriesManagerModal({ kpi, onClose, onSaved }) {
+function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [series, setSeries] = useState([]);
   const [editingId, setEditingId] = useState(null); // null = liste, 'new' = création, sinon id édité
@@ -1762,25 +1769,27 @@ function SeriesManagerModal({ kpi, onClose, onSaved }) {
                             : ''}
                         </p>
                       </div>
-                      <div className="flex shrink-0 gap-1">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(s)}
-                          aria-label="Modifier"
-                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(s)}
-                          disabled={deletingId === s.id}
-                          aria-label="Supprimer"
-                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                      {canManage && (
+                        <div className="flex shrink-0 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(s)}
+                            aria-label="Modifier"
+                            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                          >
+                            <Pencil size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(s)}
+                            disabled={deletingId === s.id}
+                            aria-label="Supprimer"
+                            className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -2113,6 +2122,7 @@ function SeriesDot({ cx, cy, payload, seriesLabel, color, clickable, onSelect })
 
 function KpiCard({
   kpi,
+  canManage,
   isMenuOpen,
   onToggleMenu,
   onEdit,
@@ -2286,6 +2296,7 @@ function KpiCard({
             )}
           </div>
 
+          {(canManage || isImportBased) && (
           <div className="relative">
             <button
               type="button"
@@ -2300,17 +2311,19 @@ function KpiCard({
               <>
                 <div className="fixed inset-0 z-10" onClick={() => onToggleMenu(null)} />
                 <div className="absolute right-0 top-full z-20 mt-1 w-48 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onToggleMenu(null);
-                      onEdit(kpi);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <Pencil size={14} />
-                    Modifier
-                  </button>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onEdit(kpi);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <Pencil size={14} />
+                      Modifier
+                    </button>
+                  )}
                   {isImportBased && (
                     <button
                       type="button"
@@ -2324,32 +2337,37 @@ function KpiCard({
                       Séries de calcul
                     </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onToggleMenu(null);
-                      onMove(kpi);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <FolderInput size={14} />
-                    Déplacer
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onToggleMenu(null);
-                      onDelete(kpi);
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 size={14} />
-                    Supprimer
-                  </button>
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onMove(kpi);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <FolderInput size={14} />
+                      Déplacer
+                    </button>
+                  )}
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onDelete(kpi);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    >
+                      <Trash2 size={14} />
+                      Supprimer
+                    </button>
+                  )}
                 </div>
               </>
             )}
           </div>
+          )}
         </div>
       </div>
 
@@ -2493,6 +2511,7 @@ function KpiCard({
             <div className="mt-2">
               <RecordHistoryTable
                 kpi={kpi}
+                canManage={canManage}
                 onEditRecord={(record) => onOpenRecordModal(kpi, record)}
                 onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
               />
@@ -2559,7 +2578,7 @@ function FolderBreadcrumb({ breadcrumb, onNavigate }) {
   );
 }
 
-function FolderTile({ folder, onOpen, onRename, onDelete }) {
+function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
@@ -2569,6 +2588,7 @@ function FolderTile({ folder, onOpen, onRename, onDelete }) {
         <span className="line-clamp-2 break-words pr-6 text-sm font-medium text-slate-900">{folder.name}</span>
       </button>
 
+      {canManage && (
       <div className="absolute right-2 top-2">
         <button
           type="button"
@@ -2609,6 +2629,7 @@ function FolderTile({ folder, onOpen, onRename, onDelete }) {
           </>
         )}
       </div>
+      )}
     </div>
   );
 }
@@ -2801,6 +2822,8 @@ function MoveKpiModal({ kpi, onClose, onMoved }) {
 }
 
 export default function Kpis() {
+  const currentUser = useCurrentUser();
+  const canManage = isManagerRole(currentUser?.role);
   const [kpis, setKpis] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -3044,6 +3067,7 @@ export default function Kpis() {
               <FolderTile
                 key={folder.id}
                 folder={folder}
+                canManage={canManage}
                 onOpen={() => navigateToFolder(folder.id)}
                 onRename={() => setFolderModal(folder)}
                 onDelete={() => handleDeleteFolder(folder)}
@@ -3085,6 +3109,7 @@ export default function Kpis() {
                 <KpiCard
                   key={kpi.id}
                   kpi={kpi}
+                  canManage={canManage}
                   isMenuOpen={openMenuId === kpi.id}
                   onToggleMenu={toggleMenu}
                   onEdit={setFormModal}
@@ -3123,13 +3148,19 @@ export default function Kpis() {
       {importModal && (
         <ImportWizardModal
           kpi={importModal}
+          canManage={canManage}
           onClose={() => setImportModal(null)}
           onImported={() => refreshKpi(importModal.id)}
         />
       )}
 
       {configModal && (
-        <SeriesManagerModal kpi={configModal} onClose={() => setConfigModal(null)} onSaved={() => refreshKpi(configModal.id)} />
+        <SeriesManagerModal
+          kpi={configModal}
+          canManage={canManage}
+          onClose={() => setConfigModal(null)}
+          onSaved={() => refreshKpi(configModal.id)}
+        />
       )}
 
       {folderModal && (

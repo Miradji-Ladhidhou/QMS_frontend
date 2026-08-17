@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Save, Send } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
+import { isManagerRole } from '../lib/roles.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 
@@ -52,6 +54,8 @@ function formatDateTime(dateStr) {
 export default function CapaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
+  const canManage = isManagerRole(currentUser?.role);
   const [capa, setCapa] = useState(null);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -224,7 +228,10 @@ export default function CapaDetail() {
         onSubmit={handleSaveTreatment}
         className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
       >
-        <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Traitement de la non-conformité</h2>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Traitement de la non-conformité</h2>
+          {!canManage && <span className="text-xs text-slate-400">Lecture seule</span>}
+        </div>
 
         {treatmentError && (
           <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -244,7 +251,8 @@ export default function CapaDetail() {
               type="text"
               value={treatmentForm.service}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, service: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
@@ -254,7 +262,8 @@ export default function CapaDetail() {
               rows={3}
               value={treatmentForm.description}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, description: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
@@ -264,7 +273,8 @@ export default function CapaDetail() {
               rows={2}
               value={treatmentForm.root_cause}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, root_cause: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
@@ -274,7 +284,8 @@ export default function CapaDetail() {
               rows={2}
               value={treatmentForm.corrective_action}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, corrective_action: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
@@ -284,7 +295,8 @@ export default function CapaDetail() {
               rows={2}
               value={treatmentForm.preventive_action}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, preventive_action: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
@@ -294,18 +306,21 @@ export default function CapaDetail() {
               rows={2}
               value={treatmentForm.comment}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, comment: e.target.value }))}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={savingTreatment}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-          >
-            <Save size={16} />
-            {savingTreatment ? 'Enregistrement...' : 'Enregistrer'}
-          </button>
+          {canManage && (
+            <button
+              type="submit"
+              disabled={savingTreatment}
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+            >
+              <Save size={16} />
+              {savingTreatment ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
+          )}
         </div>
       </form>
 
@@ -313,7 +328,10 @@ export default function CapaDetail() {
         onSubmit={handleSaveEffectiveness}
         className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6"
       >
-        <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Vérification d'efficacité</h2>
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Vérification d'efficacité</h2>
+          {!canManage && <span className="text-xs text-slate-400">Lecture seule</span>}
+        </div>
 
         {effectivenessError && (
           <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
@@ -332,7 +350,8 @@ export default function CapaDetail() {
             <select
               value={effectivenessVerified}
               onChange={(e) => setEffectivenessVerified(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:max-w-xs"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500 sm:max-w-xs"
             >
               <option value="">{CAPA_EFFECTIVENESS_LABELS[null]}</option>
               <option value="true">{CAPA_EFFECTIVENESS_LABELS[true]}</option>
@@ -346,18 +365,21 @@ export default function CapaDetail() {
               rows={2}
               value={effectivenessNotes}
               onChange={(e) => setEffectivenessNotes(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
 
-          <button
-            type="submit"
-            disabled={savingEffectiveness}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-          >
-            <Save size={16} />
-            {savingEffectiveness ? 'Enregistrement...' : 'Enregistrer'}
-          </button>
+          {canManage && (
+            <button
+              type="submit"
+              disabled={savingEffectiveness}
+              className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+            >
+              <Save size={16} />
+              {savingEffectiveness ? 'Enregistrement...' : 'Enregistrer'}
+            </button>
+          )}
         </div>
       </form>
 

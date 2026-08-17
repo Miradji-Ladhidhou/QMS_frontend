@@ -3,6 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
+import { isManagerRole } from '../lib/roles.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 
@@ -264,6 +266,7 @@ function CapaAdjustmentForm({
 export default function QqoqccpDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -504,6 +507,11 @@ export default function QqoqccpDetail() {
   const suggestedActions = analysis.ai_suggested_actions?.suggested_actions || [];
   const rootCauses = analysis.ai_suggested_actions?.root_causes || [];
   const overallPriority = analysis.ai_suggested_actions?.overall_priority;
+  // Miroir de la règle backend (PATCH /api/qqoqccp/:id) : owner/admin/manager modifient
+  // toujours ; un member modifie SA PROPRE analyse tant qu'elle n'est pas validée.
+  const canEditAnalysis =
+    isManagerRole(currentUser?.role) ||
+    (Boolean(currentUser) && analysis.created_by === currentUser.id && analysis.status !== 'validated');
 
   return (
     <div>
@@ -518,7 +526,10 @@ export default function QqoqccpDetail() {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{analysis.title}</h1>
-        <QqoqccpStatusBadge status={analysis.status} />
+        <div className="flex items-center gap-2">
+          {!canEditAnalysis && <span className="text-xs text-slate-400">Lecture seule</span>}
+          <QqoqccpStatusBadge status={analysis.status} />
+        </div>
       </div>
 
       <div className="mt-4 space-y-4">
@@ -547,7 +558,8 @@ export default function QqoqccpDetail() {
               placeholder={placeholder}
               value={form[key] || ''}
               onChange={(e) => handleFieldChange(key, e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+              disabled={!canEditAnalysis}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
         ))}

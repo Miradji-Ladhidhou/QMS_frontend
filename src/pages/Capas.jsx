@@ -4,6 +4,8 @@ import { ChevronRight, Download, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
+import { isManagerRole } from '../lib/roles.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 
@@ -325,6 +327,8 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
 
 export default function Capas() {
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
+  const canManage = isManagerRole(currentUser?.role);
   const [capas, setCapas] = useState([]);
   const [users, setUsers] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
@@ -501,19 +505,21 @@ export default function Capas() {
                 <p className="mt-1 text-xs text-slate-400">
                   Délai de traitement : {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
                 </p>
-                <select
-                  value={capa.status}
-                  disabled={updatingId === capa.id}
-                  onClick={(e) => e.stopPropagation()}
-                  onChange={(e) => handleStatusChange(e, capa)}
-                  className="mt-3 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                >
-                  {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                {canManage && (
+                  <select
+                    value={capa.status}
+                    disabled={updatingId === capa.id}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => handleStatusChange(e, capa)}
+                    className="mt-3 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  >
+                    {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
             ))}
           </div>
@@ -551,19 +557,21 @@ export default function Capas() {
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <CapaStatusBadge status={capa.status} />
-                        <select
-                          value={capa.status}
-                          disabled={updatingId === capa.id}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={(e) => handleStatusChange(e, capa)}
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                        >
-                          {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
-                            <option key={value} value={value}>
-                              {label}
-                            </option>
-                          ))}
-                        </select>
+                        {canManage && (
+                          <select
+                            value={capa.status}
+                            disabled={updatingId === capa.id}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => handleStatusChange(e, capa)}
+                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          >
+                            {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
+                              <option key={value} value={value}>
+                                {label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     </td>
                   </tr>
