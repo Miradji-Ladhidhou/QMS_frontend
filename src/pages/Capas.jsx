@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Plus, X } from 'lucide-react';
+import { ChevronRight, Download, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
@@ -31,6 +31,120 @@ function CounterCard({ label, value, accent }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <p className={`text-2xl font-semibold ${accent}`}>{value}</p>
       <p className="text-sm text-slate-500">{label}</p>
+    </div>
+  );
+}
+
+// Première étape du bouton "Nouvelle CAPA" : choisir entre partir d'un diagnostic QQOQCCP
+// guidé (mis en avant) ou aller directement au formulaire de création classique.
+function NewCapaChoiceModal({ onClose, onSelectGuided, onSelectQuick }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Nouvelle CAPA</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-3">
+          <button
+            type="button"
+            onClick={onSelectGuided}
+            className="flex w-full items-center gap-3 rounded-xl border-2 border-primary bg-primary/5 p-4 text-left transition-colors hover:bg-primary/10"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white">
+              <Sparkles size={18} />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-semibold text-slate-900">Diagnostic guidé (QQOQCCP)</span>
+              <span className="mt-0.5 block text-sm text-slate-500">
+                Structurez le problème avec les 7 questions et une proposition IA avant de créer la CAPA.
+              </span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-primary" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onSelectQuick}
+            className="flex w-full items-center gap-3 rounded-xl border border-slate-200 p-4 text-left transition-colors hover:bg-slate-50"
+          >
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+              <Plus size={18} />
+            </span>
+            <span className="flex-1">
+              <span className="block text-sm font-semibold text-slate-900">Création rapide</span>
+              <span className="mt-0.5 block text-sm text-slate-500">Ouvre directement le formulaire CAPA classique.</span>
+            </span>
+            <ChevronRight size={18} className="shrink-0 text-slate-300" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Démarre un diagnostic QQOQCCP depuis la CAPA : un simple titre, puis redirection vers le
+// détail QQOQCCP (?flow=capa signale au frontend qu'on revient créer une CAPA à la fin).
+function GuidedDiagnosticModal({ onClose, onCreated }) {
+  const [title, setTitle] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const { data } = await api.post('/qqoqccp/quick-start', { title });
+      onCreated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de démarrer le diagnostic.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-sm sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Diagnostic guidé</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <input
+              type="text"
+              required
+              autoFocus
+              placeholder="Ex : Rupture de stock composant X"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Démarrage...' : 'Démarrer le diagnostic'}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }
@@ -217,6 +331,8 @@ export default function Capas() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isChoiceModalOpen, setIsChoiceModalOpen] = useState(false);
+  const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
 
   async function loadData() {
@@ -295,6 +411,11 @@ export default function Capas() {
     setIsModalOpen(false);
   }
 
+  function handleGuidedCreated(analysis) {
+    setIsGuidedModalOpen(false);
+    navigate(`/qqoqccp/${analysis.id}?flow=capa`);
+  }
+
   async function handleStatusChange(event, capa) {
     event.stopPropagation();
     const status = event.target.value;
@@ -326,7 +447,7 @@ export default function Capas() {
           </button>
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => setIsChoiceModalOpen(true)}
             className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
           >
             <Plus size={18} />
@@ -460,6 +581,24 @@ export default function Capas() {
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />
+      )}
+
+      {isChoiceModalOpen && (
+        <NewCapaChoiceModal
+          onClose={() => setIsChoiceModalOpen(false)}
+          onSelectGuided={() => {
+            setIsChoiceModalOpen(false);
+            setIsGuidedModalOpen(true);
+          }}
+          onSelectQuick={() => {
+            setIsChoiceModalOpen(false);
+            setIsModalOpen(true);
+          }}
+        />
+      )}
+
+      {isGuidedModalOpen && (
+        <GuidedDiagnosticModal onClose={() => setIsGuidedModalOpen(false)} onCreated={handleGuidedCreated} />
       )}
     </div>
   );
