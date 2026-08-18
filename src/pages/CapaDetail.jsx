@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Send } from 'lucide-react';
+import { ArrowLeft, Save, Send, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -74,6 +74,9 @@ export default function CapaDetail() {
   const [savingEffectiveness, setSavingEffectiveness] = useState(false);
   const [effectivenessSaved, setEffectivenessSaved] = useState(false);
   const [effectivenessError, setEffectivenessError] = useState('');
+
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   async function loadCapa() {
     setLoading(true);
@@ -161,6 +164,21 @@ export default function CapaDetail() {
     }
   }
 
+  async function handleDelete() {
+    if (!window.confirm(`Supprimer définitivement la CAPA "${capa.title}" ? Cette action est irréversible.`)) return;
+
+    setDeleteError('');
+    setDeleting(true);
+
+    try {
+      await api.delete(`/capas/${id}`);
+      navigate('/capas');
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || 'Impossible de supprimer cette CAPA.');
+      setDeleting(false);
+    }
+  }
+
   if (loading) {
     return <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
@@ -175,14 +193,32 @@ export default function CapaDetail() {
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => navigate('/capas')}
-        className="mb-4 flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
-      >
-        <ArrowLeft size={16} />
-        Retour aux CAPA
-      </button>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/capas')}
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
+        >
+          <ArrowLeft size={16} />
+          Retour aux CAPA
+        </button>
+
+        {canManage && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+          >
+            <Trash2 size={16} />
+            {deleting ? 'Suppression...' : 'Supprimer'}
+          </button>
+        )}
+      </div>
+
+      {deleteError && (
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
+      )}
 
       <div className={`rounded-xl border bg-white p-5 sm:p-6 ${capa.status === 'overdue' ? 'border-red-300' : 'border-slate-200'}`}>
         <div>

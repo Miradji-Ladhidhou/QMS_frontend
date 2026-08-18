@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Grid3x3, Plus, UserCheck, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Grid3x3, Pencil, Plus, Trash2, UserCheck, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { isManagerRole } from '../lib/roles.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -99,6 +101,165 @@ function NewTrainingModal({ onClose, onCreated }) {
   );
 }
 
+function EditTrainingModal({ training, onClose, onUpdated }) {
+  const [form, setForm] = useState({
+    title: training.title,
+    type: training.type || '',
+    frequency_months: training.frequency_months || '',
+  });
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  function updateField(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const { data } = await api.patch(`/trainings/${training.id}`, {
+        title: form.title,
+        type: form.type || null,
+        frequency_months: form.frequency_months ? Number(form.frequency_months) : null,
+      });
+      onUpdated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de modifier la formation.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Modifier la formation</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <input
+              type="text"
+              required
+              value={form.title}
+              onChange={(e) => updateField('title', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
+            <input
+              type="text"
+              placeholder="Interne, externe, en ligne, certification..."
+              value={form.type}
+              onChange={(e) => updateField('type', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence de recyclage (mois)</label>
+            <input
+              type="number"
+              min="1"
+              placeholder="Laisser vide si formation ponctuelle"
+              value={form.frequency_months}
+              onChange={(e) => updateField('frequency_months', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function EditRecordModal({ training, record, onClose, onUpdated }) {
+  const [completedAt, setCompletedAt] = useState(record.completed_at);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const { data } = await api.patch(`/trainings/${training.id}/records/${record.id}`, {
+        completed_at: completedAt,
+      });
+      onUpdated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de modifier cette réalisation.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Modifier la réalisation</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-slate-500">
+          {training.title} — {record.user?.full_name}
+        </p>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Date de réalisation</label>
+            <input
+              type="date"
+              required
+              value={completedAt}
+              onChange={(e) => setCompletedAt(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function RecordModal({ training, users, onClose, onRecorded }) {
   const [userId, setUserId] = useState('');
   const [completedAt, setCompletedAt] = useState(new Date().toISOString().slice(0, 10));
@@ -187,12 +348,17 @@ function RecordModal({ training, users, onClose, onRecorded }) {
 }
 
 export default function Trainings() {
+  const currentUser = useCurrentUser();
+  const canManage = isManagerRole(currentUser?.role);
   const [trainings, setTrainings] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [recordingTraining, setRecordingTraining] = useState(null);
+  const [editingTraining, setEditingTraining] = useState(null);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [expandedId, setExpandedId] = useState(null);
 
   async function loadData() {
     setLoading(true);
@@ -224,6 +390,56 @@ export default function Trainings() {
       )
     );
     setRecordingTraining(null);
+  }
+
+  function handleTrainingUpdated(updated) {
+    setTrainings((prev) =>
+      prev.map((training) => (training.id === updated.id ? { ...training, ...updated } : training))
+    );
+    setEditingTraining(null);
+  }
+
+  async function handleDeleteTraining(training) {
+    if (
+      !window.confirm(
+        `Supprimer définitivement la formation "${training.title}" ? Les ${training.records.length} réalisation(s) associée(s) seront supprimées avec elle.`
+      )
+    )
+      return;
+
+    try {
+      await api.delete(`/trainings/${training.id}`);
+      setTrainings((prev) => prev.filter((item) => item.id !== training.id));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer cette formation.');
+    }
+  }
+
+  function handleRecordUpdated(training, updated) {
+    setTrainings((prev) =>
+      prev.map((item) =>
+        item.id === training.id
+          ? { ...item, records: item.records.map((record) => (record.id === updated.id ? updated : record)) }
+          : item
+      )
+    );
+    setEditingRecord(null);
+  }
+
+  async function handleDeleteRecord(training, record) {
+    if (!window.confirm(`Supprimer la réalisation de ${record.user?.full_name} du ${formatDate(record.completed_at)} ?`))
+      return;
+
+    try {
+      await api.delete(`/trainings/${training.id}/records/${record.id}`);
+      setTrainings((prev) =>
+        prev.map((item) =>
+          item.id === training.id ? { ...item, records: item.records.filter((r) => r.id !== record.id) } : item
+        )
+      );
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer cette réalisation.');
+    }
   }
 
   return (
@@ -263,34 +479,99 @@ export default function Trainings() {
         <p className="mt-6 text-sm text-slate-500">Aucune formation pour l'instant.</p>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {trainings.map((training) => (
-            <div key={training.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-              <p className="font-medium text-slate-900">{training.title}</p>
-              {training.type && <p className="mt-1 text-sm text-slate-500">{training.type}</p>}
-              <p className="mt-2 text-sm text-slate-600">
-                {training.frequency_months
-                  ? `Renouvellement tous les ${training.frequency_months} mois`
-                  : 'Formation ponctuelle'}
-              </p>
-              <p className="mt-1 text-sm text-slate-600">
-                {training.records.length} réalisation{training.records.length > 1 ? 's' : ''}
-              </p>
-              {training.records.length > 0 && (
-                <p className="mt-1 text-xs text-slate-400">
-                  Dernière : {formatDate(training.records[training.records.length - 1]?.completed_at)}
-                </p>
-              )}
+          {trainings.map((training) => {
+            const isExpanded = expandedId === training.id;
 
-              <button
-                type="button"
-                onClick={() => setRecordingTraining(training)}
-                className="mt-4 flex items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-              >
-                <UserCheck size={16} />
-                Enregistrer une réalisation
-              </button>
-            </div>
-          ))}
+            return (
+              <div key={training.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <div className="flex items-start justify-between gap-2">
+                  <p className="font-medium text-slate-900">{training.title}</p>
+                  {canManage && (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setEditingTraining(training)}
+                        aria-label="Modifier la formation"
+                        className="p-1 text-slate-400 hover:text-primary"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteTraining(training)}
+                        aria-label="Supprimer la formation"
+                        className="p-1 text-slate-400 hover:text-red-600"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                {training.type && <p className="mt-1 text-sm text-slate-500">{training.type}</p>}
+                <p className="mt-2 text-sm text-slate-600">
+                  {training.frequency_months
+                    ? `Renouvellement tous les ${training.frequency_months} mois`
+                    : 'Formation ponctuelle'}
+                </p>
+
+                <button
+                  type="button"
+                  onClick={() => setExpandedId(isExpanded ? null : training.id)}
+                  disabled={training.records.length === 0}
+                  className="mt-1 flex items-center gap-1 text-sm text-slate-600 hover:text-primary disabled:cursor-default disabled:hover:text-slate-600"
+                >
+                  {training.records.length} réalisation{training.records.length > 1 ? 's' : ''}
+                  {training.records.length > 0 && (isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
+                </button>
+                {!isExpanded && training.records.length > 0 && (
+                  <p className="mt-1 text-xs text-slate-400">
+                    Dernière : {formatDate(training.records[training.records.length - 1]?.completed_at)}
+                  </p>
+                )}
+
+                {isExpanded && (
+                  <ul className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+                    {training.records.map((record) => (
+                      <li key={record.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="text-slate-700">
+                          {record.user?.full_name} — {formatDate(record.completed_at)}
+                        </span>
+                        {canManage && (
+                          <div className="flex shrink-0 gap-1">
+                            <button
+                              type="button"
+                              onClick={() => setEditingRecord({ training, record })}
+                              aria-label="Modifier la réalisation"
+                              className="p-1 text-slate-400 hover:text-primary"
+                            >
+                              <Pencil size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteRecord(training, record)}
+                              aria-label="Supprimer la réalisation"
+                              className="p-1 text-slate-400 hover:text-red-600"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setRecordingTraining(training)}
+                  className="mt-4 flex items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                >
+                  <UserCheck size={16} />
+                  Enregistrer une réalisation
+                </button>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -302,6 +583,23 @@ export default function Trainings() {
           users={users}
           onClose={() => setRecordingTraining(null)}
           onRecorded={handleRecordCreated}
+        />
+      )}
+
+      {editingTraining && (
+        <EditTrainingModal
+          training={editingTraining}
+          onClose={() => setEditingTraining(null)}
+          onUpdated={handleTrainingUpdated}
+        />
+      )}
+
+      {editingRecord && (
+        <EditRecordModal
+          training={editingRecord.training}
+          record={editingRecord.record}
+          onClose={() => setEditingRecord(null)}
+          onUpdated={(updated) => handleRecordUpdated(editingRecord.training, updated)}
         />
       )}
     </div>

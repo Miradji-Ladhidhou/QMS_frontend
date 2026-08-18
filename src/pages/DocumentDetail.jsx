@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, Check, ChevronDown, ChevronUp, Download, Lock, Send, Upload, X, XCircle } from 'lucide-react';
+import { ArrowLeft, BadgeCheck, Check, ChevronDown, ChevronUp, Download, Lock, Send, Trash2, Upload, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
+import { isManagerRole } from '../lib/roles.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import ApprovalStatusBadge from '../components/ApprovalStatusBadge.jsx';
@@ -123,6 +124,8 @@ export default function DocumentDetail() {
   const [certificateError, setCertificateError] = useState('');
   const [restrictedAccess, setRestrictedAccess] = useState(null);
   const [showRestrictedList, setShowRestrictedList] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   async function loadDocument() {
     setLoading(true);
@@ -195,6 +198,21 @@ export default function DocumentDetail() {
     }
   }
 
+  async function handleDelete() {
+    if (!window.confirm(`Supprimer définitivement le document "${doc.title}" ? Cette action est irréversible.`)) return;
+
+    setDeleteError('');
+    setDeleting(true);
+
+    try {
+      await api.delete(`/documents/${doc.id}`);
+      navigate('/documents');
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || 'Impossible de supprimer ce document.');
+      setDeleting(false);
+    }
+  }
+
   if (loading) {
     return <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
@@ -217,17 +235,36 @@ export default function DocumentDetail() {
   const isSigned = doc.status === 'approved' && doc.workflow?.status === 'approved';
   const canSubmitForApproval = doc.status === 'draft' && currentUser && doc.created_by === currentUser.id;
   const otherUsers = users.filter((user) => user.id !== currentUser?.id);
+  const canManage = isManagerRole(currentUser?.role);
 
   return (
     <div>
-      <button
-        type="button"
-        onClick={() => navigate('/documents')}
-        className="mb-4 flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
-      >
-        <ArrowLeft size={16} />
-        Retour aux documents
-      </button>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={() => navigate('/documents')}
+          className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
+        >
+          <ArrowLeft size={16} />
+          Retour aux documents
+        </button>
+
+        {canManage && (
+          <button
+            type="button"
+            onClick={handleDelete}
+            disabled={deleting}
+            className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+          >
+            <Trash2 size={16} />
+            {deleting ? 'Suppression...' : 'Supprimer'}
+          </button>
+        )}
+      </div>
+
+      {deleteError && (
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
