@@ -23,6 +23,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useRole } from '../lib/useRole.js';
 import { ROLE_LABELS } from '../lib/roles.js';
+import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import NotificationBell from './NotificationBell.jsx';
 
 function initialsOf(fullName) {
@@ -54,6 +55,7 @@ export default function Layout() {
   const currentUser = useCurrentUser();
   const tenant = useTenant();
   const role = useRole();
+  const logoUrl = getTenantLogoPublicUrl(tenant?.logo_url);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
@@ -77,7 +79,12 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
       <header className="sticky top-0 z-30 flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
-        <span className="text-lg font-semibold">QMS SaaS</span>
+        <div className="flex items-center gap-2">
+          {logoUrl && (
+            <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded bg-white/10 object-contain p-0.5" />
+          )}
+          <span className="text-lg font-semibold">QMS SaaS</span>
+        </div>
         <div className="flex items-center gap-1">
           <NotificationBell variant="mobile" />
           <button type="button" onClick={() => setIsMenuOpen(true)} aria-label="Ouvrir le menu" className="-mr-2 p-2">
@@ -94,7 +101,12 @@ export default function Layout() {
         }`}
       >
         <div className="flex items-center justify-between px-6 py-5">
-          <span className="text-xl font-semibold">QMS SaaS</span>
+          <div className="flex items-center gap-2">
+            {logoUrl && (
+              <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 rounded bg-white/10 object-contain p-0.5" />
+            )}
+            <span className="text-xl font-semibold">QMS SaaS</span>
+          </div>
           <div className="flex items-center gap-1">
             <div className="hidden md:block">
               <NotificationBell variant="sidebar" />
