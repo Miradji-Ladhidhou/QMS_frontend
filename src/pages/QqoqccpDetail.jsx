@@ -396,6 +396,7 @@ export default function QqoqccpDetail() {
   function handleOpenCapaForm() {
     const suggested = analysis.ai_suggested_actions?.overall_priority || 'medium';
     const causes = analysis.ai_suggested_actions?.root_causes || [];
+    const preventiveActions = analysis.ai_suggested_actions?.preventive_actions || [];
     const delayDays = getDelayDays(suggested, priorityDelays);
 
     setCapaForm({
@@ -405,7 +406,7 @@ export default function QqoqccpDetail() {
       severity: suggested,
       root_cause: causes.length > 0 ? causes.map((cause) => `- ${cause}`).join('\n') : '',
       corrective_action: '',
-      preventive_action: '',
+      preventive_action: preventiveActions.length > 0 ? preventiveActions.map((action) => `- ${action}`).join('\n') : '',
       assigned_to: '',
       due_date: delayDays ? addDaysToToday(delayDays) : '',
     });
