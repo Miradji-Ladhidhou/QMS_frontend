@@ -11,6 +11,7 @@ import LegalTerms from './pages/LegalTerms.jsx';
 import LegalPrivacy from './pages/LegalPrivacy.jsx';
 import CookieNotice from './components/CookieNotice.jsx';
 import Dashboard from './pages/Dashboard.jsx';
+import Planning from './pages/Planning.jsx';
 import Documents from './pages/Documents.jsx';
 import DocumentDetail from './pages/DocumentDetail.jsx';
 import Capas from './pages/Capas.jsx';
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="/super-admin" element={<SuperAdmin />} />
           <Route path="/" element={<Layout />}>
             <Route index element={<Dashboard />} />
+            <Route path="planning" element={<Planning />} />
             <Route path="documents" element={<Documents />} />
             <Route path="documents/:id" element={<DocumentDetail />} />
             <Route path="capas" element={<Capas />} />

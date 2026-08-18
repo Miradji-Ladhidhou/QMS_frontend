@@ -13,6 +13,7 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  CalendarClock,
   Wrench,
   X,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ import NotificationBell from './NotificationBell.jsx';
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { to: '/planning', label: 'Planning', icon: CalendarClock },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/capas', label: 'CAPA', icon: ClipboardList },
   { to: '/trainings', label: 'Formations', icon: GraduationCap },
