@@ -22,6 +22,7 @@ import Qqoqccp from './pages/Qqoqccp.jsx';
 import QqoqccpDetail from './pages/QqoqccpDetail.jsx';
 import Settings from './pages/Settings.jsx';
 import Services from './pages/Services.jsx';
+import Employees from './pages/Employees.jsx';
 import MyApprovals from './pages/MyApprovals.jsx';
 import SuperAdmin from './pages/SuperAdmin.jsx';
 
@@ -73,6 +74,7 @@ export default function App() {
             <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
             <Route path="settings" element={<Settings />} />
             <Route path="services" element={<Services />} />
+            <Route path="employees" element={<Employees />} />
             <Route path="my-approvals" element={<MyApprovals />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />

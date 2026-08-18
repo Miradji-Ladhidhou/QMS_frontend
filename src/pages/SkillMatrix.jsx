@@ -40,10 +40,12 @@ export default function SkillMatrix() {
     load();
   }, []);
 
-  const users = matrix[0]?.users.map((entry) => entry.user) ?? [];
+  // people : comptes utilisateurs ET personnel sans compte (voir trainings.js /matrix),
+  // chaque entrée { id, full_name, kind: 'user' | 'employee' }.
+  const people = matrix[0]?.people.map((entry) => entry.person) ?? [];
 
-  function findEntry(training, userId) {
-    return training.users.find((entry) => entry.user.id === userId);
+  function findEntry(training, personId) {
+    return training.people.find((entry) => entry.person.id === personId);
   }
 
   return (
@@ -81,7 +83,7 @@ export default function SkillMatrix() {
           <table className="text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="sticky left-0 z-10 bg-slate-50 px-4 py-3">Utilisateur</th>
+                <th className="sticky left-0 z-10 bg-slate-50 px-4 py-3">Personnel</th>
                 {matrix.map((entry) => (
                   <th key={entry.training.id} className="min-w-[140px] px-4 py-3">
                     {entry.training.title}
@@ -90,13 +92,18 @@ export default function SkillMatrix() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {users.map((user) => (
-                <tr key={user.id}>
+              {people.map((person) => (
+                <tr key={person.id}>
                   <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-3 font-medium text-slate-800">
-                    {user.full_name}
+                    {person.full_name}
+                    {person.kind === 'employee' && (
+                      <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                        Sans compte
+                      </span>
+                    )}
                   </td>
                   {matrix.map((entry) => {
-                    const cell = findEntry(entry, user.id);
+                    const cell = findEntry(entry, person.id);
                     const status = cell?.status ?? 'never_done';
                     const Icon = CELL_ICONS[status];
                     return (

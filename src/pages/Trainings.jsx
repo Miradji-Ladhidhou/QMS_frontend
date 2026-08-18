@@ -195,6 +195,10 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
   );
 }
 
+function personName(record) {
+  return record.user?.full_name || record.employee?.full_name || 'Personne inconnue';
+}
+
 function EditRecordModal({ training, record, onClose, onUpdated }) {
   const [completedAt, setCompletedAt] = useState(record.completed_at);
   const [error, setError] = useState('');
@@ -228,7 +232,7 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
         </div>
 
         <p className="mb-4 text-sm text-slate-500">
-          {training.title} — {record.user?.full_name}
+          {training.title} — {personName(record)}
         </p>
 
         {error && (
@@ -260,16 +264,22 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
   );
 }
 
-function RecordModal({ training, users, onClose, onRecorded }) {
-  const [userId, setUserId] = useState('');
+function RecordModal({ training, users, employees, onClose, onRecorded }) {
+  const [source, setSource] = useState('user');
+  const [personId, setPersonId] = useState('');
   const [completedAt, setCompletedAt] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  function handleSourceChange(next) {
+    setSource(next);
+    setPersonId('');
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!userId) {
-      setError('Sélectionnez un utilisateur.');
+    if (!personId) {
+      setError(source === 'user' ? 'Sélectionnez un utilisateur.' : 'Sélectionnez une personne.');
       return;
     }
 
@@ -277,10 +287,8 @@ function RecordModal({ training, users, onClose, onRecorded }) {
     setSubmitting(true);
 
     try {
-      const { data } = await api.post(`/trainings/${training.id}/records`, {
-        user_id: userId,
-        completed_at: completedAt,
-      });
+      const payload = source === 'user' ? { user_id: personId } : { employee_id: personId };
+      const { data } = await api.post(`/trainings/${training.id}/records`, { ...payload, completed_at: completedAt });
       onRecorded(data);
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer la réalisation.");
@@ -288,6 +296,8 @@ function RecordModal({ training, users, onClose, onRecorded }) {
       setSubmitting(false);
     }
   }
+
+  const options = source === 'user' ? users : employees;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
@@ -307,20 +317,49 @@ function RecordModal({ training, users, onClose, onRecorded }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Utilisateur</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Cette personne a-t-elle un compte ?</label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => handleSourceChange('user')}
+                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                  source === 'user' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Utilisateur du compte
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSourceChange('employee')}
+                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                  source === 'employee' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                Personnel sans compte
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              {source === 'user' ? 'Utilisateur' : 'Personne'}
+            </label>
             <select
               required
-              value={userId}
-              onChange={(e) => setUserId(e.target.value)}
+              value={personId}
+              onChange={(e) => setPersonId(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             >
               <option value="">Sélectionner...</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.full_name}
+              {options.map((person) => (
+                <option key={person.id} value={person.id}>
+                  {person.full_name}
                 </option>
               ))}
             </select>
+            {source === 'employee' && options.length === 0 && (
+              <p className="mt-1 text-xs text-slate-400">Aucune personne enregistrée — ajoutez-la depuis Personnel.</p>
+            )}
           </div>
 
           <div>
@@ -352,6 +391,7 @@ export default function Trainings() {
   const canManage = isManagerRole(currentUser?.role);
   const [trainings, setTrainings] = useState([]);
   const [users, setUsers] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -364,9 +404,16 @@ export default function Trainings() {
     setLoading(true);
     setError('');
     try {
-      const [trainingsRes, usersRes] = await Promise.all([api.get('/trainings'), api.get('/users')]);
+      const [trainingsRes, usersRes, employeesRes] = await Promise.all([
+        api.get('/trainings'),
+        api.get('/users'),
+        api.get('/employees'),
+      ]);
       setTrainings(trainingsRes.data);
       setUsers(usersRes.data);
+      // GET /employees renvoie aussi les inactifs (utile à la page de gestion du personnel) —
+      // ce sélecteur d'enregistrement de réalisation ne doit proposer que les actifs.
+      setEmployees(employeesRes.data.filter((employee) => employee.is_active));
     } catch {
       setError('Impossible de charger les formations.');
     } finally {
@@ -427,7 +474,7 @@ export default function Trainings() {
   }
 
   async function handleDeleteRecord(training, record) {
-    if (!window.confirm(`Supprimer la réalisation de ${record.user?.full_name} du ${formatDate(record.completed_at)} ?`))
+    if (!window.confirm(`Supprimer la réalisation de ${personName(record)} du ${formatDate(record.completed_at)} ?`))
       return;
 
     try {
@@ -534,7 +581,14 @@ export default function Trainings() {
                     {training.records.map((record) => (
                       <li key={record.id} className="flex items-center justify-between gap-2 text-sm">
                         <span className="text-slate-700">
-                          {record.user?.full_name} — {formatDate(record.completed_at)}
+                          {personName(record)}
+                          {record.employee_id && (
+                            <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                              Sans compte
+                            </span>
+                          )}
+                          {' — '}
+                          {formatDate(record.completed_at)}
                         </span>
                         {canManage && (
                           <div className="flex shrink-0 gap-1">
@@ -581,6 +635,7 @@ export default function Trainings() {
         <RecordModal
           training={recordingTraining}
           users={users}
+          employees={employees}
           onClose={() => setRecordingTraining(null)}
           onRecorded={handleRecordCreated}
         />

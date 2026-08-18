@@ -4,6 +4,7 @@ import {
   BarChart3,
   CheckSquare,
   ClipboardList,
+  Contact,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -29,8 +30,9 @@ const NAV_ITEMS = [
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
-  // Gestion des services/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
+  // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
   { to: '/services', label: 'Services', icon: Wrench, adminOnly: true },
+  { to: '/employees', label: 'Personnel', icon: Contact, adminOnly: true },
   { to: '/settings', label: 'Paramètres', icon: Settings, adminOnly: true },
 ];
 
