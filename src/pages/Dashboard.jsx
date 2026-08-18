@@ -4,6 +4,22 @@ import { AlertTriangle, Check, CheckCircle2, ClipboardList, Filter, TrendingDown
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
+// Se met à jour toutes les 30s plutôt qu'à chaque seconde : l'heure affichée n'a besoin
+// d'être qu'approximativement fraîche ici, pas d'un vrai chronomètre — inutile de re-render
+// toute la page au rythme d'une horloge.
+function useLiveClock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const interval = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(interval);
+  }, []);
+  return now;
+}
+
+function capitalize(text) {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -62,6 +78,7 @@ export default function Dashboard() {
   const role = currentUser?.role;
   const isMember = role === 'member';
   const canFilterByService = role === 'admin' || role === 'manager';
+  const now = useLiveClock();
 
   const [stats, setStats] = useState(null);
   const [allServices, setAllServices] = useState([]);
@@ -145,6 +162,12 @@ export default function Dashboard() {
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Dashboard</h1>
+      <p className="mt-1 text-sm text-slate-500">
+        {currentUser?.full_name ? `Bonjour, ${currentUser.full_name.split(' ')[0]} — ` : ''}
+        {capitalize(now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}
+        {' · '}
+        {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+      </p>
 
       {error && (
         <p className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">

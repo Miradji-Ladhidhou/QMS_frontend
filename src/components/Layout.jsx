@@ -20,8 +20,20 @@ import {
 import { supabase } from '../lib/supabase.js';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { useRole } from '../lib/useRole.js';
+import { ROLE_LABELS } from '../lib/roles.js';
 import NotificationBell from './NotificationBell.jsx';
+
+function initialsOf(fullName) {
+  if (!fullName) return '?';
+  return fullName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0].toUpperCase())
+    .join('');
+}
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -40,6 +52,7 @@ const NAV_ITEMS = [
 
 export default function Layout() {
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const role = useRole();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
@@ -91,6 +104,21 @@ export default function Layout() {
             </button>
           </div>
         </div>
+
+        {currentUser && (
+          <div className="mx-3 mb-3 flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2.5">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">
+              {initialsOf(currentUser.full_name)}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium text-white">{currentUser.full_name}</p>
+              <p className="truncate text-xs text-white/60">
+                {ROLE_LABELS[currentUser.role] || currentUser.role}
+                {tenant?.name ? ` · ${tenant.name}` : ''}
+              </p>
+            </div>
+          </div>
+        )}
 
         <nav className="flex-1 space-y-1 px-3">
           {NAV_ITEMS.filter((item) => !item.adminOnly || role === 'admin').map(({ to, label, icon: Icon, end }) => (
