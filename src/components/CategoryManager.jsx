@@ -6,7 +6,7 @@ import CategoryPermissionsPanel from './CategoryPermissionsPanel.jsx';
 const DEFAULT_COLOR = '#1F3864';
 const DEFAULT_FORM = { name: '', color: DEFAULT_COLOR, is_restricted: false };
 
-export default function CategoryManager() {
+export default function CategoryManager({ isAdmin }) {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -137,7 +137,7 @@ export default function CategoryManager() {
     <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Catégories de documents</h2>
-        {editingId === null && (
+        {isAdmin && editingId === null && (
           <button
             type="button"
             onClick={startCreate}
@@ -199,24 +199,26 @@ export default function CategoryManager() {
                         <ChevronDown size={14} className="shrink-0 text-slate-400" />
                       ))}
                   </button>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => startEdit(category)}
-                      aria-label="Modifier"
-                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(category)}
-                      aria-label="Supprimer"
-                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
+                  {isAdmin && (
+                    <div className="flex shrink-0 gap-1">
+                      <button
+                        type="button"
+                        onClick={() => startEdit(category)}
+                        aria-label="Modifier"
+                        className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(category)}
+                        aria-label="Supprimer"
+                        className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {category.is_restricted && expandedPermissionsId === category.id && (

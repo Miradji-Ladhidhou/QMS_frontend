@@ -56,7 +56,7 @@ export default function Settings() {
 
       <div className="mt-4">
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
-        {activeTab === 'categories' && <CategoryManager />}
+        {activeTab === 'categories' && <CategoryManager isAdmin={isAdmin} />}
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}
