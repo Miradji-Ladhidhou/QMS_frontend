@@ -83,7 +83,7 @@ export default function Layout() {
           {logoUrl && (
             <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded bg-white/10 object-contain p-0.5" />
           )}
-          <span className="text-lg font-semibold">QMS SaaS</span>
+          <span className="truncate text-lg font-semibold">{tenant?.name || 'QMS SaaS'}</span>
         </div>
         <div className="flex items-center gap-1">
           <NotificationBell variant="mobile" />
@@ -105,7 +105,7 @@ export default function Layout() {
             {logoUrl && (
               <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 rounded bg-white/10 object-contain p-0.5" />
             )}
-            <span className="text-xl font-semibold">QMS SaaS</span>
+            <span className="truncate text-xl font-semibold">{tenant?.name || 'QMS SaaS'}</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="hidden md:block">
@@ -124,10 +124,9 @@ export default function Layout() {
             </div>
             <div className="min-w-0">
               <p className="truncate text-sm font-medium text-white">{currentUser.full_name}</p>
-              <p className="truncate text-xs text-white/60">
-                {ROLE_LABELS[currentUser.role] || currentUser.role}
-                {tenant?.name ? ` · ${tenant.name}` : ''}
-              </p>
+              {/* Le nom de l'entreprise est déjà affiché en haut à côté du logo — pas la peine
+                  de le répéter ici, cette carte ne porte plus que l'identité de la personne. */}
+              <p className="truncate text-xs text-white/60">{ROLE_LABELS[currentUser.role] || currentUser.role}</p>
             </div>
           </div>
         )}
