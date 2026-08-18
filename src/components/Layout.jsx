@@ -63,7 +63,7 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
-      <header className="flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
+      <header className="sticky top-0 z-30 flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
         <span className="text-lg font-semibold">QMS SaaS</span>
         <div className="flex items-center gap-1">
           <NotificationBell variant="mobile" />
