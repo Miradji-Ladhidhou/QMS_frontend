@@ -17,6 +17,7 @@ import {
 import { supabase } from '../lib/supabase.js';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useRole } from '../lib/useRole.js';
 import NotificationBell from './NotificationBell.jsx';
 
 const NAV_ITEMS = [
@@ -27,11 +28,13 @@ const NAV_ITEMS = [
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
-  { to: '/settings', label: 'Paramètres', icon: Settings },
+  // Gestion des services/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
+  { to: '/settings', label: 'Paramètres', icon: Settings, adminOnly: true },
 ];
 
 export default function Layout() {
   const currentUser = useCurrentUser();
+  const role = useRole();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
@@ -84,7 +87,7 @@ export default function Layout() {
         </div>
 
         <nav className="flex-1 space-y-1 px-3">
-          {NAV_ITEMS.map(({ to, label, icon: Icon, end }) => (
+          {NAV_ITEMS.filter((item) => !item.adminOnly || role === 'admin').map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
