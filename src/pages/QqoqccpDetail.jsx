@@ -56,6 +56,7 @@ function AiSuggestedBadge() {
 function CapaAdjustmentForm({
   form,
   users,
+  services,
   priorityDelays,
   priorityTouched,
   severityTouched,
@@ -100,13 +101,23 @@ function CapaAdjustmentForm({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
-          <input
-            type="text"
-            placeholder="Production, Qualité, Logistique..."
-            value={form.service}
-            onChange={(e) => onFieldChange('service', e.target.value)}
+          <select
+            value={form.service_id}
+            onChange={(e) => onFieldChange('service_id', e.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          >
+            <option value="">Aucun service</option>
+            {services.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name}
+              </option>
+            ))}
+          </select>
+          {services.length === 0 && (
+            <p className="mt-1 text-xs text-slate-400">
+              Aucun service configuré — un administrateur peut en créer depuis les paramètres.
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -287,6 +298,7 @@ export default function QqoqccpDetail() {
   const [dueDateTouched, setDueDateTouched] = useState(false);
   const [selectedActionIndex, setSelectedActionIndex] = useState(null);
   const [users, setUsers] = useState([]);
+  const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [capaError, setCapaError] = useState('');
   const [creatingCapa, setCreatingCapa] = useState(false);
@@ -324,6 +336,12 @@ export default function QqoqccpDetail() {
     api
       .get('/capas/priority-delays')
       .then(({ data }) => setPriorityDelays(data))
+      .catch(() => {});
+    api
+      .get('/services')
+      // GET /services renvoie aussi les inactifs (nécessaires à la page de gestion) — ce
+      // formulaire de création ne doit proposer que les actifs.
+      .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
   }, []);
 
@@ -382,7 +400,7 @@ export default function QqoqccpDetail() {
 
     setCapaForm({
       title: analysis.title,
-      service: '',
+      service_id: '',
       priority: suggested,
       severity: suggested,
       root_cause: causes.length > 0 ? causes.map((cause) => `- ${cause}`).join('\n') : '',
@@ -444,7 +462,7 @@ export default function QqoqccpDetail() {
     try {
       const payload = {
         title: capaForm.title,
-        service: capaForm.service || undefined,
+        service_id: capaForm.service_id || undefined,
         priority: capaForm.priority,
         severity: capaForm.severity,
         root_cause: capaForm.root_cause || undefined,
@@ -654,6 +672,7 @@ export default function QqoqccpDetail() {
         <CapaAdjustmentForm
           form={capaForm}
           users={users}
+          services={services}
           priorityDelays={priorityDelays}
           priorityTouched={priorityTouched}
           severityTouched={severityTouched}

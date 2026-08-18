@@ -151,10 +151,10 @@ function GuidedDiagnosticModal({ onClose, onCreated }) {
   );
 }
 
-function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
+function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
-    service: '',
+    service_id: '',
     description: '',
     origin: '',
     priority: 'medium',
@@ -187,7 +187,7 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
     try {
       const payload = {
         title: form.title,
-        service: form.service || undefined,
+        service_id: form.service_id || undefined,
         description: form.description || undefined,
         priority: form.priority,
         origin: form.origin || undefined,
@@ -231,13 +231,23 @@ function NewCapaModal({ users, priorityDelays, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
-            <input
-              type="text"
-              placeholder="Production, Qualité, Logistique..."
-              value={form.service}
-              onChange={(e) => updateField('service', e.target.value)}
+            <select
+              value={form.service_id}
+              onChange={(e) => updateField('service_id', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
+            >
+              <option value="">Aucun service</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+            {services.length === 0 && (
+              <p className="mt-1 text-xs text-slate-400">
+                Aucun service configuré — un administrateur peut en créer depuis les paramètres.
+              </p>
+            )}
           </div>
 
           <div>
@@ -331,6 +341,7 @@ export default function Capas() {
   const canManage = isManagerRole(currentUser?.role);
   const [capas, setCapas] = useState([]);
   const [users, setUsers] = useState([]);
+  const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -343,14 +354,18 @@ export default function Capas() {
     setLoading(true);
     setError('');
     try {
-      const [capasRes, usersRes, delaysRes] = await Promise.all([
+      const [capasRes, usersRes, delaysRes, servicesRes] = await Promise.all([
         api.get('/capas'),
         api.get('/users'),
         api.get('/capas/priority-delays'),
+        api.get('/services'),
       ]);
       setCapas(capasRes.data);
       setUsers(usersRes.data);
       setPriorityDelays(delaysRes.data);
+      // GET /services renvoie aussi les services désactivés (nécessaire à la page de
+      // gestion) — un formulaire de création ne doit proposer que les actifs.
+      setServices(servicesRes.data.filter((service) => service.is_active));
     } catch {
       setError('Impossible de charger les CAPA.');
     } finally {
@@ -585,6 +600,7 @@ export default function Capas() {
       {isModalOpen && (
         <NewCapaModal
           users={users}
+          services={services}
           priorityDelays={priorityDelays}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
