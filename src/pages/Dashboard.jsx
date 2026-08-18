@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, Check, ClipboardList, Filter } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, Check, CheckCircle2, ClipboardList, Filter, TrendingDown } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
@@ -196,6 +197,37 @@ export default function Dashboard() {
         </div>
       )}
 
+      {loading || !stats ? (
+        <div className="mt-4 h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
+      ) : (
+        <Link
+          to="/planning"
+          className={`mt-4 flex items-center gap-4 rounded-xl border p-4 shadow-sm transition-colors sm:p-5 ${
+            stats.overdue.total > 0
+              ? 'border-red-200 bg-red-50 hover:bg-red-100'
+              : 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
+          }`}
+        >
+          <div
+            className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${
+              stats.overdue.total > 0 ? 'bg-red-100 text-red-700' : 'bg-emerald-100 text-emerald-700'
+            }`}
+          >
+            {stats.overdue.total > 0 ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
+          </div>
+          <div>
+            <p className={`text-2xl font-semibold ${stats.overdue.total > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+              {stats.overdue.total}
+            </p>
+            <p className="text-sm text-slate-600">
+              {stats.overdue.total > 0
+                ? `Élément${stats.overdue.total > 1 ? 's' : ''} en retard, tous outils confondus — voir le planning`
+                : 'Rien en retard, tous outils confondus'}
+            </p>
+          </div>
+        </Link>
+      )}
+
       <h2 className="mt-6 text-sm font-semibold text-slate-900 sm:text-base">{capaTitle}</h2>
       <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         {loading || !stats
@@ -203,7 +235,7 @@ export default function Dashboard() {
           : capaCards.map((card) => <StatCard key={card.id} {...card} value={stats.capas[card.id]} />)}
       </div>
 
-      <div className={`mt-6 grid grid-cols-1 gap-4 ${isMember ? '' : 'sm:grid-cols-2'}`}>
+      <div className={`mt-6 grid grid-cols-1 gap-4 ${isMember ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
         {!isMember &&
           (loading || !stats ? (
             <WidgetSkeleton />
@@ -220,6 +252,18 @@ export default function Dashboard() {
             <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" />
           </WidgetCard>
         )}
+
+        {!isMember &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title="KPI hors objectif">
+              <div className="flex items-baseline gap-2">
+                <TrendingDown size={20} className={stats.kpis.off_target > 0 ? 'text-red-600' : 'text-slate-300'} />
+                <BigNumber value={stats.kpis.off_target} suffix="indicateur(s) sous l'objectif" />
+              </div>
+            </WidgetCard>
+          ))}
       </div>
     </div>
   );
