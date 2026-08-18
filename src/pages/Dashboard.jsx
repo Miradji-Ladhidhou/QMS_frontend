@@ -1,18 +1,7 @@
 import { useEffect, useState } from 'react';
-import { AlertTriangle, BarChart3, ClipboardList, FileText, GraduationCap } from 'lucide-react';
+import { AlertTriangle, Check, ClipboardList, Filter } from 'lucide-react';
 import { api } from '../lib/api.js';
-
-const PRIORITY_STYLES = {
-  low: 'bg-slate-100 text-slate-700',
-  medium: 'bg-amber-100 text-amber-700',
-  high: 'bg-orange-100 text-orange-700',
-  critical: 'bg-red-100 text-red-700',
-};
-
-function formatDate(dateStr) {
-  if (!dateStr) return '—';
-  return new Date(dateStr).toLocaleDateString('fr-FR');
-}
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 
 function StatCard({ icon: Icon, label, value, accent }) {
   return (
@@ -53,74 +42,103 @@ function WidgetSkeleton() {
   return (
     <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="mb-4 h-4 w-40 rounded bg-slate-200" />
-      <div className="space-y-3">
-        {[0, 1, 2].map((key) => (
-          <div key={key} className="h-4 w-full rounded bg-slate-200" />
-        ))}
-      </div>
+      <div className="h-8 w-24 rounded bg-slate-200" />
+    </div>
+  );
+}
+
+function BigNumber({ value, suffix }) {
+  return (
+    <div className="flex items-baseline gap-2">
+      <span className="text-3xl font-semibold text-slate-900">{value}</span>
+      <span className="text-sm text-slate-500">{suffix}</span>
     </div>
   );
 }
 
 export default function Dashboard() {
+  const currentUser = useCurrentUser();
+  const role = currentUser?.role;
+  const isMember = role === 'member';
+  const canFilterByService = role === 'admin' || role === 'manager';
+
+  const [stats, setStats] = useState(null);
+  const [allServices, setAllServices] = useState([]);
+  const [selectedServiceIds, setSelectedServiceIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [stats, setStats] = useState({ documents: 0, openCapas: 0, trainings: 0, kpis: 0 });
-  const [documentAlerts, setDocumentAlerts] = useState([]);
-  const [overdueCapas, setOverdueCapas] = useState([]);
-  const [upcomingRenewals, setUpcomingRenewals] = useState([]);
+
+  async function loadStats(serviceIds) {
+    setError('');
+    try {
+      const { data } = await api.get('/dashboard/stats', {
+        params: serviceIds.length > 0 ? { service_id: serviceIds } : {},
+      });
+      setStats(data);
+    } catch {
+      setError('Impossible de charger le tableau de bord.');
+    }
+  }
 
   useEffect(() => {
-    let isMounted = true;
+    if (!role) return;
 
-    async function loadDashboard() {
-      try {
-        const [documentsRes, capasRes, trainingsRes, kpisRes, alertsRes, renewalsRes] = await Promise.all([
-          api.get('/documents'),
-          api.get('/capas'),
-          api.get('/trainings'),
-          api.get('/kpis'),
-          api.get('/documents/alerts'),
-          api.get('/trainings/upcoming-renewals'),
-        ]);
+    let cancelled = false;
 
-        if (!isMounted) return;
+    async function init() {
+      setLoading(true);
 
-        const capas = capasRes.data;
-
-        setStats({
-          documents: documentsRes.data.length,
-          openCapas: capas.filter((capa) => capa.status === 'open').length,
-          trainings: trainingsRes.data.length,
-          kpis: kpisRes.data.length,
-        });
-        setDocumentAlerts(alertsRes.data.slice(0, 5));
-        setOverdueCapas(
-          capas
-            .filter((capa) => capa.status === 'overdue')
-            .sort((a, b) => (a.due_date > b.due_date ? 1 : -1))
-            .slice(0, 5)
-        );
-        setUpcomingRenewals(renewalsRes.data.slice(0, 5));
-      } catch {
-        if (isMounted) setError('Impossible de charger le tableau de bord.');
-      } finally {
-        if (isMounted) setLoading(false);
+      if (role !== 'member') {
+        try {
+          const { data } = await api.get('/services');
+          if (!cancelled) setAllServices(data.filter((service) => service.is_active));
+        } catch {
+          // Liste vide si indisponible : le sélecteur reste vide, non bloquant pour le reste.
+        }
       }
+
+      // Le montage n'envoie jamais service_id : le backend gère lui-même le filtrage par
+      // défaut selon le rôle (manager -> ses services, admin -> tout le tenant). Les cases
+      // cochées ci-dessous ne font que représenter visuellement ce périmètre par défaut.
+      let initialSelected = [];
+      if (role === 'manager') {
+        try {
+          const { data } = await api.get('/services/my-services');
+          if (!cancelled) initialSelected = data.map((service) => service.id);
+        } catch {
+          // Pas de présélection si l'appel échoue — dégrade sans bloquer le dashboard.
+        }
+      }
+
+      if (cancelled) return;
+      setSelectedServiceIds(initialSelected);
+      await loadStats([]);
+      if (!cancelled) setLoading(false);
     }
 
-    loadDashboard();
-
+    init();
     return () => {
-      isMounted = false;
+      cancelled = true;
     };
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [role]);
 
-  const statCards = [
-    { id: 'documents', label: 'Documents', value: stats.documents, icon: FileText, accent: 'bg-blue-100 text-blue-700' },
-    { id: 'openCapas', label: 'CAPA ouvertes', value: stats.openCapas, icon: ClipboardList, accent: 'bg-orange-100 text-orange-700' },
-    { id: 'trainings', label: 'Formations actives', value: stats.trainings, icon: GraduationCap, accent: 'bg-emerald-100 text-emerald-700' },
-    { id: 'kpis', label: 'KPIs suivis', value: stats.kpis, icon: BarChart3, accent: 'bg-purple-100 text-purple-700' },
+  function handleToggleService(serviceId) {
+    setSelectedServiceIds((prev) => {
+      const next = prev.includes(serviceId) ? prev.filter((id) => id !== serviceId) : [...prev, serviceId];
+      loadStats(next);
+      return next;
+    });
+  }
+
+  const capaTitle = isMember ? 'Mes CAPA' : 'CAPA de l’entreprise';
+  const trainingsTitle = isMember ? 'Mes formations à renouveler' : 'Formations à renouveler';
+
+  const capaCards = [
+    { id: 'open', label: 'Ouvertes', icon: ClipboardList, accent: 'bg-blue-100 text-blue-700' },
+    { id: 'in_progress', label: 'En cours', icon: ClipboardList, accent: 'bg-amber-100 text-amber-700' },
+    { id: 'overdue', label: 'En retard', icon: AlertTriangle, accent: 'bg-red-100 text-red-700' },
+    { id: 'closed', label: 'Clôturées', icon: ClipboardList, accent: 'bg-emerald-100 text-emerald-700' },
   ];
 
   return (
@@ -134,87 +152,73 @@ export default function Dashboard() {
         </p>
       )}
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-        {loading
+      {canFilterByService && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+            <Filter size={16} />
+            Filtrer par service
+          </div>
+
+          {allServices.length === 0 ? (
+            <p className="text-sm text-slate-500">Aucun service configuré.</p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {allServices.map((service) => {
+                const checked = selectedServiceIds.includes(service.id);
+                return (
+                  <label
+                    key={service.id}
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                      checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => handleToggleService(service.id)}
+                      className="sr-only"
+                    />
+                    {checked && <Check size={14} />}
+                    {service.name}
+                  </label>
+                );
+              })}
+            </div>
+          )}
+
+          <p className="mt-3 text-xs text-slate-400">
+            {selectedServiceIds.length === 0
+              ? role === 'manager'
+                ? 'Aucune sélection : vos services par défaut.'
+                : "Aucune sélection : vue globale de l'entreprise."
+              : `${selectedServiceIds.length} service(s) sélectionné(s).`}
+          </p>
+        </div>
+      )}
+
+      <h2 className="mt-6 text-sm font-semibold text-slate-900 sm:text-base">{capaTitle}</h2>
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+        {loading || !stats
           ? [0, 1, 2, 3].map((key) => <StatSkeleton key={key} />)
-          : statCards.map((card) => <StatCard key={card.id} {...card} />)}
+          : capaCards.map((card) => <StatCard key={card.id} {...card} value={stats.capas[card.id]} />)}
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 lg:grid-cols-3">
-        {loading ? (
-          <>
+      <div className={`mt-6 grid grid-cols-1 gap-4 ${isMember ? '' : 'sm:grid-cols-2'}`}>
+        {!isMember &&
+          (loading || !stats ? (
             <WidgetSkeleton />
-            <WidgetSkeleton />
-            <WidgetSkeleton />
-          </>
-        ) : (
-          <>
+          ) : (
             <WidgetCard title="Documents à réviser">
-              {documentAlerts.length === 0 ? (
-                <p className="text-sm text-slate-500">Aucun document à réviser.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {documentAlerts.map((doc) => (
-                    <li key={doc.id} className="flex items-start justify-between gap-3 text-sm">
-                      <div>
-                        <p className="font-medium text-slate-800">{doc.title}</p>
-                        <p className="text-slate-500">{doc.number}</p>
-                      </div>
-                      <span className="shrink-0 text-slate-500">{formatDate(doc.review_date)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <BigNumber value={stats.documents.to_review} suffix="document(s) à réviser sous 30 jours" />
             </WidgetCard>
+          ))}
 
-            <WidgetCard title="CAPA en retard">
-              {overdueCapas.length === 0 ? (
-                <p className="text-sm text-slate-500">Aucune CAPA en retard.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {overdueCapas.map((capa) => (
-                    <li key={capa.id} className="flex items-start justify-between gap-3 text-sm">
-                      <div>
-                        <p className="font-medium text-slate-800">{capa.title}</p>
-                        <p className="text-slate-500">{capa.number}</p>
-                      </div>
-                      <div className="flex shrink-0 flex-col items-end gap-1">
-                        <span
-                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                            PRIORITY_STYLES[capa.priority] ?? 'bg-slate-100 text-slate-700'
-                          }`}
-                        >
-                          {capa.priority}
-                        </span>
-                        <span className="text-slate-500">{formatDate(capa.due_date)}</span>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </WidgetCard>
-
-            <WidgetCard title="Formations à renouveler">
-              {upcomingRenewals.length === 0 ? (
-                <p className="text-sm text-slate-500">Aucun renouvellement dans les 60 prochains jours.</p>
-              ) : (
-                <ul className="space-y-3">
-                  {upcomingRenewals.map((renewal) => (
-                    <li
-                      key={`${renewal.training?.id}-${renewal.user?.id}`}
-                      className="flex items-start justify-between gap-3 text-sm"
-                    >
-                      <div>
-                        <p className="font-medium text-slate-800">{renewal.training?.title}</p>
-                        <p className="text-slate-500">{renewal.user?.full_name}</p>
-                      </div>
-                      <span className="shrink-0 text-slate-500">{formatDate(renewal.next_due_date)}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </WidgetCard>
-          </>
+        {loading || !stats ? (
+          <WidgetSkeleton />
+        ) : (
+          <WidgetCard title={trainingsTitle}>
+            <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" />
+          </WidgetCard>
         )}
       </div>
     </div>
