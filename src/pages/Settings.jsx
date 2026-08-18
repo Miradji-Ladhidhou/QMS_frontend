@@ -6,7 +6,6 @@ import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
 import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
-import DataPrivacy from '../components/DataPrivacy.jsx';
 import Groups from './Groups.jsx';
 
 const TABS = [
@@ -17,7 +16,6 @@ const TABS = [
   { id: 'capa', label: 'CAPA', adminOnly: true },
   { id: 'profile', label: 'Mon profil' },
   { id: 'notifications', label: 'Notifications' },
-  { id: 'privacy', label: 'Confidentialité', ownerOnly: true },
 ];
 
 export default function Settings() {
@@ -35,15 +33,14 @@ export default function Settings() {
     loadCurrentUser();
   }, []);
 
-  const isAdmin = currentUser?.role === 'owner' || currentUser?.role === 'admin';
-  const isOwner = currentUser?.role === 'owner';
+  const isAdmin = currentUser?.role === 'admin';
 
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Paramètres</h1>
 
       <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
-        {TABS.filter((tab) => (!tab.adminOnly || isAdmin) && (!tab.ownerOnly || isOwner)).map((tab) => (
+        {TABS.filter((tab) => !tab.adminOnly || isAdmin).map((tab) => (
           <button
             key={tab.id}
             type="button"
@@ -60,16 +57,13 @@ export default function Settings() {
       <div className="mt-4">
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
         {activeTab === 'categories' && <CategoryManager />}
-        {activeTab === 'users' && (
-          <UserManager currentUser={currentUser} isAdmin={isAdmin} onOwnershipTransferred={loadCurrentUser} />
-        )}
+        {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />
         )}
         {activeTab === 'notifications' && <NotificationPreferences />}
-        {activeTab === 'privacy' && isOwner && <DataPrivacy />}
       </div>
     </div>
   );

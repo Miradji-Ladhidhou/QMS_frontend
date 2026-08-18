@@ -1468,7 +1468,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
             ) : (
               <>
                 {/* Le choix de réutiliser/modifier une série existante passe par un PATCH,
-                    réservé à owner/admin/manager (voir kpis.js) — un member ne voit que la
+                    réservé à admin/manager (voir kpis.js) — un member ne voit que la
                     création d'une nouvelle série, toujours autorisée. */}
                 {canManage && existingSeries.length > 0 && (
                   <div className="mb-4">

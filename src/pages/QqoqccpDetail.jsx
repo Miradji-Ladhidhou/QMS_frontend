@@ -507,7 +507,7 @@ export default function QqoqccpDetail() {
   const suggestedActions = analysis.ai_suggested_actions?.suggested_actions || [];
   const rootCauses = analysis.ai_suggested_actions?.root_causes || [];
   const overallPriority = analysis.ai_suggested_actions?.overall_priority;
-  // Miroir de la règle backend (PATCH /api/qqoqccp/:id) : owner/admin/manager modifient
+  // Miroir de la règle backend (PATCH /api/qqoqccp/:id) : admin/manager modifient
   // toujours ; un member modifie SA PROPRE analyse tant qu'elle n'est pas validée.
   const canEditAnalysis =
     isManagerRole(currentUser?.role) ||

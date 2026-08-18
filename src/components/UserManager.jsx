@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { supabase } from '../lib/supabase.js';
 import { ASSIGNABLE_ROLES, ROLE_LABELS } from '../lib/roles.js';
 
-export default function UserManager({ currentUser, isAdmin, onOwnershipTransferred }) {
+export default function UserManager({ currentUser, isAdmin }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -16,12 +15,6 @@ export default function UserManager({ currentUser, isAdmin, onOwnershipTransferr
   const [submittingInvite, setSubmittingInvite] = useState(false);
   const [resendingId, setResendingId] = useState(null);
   const [resendMessage, setResendMessage] = useState('');
-  const [transferTarget, setTransferTarget] = useState(null);
-  const [transferPassword, setTransferPassword] = useState('');
-  const [transferError, setTransferError] = useState('');
-  const [transferring, setTransferring] = useState(false);
-
-  const isOwner = currentUser?.role === 'owner';
 
   async function loadUsers() {
     setLoading(true);
@@ -104,35 +97,6 @@ export default function UserManager({ currentUser, isAdmin, onOwnershipTransferr
       setInviteError(err.response?.data?.error || "Impossible d'envoyer l'invitation.");
     } finally {
       setSubmittingInvite(false);
-    }
-  }
-
-  async function handleTransferSubmit(event) {
-    event.preventDefault();
-    setTransferError('');
-    setTransferring(true);
-
-    const { error: verifyError } = await supabase.auth.signInWithPassword({
-      email: currentUser.email,
-      password: transferPassword,
-    });
-
-    if (verifyError) {
-      setTransferError('Mot de passe incorrect.');
-      setTransferring(false);
-      return;
-    }
-
-    try {
-      await api.post(`/users/${transferTarget.id}/transfer-ownership`);
-      setTransferTarget(null);
-      setTransferPassword('');
-      await loadUsers();
-      onOwnershipTransferred?.();
-    } catch (err) {
-      setTransferError(err.response?.data?.error || 'Impossible de transférer la propriété.');
-    } finally {
-      setTransferring(false);
     }
   }
 
@@ -272,17 +236,7 @@ export default function UserManager({ currentUser, isAdmin, onOwnershipTransferr
                     </button>
                   )}
 
-                  {isOwner && user.role !== 'owner' && user.is_active && (
-                    <button
-                      type="button"
-                      onClick={() => setTransferTarget(user)}
-                      className="rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                    >
-                      Transférer la propriété
-                    </button>
-                  )}
-
-                  {isAdmin && user.role !== 'owner' && !isSelf && (
+                  {isAdmin && !isSelf && (
                     <button
                       type="button"
                       disabled={isBusy}
@@ -297,7 +251,7 @@ export default function UserManager({ currentUser, isAdmin, onOwnershipTransferr
                     </button>
                   )}
 
-                  {isAdmin && user.role !== 'owner' ? (
+                  {isAdmin ? (
                     <select
                       value={user.role}
                       disabled={isBusy}
@@ -320,55 +274,6 @@ export default function UserManager({ currentUser, isAdmin, onOwnershipTransferr
             );
           })}
         </ul>
-      )}
-
-      {transferTarget && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
-          <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-lg">
-            <h3 className="text-base font-semibold text-slate-900">Transférer la propriété</h3>
-            <p className="mt-2 text-sm text-slate-600">
-              Vous allez céder le rôle de propriétaire à <span className="font-medium">{transferTarget.full_name}</span>.
-              Vous deviendrez admin. Cette action est immédiate. Confirmez avec votre mot de passe.
-            </p>
-
-            <form onSubmit={handleTransferSubmit} className="mt-4 space-y-3">
-              {transferError && (
-                <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-                  {transferError}
-                </p>
-              )}
-              <input
-                type="password"
-                autoComplete="current-password"
-                required
-                placeholder="Votre mot de passe"
-                value={transferPassword}
-                onChange={(e) => setTransferPassword(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-              <div className="flex gap-2">
-                <button
-                  type="submit"
-                  disabled={transferring}
-                  className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
-                >
-                  {transferring ? 'Transfert...' : 'Confirmer le transfert'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setTransferTarget(null);
-                    setTransferPassword('');
-                    setTransferError('');
-                  }}
-                  className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-                >
-                  Annuler
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );
