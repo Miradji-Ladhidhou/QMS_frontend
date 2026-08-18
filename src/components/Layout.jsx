@@ -12,6 +12,7 @@ import {
   Menu,
   Settings,
   ShieldCheck,
+  Wrench,
   X,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
@@ -29,6 +30,7 @@ const NAV_ITEMS = [
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Gestion des services/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
+  { to: '/services', label: 'Services', icon: Wrench, adminOnly: true },
   { to: '/settings', label: 'Paramètres', icon: Settings, adminOnly: true },
 ];
 

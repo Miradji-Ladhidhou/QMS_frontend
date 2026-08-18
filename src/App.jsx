@@ -21,6 +21,7 @@ import Kpis from './pages/Kpis.jsx';
 import Qqoqccp from './pages/Qqoqccp.jsx';
 import QqoqccpDetail from './pages/QqoqccpDetail.jsx';
 import Settings from './pages/Settings.jsx';
+import Services from './pages/Services.jsx';
 import MyApprovals from './pages/MyApprovals.jsx';
 import SuperAdmin from './pages/SuperAdmin.jsx';
 
@@ -71,6 +72,7 @@ export default function App() {
             <Route path="qqoqccp" element={<Qqoqccp />} />
             <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="services" element={<Services />} />
             <Route path="my-approvals" element={<MyApprovals />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
