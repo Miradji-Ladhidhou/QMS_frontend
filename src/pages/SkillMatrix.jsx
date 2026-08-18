@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Minus, RefreshCw, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Check, Download, Loader2, Minus, RefreshCw, X as XIcon } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { exportToCsv } from '../lib/csvExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
 
 const CELL_STYLES = {
@@ -23,6 +24,8 @@ export default function SkillMatrix() {
   const [matrix, setMatrix] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     async function load() {
@@ -48,6 +51,34 @@ export default function SkillMatrix() {
     return training.people.find((entry) => entry.person.id === personId);
   }
 
+  function handleExportCsv() {
+    const headers = ['Personnel', 'Statut personnel', ...matrix.map((entry) => entry.training.title)];
+    const rows = people.map((person) => [
+      person.full_name,
+      person.kind === 'employee' ? 'Sans compte' : 'Compte',
+      ...matrix.map((entry) => {
+        const cell = findEntry(entry, person.id);
+        const status = cell?.status ?? 'never_done';
+        return TRAINING_STATUS_LABELS[status];
+      }),
+    ]);
+    exportToCsv(`matrice-competences-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
+  async function handleExportPdf() {
+    setExportError('');
+    setExportingPdf(true);
+    try {
+      const response = await api.get('/trainings/matrix/pdf', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank', 'noopener');
+    } catch {
+      setExportError('Impossible d\'exporter la matrice en PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <button
@@ -59,7 +90,30 @@ export default function SkillMatrix() {
         Retour aux formations
       </button>
 
-      <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Matrice des compétences</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Matrice des compétences</h1>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={people.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download size={18} />
+            CSV
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || people.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            PDF
+          </button>
+        </div>
+      </div>
+      {exportError && <p className="mt-2 text-sm text-red-600">{exportError}</p>}
 
       <div className="mt-3 flex flex-wrap items-center gap-4 text-xs text-slate-600">
         {Object.entries(TRAINING_STATUS_LABELS).map(([status, label]) => (

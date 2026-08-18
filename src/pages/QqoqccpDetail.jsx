@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -281,6 +281,8 @@ export default function QqoqccpDetail() {
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportError, setExportError] = useState('');
   const [form, setForm] = useState({});
   // Par champ : undefined (rien à signaler) | 'saving' | 'saved' | 'error'
   const [fieldStatus, setFieldStatus] = useState({});
@@ -523,6 +525,20 @@ export default function QqoqccpDetail() {
     );
   }
 
+  async function handleExportPdf() {
+    setExportError('');
+    setExportingPdf(true);
+    try {
+      const response = await api.get(`/qqoqccp/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(url, '_blank', 'noopener');
+    } catch {
+      setExportError("Impossible d'exporter cette analyse en PDF.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   const suggestedActions = analysis.ai_suggested_actions?.suggested_actions || [];
   const rootCauses = analysis.ai_suggested_actions?.root_causes || [];
   const overallPriority = analysis.ai_suggested_actions?.overall_priority;
@@ -548,8 +564,18 @@ export default function QqoqccpDetail() {
         <div className="flex items-center gap-2">
           {!canEditAnalysis && <span className="text-xs text-slate-400">Lecture seule</span>}
           <QqoqccpStatusBadge status={analysis.status} />
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Exporter PDF
+          </button>
         </div>
       </div>
+      {exportError && <p className="mt-2 text-sm text-red-600">{exportError}</p>}
 
       <div className="mt-4 space-y-4">
         {QUESTIONS.map(({ key, label, placeholder }) => (

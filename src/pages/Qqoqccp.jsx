@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Download, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { exportToCsv } from '../lib/csvExport.js';
+import { QQOQCCP_STATUS_LABELS } from '../lib/qqoqccpStatus.js';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 
 function formatDate(dateStr) {
@@ -90,18 +92,39 @@ export default function Qqoqccp() {
     navigate(`/qqoqccp/${analysis.id}`);
   }
 
+  function handleExportCsv() {
+    const headers = ['Titre', 'Statut', 'Créée le'];
+    const rows = analyses.map((analysis) => [
+      analysis.title,
+      QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
+      formatDate(analysis.created_at),
+    ]);
+    exportToCsv(`qqoqccp-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">QQOQCCP</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouvelle analyse
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={analyses.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
+          >
+            <Plus size={18} />
+            Nouvelle analyse
+          </button>
+        </div>
       </div>
 
       {error && (

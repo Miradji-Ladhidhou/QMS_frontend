@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Grid3x3, Pencil, Plus, Trash2, UserCheck, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Grid3x3, Pencil, Plus, Trash2, UserCheck, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { exportToCsv } from '../lib/csvExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
@@ -489,11 +490,36 @@ export default function Trainings() {
     }
   }
 
+  function handleExportCsv() {
+    const headers = ['Formation', 'Type', 'Personne', 'Statut personnel', 'Date de réalisation'];
+    const rows = trainings.flatMap((training) =>
+      training.records.map((record) => [
+        training.title,
+        training.type || '',
+        personName(record),
+        record.employee_id ? 'Sans compte' : 'Compte',
+        formatDate(record.completed_at),
+      ])
+    );
+    exportToCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
+  const hasAnyRecord = trainings.some((training) => training.records.length > 0);
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Formations</h1>
         <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={!hasAnyRecord}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
           <Link
             to="/trainings/matrix"
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"

@@ -4,11 +4,17 @@ import { Download, Loader2, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import SearchSnippet from '../components/SearchSnippet.jsx';
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+function formatDate(dateStr) {
+  if (!dateStr) return '';
+  return new Date(dateStr).toLocaleDateString('fr-FR');
+}
 
 function MatchLocationBadge({ location }) {
   if (!location) return null;
@@ -260,18 +266,43 @@ export default function Documents() {
     setIsModalOpen(false);
   }
 
+  function handleExportCsv() {
+    const headers = ['Numéro', 'Titre', 'Catégorie', 'Version', 'Statut', 'Date de révision', 'Créé le'];
+    const rows = filteredDocuments.map((doc) => [
+      doc.number,
+      doc.title,
+      doc.category?.name || '',
+      doc.version,
+      STATUS_LABELS[doc.status] || doc.status,
+      formatDate(doc.review_date),
+      formatDate(doc.created_at),
+    ]);
+    exportToCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Documents</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouveau document
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={filteredDocuments.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
+          >
+            <Plus size={18} />
+            Nouveau document
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">

@@ -6,6 +6,7 @@ import {
   CheckSquare,
   Circle,
   ClipboardList,
+  Download,
   Filter,
   FileText,
   GraduationCap,
@@ -15,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { exportToCsv } from '../lib/csvExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
@@ -323,18 +325,35 @@ export default function Planning() {
   }, {});
   const dates = Object.keys(grouped).sort();
 
+  function handleExportCsv() {
+    const headers = ['Date', 'Type', 'Titre', 'En retard'];
+    const rows = items.map((item) => [item.date, TYPE_CONFIG[item.type].label, item.title, item.is_overdue ? 'Oui' : 'Non']);
+    exportToCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Planning</h1>
-        <button
-          type="button"
-          onClick={() => setIsNewModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouvelle tâche
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={items.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsNewModalOpen(true)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
+          >
+            <Plus size={18} />
+            Nouvelle tâche
+          </button>
+        </div>
       </div>
 
       {error && (
