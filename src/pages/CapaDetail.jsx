@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save, Send, Trash2 } from 'lucide-react';
+import { ArrowLeft, Lock, Save, Send, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -218,6 +218,13 @@ export default function CapaDetail() {
 
       {deleteError && (
         <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
+      )}
+
+      {currentUser?.role === 'member' && (
+        <p className="mb-4 flex items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+          <Lock size={14} className="shrink-0" />
+          Cette CAPA est en lecture seule. Contactez un manager pour toute modification.
+        </p>
       )}
 
       <div className={`rounded-xl border bg-white p-5 sm:p-6 ${capa.status === 'overdue' ? 'border-red-300' : 'border-slate-200'}`}>
