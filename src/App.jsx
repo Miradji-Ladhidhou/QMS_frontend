@@ -27,6 +27,8 @@ import ManagementReviews from './pages/ManagementReviews.jsx';
 import ManagementReviewDetail from './pages/ManagementReviewDetail.jsx';
 import Complaints from './pages/Complaints.jsx';
 import ComplaintDetail from './pages/ComplaintDetail.jsx';
+import Risks from './pages/Risks.jsx';
+import RiskDetail from './pages/RiskDetail.jsx';
 import Settings from './pages/Settings.jsx';
 import Services from './pages/Services.jsx';
 import Employees from './pages/Employees.jsx';
@@ -84,6 +86,8 @@ export default function App() {
             <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
             <Route path="audits" element={<Audits />} />
             <Route path="audits/:id" element={<AuditDetail />} />
+            <Route path="risks" element={<Risks />} />
+            <Route path="risks/:id" element={<RiskDetail />} />
             <Route path="management-reviews" element={<ManagementReviews />} />
             <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
             <Route path="settings" element={<Settings />} />

@@ -14,6 +14,7 @@ import {
   Menu,
   MessageSquareWarning,
   Settings,
+  ShieldAlert,
   ShieldCheck,
   CalendarClock,
   Users2,
@@ -49,6 +50,7 @@ const NAV_ITEMS = [
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   { to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
+  { to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
   { to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
   { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
