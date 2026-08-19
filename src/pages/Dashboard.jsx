@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { AlertTriangle, Check, CheckCircle2, ClipboardList, Filter, TrendingDown } from 'lucide-react';
+import {
+  AlertTriangle,
+  Check,
+  CheckCircle2,
+  ClipboardCheck,
+  ClipboardList,
+  Filter,
+  MessageSquareWarning,
+  ShieldAlert,
+  TrendingDown,
+  Truck,
+  Users2,
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
@@ -46,13 +58,27 @@ function StatSkeleton() {
   );
 }
 
-function WidgetCard({ title, children }) {
+// `to` optionnel : rend la carte cliquable vers l'outil concerné (comme le bandeau "en
+// retard" plus haut), sans rien changer pour les 3 widgets existants qui ne l'utilisaient pas.
+function WidgetCard({ title, to, children }) {
+  const Wrapper = to ? Link : 'div';
+  const wrapperProps = to ? { to } : {};
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+    <Wrapper
+      {...wrapperProps}
+      className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5 ${
+        to ? 'block transition-colors hover:border-primary/40 hover:shadow-md' : ''
+      }`}
+    >
       <h2 className="mb-3 text-sm font-semibold text-slate-900 sm:text-base">{title}</h2>
       {children}
-    </div>
+    </Wrapper>
   );
+}
+
+function OverdueNote({ count }) {
+  if (!count) return null;
+  return <p className="mt-1 text-xs font-medium text-red-600">{count} en retard</p>;
 }
 
 function WidgetSkeleton() {
@@ -151,6 +177,12 @@ export default function Dashboard() {
 
   const capaTitle = isMember ? 'Mes CAPA' : 'CAPA de l’entreprise';
   const trainingsTitle = isMember ? 'Mes formations à renouveler' : 'Formations à renouveler';
+  // Audits/réclamations/risques : un member peut être personnellement auditeur/assigné/
+  // responsable (voir dashboard.js), ce widget a donc un sens pour tous les rôles — seul le
+  // titre change pour refléter le scope (personnel vs entreprise), comme CAPA/formations.
+  const auditsTitle = isMember ? 'Mes audits en cours' : 'Audits en cours';
+  const complaintsTitle = isMember ? 'Mes réclamations ouvertes' : 'Réclamations ouvertes';
+  const risksTitle = isMember ? 'Mes risques actifs' : 'Risques actifs';
 
   const capaCards = [
     { id: 'open', label: 'Ouvertes', icon: ClipboardList, accent: 'bg-blue-100 text-blue-700' },
@@ -258,12 +290,12 @@ export default function Dashboard() {
           : capaCards.map((card) => <StatCard key={card.id} {...card} value={stats.capas[card.id]} />)}
       </div>
 
-      <div className={`mt-6 grid grid-cols-1 gap-4 ${isMember ? '' : 'sm:grid-cols-2 lg:grid-cols-3'}`}>
+      <div className={`mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 ${isMember ? '' : 'lg:grid-cols-3'}`}>
         {!isMember &&
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="Documents à réviser">
+            <WidgetCard title="Documents à réviser" to="/documents">
               <BigNumber value={stats.documents.to_review} suffix="document(s) à réviser sous 30 jours" />
             </WidgetCard>
           ))}
@@ -271,7 +303,7 @@ export default function Dashboard() {
         {loading || !stats ? (
           <WidgetSkeleton />
         ) : (
-          <WidgetCard title={trainingsTitle}>
+          <WidgetCard title={trainingsTitle} to="/trainings">
             <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" />
           </WidgetCard>
         )}
@@ -280,10 +312,71 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="KPI hors objectif">
+            <WidgetCard title="KPI hors objectif" to="/kpis">
               <div className="flex items-baseline gap-2">
                 <TrendingDown size={20} className={stats.kpis.off_target > 0 ? 'text-red-600' : 'text-slate-300'} />
                 <BigNumber value={stats.kpis.off_target} suffix="indicateur(s) sous l'objectif" />
+              </div>
+            </WidgetCard>
+          ))}
+
+        {loading || !stats ? (
+          <WidgetSkeleton />
+        ) : (
+          <WidgetCard title={auditsTitle} to="/audits">
+            <div className="flex items-baseline gap-2">
+              <ClipboardCheck size={20} className="text-slate-300" />
+              <BigNumber value={stats.audits.active} suffix="audit(s) en cours" />
+            </div>
+            <OverdueNote count={stats.audits.overdue} />
+          </WidgetCard>
+        )}
+
+        {loading || !stats ? (
+          <WidgetSkeleton />
+        ) : (
+          <WidgetCard title={complaintsTitle} to="/complaints">
+            <div className="flex items-baseline gap-2">
+              <MessageSquareWarning size={20} className="text-slate-300" />
+              <BigNumber value={stats.complaints.active} suffix="réclamation(s) ouverte(s)" />
+            </div>
+            <OverdueNote count={stats.complaints.overdue} />
+          </WidgetCard>
+        )}
+
+        {loading || !stats ? (
+          <WidgetSkeleton />
+        ) : (
+          <WidgetCard title={risksTitle} to="/risks">
+            <div className="flex items-baseline gap-2">
+              <ShieldAlert size={20} className="text-slate-300" />
+              <BigNumber value={stats.risks.active} suffix="risque(s) actif(s)" />
+            </div>
+            <OverdueNote count={stats.risks.overdue} />
+          </WidgetCard>
+        )}
+
+        {!isMember &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title="Fournisseurs à évaluer" to="/suppliers">
+              <div className="flex items-baseline gap-2">
+                <Truck size={20} className="text-slate-300" />
+                <BigNumber value={stats.suppliers.active} suffix="évaluation(s) à planifier" />
+              </div>
+              <OverdueNote count={stats.suppliers.overdue} />
+            </WidgetCard>
+          ))}
+
+        {!isMember &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title="Revues de direction à clôturer" to="/management-reviews">
+              <div className="flex items-baseline gap-2">
+                <Users2 size={20} className="text-slate-300" />
+                <BigNumber value={stats.management_reviews.draft} suffix="revue(s) en attente de clôture" />
               </div>
             </WidgetCard>
           ))}
