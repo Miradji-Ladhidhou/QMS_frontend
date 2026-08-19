@@ -25,6 +25,8 @@ import Audits from './pages/Audits.jsx';
 import AuditDetail from './pages/AuditDetail.jsx';
 import ManagementReviews from './pages/ManagementReviews.jsx';
 import ManagementReviewDetail from './pages/ManagementReviewDetail.jsx';
+import Complaints from './pages/Complaints.jsx';
+import ComplaintDetail from './pages/ComplaintDetail.jsx';
 import Settings from './pages/Settings.jsx';
 import Services from './pages/Services.jsx';
 import Employees from './pages/Employees.jsx';
@@ -73,6 +75,8 @@ export default function App() {
             <Route path="documents/:id" element={<DocumentDetail />} />
             <Route path="capas" element={<Capas />} />
             <Route path="capas/:id" element={<CapaDetail />} />
+            <Route path="complaints" element={<Complaints />} />
+            <Route path="complaints/:id" element={<ComplaintDetail />} />
             <Route path="trainings" element={<Trainings />} />
             <Route path="trainings/matrix" element={<SkillMatrix />} />
             <Route path="kpis" element={<Kpis />} />
