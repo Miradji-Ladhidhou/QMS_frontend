@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { supabase } from './lib/supabase.js';
 import Layout from './components/Layout.jsx';
@@ -10,32 +10,46 @@ import ResetPassword from './pages/ResetPassword.jsx';
 import LegalTerms from './pages/LegalTerms.jsx';
 import LegalPrivacy from './pages/LegalPrivacy.jsx';
 import CookieNotice from './components/CookieNotice.jsx';
-import Dashboard from './pages/Dashboard.jsx';
-import Planning from './pages/Planning.jsx';
-import Documents from './pages/Documents.jsx';
-import DocumentDetail from './pages/DocumentDetail.jsx';
-import Capas from './pages/Capas.jsx';
-import CapaDetail from './pages/CapaDetail.jsx';
-import Trainings from './pages/Trainings.jsx';
-import SkillMatrix from './pages/SkillMatrix.jsx';
-import Kpis from './pages/Kpis.jsx';
-import Qqoqccp from './pages/Qqoqccp.jsx';
-import QqoqccpDetail from './pages/QqoqccpDetail.jsx';
-import Audits from './pages/Audits.jsx';
-import AuditDetail from './pages/AuditDetail.jsx';
-import ManagementReviews from './pages/ManagementReviews.jsx';
-import ManagementReviewDetail from './pages/ManagementReviewDetail.jsx';
-import Complaints from './pages/Complaints.jsx';
-import ComplaintDetail from './pages/ComplaintDetail.jsx';
-import Risks from './pages/Risks.jsx';
-import RiskDetail from './pages/RiskDetail.jsx';
-import Suppliers from './pages/Suppliers.jsx';
-import SupplierDetail from './pages/SupplierDetail.jsx';
-import Settings from './pages/Settings.jsx';
-import Services from './pages/Services.jsx';
-import Employees from './pages/Employees.jsx';
-import MyApprovals from './pages/MyApprovals.jsx';
-import SuperAdmin from './pages/SuperAdmin.jsx';
+
+// Chargées à la demande plutôt qu'au démarrage : ces ~26 pages ne sont utiles qu'une fois
+// connecté, et une session ne visite jamais qu'une poignée d'entre elles — les regrouper dans
+// le bundle initial (1,3 Mo avant ce changement, voir l'audit) pénalise le premier chargement
+// de TOUT le monde (y compris la page vitrine publique, chargée eagerly ci-dessus) pour un
+// gain que seule une fraction des visiteurs (déjà connectés) utilise réellement.
+const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
+const Planning = lazy(() => import('./pages/Planning.jsx'));
+const Documents = lazy(() => import('./pages/Documents.jsx'));
+const DocumentDetail = lazy(() => import('./pages/DocumentDetail.jsx'));
+const Capas = lazy(() => import('./pages/Capas.jsx'));
+const CapaDetail = lazy(() => import('./pages/CapaDetail.jsx'));
+const Trainings = lazy(() => import('./pages/Trainings.jsx'));
+const SkillMatrix = lazy(() => import('./pages/SkillMatrix.jsx'));
+const Kpis = lazy(() => import('./pages/Kpis.jsx'));
+const Qqoqccp = lazy(() => import('./pages/Qqoqccp.jsx'));
+const QqoqccpDetail = lazy(() => import('./pages/QqoqccpDetail.jsx'));
+const Audits = lazy(() => import('./pages/Audits.jsx'));
+const AuditDetail = lazy(() => import('./pages/AuditDetail.jsx'));
+const ManagementReviews = lazy(() => import('./pages/ManagementReviews.jsx'));
+const ManagementReviewDetail = lazy(() => import('./pages/ManagementReviewDetail.jsx'));
+const Complaints = lazy(() => import('./pages/Complaints.jsx'));
+const ComplaintDetail = lazy(() => import('./pages/ComplaintDetail.jsx'));
+const Risks = lazy(() => import('./pages/Risks.jsx'));
+const RiskDetail = lazy(() => import('./pages/RiskDetail.jsx'));
+const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
+const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
+const Settings = lazy(() => import('./pages/Settings.jsx'));
+const Services = lazy(() => import('./pages/Services.jsx'));
+const Employees = lazy(() => import('./pages/Employees.jsx'));
+const MyApprovals = lazy(() => import('./pages/MyApprovals.jsx'));
+const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
+
+function RouteFallback() {
+  return (
+    <div className="flex min-h-[50vh] items-center justify-center">
+      <p className="text-sm text-slate-400">Chargement...</p>
+    </div>
+  );
+}
 
 export default function App() {
   const [session, setSession] = useState(undefined);
@@ -64,55 +78,57 @@ export default function App() {
   return (
     <BrowserRouter>
       <CookieNotice />
-      {session ? (
-        <Routes>
-          <Route path="/login" element={<Navigate to="/" replace />} />
-          <Route path="/register" element={<Navigate to="/" replace />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/legal/cgu" element={<LegalTerms />} />
-          <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
-          <Route path="/super-admin" element={<SuperAdmin />} />
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="planning" element={<Planning />} />
-            <Route path="documents" element={<Documents />} />
-            <Route path="documents/:id" element={<DocumentDetail />} />
-            <Route path="capas" element={<Capas />} />
-            <Route path="capas/:id" element={<CapaDetail />} />
-            <Route path="complaints" element={<Complaints />} />
-            <Route path="complaints/:id" element={<ComplaintDetail />} />
-            <Route path="trainings" element={<Trainings />} />
-            <Route path="trainings/matrix" element={<SkillMatrix />} />
-            <Route path="kpis" element={<Kpis />} />
-            <Route path="qqoqccp" element={<Qqoqccp />} />
-            <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
-            <Route path="audits" element={<Audits />} />
-            <Route path="audits/:id" element={<AuditDetail />} />
-            <Route path="risks" element={<Risks />} />
-            <Route path="risks/:id" element={<RiskDetail />} />
-            <Route path="suppliers" element={<Suppliers />} />
-            <Route path="suppliers/:id" element={<SupplierDetail />} />
-            <Route path="management-reviews" element={<ManagementReviews />} />
-            <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
-            <Route path="settings" element={<Settings />} />
-            <Route path="services" element={<Services />} />
-            <Route path="employees" element={<Employees />} />
-            <Route path="my-approvals" element={<MyApprovals />} />
-          </Route>
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      ) : (
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/legal/cgu" element={<LegalTerms />} />
-          <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
-          <Route path="/" element={<Landing />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      )}
+      <Suspense fallback={<RouteFallback />}>
+        {session ? (
+          <Routes>
+            <Route path="/login" element={<Navigate to="/" replace />} />
+            <Route path="/register" element={<Navigate to="/" replace />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/legal/cgu" element={<LegalTerms />} />
+            <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
+            <Route path="/super-admin" element={<SuperAdmin />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="planning" element={<Planning />} />
+              <Route path="documents" element={<Documents />} />
+              <Route path="documents/:id" element={<DocumentDetail />} />
+              <Route path="capas" element={<Capas />} />
+              <Route path="capas/:id" element={<CapaDetail />} />
+              <Route path="complaints" element={<Complaints />} />
+              <Route path="complaints/:id" element={<ComplaintDetail />} />
+              <Route path="trainings" element={<Trainings />} />
+              <Route path="trainings/matrix" element={<SkillMatrix />} />
+              <Route path="kpis" element={<Kpis />} />
+              <Route path="qqoqccp" element={<Qqoqccp />} />
+              <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
+              <Route path="audits" element={<Audits />} />
+              <Route path="audits/:id" element={<AuditDetail />} />
+              <Route path="risks" element={<Risks />} />
+              <Route path="risks/:id" element={<RiskDetail />} />
+              <Route path="suppliers" element={<Suppliers />} />
+              <Route path="suppliers/:id" element={<SupplierDetail />} />
+              <Route path="management-reviews" element={<ManagementReviews />} />
+              <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
+              <Route path="settings" element={<Settings />} />
+              <Route path="services" element={<Services />} />
+              <Route path="employees" element={<Employees />} />
+              <Route path="my-approvals" element={<MyApprovals />} />
+            </Route>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        ) : (
+          <Routes>
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/legal/cgu" element={<LegalTerms />} />
+            <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
+            <Route path="/" element={<Landing />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        )}
+      </Suspense>
     </BrowserRouter>
   );
 }

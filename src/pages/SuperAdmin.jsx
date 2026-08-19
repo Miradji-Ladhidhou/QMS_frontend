@@ -526,7 +526,12 @@ export default function SuperAdmin() {
       </header>
 
       <main className="mx-auto max-w-5xl px-4 py-6 sm:px-6">
-        <HealthWidget />
+        {/* Gardé derrière la même condition que loadTenants ci-dessus (currentUser confirmé
+            super admin) plutôt que monté sans condition : appeler /super-admin/health dès le
+            montage, avant même que le rôle soit vérifié, n'a pas de sens pour un utilisateur
+            qui n'est pas super admin — la route backend le rejette de toute façon (403), mais
+            autant ne pas déclencher l'appel du tout. */}
+        {currentUser?.is_super_admin && <HealthWidget />}
 
         <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
           {TABS.map((tab) => (
