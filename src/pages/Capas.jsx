@@ -6,6 +6,7 @@ import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } f
 import { exportToCsv } from '../lib/csvExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 
@@ -160,6 +161,9 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
     priority: 'medium',
     due_date: priorityDelays ? addDaysToToday(priorityDelays.medium) : '',
     assigned_to: '',
+    root_cause: '',
+    corrective_action: '',
+    preventive_action: '',
   });
   const [dueDateTouched, setDueDateTouched] = useState(false);
   const [error, setError] = useState('');
@@ -179,6 +183,21 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
     }));
   }
 
+  function handleAiGenerated(suggestion) {
+    if (suggestion.overall_priority) handlePriorityChange(suggestion.overall_priority);
+    setForm((prev) => ({
+      ...prev,
+      root_cause: suggestion.root_causes?.length ? suggestion.root_causes.map((c) => `- ${c}`).join('\n') : prev.root_cause,
+      preventive_action: suggestion.preventive_actions?.length
+        ? suggestion.preventive_actions.map((a) => `- ${a}`).join('\n')
+        : prev.preventive_action,
+    }));
+  }
+
+  function handleAiSelectAction(action) {
+    updateField('corrective_action', action.description ? `${action.title}\n\n${action.description}` : action.title);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -193,6 +212,9 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
         origin: form.origin || undefined,
         due_date: form.due_date || undefined,
         assigned_to: form.assigned_to || undefined,
+        root_cause: form.root_cause || undefined,
+        corrective_action: form.corrective_action || undefined,
+        preventive_action: form.preventive_action || undefined,
       };
       const { data } = await api.post('/capas', payload);
       onCreated(data);
@@ -267,6 +289,42 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
               placeholder="Audit, réclamation client, non-conformité..."
               value={form.origin}
               onChange={(e) => updateField('origin', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <AiCapaSuggestion
+            context={`${form.title}${form.description ? `. ${form.description}` : ''}`}
+            onGenerated={handleAiGenerated}
+            onSelectAction={handleAiSelectAction}
+          />
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
+            <textarea
+              rows={2}
+              value={form.root_cause}
+              onChange={(e) => updateField('root_cause', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
+            <textarea
+              rows={2}
+              value={form.corrective_action}
+              onChange={(e) => updateField('corrective_action', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
+            <textarea
+              rows={2}
+              value={form.preventive_action}
+              onChange={(e) => updateField('preventive_action', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>

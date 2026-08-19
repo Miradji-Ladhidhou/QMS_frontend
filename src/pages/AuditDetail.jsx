@@ -8,6 +8,7 @@ import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import FindingTypeBadge from '../components/FindingTypeBadge.jsx';
+import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -524,12 +525,31 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, onClose
     severity: 'medium',
     assigned_to: '',
     due_date: '',
+    root_cause: '',
+    corrective_action: '',
+    preventive_action: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleAiGenerated(suggestion) {
+    setForm((prev) => ({
+      ...prev,
+      priority: suggestion.overall_priority || prev.priority,
+      severity: suggestion.overall_priority || prev.severity,
+      root_cause: suggestion.root_causes?.length ? suggestion.root_causes.map((c) => `- ${c}`).join('\n') : prev.root_cause,
+      preventive_action: suggestion.preventive_actions?.length
+        ? suggestion.preventive_actions.map((a) => `- ${a}`).join('\n')
+        : prev.preventive_action,
+    }));
+  }
+
+  function handleAiSelectAction(action) {
+    updateField('corrective_action', action.description ? `${action.title}\n\n${action.description}` : action.title);
   }
 
   async function handleSubmit(event) {
@@ -545,6 +565,9 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, onClose
         severity: form.severity,
         assigned_to: form.assigned_to || undefined,
         due_date: form.due_date || undefined,
+        root_cause: form.root_cause || undefined,
+        corrective_action: form.corrective_action || undefined,
+        preventive_action: form.preventive_action || undefined,
       };
       const { data } = await api.post(`/audits/${auditId}/findings/${finding.id}/create-capa`, payload);
       onCreated(data);
@@ -583,6 +606,12 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, onClose
             />
           </div>
 
+          <AiCapaSuggestion
+            context={`Constat d'audit : ${finding.description}`}
+            onGenerated={handleAiGenerated}
+            onSelectAction={handleAiSelectAction}
+          />
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
@@ -607,6 +636,36 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, onClose
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
+            <textarea
+              rows={2}
+              value={form.root_cause}
+              onChange={(e) => updateField('root_cause', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
+            <textarea
+              rows={2}
+              value={form.corrective_action}
+              onChange={(e) => updateField('corrective_action', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
+            <textarea
+              rows={2}
+              value={form.preventive_action}
+              onChange={(e) => updateField('preventive_action', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">

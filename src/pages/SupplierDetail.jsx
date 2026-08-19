@@ -9,6 +9,7 @@ import { SUPPLIER_STATUS_LABELS, EVALUATION_DECISION_LABELS } from '../lib/suppl
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
 import EvaluationDecisionBadge from '../components/EvaluationDecisionBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
+import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -185,7 +186,7 @@ function EditSupplierModal({ supplier, services, onClose, onUpdated }) {
   );
 }
 
-function CreateCapaFromEvaluationModal({ supplierId, evaluation, users, services, onClose, onCreated }) {
+function CreateCapaFromEvaluationModal({ supplierId, supplierName, evaluation, users, services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     service_id: '',
@@ -193,12 +194,31 @@ function CreateCapaFromEvaluationModal({ supplierId, evaluation, users, services
     severity: 'medium',
     assigned_to: '',
     due_date: '',
+    root_cause: '',
+    corrective_action: '',
+    preventive_action: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleAiGenerated(suggestion) {
+    setForm((prev) => ({
+      ...prev,
+      priority: suggestion.overall_priority || prev.priority,
+      severity: suggestion.overall_priority || prev.severity,
+      root_cause: suggestion.root_causes?.length ? suggestion.root_causes.map((c) => `- ${c}`).join('\n') : prev.root_cause,
+      preventive_action: suggestion.preventive_actions?.length
+        ? suggestion.preventive_actions.map((a) => `- ${a}`).join('\n')
+        : prev.preventive_action,
+    }));
+  }
+
+  function handleAiSelectAction(action) {
+    updateField('corrective_action', action.description ? `${action.title}\n\n${action.description}` : action.title);
   }
 
   async function handleSubmit(event) {
@@ -214,6 +234,9 @@ function CreateCapaFromEvaluationModal({ supplierId, evaluation, users, services
         severity: form.severity,
         assigned_to: form.assigned_to || undefined,
         due_date: form.due_date || undefined,
+        root_cause: form.root_cause || undefined,
+        corrective_action: form.corrective_action || undefined,
+        preventive_action: form.preventive_action || undefined,
       };
       const { data } = await api.post(`/suppliers/${supplierId}/evaluations/${evaluation.id}/create-capa`, payload);
       onCreated(data);
@@ -250,6 +273,12 @@ function CreateCapaFromEvaluationModal({ supplierId, evaluation, users, services
             />
           </div>
 
+          <AiCapaSuggestion
+            context={`Évaluation fournisseur ${supplierName} — décision : ${EVALUATION_DECISION_LABELS[evaluation.decision]}. Notes : qualité ${evaluation.quality_score}/5, délais ${evaluation.delivery_score}/5, prix ${evaluation.price_score}/5, réactivité ${evaluation.responsiveness_score}/5.${evaluation.comment ? ` Commentaire : ${evaluation.comment}` : ''}`}
+            onGenerated={handleAiGenerated}
+            onSelectAction={handleAiSelectAction}
+          />
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
@@ -274,6 +303,36 @@ function CreateCapaFromEvaluationModal({ supplierId, evaluation, users, services
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
+            <textarea
+              rows={2}
+              value={form.root_cause}
+              onChange={(e) => updateField('root_cause', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
+            <textarea
+              rows={2}
+              value={form.corrective_action}
+              onChange={(e) => updateField('corrective_action', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
+            <textarea
+              rows={2}
+              value={form.preventive_action}
+              onChange={(e) => updateField('preventive_action', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -671,6 +730,7 @@ export default function SupplierDetail() {
       {capaModalEvaluation && (
         <CreateCapaFromEvaluationModal
           supplierId={id}
+          supplierName={supplier.name}
           evaluation={capaModalEvaluation}
           users={users}
           services={services}
