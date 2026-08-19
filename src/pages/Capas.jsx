@@ -211,6 +211,10 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
         service_id: form.service_id || undefined,
         description: form.description || undefined,
         priority: form.priority,
+        // severity reste en base (voir schema.sql) mais n'est plus un champ distinct dans
+        // aucun formulaire de création CAPA — toujours miroir de la gravité choisie, comme
+        // les 5 flux "créer une CAPA depuis X" et QqoqccpDetail.jsx.
+        severity: form.priority,
         origin: form.origin || undefined,
         due_date: form.due_date || undefined,
         assigned_to: form.assigned_to || undefined,
@@ -254,27 +258,6 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
-            <select
-              value={form.service_id}
-              onChange={(e) => updateField('service_id', e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">Aucun service</option>
-              {services.map((service) => (
-                <option key={service.id} value={service.id}>
-                  {service.name}
-                </option>
-              ))}
-            </select>
-            {services.length === 0 && (
-              <p className="mt-1 text-xs text-slate-400">
-                Aucun service configuré — un administrateur peut en créer depuis les paramètres.
-              </p>
-            )}
-          </div>
-
-          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description de la non-conformité</label>
             <AutoTextarea
               rows={3}
@@ -300,6 +283,42 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}
           />
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
+              <select
+                value={form.priority}
+                onChange={(e) => handlePriorityChange(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Échéance
+                {!dueDateTouched && (
+                  <span className="ml-1 font-normal text-slate-400">
+                    (délai suggéré : {getDelayDays(form.priority, priorityDelays) ?? '—'} jours)
+                  </span>
+                )}
+              </label>
+              <input
+                type="date"
+                value={form.due_date}
+                onChange={(e) => {
+                  setDueDateTouched(true);
+                  updateField('due_date', e.target.value);
+                }}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
@@ -331,55 +350,40 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
-            <select
-              value={form.priority}
-              onChange={(e) => handlePriorityChange(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              Échéance
-              {!dueDateTouched && (
-                <span className="ml-1 font-normal text-slate-400">
-                  (délai de traitement suggéré : {getDelayDays(form.priority, priorityDelays) ?? '—'} jours)
-                </span>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
+              <select
+                value={form.service_id}
+                onChange={(e) => updateField('service_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucun service</option>
+                {services.map((service) => (
+                  <option key={service.id} value={service.id}>
+                    {service.name}
+                  </option>
+                ))}
+              </select>
+              {services.length === 0 && (
+                <p className="mt-1 text-xs text-slate-400">Aucun service configuré.</p>
               )}
-            </label>
-            <input
-              type="date"
-              value={form.due_date}
-              onChange={(e) => {
-                setDueDateTouched(true);
-                updateField('due_date', e.target.value);
-              }}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Responsable assigné</label>
-            <select
-              value={form.assigned_to}
-              onChange={(e) => updateField('assigned_to', e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">Non assigné</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.full_name}
-                </option>
-              ))}
-            </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Responsable assigné</label>
+              <select
+                value={form.assigned_to}
+                onChange={(e) => updateField('assigned_to', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Non assigné</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.full_name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <button

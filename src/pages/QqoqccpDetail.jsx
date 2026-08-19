@@ -60,13 +60,11 @@ function CapaAdjustmentForm({
   services,
   priorityDelays,
   priorityTouched,
-  severityTouched,
   dueDateTouched,
   suggestedActions,
   selectedActionIndex,
   onFieldChange,
   onPriorityChange,
-  onSeverityChange,
   onDueDateChange,
   onSelectAction,
   onSelectCustomAction,
@@ -100,31 +98,10 @@ function CapaAdjustmentForm({
           />
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
-          <select
-            value={form.service_id}
-            onChange={(e) => onFieldChange('service_id', e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Aucun service</option>
-            {services.map((service) => (
-              <option key={service.id} value={service.id}>
-                {service.name}
-              </option>
-            ))}
-          </select>
-          {services.length === 0 && (
-            <p className="mt-1 text-xs text-slate-400">
-              Aucun service configuré — un administrateur peut en créer depuis les paramètres.
-            </p>
-          )}
-        </div>
-
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div>
             <label className="mb-1 flex flex-wrap items-center text-sm font-medium text-slate-700">
-              Priorité
+              Gravité
               {!priorityTouched && form.priority && <AiSuggestedBadge />}
             </label>
             <select
@@ -141,21 +118,20 @@ function CapaAdjustmentForm({
           </div>
 
           <div>
-            <label className="mb-1 flex flex-wrap items-center text-sm font-medium text-slate-700">
-              Gravité
-              {!severityTouched && form.severity && <AiSuggestedBadge />}
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Échéance
+              {!dueDateTouched && (
+                <span className="ml-1 font-normal text-slate-400">
+                  (suggéré : {getDelayDays(form.priority, priorityDelays) ?? '—'} jours)
+                </span>
+              )}
             </label>
-            <select
-              value={form.severity}
-              onChange={(e) => onSeverityChange(e.target.value)}
+            <input
+              type="date"
+              value={form.due_date}
+              onChange={(e) => onDueDateChange(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-            >
-              {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+            />
           </div>
         </div>
 
@@ -223,37 +199,39 @@ function CapaAdjustmentForm({
           />
         </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Responsable assigné</label>
-          <select
-            value={form.assigned_to}
-            onChange={(e) => onFieldChange('assigned_to', e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-          >
-            <option value="">Non assigné</option>
-            {users.map((user) => (
-              <option key={user.id} value={user.id}>
-                {user.full_name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
+            <select
+              value={form.service_id}
+              onChange={(e) => onFieldChange('service_id', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Aucun service</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+            {services.length === 0 && <p className="mt-1 text-xs text-slate-400">Aucun service configuré.</p>}
+          </div>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">
-            Échéance
-            {!dueDateTouched && (
-              <span className="ml-1 font-normal text-slate-400">
-                (suggéré : {getDelayDays(form.priority, priorityDelays) ?? '—'} jours)
-              </span>
-            )}
-          </label>
-          <input
-            type="date"
-            value={form.due_date}
-            onChange={(e) => onDueDateChange(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-          />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Responsable assigné</label>
+            <select
+              value={form.assigned_to}
+              onChange={(e) => onFieldChange('assigned_to', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            >
+              <option value="">Non assigné</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
         <button
@@ -297,7 +275,6 @@ export default function QqoqccpDetail() {
   const [showCapaForm, setShowCapaForm] = useState(false);
   const [capaForm, setCapaForm] = useState(null);
   const [priorityTouched, setPriorityTouched] = useState(false);
-  const [severityTouched, setSeverityTouched] = useState(false);
   const [dueDateTouched, setDueDateTouched] = useState(false);
   const [selectedActionIndex, setSelectedActionIndex] = useState(null);
   const [users, setUsers] = useState([]);
@@ -406,7 +383,6 @@ export default function QqoqccpDetail() {
       title: analysis.title,
       service_id: '',
       priority: suggested,
-      severity: suggested,
       root_cause: causes.length > 0 ? causes.map((cause) => `- ${cause}`).join('\n') : '',
       corrective_action: '',
       preventive_action: preventiveActions.length > 0 ? preventiveActions.map((action) => `- ${action}`).join('\n') : '',
@@ -414,7 +390,6 @@ export default function QqoqccpDetail() {
       due_date: delayDays ? addDaysToToday(delayDays) : '',
     });
     setPriorityTouched(false);
-    setSeverityTouched(false);
     setDueDateTouched(false);
     setSelectedActionIndex(null);
     setCapaError('');
@@ -435,11 +410,6 @@ export default function QqoqccpDetail() {
         due_date: !dueDateTouched && days ? addDaysToToday(days) : prev.due_date,
       };
     });
-  }
-
-  function handleCapaSeverityChange(value) {
-    setSeverityTouched(true);
-    updateCapaField('severity', value);
   }
 
   function handleCapaDueDateChange(value) {
@@ -468,7 +438,9 @@ export default function QqoqccpDetail() {
         title: capaForm.title,
         service_id: capaForm.service_id || undefined,
         priority: capaForm.priority,
-        severity: capaForm.severity,
+        // severity reste en base mais n'est plus un champ distinct du formulaire — toujours
+        // miroir de la gravité choisie, comme partout ailleurs (voir Capas.jsx).
+        severity: capaForm.priority,
         root_cause: capaForm.root_cause || undefined,
         corrective_action: capaForm.corrective_action || undefined,
         preventive_action: capaForm.preventive_action || undefined,
@@ -703,13 +675,11 @@ export default function QqoqccpDetail() {
           services={services}
           priorityDelays={priorityDelays}
           priorityTouched={priorityTouched}
-          severityTouched={severityTouched}
           dueDateTouched={dueDateTouched}
           suggestedActions={suggestedActions}
           selectedActionIndex={selectedActionIndex}
           onFieldChange={updateCapaField}
           onPriorityChange={handleCapaPriorityChange}
-          onSeverityChange={handleCapaSeverityChange}
           onDueDateChange={handleCapaDueDateChange}
           onSelectAction={handleSelectSuggestedAction}
           onSelectCustomAction={handleSelectCustomAction}
