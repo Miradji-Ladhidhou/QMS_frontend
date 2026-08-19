@@ -41,6 +41,9 @@ function initialsOf(fullName) {
     .join('');
 }
 
+// Libellés courts et cohérents (un nom, rarement deux) — le titre complet de chaque page
+// (ex. "Audits internes", "Registre des risques", "Revue de direction") reste affiché en h1
+// sur la page elle-même ; le menu n'a besoin que d'identifier le module en un coup d'œil.
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/planning', label: 'Planning', icon: CalendarClock },
@@ -50,11 +53,11 @@ const NAV_ITEMS = [
   { to: '/trainings', label: 'Formations', icon: GraduationCap },
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
-  { to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
-  { to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
+  { to: '/audits', label: 'Audits', icon: ClipboardCheck },
+  { to: '/risks', label: 'Risques', icon: ShieldAlert },
   { to: '/suppliers', label: 'Fournisseurs', icon: Truck },
-  { to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
-  { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
+  { to: '/management-reviews', label: 'Revues', icon: Users2 },
+  { to: '/my-approvals', label: 'Approbations', icon: CheckSquare },
   // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
   { to: '/services', label: 'Services', icon: Wrench, adminOnly: true },
   { to: '/employees', label: 'Personnel', icon: Contact, adminOnly: true },
