@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   CheckSquare,
+  ClipboardCheck,
   ClipboardList,
   Contact,
   FileText,
@@ -44,6 +45,7 @@ const NAV_ITEMS = [
   { to: '/trainings', label: 'Formations', icon: GraduationCap },
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
+  { to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
   { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
   { to: '/services', label: 'Services', icon: Wrench, adminOnly: true },
