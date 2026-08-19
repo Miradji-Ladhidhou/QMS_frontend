@@ -9,6 +9,7 @@ import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -107,7 +108,7 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               required
               value={form.description}
@@ -177,7 +178,7 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.root_cause}
               onChange={(e) => updateField('root_cause', e.target.value)}
@@ -187,7 +188,7 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Résolution apportée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.resolution}
               onChange={(e) => updateField('resolution', e.target.value)}
@@ -374,7 +375,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.root_cause}
               onChange={(e) => updateField('root_cause', e.target.value)}
@@ -384,7 +385,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.corrective_action}
               onChange={(e) => updateField('corrective_action', e.target.value)}
@@ -394,7 +395,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.preventive_action}
               onChange={(e) => updateField('preventive_action', e.target.value)}

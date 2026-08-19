@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
+import AutoTextarea from './AutoTextarea.jsx';
 
 export default function DecisionModal({ workflowId, decision, onClose, onDecided }) {
   const isApproval = decision === 'approved';
@@ -77,7 +78,7 @@ export default function DecisionModal({ workflowId, decision, onClose, onDecided
           ) : (
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Motif du rejet</label>
-              <textarea
+              <AutoTextarea
                 rows={3}
                 required
                 value={comment}

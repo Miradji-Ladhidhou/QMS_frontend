@@ -16,6 +16,7 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
 import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -178,7 +179,7 @@ function NewRiskModal({ users, services, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}

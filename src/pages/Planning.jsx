@@ -25,6 +25,7 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 const TYPE_CONFIG = {
   capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700' },
@@ -136,7 +137,7 @@ function TaskFormModal({ task, users, employees, onClose, onSaved }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
-            <textarea
+            <AutoTextarea
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}

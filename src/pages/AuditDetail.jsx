@@ -9,6 +9,7 @@ import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import FindingTypeBadge from '../components/FindingTypeBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -124,7 +125,7 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Périmètre</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.scope}
               onChange={(e) => updateField('scope', e.target.value)}
@@ -177,7 +178,7 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Conclusion</label>
-            <textarea
+            <AutoTextarea
               rows={3}
               value={form.conclusion}
               onChange={(e) => updateField('conclusion', e.target.value)}
@@ -497,7 +498,7 @@ export default function AuditDetail() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
-                <textarea
+                <AutoTextarea
                   rows={3}
                   required
                   value={findingForm.description}
@@ -676,7 +677,7 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, priorit
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.root_cause}
               onChange={(e) => updateField('root_cause', e.target.value)}
@@ -686,7 +687,7 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, priorit
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.corrective_action}
               onChange={(e) => updateField('corrective_action', e.target.value)}
@@ -696,7 +697,7 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, priorit
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.preventive_action}
               onChange={(e) => updateField('preventive_action', e.target.value)}

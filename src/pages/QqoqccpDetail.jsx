@@ -7,6 +7,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 // Mêmes noms de champs que qqoqccp_analyses (schema.sql) et que le corps attendu par
 // PATCH /api/qqoqccp/:id — voir backend/src/routes/qqoqccp.js.
@@ -160,7 +161,7 @@ function CapaAdjustmentForm({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Cause racine</label>
-          <textarea
+          <AutoTextarea
             rows={3}
             value={form.root_cause}
             onChange={(e) => onFieldChange('root_cause', e.target.value)}
@@ -202,7 +203,7 @@ function CapaAdjustmentForm({
             </div>
           )}
 
-          <textarea
+          <AutoTextarea
             rows={3}
             placeholder="Que va-t-on faire pour corriger le problème ?"
             value={form.corrective_action}
@@ -213,7 +214,7 @@ function CapaAdjustmentForm({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
-          <textarea
+          <AutoTextarea
             rows={2}
             placeholder="Comment éviter que cela se reproduise ?"
             value={form.preventive_action}
@@ -598,7 +599,7 @@ export default function QqoqccpDetail() {
                 <span className="text-xs text-red-600">Échec de l'enregistrement</span>
               )}
             </div>
-            <textarea
+            <AutoTextarea
               rows={2}
               placeholder={placeholder}
               value={form[key] || ''}

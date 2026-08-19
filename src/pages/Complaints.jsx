@@ -8,6 +8,7 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -99,7 +100,7 @@ function NewComplaintModal({ users, services, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description de la réclamation</label>
-            <textarea
+            <AutoTextarea
               rows={3}
               required
               value={form.description}

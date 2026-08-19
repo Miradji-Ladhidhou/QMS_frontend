@@ -43,6 +43,7 @@ import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiSt
 import { exportToCsv } from '../lib/csvExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
@@ -589,7 +590,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Commentaire</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={comment}
               onChange={(e) => setComment(e.target.value)}

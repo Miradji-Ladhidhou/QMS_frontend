@@ -14,6 +14,7 @@ import {
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
 import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -153,7 +154,7 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
@@ -195,7 +196,7 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Contrôles actuels</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.current_controls}
               onChange={(e) => updateField('current_controls', e.target.value)}
@@ -205,7 +206,7 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Plan de traitement</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.treatment_plan}
               onChange={(e) => updateField('treatment_plan', e.target.value)}
@@ -445,7 +446,7 @@ function CreateCapaFromRiskModal({ riskId, risk, users, services, priorityDelays
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.root_cause}
               onChange={(e) => updateField('root_cause', e.target.value)}
@@ -455,7 +456,7 @@ function CreateCapaFromRiskModal({ riskId, risk, users, services, priorityDelays
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.corrective_action}
               onChange={(e) => updateField('corrective_action', e.target.value)}
@@ -465,7 +466,7 @@ function CreateCapaFromRiskModal({ riskId, risk, users, services, priorityDelays
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.preventive_action}
               onChange={(e) => updateField('preventive_action', e.target.value)}

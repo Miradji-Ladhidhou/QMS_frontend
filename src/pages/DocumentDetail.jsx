@@ -9,6 +9,7 @@ import CategoryBadge from '../components/CategoryBadge.jsx';
 import ApprovalStatusBadge from '../components/ApprovalStatusBadge.jsx';
 import DecisionModal from '../components/DecisionModal.jsx';
 import SubmitForApprovalModal from '../components/SubmitForApprovalModal.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 const AUDIT_ACTION_LABELS = {
   submitted_for_approval: 'Soumis pour approbation',
@@ -87,7 +88,7 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Commentaire (optionnel)</label>
-            <textarea
+            <AutoTextarea
               rows={3}
               value={changeNote}
               onChange={(e) => setChangeNote(e.target.value)}

@@ -8,6 +8,7 @@ import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -150,7 +151,7 @@ function EditReviewModal({ review, onClose, onUpdated }) {
           {TEXT_SECTIONS.map(({ key, label }) => (
             <div key={key}>
               <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
-              <textarea
+              <AutoTextarea
                 rows={2}
                 value={form[key]}
                 onChange={(e) => updateField(key, e.target.value)}
@@ -316,7 +317,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.root_cause}
               onChange={(e) => updateField('root_cause', e.target.value)}
@@ -326,7 +327,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.corrective_action}
               onChange={(e) => updateField('corrective_action', e.target.value)}
@@ -336,7 +337,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.preventive_action}
               onChange={(e) => updateField('preventive_action', e.target.value)}
@@ -670,7 +671,7 @@ export default function ManagementReviewDetail() {
             <form onSubmit={handleAddAction} className="space-y-4">
               <div>
                 <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
-                <textarea
+                <AutoTextarea
                   rows={3}
                   required
                   value={actionDescription}

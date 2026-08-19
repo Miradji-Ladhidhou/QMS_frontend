@@ -8,6 +8,7 @@ import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -109,7 +110,7 @@ function NewAuditModal({ users, services, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Périmètre</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               placeholder="Ce que couvre l'audit : processus, exigences, documents de référence..."
               value={form.scope}

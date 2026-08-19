@@ -9,6 +9,7 @@ import { exportToPdf } from '../lib/pdfExport.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import SearchSnippet from '../components/SearchSnippet.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -103,7 +104,7 @@ function DocumentModal({ categories, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
-            <textarea
+            <AutoTextarea
               rows={3}
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}

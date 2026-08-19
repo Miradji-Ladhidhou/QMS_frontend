@@ -7,6 +7,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
 // un <select>, seul moyen simple de distinguer "non vérifiée" d'un false explicite.
@@ -314,7 +315,7 @@ export default function CapaDetail() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description de la non-conformité</label>
-            <textarea
+            <AutoTextarea
               rows={3}
               value={treatmentForm.description}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, description: e.target.value }))}
@@ -325,7 +326,7 @@ export default function CapaDetail() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={treatmentForm.root_cause}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, root_cause: e.target.value }))}
@@ -336,7 +337,7 @@ export default function CapaDetail() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={treatmentForm.corrective_action}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, corrective_action: e.target.value }))}
@@ -347,7 +348,7 @@ export default function CapaDetail() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={treatmentForm.preventive_action}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, preventive_action: e.target.value }))}
@@ -358,7 +359,7 @@ export default function CapaDetail() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Commentaire</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={treatmentForm.comment}
               onChange={(e) => setTreatmentForm((prev) => ({ ...prev, comment: e.target.value }))}
@@ -417,7 +418,7 @@ export default function CapaDetail() {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Notes de vérification</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={effectivenessNotes}
               onChange={(e) => setEffectivenessNotes(e.target.value)}
@@ -462,7 +463,7 @@ export default function CapaDetail() {
           {commentError && (
             <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{commentError}</p>
           )}
-          <textarea
+          <AutoTextarea
             rows={3}
             placeholder="Ajouter un commentaire de suivi..."
             value={commentText}
