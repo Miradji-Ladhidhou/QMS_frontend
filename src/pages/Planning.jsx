@@ -5,15 +5,19 @@ import {
   Check,
   CheckSquare,
   Circle,
+  ClipboardCheck,
   ClipboardList,
   Download,
   Filter,
   FileText,
   GraduationCap,
   Loader2,
+  MessageSquareWarning,
   Pencil,
   Plus,
+  ShieldAlert,
   Trash2,
+  Truck,
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -27,6 +31,10 @@ const TYPE_CONFIG = {
   document: { label: 'Document', icon: FileText, className: 'bg-purple-100 text-purple-700' },
   training: { label: 'Formation', icon: GraduationCap, className: 'bg-emerald-100 text-emerald-700' },
   task: { label: 'Tâche', icon: CheckSquare, className: 'bg-amber-100 text-amber-700' },
+  audit: { label: 'Audit', icon: ClipboardCheck, className: 'bg-sky-100 text-sky-700' },
+  complaint: { label: 'Réclamation', icon: MessageSquareWarning, className: 'bg-rose-100 text-rose-700' },
+  risk: { label: 'Risque', icon: ShieldAlert, className: 'bg-orange-100 text-orange-700' },
+  supplier: { label: 'Fournisseur', icon: Truck, className: 'bg-teal-100 text-teal-700' },
 };
 
 function formatDateHeading(dateStr) {
