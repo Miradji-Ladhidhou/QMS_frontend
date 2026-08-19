@@ -22,11 +22,11 @@ function selectValueToEffectiveness(value) {
   return null;
 }
 
-const TREATMENT_FIELDS = ['service', 'description', 'root_cause', 'corrective_action', 'preventive_action', 'comment'];
+const TREATMENT_FIELDS = ['service_id', 'description', 'root_cause', 'corrective_action', 'preventive_action', 'comment'];
 
 function buildTreatmentForm(capa) {
   return {
-    service: capa.service || '',
+    service_id: capa.service_id || '',
     description: capa.description || '',
     root_cause: capa.root_cause || '',
     corrective_action: capa.corrective_action || '',
@@ -57,6 +57,7 @@ export default function CapaDetail() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [capa, setCapa] = useState(null);
+  const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -99,6 +100,12 @@ export default function CapaDetail() {
     api
       .get('/capas/priority-delays')
       .then(({ data }) => setPriorityDelays(data))
+      .catch(() => {});
+    api
+      .get('/services')
+      // GET /services renvoie aussi les services désactivés (nécessaire à la page de
+      // gestion) — ce formulaire ne doit proposer que les actifs.
+      .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -290,13 +297,19 @@ export default function CapaDetail() {
         <div className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
-            <input
-              type="text"
-              value={treatmentForm.service}
-              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, service: e.target.value }))}
+            <select
+              value={treatmentForm.service_id}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, service_id: e.target.value }))}
               disabled={!canManage}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
-            />
+            >
+              <option value="">Aucun service</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
           </div>
 
           <div>

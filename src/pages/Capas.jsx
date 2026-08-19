@@ -468,7 +468,7 @@ export default function Capas() {
     const rows = capas.map((capa) => [
       capa.number,
       formatDate(capa.created_at),
-      capa.service || '',
+      capa.service?.name || '',
       capa.description || '',
       CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
       getDelayDays(capa.priority, priorityDelays) ?? '',
@@ -611,7 +611,7 @@ export default function Capas() {
                   <div>
                     <p className="font-medium text-slate-900">{capa.title}</p>
                     <p className="text-sm text-slate-500">
-                      {capa.number} · {capa.service || 'Service non précisé'}
+                      {capa.number} · {capa.service?.name || 'Service non précisé'}
                     </p>
                   </div>
                   <CapaPriorityBadge priority={capa.priority} />
@@ -664,7 +664,7 @@ export default function Capas() {
                   >
                     <td className="px-4 py-3 font-medium text-slate-800">{capa.number}</td>
                     <td className="px-4 py-3 text-slate-700">{capa.title}</td>
-                    <td className="px-4 py-3 text-slate-600">{capa.service || '—'}</td>
+                    <td className="px-4 py-3 text-slate-600">{capa.service?.name || '—'}</td>
                     <td className="px-4 py-3">
                       <CapaPriorityBadge priority={capa.priority} />
                     </td>
