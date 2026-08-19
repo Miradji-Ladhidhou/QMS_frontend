@@ -2838,7 +2838,6 @@ export default function Kpis() {
   // Indépendant du dossier parcouru : le bouton rapport porte sur TOUS les KPI du tenant
   // (voir GET /kpis/report), donc ne doit pas se désactiver juste parce qu'un dossier vide
   // est affiché. Optimiste tant que non chargé, pour éviter un flash désactivé au montage.
-  const [hasAnyKpi, setHasAnyKpi] = useState(true);
   const [currentFolderId, setCurrentFolderId] = useState(null); // null = racine
   const [breadcrumb, setBreadcrumb] = useState([]); // ancêtres du dossier courant, racine → courant
   const [folders, setFolders] = useState([]); // sous-dossiers directs du dossier courant
@@ -2890,12 +2889,6 @@ export default function Kpis() {
     loadBreadcrumb(currentFolderId);
   }, [currentFolderId]);
 
-  useEffect(() => {
-    api
-      .get('/kpis')
-      .then(({ data }) => setHasAnyKpi(data.length > 0))
-      .catch(() => {});
-  }, []);
 
   function navigateToFolder(folderId) {
     setOpenMenuId(null);
@@ -3010,11 +3003,17 @@ export default function Kpis() {
 
   // Même schéma que le certificat de signature (DocumentDetail.jsx) : ouvre le PDF dans un
   // nouvel onglet plutôt qu'un téléchargement forcé, pour permettre un aperçu avant impression.
+  // folder_id = exactement le dossier actuellement affiché (racine ou sous-dossier) : le PDF
+  // doit toujours correspondre à ce que l'utilisateur regarde à l'écran, jamais à tout le
+  // tenant en vrac si un dossier est ouvert — voir GET /kpis/report côté backend.
   async function handleGenerateReport() {
     setError('');
     setGeneratingReport(true);
     try {
-      const response = await api.get('/kpis/report', { responseType: 'blob' });
+      const response = await api.get('/kpis/report', {
+        params: { folder_id: currentFolderId || 'root' },
+        responseType: 'blob',
+      });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       window.open(url, '_blank', 'noopener');
     } catch {
@@ -3032,7 +3031,7 @@ export default function Kpis() {
           <button
             type="button"
             onClick={handleGenerateReport}
-            disabled={generatingReport || !hasAnyKpi}
+            disabled={generatingReport || kpis.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
             <FileText size={18} />
