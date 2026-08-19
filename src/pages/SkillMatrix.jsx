@@ -19,6 +19,20 @@ const CELL_ICONS = {
   never_done: Minus,
 };
 
+function formatDate(dateStr) {
+  if (!dateStr) return null;
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: '2-digit' });
+}
+
+// Date affichée sous chaque pastille : l'échéance de renouvellement quand elle existe (à
+// jour/bientôt/expiré s'appuient dessus), sinon la date de réalisation pour une formation
+// non récurrente déjà faite (up_to_date sans next_due_date), sinon rien (never_done).
+function cellDateLabel(cell) {
+  if (cell?.next_due_date) return formatDate(cell.next_due_date);
+  if (cell?.last_completed_at) return formatDate(cell.last_completed_at);
+  return null;
+}
+
 export default function SkillMatrix() {
   const navigate = useNavigate();
   const [matrix, setMatrix] = useState([]);
@@ -59,7 +73,8 @@ export default function SkillMatrix() {
       ...matrix.map((entry) => {
         const cell = findEntry(entry, person.id);
         const status = cell?.status ?? 'never_done';
-        return TRAINING_STATUS_LABELS[status];
+        const dateLabel = cellDateLabel(cell);
+        return dateLabel ? `${TRAINING_STATUS_LABELS[status]} (${dateLabel})` : TRAINING_STATUS_LABELS[status];
       }),
     ]);
     exportToCsv(`matrice-competences-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
@@ -123,6 +138,9 @@ export default function SkillMatrix() {
           </span>
         ))}
       </div>
+      <p className="mt-1 text-xs text-slate-400">
+        Date affichée sous chaque case : échéance de renouvellement, ou date de réalisation si la formation n'est pas récurrente.
+      </p>
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
@@ -160,14 +178,20 @@ export default function SkillMatrix() {
                     const cell = findEntry(entry, person.id);
                     const status = cell?.status ?? 'never_done';
                     const Icon = CELL_ICONS[status];
+                    const dateLabel = cellDateLabel(cell);
                     return (
                       <td key={entry.training.id} className="px-4 py-3">
-                        <span
-                          title={TRAINING_STATUS_LABELS[status]}
-                          className={`inline-flex h-8 w-8 items-center justify-center rounded-md ${CELL_STYLES[status]}`}
-                        >
-                          <Icon size={16} />
-                        </span>
+                        <div className="flex flex-col items-center gap-1">
+                          <span
+                            title={TRAINING_STATUS_LABELS[status]}
+                            className={`inline-flex h-8 w-8 items-center justify-center rounded-md ${CELL_STYLES[status]}`}
+                          >
+                            <Icon size={16} />
+                          </span>
+                          <span className={`whitespace-nowrap text-[11px] ${dateLabel ? 'text-slate-500' : 'text-slate-300'}`}>
+                            {dateLabel || '—'}
+                          </span>
+                        </div>
                       </td>
                     );
                   })}
