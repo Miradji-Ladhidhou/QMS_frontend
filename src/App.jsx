@@ -23,6 +23,8 @@ import Qqoqccp from './pages/Qqoqccp.jsx';
 import QqoqccpDetail from './pages/QqoqccpDetail.jsx';
 import Audits from './pages/Audits.jsx';
 import AuditDetail from './pages/AuditDetail.jsx';
+import ManagementReviews from './pages/ManagementReviews.jsx';
+import ManagementReviewDetail from './pages/ManagementReviewDetail.jsx';
 import Settings from './pages/Settings.jsx';
 import Services from './pages/Services.jsx';
 import Employees from './pages/Employees.jsx';
@@ -78,6 +80,8 @@ export default function App() {
             <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
             <Route path="audits" element={<Audits />} />
             <Route path="audits/:id" element={<AuditDetail />} />
+            <Route path="management-reviews" element={<ManagementReviews />} />
+            <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
             <Route path="settings" element={<Settings />} />
             <Route path="services" element={<Services />} />
             <Route path="employees" element={<Employees />} />
