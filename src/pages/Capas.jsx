@@ -10,6 +10,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -275,7 +276,7 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description de la non-conformité</label>
-            <textarea
+            <AutoTextarea
               rows={3}
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
@@ -302,7 +303,7 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.root_cause}
               onChange={(e) => updateField('root_cause', e.target.value)}
@@ -312,7 +313,7 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.corrective_action}
               onChange={(e) => updateField('corrective_action', e.target.value)}
@@ -322,7 +323,7 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Action préventive</label>
-            <textarea
+            <AutoTextarea
               rows={2}
               value={form.preventive_action}
               onChange={(e) => updateField('preventive_action', e.target.value)}
@@ -442,6 +443,8 @@ export default function Capas() {
     () => ({
       open: capas.filter((capa) => capa.status === 'open').length,
       in_progress: capas.filter((capa) => capa.status === 'in_progress').length,
+      pending_verification: capas.filter((capa) => capa.status === 'pending_verification').length,
+      overdue: capas.filter((capa) => capa.status === 'overdue').length,
       closed: capas.filter((capa) => capa.status === 'closed').length,
     }),
     [capas]
@@ -575,9 +578,11 @@ export default function Capas() {
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-3">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <CounterCard label="Ouvertes" value={counters.open} accent="text-blue-700" />
         <CounterCard label="En cours" value={counters.in_progress} accent="text-amber-700" />
+        <CounterCard label="En vérification" value={counters.pending_verification} accent="text-purple-700" />
+        <CounterCard label="En retard" value={counters.overdue} accent="text-red-700" />
         <CounterCard label="Clôturées" value={counters.closed} accent="text-emerald-700" />
       </div>
 
