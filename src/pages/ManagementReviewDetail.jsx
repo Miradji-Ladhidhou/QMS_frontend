@@ -19,6 +19,18 @@ function formatDateTime(dateStr) {
   return new Date(dateStr).toLocaleString('fr-FR');
 }
 
+// Ajoute `days` jours à la date du jour, au format yyyy-mm-dd attendu par <input type="date">.
+function addDaysToToday(days) {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+// Délai de traitement (en jours) paramétré pour la gravité choisie (Paramètres > CAPA).
+function getDelayDays(priority, priorityDelays) {
+  return priorityDelays?.[priority] ?? null;
+}
+
 const TEXT_SECTIONS = [
   { key: 'previous_actions_status', label: 'Statut des actions de la revue précédente' },
   { key: 'context_changes', label: 'Évolutions du contexte' },
@@ -160,18 +172,19 @@ function EditReviewModal({ review, onClose, onUpdated }) {
   );
 }
 
-function CreateCapaFromActionModal({ reviewId, action, users, services, onClose, onCreated }) {
+function CreateCapaFromActionModal({ reviewId, action, users, services, priorityDelays, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     service_id: '',
     priority: 'medium',
     severity: 'medium',
     assigned_to: '',
-    due_date: '',
+    due_date: priorityDelays ? addDaysToToday(priorityDelays.medium) : '',
     root_cause: '',
     corrective_action: '',
     preventive_action: '',
   });
+  const [dueDateTouched, setDueDateTouched] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -179,11 +192,21 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, onClose,
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleAiGenerated(suggestion) {
+  // La gravité pilote le délai de traitement paramétré (Paramètres > CAPA) : l'échéance se
+  // met à jour tant que l'utilisateur ne l'a pas modifiée à la main.
+  function handlePriorityChange(priority) {
     setForm((prev) => ({
       ...prev,
-      priority: suggestion.overall_priority || prev.priority,
-      severity: suggestion.overall_priority || prev.severity,
+      priority,
+      severity: priority,
+      due_date: !dueDateTouched && priorityDelays ? addDaysToToday(priorityDelays[priority]) : prev.due_date,
+    }));
+  }
+
+  function handleAiGenerated(suggestion) {
+    if (suggestion.overall_priority) handlePriorityChange(suggestion.overall_priority);
+    setForm((prev) => ({
+      ...prev,
       root_cause: suggestion.root_causes?.length ? suggestion.root_causes.map((c) => `- ${c}`).join('\n') : prev.root_cause,
       preventive_action: suggestion.preventive_actions?.length
         ? suggestion.preventive_actions.map((a) => `- ${a}`).join('\n')
@@ -257,10 +280,10 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, onClose,
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
               <select
                 value={form.priority}
-                onChange={(e) => updateField('priority', e.target.value)}
+                onChange={(e) => handlePriorityChange(e.target.value)}
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               >
                 {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
@@ -271,11 +294,21 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, onClose,
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Échéance</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">
+                Échéance
+                {!dueDateTouched && (
+                  <span className="ml-1 font-normal text-slate-400">
+                    (délai suggéré : {getDelayDays(form.priority, priorityDelays) ?? '—'} jours)
+                  </span>
+                )}
+              </label>
               <input
                 type="date"
                 value={form.due_date}
-                onChange={(e) => updateField('due_date', e.target.value)}
+                onChange={(e) => {
+                  setDueDateTouched(true);
+                  updateField('due_date', e.target.value);
+                }}
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
@@ -365,6 +398,7 @@ export default function ManagementReviewDetail() {
   const [review, setReview] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
+  const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -394,6 +428,7 @@ export default function ManagementReviewDetail() {
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
+    api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -661,6 +696,7 @@ export default function ManagementReviewDetail() {
           action={capaModalAction}
           users={users}
           services={services}
+          priorityDelays={priorityDelays}
           onClose={() => setCapaModalAction(null)}
           onCreated={(capa) => handleCapaCreated(capaModalAction, capa)}
         />
