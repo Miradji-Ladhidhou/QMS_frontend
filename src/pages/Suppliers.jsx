@@ -246,7 +246,7 @@ export default function Suppliers() {
         contact: supplier.contact_name || '',
         next_evaluation_date: formatDate(supplier.next_evaluation_date),
       }));
-      await exportToPdf(`fournisseurs-${new Date().toISOString().slice(0, 10)}.pdf`, 'Fournisseurs', columns, rows, {
+      await exportToPdf(`fournisseurs-${new Date().toISOString().slice(0, 10)}.pdf`, 'Évaluation fournisseurs', columns, rows, {
         subtitle: `${suppliers.length} fournisseur${suppliers.length > 1 ? 's' : ''}`,
       });
     } catch {
@@ -259,7 +259,7 @@ export default function Suppliers() {
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Fournisseurs</h1>
+        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Évaluation fournisseurs</h1>
         <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"

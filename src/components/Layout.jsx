@@ -57,7 +57,7 @@ const NAV_ITEMS = [
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   { to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
   { to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
-  { to: '/suppliers', label: 'Fournisseurs', icon: Truck },
+  { to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
   { to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
   { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
