@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Download, Plus, Sparkles, X } from 'lucide-react';
+import { ChevronRight, Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
@@ -407,6 +408,8 @@ export default function Capas() {
   const [isChoiceModalOpen, setIsChoiceModalOpen] = useState(false);
   const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -483,6 +486,36 @@ export default function Capas() {
     exportToCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro', width: 0.11 },
+        { key: 'title', label: 'Objet', width: 0.28 },
+        { key: 'priority', label: 'Gravité', width: 0.11 },
+        { key: 'status', label: 'Statut', width: 0.13 },
+        { key: 'due_date', label: 'Échéance', width: 0.13 },
+        { key: 'assigned', label: 'Responsable', width: 0.24 },
+      ];
+      const rows = capas.map((capa) => ({
+        number: capa.number,
+        title: capa.title,
+        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
+        due_date: formatDate(capa.due_date),
+        assigned: capa.assigned?.full_name || '',
+      }));
+      await exportToPdf(`capa-${new Date().toISOString().slice(0, 10)}.pdf`, 'CAPA', columns, rows, {
+        subtitle: `${capas.length} CAPA`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   function handleCreated(newCapa) {
     setCapas((prev) => [newCapa, ...prev]);
     setIsModalOpen(false);
@@ -524,6 +557,15 @@ export default function Capas() {
           </button>
           <button
             type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || capas.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          <button
+            type="button"
             onClick={() => setIsChoiceModalOpen(true)}
             className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
           >
@@ -541,6 +583,9 @@ export default function Capas() {
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {loading ? (

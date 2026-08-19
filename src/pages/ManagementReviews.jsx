@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
 
 function formatDate(dateStr) {
@@ -108,6 +111,8 @@ export default function ManagementReviews() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   useEffect(() => {
     api
@@ -122,24 +127,84 @@ export default function ManagementReviews() {
     navigate(`/management-reviews/${review.id}`);
   }
 
+  function handleExportCsv() {
+    const headers = ['Titre', 'Date de revue', 'Statut', 'Participants'];
+    const rows = reviews.map((review) => [
+      review.title,
+      formatDate(review.review_date),
+      REVIEW_STATUS_LABELS[review.status] || review.status,
+      review.participants || '',
+    ]);
+    exportToCsv(`revues-direction-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre', width: 0.36 },
+        { key: 'review_date', label: 'Date de revue', width: 0.18 },
+        { key: 'status', label: 'Statut', width: 0.18 },
+        { key: 'participants', label: 'Participants', width: 0.28 },
+      ];
+      const rows = reviews.map((review) => ({
+        title: review.title,
+        review_date: formatDate(review.review_date),
+        status: REVIEW_STATUS_LABELS[review.status] || review.status,
+        participants: review.participants || '',
+      }));
+      await exportToPdf(`revues-direction-${new Date().toISOString().slice(0, 10)}.pdf`, 'Revues de direction', columns, rows, {
+        subtitle: `${reviews.length} revue${reviews.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Revues de direction</h1>
-        {canManage && (
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            onClick={handleExportCsv}
+            disabled={reviews.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
-            <Plus size={18} />
-            Nouvelle revue
+            <Download size={18} />
+            Exporter CSV
           </button>
-        )}
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || reviews.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              <Plus size={18} />
+              Nouvelle revue
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {loading ? (

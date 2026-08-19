@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import SearchSnippet from '../components/SearchSnippet.jsx';
@@ -171,6 +172,8 @@ export default function Documents() {
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -280,6 +283,36 @@ export default function Documents() {
     exportToCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro', width: 0.13 },
+        { key: 'title', label: 'Titre', width: 0.34 },
+        { key: 'category', label: 'Catégorie', width: 0.18 },
+        { key: 'version', label: 'Version', width: 0.09 },
+        { key: 'status', label: 'Statut', width: 0.13 },
+        { key: 'review_date', label: 'Révision', width: 0.13 },
+      ];
+      const rows = filteredDocuments.map((doc) => ({
+        number: doc.number,
+        title: doc.title,
+        category: doc.category?.name || '',
+        version: doc.version,
+        status: STATUS_LABELS[doc.status] || doc.status,
+        review_date: formatDate(doc.review_date),
+      }));
+      await exportToPdf(`documents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Documents', columns, rows, {
+        subtitle: `${filteredDocuments.length} document${filteredDocuments.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -296,6 +329,15 @@ export default function Documents() {
           </button>
           <button
             type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || filteredDocuments.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          <button
+            type="button"
             onClick={() => setIsModalOpen(true)}
             className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
           >
@@ -304,6 +346,9 @@ export default function Documents() {
           </button>
         </div>
       </div>
+      {exportPdfError && (
+        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">

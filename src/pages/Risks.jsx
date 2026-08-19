@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -12,6 +12,8 @@ import {
   riskLevel,
   RISK_LEVEL_CELL_STYLES,
 } from '../lib/riskStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
 import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
 
@@ -283,6 +285,8 @@ export default function Risks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -316,24 +320,91 @@ export default function Risks() {
     navigate(`/risks/${risk.id}`);
   }
 
+  function handleExportCsv() {
+    const headers = ['Titre', 'Type', 'Catégorie', 'Statut', 'Score', 'Responsable', 'Prochaine revue'];
+    const rows = risks.map((risk) => [
+      risk.title,
+      RISK_TYPE_LABELS[risk.type] || risk.type,
+      risk.category || '',
+      RISK_STATUS_LABELS[risk.status] || risk.status,
+      risk.risk_score ?? '',
+      risk.owner_user?.full_name || '',
+      formatDate(risk.review_date),
+    ]);
+    exportToCsv(`risques-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre', width: 0.3 },
+        { key: 'type', label: 'Type', width: 0.14 },
+        { key: 'status', label: 'Statut', width: 0.14 },
+        { key: 'score', label: 'Score', width: 0.1 },
+        { key: 'owner', label: 'Responsable', width: 0.16 },
+        { key: 'review_date', label: 'Revue', width: 0.16 },
+      ];
+      const rows = risks.map((risk) => ({
+        title: risk.title,
+        type: RISK_TYPE_LABELS[risk.type] || risk.type,
+        status: RISK_STATUS_LABELS[risk.status] || risk.status,
+        score: risk.risk_score ?? '',
+        owner: risk.owner_user?.full_name || '',
+        review_date: formatDate(risk.review_date),
+      }));
+      await exportToPdf(`risques-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des risques', columns, rows, {
+        subtitle: `${risks.length} risque${risks.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Registre des risques</h1>
-        {canManage && (
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            onClick={handleExportCsv}
+            disabled={risks.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
-            <Plus size={18} />
-            Nouveau risque
+            <Download size={18} />
+            Exporter CSV
           </button>
-        )}
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || risks.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              <Plus size={18} />
+              Nouveau risque
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {!loading && risks.length > 0 && (

@@ -10,6 +10,7 @@ import {
   Filter,
   FileText,
   GraduationCap,
+  Loader2,
   Pencil,
   Plus,
   Trash2,
@@ -17,6 +18,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
@@ -218,6 +220,8 @@ export default function Planning() {
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadPlanning(serviceIds) {
     setError('');
@@ -331,6 +335,32 @@ export default function Planning() {
     exportToCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'date', label: 'Date', width: 0.15 },
+        { key: 'type', label: 'Type', width: 0.2 },
+        { key: 'title', label: 'Titre', width: 0.5 },
+        { key: 'overdue', label: 'En retard', width: 0.15 },
+      ];
+      const rows = items.map((item) => ({
+        date: item.date,
+        type: TYPE_CONFIG[item.type].label,
+        title: item.title,
+        overdue: item.is_overdue ? 'Oui' : 'Non',
+      }));
+      await exportToPdf(`planning-${new Date().toISOString().slice(0, 10)}.pdf`, 'Planning', columns, rows, {
+        subtitle: `${items.length} élément${items.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -344,6 +374,15 @@ export default function Planning() {
           >
             <Download size={18} />
             Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || items.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
           </button>
           <button
             type="button"
@@ -361,6 +400,9 @@ export default function Planning() {
           <AlertTriangle size={16} />
           {error}
         </p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {canFilterByService && (

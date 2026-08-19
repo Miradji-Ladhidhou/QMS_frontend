@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 
 function formatDate(dateStr) {
@@ -173,6 +175,8 @@ export default function Audits() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -203,20 +207,84 @@ export default function Audits() {
     navigate(`/audits/${audit.id}`);
   }
 
+  function handleExportCsv() {
+    const headers = ['Titre', 'Type', 'Statut', 'Service', 'Auditeur', 'Date planifiée', 'Date réalisée'];
+    const rows = audits.map((audit) => [
+      audit.title,
+      AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
+      AUDIT_STATUS_LABELS[audit.status] || audit.status,
+      audit.service?.name || '',
+      audit.lead?.full_name || '',
+      formatDate(audit.planned_date),
+      formatDate(audit.completed_date),
+    ]);
+    exportToCsv(`audits-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre', width: 0.32 },
+        { key: 'type', label: 'Type', width: 0.16 },
+        { key: 'status', label: 'Statut', width: 0.14 },
+        { key: 'service', label: 'Service', width: 0.16 },
+        { key: 'auditor', label: 'Auditeur', width: 0.1 },
+        { key: 'planned_date', label: 'Date', width: 0.12 },
+      ];
+      const rows = audits.map((audit) => ({
+        title: audit.title,
+        type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
+        status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
+        service: audit.service?.name || '',
+        auditor: audit.lead?.full_name || '',
+        planned_date: formatDate(audit.planned_date),
+      }));
+      await exportToPdf(`audits-${new Date().toISOString().slice(0, 10)}.pdf`, 'Audits internes', columns, rows, {
+        subtitle: `${audits.length} audit${audits.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Audits internes</h1>
-        {canManage && (
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            onClick={handleExportCsv}
+            disabled={audits.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
-            <Plus size={18} />
-            Nouvel audit
+            <Download size={18} />
+            Exporter CSV
           </button>
-        )}
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || audits.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              <Plus size={18} />
+              Nouvel audit
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-4">
@@ -236,6 +304,9 @@ export default function Audits() {
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {loading ? (

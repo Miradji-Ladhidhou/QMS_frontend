@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Download, Grid3x3, Pencil, Plus, Trash2, UserCheck, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Grid3x3, Loader2, Pencil, Plus, Trash2, UserCheck, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
@@ -400,6 +401,8 @@ export default function Trainings() {
   const [editingTraining, setEditingTraining] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -504,6 +507,36 @@ export default function Trainings() {
     exportToCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'training', label: 'Formation', width: 0.3 },
+        { key: 'type', label: 'Type', width: 0.15 },
+        { key: 'person', label: 'Personne', width: 0.25 },
+        { key: 'status', label: 'Statut', width: 0.13 },
+        { key: 'completed_at', label: 'Réalisation', width: 0.17 },
+      ];
+      const rows = trainings.flatMap((training) =>
+        training.records.map((record) => ({
+          training: training.title,
+          type: training.type || '',
+          person: personName(record),
+          status: record.employee_id ? 'Sans compte' : 'Compte',
+          completed_at: formatDate(record.completed_at),
+        }))
+      );
+      await exportToPdf(`formations-${new Date().toISOString().slice(0, 10)}.pdf`, 'Formations', columns, rows, {
+        subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   const hasAnyRecord = trainings.some((training) => training.records.length > 0);
 
   return (
@@ -519,6 +552,15 @@ export default function Trainings() {
           >
             <Download size={18} />
             Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || !hasAnyRecord}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
           </button>
           <Link
             to="/trainings/matrix"
@@ -540,6 +582,9 @@ export default function Trainings() {
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {loading ? (

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 
@@ -208,6 +210,8 @@ export default function Complaints() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -238,18 +242,82 @@ export default function Complaints() {
     navigate(`/complaints/${complaint.id}`);
   }
 
+  function handleExportCsv() {
+    const headers = ['Client', 'Description', 'Gravité', 'Statut', 'Date de réception', 'Échéance de réponse', 'Assigné'];
+    const rows = complaints.map((complaint) => [
+      complaint.customer_name,
+      complaint.description || '',
+      CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
+      COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
+      formatDate(complaint.received_date),
+      formatDate(complaint.due_date),
+      complaint.assigned?.full_name || '',
+    ]);
+    exportToCsv(`reclamations-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'customer_name', label: 'Client', width: 0.2 },
+        { key: 'description', label: 'Description', width: 0.32 },
+        { key: 'severity', label: 'Gravité', width: 0.12 },
+        { key: 'status', label: 'Statut', width: 0.14 },
+        { key: 'due_date', label: 'Échéance', width: 0.12 },
+        { key: 'assigned', label: 'Assigné', width: 0.1 },
+      ];
+      const rows = complaints.map((complaint) => ({
+        customer_name: complaint.customer_name,
+        description: complaint.description || '',
+        severity: CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
+        status: COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
+        due_date: formatDate(complaint.due_date),
+        assigned: complaint.assigned?.full_name || '',
+      }));
+      await exportToPdf(`reclamations-${new Date().toISOString().slice(0, 10)}.pdf`, 'Réclamations clients', columns, rows, {
+        subtitle: `${complaints.length} réclamation${complaints.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Réclamations clients</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouvelle réclamation
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={complaints.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || complaints.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            <Plus size={18} />
+            Nouvelle réclamation
+          </button>
+        </div>
       </div>
 
       <div className="mt-4">
@@ -269,6 +337,9 @@ export default function Complaints() {
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {loading ? (

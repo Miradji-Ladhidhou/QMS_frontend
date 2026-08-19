@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SUPPLIER_STATUS_LABELS } from '../lib/supplierStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf } from '../lib/pdfExport.js';
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 
@@ -181,6 +183,8 @@ export default function Suppliers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -209,20 +213,83 @@ export default function Suppliers() {
     navigate(`/suppliers/${supplier.id}`);
   }
 
+  function handleExportCsv() {
+    const headers = ['Nom', 'Catégorie', 'Criticité', 'Statut', 'Contact', 'Prochaine évaluation'];
+    const rows = suppliers.map((supplier) => [
+      supplier.name,
+      supplier.category || '',
+      CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
+      SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
+      supplier.contact_name || '',
+      formatDate(supplier.next_evaluation_date),
+    ]);
+    exportToCsv(`fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'name', label: 'Nom', width: 0.24 },
+        { key: 'category', label: 'Catégorie', width: 0.2 },
+        { key: 'criticality', label: 'Criticité', width: 0.14 },
+        { key: 'status', label: 'Statut', width: 0.14 },
+        { key: 'contact', label: 'Contact', width: 0.14 },
+        { key: 'next_evaluation_date', label: 'Prochaine éval.', width: 0.14 },
+      ];
+      const rows = suppliers.map((supplier) => ({
+        name: supplier.name,
+        category: supplier.category || '',
+        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
+        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
+        contact: supplier.contact_name || '',
+        next_evaluation_date: formatDate(supplier.next_evaluation_date),
+      }));
+      await exportToPdf(`fournisseurs-${new Date().toISOString().slice(0, 10)}.pdf`, 'Fournisseurs', columns, rows, {
+        subtitle: `${suppliers.length} fournisseur${suppliers.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Fournisseurs</h1>
-        {canManage && (
+        <div className="flex flex-col gap-2 sm:flex-row">
           <button
             type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            onClick={handleExportCsv}
+            disabled={suppliers.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
-            <Plus size={18} />
-            Nouveau fournisseur
+            <Download size={18} />
+            Exporter CSV
           </button>
-        )}
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || suppliers.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              <Plus size={18} />
+              Nouveau fournisseur
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="mt-4">
@@ -242,6 +309,9 @@ export default function Suppliers() {
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportPdfError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
 
       {loading ? (
