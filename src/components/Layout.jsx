@@ -41,23 +41,25 @@ function initialsOf(fullName) {
     .join('');
 }
 
-// Libellés courts et cohérents (un nom, rarement deux) — le titre complet de chaque page
-// (ex. "Audits internes", "Registre des risques", "Revue de direction") reste affiché en h1
-// sur la page elle-même ; le menu n'a besoin que d'identifier le module en un coup d'œil.
+// Chaque libellé reprend exactement le h1 affiché sur la page correspondante (voir
+// Audits.jsx, Risks.jsx, ManagementReviews.jsx, Complaints.jsx, MyApprovals.jsx...) : un nom
+// seul ("Audits", "Risques", "Revues") ne dit pas ce que la page fait, alors que son propre
+// titre a déjà été choisi pour être clair — le menu doit rester cohérent avec lui plutôt que
+// d'en inventer une version raccourcie et plus ambiguë.
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/planning', label: 'Planning', icon: CalendarClock },
   { to: '/documents', label: 'Documents', icon: FileText },
   { to: '/capas', label: 'CAPA', icon: ClipboardList },
-  { to: '/complaints', label: 'Réclamations', icon: MessageSquareWarning },
+  { to: '/complaints', label: 'Réclamations clients', icon: MessageSquareWarning },
   { to: '/trainings', label: 'Formations', icon: GraduationCap },
   { to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
-  { to: '/audits', label: 'Audits', icon: ClipboardCheck },
-  { to: '/risks', label: 'Risques', icon: ShieldAlert },
+  { to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
+  { to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
   { to: '/suppliers', label: 'Fournisseurs', icon: Truck },
-  { to: '/management-reviews', label: 'Revues', icon: Users2 },
-  { to: '/my-approvals', label: 'Approbations', icon: CheckSquare },
+  { to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
+  { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
   { to: '/services', label: 'Services', icon: Wrench, adminOnly: true },
   { to: '/employees', label: 'Personnel', icon: Contact, adminOnly: true },
