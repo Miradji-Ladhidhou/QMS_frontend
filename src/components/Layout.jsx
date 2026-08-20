@@ -94,13 +94,13 @@ export default function Layout() {
   return (
     <div className="min-h-screen bg-slate-50 md:flex">
       <header className="sticky top-0 z-30 flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
-        <div className="flex items-center gap-2">
+        <div className="flex min-w-0 items-center gap-2">
           {logoUrl && (
             <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded bg-white/10 object-contain p-0.5" />
           )}
           <span className="truncate text-lg font-semibold">{tenant?.name || 'QMS SaaS'}</span>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <NotificationBell variant="mobile" />
           <button type="button" onClick={() => setIsMenuOpen(true)} aria-label="Ouvrir le menu" className="-mr-2 p-2">
             <Menu size={24} />
@@ -111,18 +111,18 @@ export default function Layout() {
       {isMenuOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMenu} />}
 
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col overflow-y-auto bg-primary text-white transition-transform duration-200 ease-in-out md:sticky md:top-0 md:h-screen md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col overflow-y-auto overflow-x-hidden bg-primary text-white transition-transform duration-200 ease-in-out md:sticky md:top-0 md:h-screen md:translate-x-0 ${
           isMenuOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex items-center justify-between px-6 py-5">
-          <div className="flex items-center gap-2">
+          <div className="flex min-w-0 items-center gap-2">
             {logoUrl && (
               <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 rounded bg-white/10 object-contain p-0.5" />
             )}
             <span className="truncate text-xl font-semibold">{tenant?.name || 'QMS SaaS'}</span>
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex shrink-0 items-center gap-1">
             <div className="hidden md:block">
               <NotificationBell variant="sidebar" />
             </div>

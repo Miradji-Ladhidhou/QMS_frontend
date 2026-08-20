@@ -107,7 +107,7 @@ export default function NotificationBell({ variant = 'sidebar' }) {
           {visibleNotifications.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-slate-500">Aucune notification.</p>
           ) : (
-            <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto">
+            <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto overflow-x-hidden">
               {visibleNotifications.map((notification) => (
                 <li key={notification.id}>
                   <Link

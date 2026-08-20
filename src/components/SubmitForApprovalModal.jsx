@@ -34,7 +34,7 @@ export default function SubmitForApprovalModal({ documentId, users, onClose, onS
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Soumettre pour approbation</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -52,7 +52,7 @@ export default function SubmitForApprovalModal({ documentId, users, onClose, onS
             {users.length === 0 ? (
               <p className="text-sm text-slate-500">Aucun autre utilisateur dans l'entreprise.</p>
             ) : (
-              <ul className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
+              <ul className="max-h-64 space-y-1 overflow-y-auto overflow-x-hidden rounded-md border border-slate-200 p-2">
                 {users.map((user) => (
                   <li key={user.id}>
                     <label className="flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-slate-50">

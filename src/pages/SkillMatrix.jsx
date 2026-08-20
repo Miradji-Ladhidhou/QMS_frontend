@@ -155,9 +155,9 @@ export default function SkillMatrix() {
           <table className="text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="sticky left-0 z-10 bg-slate-50 px-4 py-3">Personnel</th>
+                <th className="sticky left-0 z-10 max-w-[110px] bg-slate-50 px-3 py-3 sm:max-w-none sm:px-4">Personnel</th>
                 {matrix.map((entry) => (
-                  <th key={entry.training.id} className="min-w-[140px] px-4 py-3">
+                  <th key={entry.training.id} className="min-w-[110px] whitespace-nowrap px-3 py-3 sm:px-4">
                     {entry.training.title}
                   </th>
                 ))}
@@ -166,10 +166,13 @@ export default function SkillMatrix() {
             <tbody className="divide-y divide-slate-100">
               {people.map((person) => (
                 <tr key={person.id}>
-                  <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-4 py-3 font-medium text-slate-800">
+                  <td
+                    title={person.full_name}
+                    className="sticky left-0 z-10 max-w-[110px] truncate bg-white px-3 py-3 font-medium text-slate-800 sm:max-w-none sm:whitespace-nowrap sm:px-4"
+                  >
                     {person.full_name}
                     {person.kind === 'employee' && (
-                      <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                      <span className="ml-1.5 hidden rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 sm:inline">
                         Sans compte
                       </span>
                     )}
@@ -180,7 +183,7 @@ export default function SkillMatrix() {
                     const Icon = CELL_ICONS[status];
                     const dateLabel = cellDateLabel(cell);
                     return (
-                      <td key={entry.training.id} className="px-4 py-3">
+                      <td key={entry.training.id} className="px-3 py-3 sm:px-4">
                         <div className="flex flex-col items-center gap-1">
                           <span
                             title={TRAINING_STATUS_LABELS[status]}

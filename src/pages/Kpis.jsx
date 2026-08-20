@@ -358,7 +358,7 @@ function KpiFormModal({ kpi, folderId, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">{isEditing ? 'Modifier le KPI' : 'Nouveau KPI'}</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -1233,7 +1233,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Importer un fichier</h2>
@@ -1389,7 +1389,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                 )}
 
                 {!loadingRecent && recentImports?.length > 0 && (
-                  <div className="max-h-72 space-y-2 overflow-y-auto">
+                  <div className="max-h-72 space-y-2 overflow-y-auto overflow-x-hidden">
                     {recentImports.map((imp) => (
                       <button
                         key={imp.id}
@@ -1706,7 +1706,7 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">
@@ -1987,7 +1987,7 @@ function RecordProofModal({ kpi, record, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Détail du calcul</h2>
@@ -2778,7 +2778,7 @@ function MoveKpiModal({ kpi, onClose, onMoved }) {
 
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={setPickerFolderId} />
 
-        <div className="mt-3 flex-1 overflow-y-auto rounded-md border border-slate-100">
+        <div className="mt-3 flex-1 overflow-y-auto overflow-x-hidden rounded-md border border-slate-100">
           {loadingFolders ? (
             <p className="py-6 text-center text-sm text-slate-400">Chargement...</p>
           ) : folders.length === 0 ? (
