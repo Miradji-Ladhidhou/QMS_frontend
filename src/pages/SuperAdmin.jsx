@@ -1,6 +1,25 @@
 import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Activity, ArrowLeft, Ban, Building2, CheckCircle2, History, ShieldCheck, Users, X, XCircle } from 'lucide-react';
+import {
+  Activity,
+  ArrowLeft,
+  Ban,
+  Building2,
+  CheckCircle2,
+  Cloud,
+  Database,
+  Download,
+  History,
+  Pencil,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  UserPlus,
+  Users,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -11,7 +30,19 @@ const MUTED_COLOR = '#94a3b8';
 
 const PLAN_LABELS = { free: 'Free', starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise' };
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', member: 'Membre' };
-const ACTION_LABELS = { tenant_suspended: 'Tenant suspendu', tenant_reactivated: 'Tenant réactivé' };
+const ACTION_LABELS = {
+  tenant_suspended: 'Tenant suspendu',
+  tenant_reactivated: 'Tenant réactivé',
+  tenant_created: 'Tenant créé',
+  tenant_updated: 'Tenant modifié',
+  tenant_deleted: 'Tenant supprimé',
+  user_created: 'Utilisateur créé',
+  user_updated: 'Utilisateur modifié',
+  user_deleted: 'Utilisateur supprimé',
+  db_backup_created: 'Sauvegarde créée',
+  db_backup_downloaded: 'Sauvegarde téléchargée',
+  db_restored_from_drive: 'Base restaurée depuis Google Drive',
+};
 const MODULE_LABELS = {
   documents: 'Documents',
   capas: 'CAPA',
@@ -26,6 +57,7 @@ const TABS = [
   { id: 'tenants', label: 'Tenants' },
   { id: 'stats', label: 'Statistiques' },
   { id: 'audit', label: "Journal d'audit" },
+  { id: 'system', label: 'Système' },
 ];
 
 function formatDate(dateStr) {
@@ -108,15 +140,378 @@ function HealthWidget() {
   );
 }
 
-function TenantDetailModal({ tenantId, onClose, onToggleSuspend, togglingId }) {
+function ModalShell({ title, onClose, children }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+// Remplace window.confirm()/window.prompt() : certains contextes (webview mobile, PWA
+// installée) ne les supportent pas du tout et lèvent une exception (constaté en pratique sur
+// la suppression de tenant). Une modale maison fonctionne partout où React fonctionne.
+function ConfirmModal({ title, message, confirmLabel = 'Confirmer', danger = true, onConfirm, onClose }) {
+  const [busy, setBusy] = useState(false);
+
+  async function handleConfirm() {
+    setBusy(true);
+    await onConfirm();
+    setBusy(false);
+  }
+
+  return (
+    <ModalShell title={title} onClose={onClose}>
+      <p className="whitespace-pre-line text-sm text-slate-600">{message}</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={busy}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium text-white disabled:opacity-60 ${
+            danger ? 'bg-red-600 hover:bg-red-700' : 'bg-primary hover:bg-primary-700'
+          }`}
+        >
+          {busy ? '...' : confirmLabel}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+// Confirmation renforcée pour une suppression à fort impact (tenant entier) : le nom exact
+// doit être retapé, pas juste un clic — plus dur à déclencher par erreur qu'un simple confirm.
+function ConfirmTypedModal({ title, message, expectedText, onConfirm, onClose }) {
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const matches = typed === expectedText;
+
+  async function handleConfirm() {
+    if (!matches) return;
+    setBusy(true);
+    await onConfirm();
+    setBusy(false);
+  }
+
+  return (
+    <ModalShell title={title} onClose={onClose}>
+      <p className="whitespace-pre-line text-sm text-slate-600">{message}</p>
+      <p className="mt-3 text-xs font-medium text-slate-500">
+        Tape <span className="font-semibold text-slate-800">{expectedText}</span> pour confirmer :
+      </p>
+      <input
+        type="text"
+        value={typed}
+        onChange={(event) => setTyped(event.target.value)}
+        className="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-red-400 focus:outline-none"
+        autoFocus
+      />
+      <div className="mt-4 flex justify-end gap-2">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Annuler
+        </button>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={!matches || busy}
+          className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {busy ? '...' : 'Supprimer définitivement'}
+        </button>
+      </div>
+    </ModalShell>
+  );
+}
+
+function CreateTenantModal({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [plan, setPlan] = useState('free');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      const { data } = await api.post('/super-admin/tenants', { name, plan });
+      onCreated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer ce tenant.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <ModalShell title="Nouveau tenant" onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Nom de l'entreprise</label>
+          <input
+            type="text"
+            required
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Plan</label>
+          <select
+            value={plan}
+            onChange={(event) => setPlan(event.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+          >
+            {Object.entries(PLAN_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          type="submit"
+          disabled={saving}
+          className="w-full rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+        >
+          {saving ? 'Création...' : 'Créer le tenant'}
+        </button>
+      </form>
+    </ModalShell>
+  );
+}
+
+function InviteUserForm({ tenantId, onCreated }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [role, setRole] = useState('member');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSaving(true);
+    try {
+      await api.post(`/super-admin/tenants/${tenantId}/users`, { email, full_name: fullName, role });
+      setEmail('');
+      setFullName('');
+      setRole('member');
+      setOpen(false);
+      onCreated();
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'inviter cet utilisateur.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+      >
+        <UserPlus size={14} />
+        Inviter un utilisateur
+      </button>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+      {error && <p className="rounded-md border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-600">{error}</p>}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        <input
+          type="text"
+          required
+          placeholder="Nom complet"
+          value={fullName}
+          onChange={(event) => setFullName(event.target.value)}
+          className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+        />
+        <input
+          type="email"
+          required
+          placeholder="Email"
+          value={email}
+          onChange={(event) => setEmail(event.target.value)}
+          className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+        />
+      </div>
+      <select
+        value={role}
+        onChange={(event) => setRole(event.target.value)}
+        className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+      >
+        {Object.entries(ROLE_LABELS).map(([value, label]) => (
+          <option key={value} value={value}>
+            {label}
+          </option>
+        ))}
+      </select>
+      <div className="flex gap-2">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+        >
+          {saving ? 'Envoi...' : "Envoyer l'invitation"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+        >
+          Annuler
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function UserRow({ user, currentUserId, onUpdate, onDelete }) {
+  const [editing, setEditing] = useState(false);
+  const [role, setRole] = useState(user.role);
+  const [isActive, setIsActive] = useState(user.is_active);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(user.is_super_admin);
+  const [saving, setSaving] = useState(false);
+  const isSelf = user.id === currentUserId;
+
+  async function handleSave() {
+    setSaving(true);
+    const ok = await onUpdate(user.id, { role, is_active: isActive, is_super_admin: isSuperAdmin });
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+
+  if (editing) {
+    return (
+      <li className="space-y-2 px-3 py-2.5">
+        <p className="text-sm font-medium text-slate-800">{user.full_name}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={role}
+            onChange={(event) => setRole(event.target.value)}
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:border-primary focus:outline-none"
+          >
+            {Object.entries(ROLE_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
+          <label className="flex items-center gap-1 text-xs text-slate-600">
+            <input type="checkbox" checked={isActive} disabled={isSelf} onChange={(event) => setIsActive(event.target.checked)} />
+            Actif
+          </label>
+          <label className="flex items-center gap-1 text-xs text-slate-600">
+            <input
+              type="checkbox"
+              checked={isSuperAdmin}
+              disabled={isSelf}
+              onChange={(event) => setIsSuperAdmin(event.target.checked)}
+            />
+            Super admin
+          </label>
+          <div className="ml-auto flex gap-1.5">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-md bg-primary px-2.5 py-1 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+            >
+              {saving ? '...' : 'Enregistrer'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditing(false)}
+              className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+            >
+              Annuler
+            </button>
+          </div>
+        </div>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
+      <span className="text-slate-800">
+        {user.full_name}
+        {user.is_super_admin && (
+          <span className="ml-1.5 rounded-full bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700">
+            Super admin
+          </span>
+        )}
+      </span>
+      <span className="flex items-center gap-2 text-xs text-slate-500">
+        {ROLE_LABELS[user.role] || user.role}
+        {!user.is_active && <span className="text-red-500">Inactif</span>}
+        <button type="button" onClick={() => setEditing(true)} className="p-1 text-slate-400 hover:text-slate-700" aria-label="Modifier">
+          <Pencil size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={() => onDelete(user)}
+          disabled={isSelf}
+          className="p-1 text-slate-400 hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-30"
+          aria-label="Supprimer"
+        >
+          <Trash2 size={14} />
+        </button>
+      </span>
+    </li>
+  );
+}
+
+function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, onDeleted, togglingId }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
+  const [editingTenant, setEditingTenant] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editPlan, setEditPlan] = useState('free');
+  const [savingTenant, setSavingTenant] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [showDeleteTenant, setShowDeleteTenant] = useState(false);
+  const [pendingDeleteUser, setPendingDeleteUser] = useState(null);
 
-  useEffect(() => {
-    api
+  function load() {
+    return api
       .get(`/super-admin/tenants/${tenantId}`)
       .then(({ data }) => setDetail(data))
       .catch(() => setError('Impossible de charger la fiche de ce tenant.'));
+  }
+
+  useEffect(() => {
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tenantId]);
 
   // onToggleSuspend renvoie le tenant à jour (voir handleToggleSuspend) : sans réappliquer
@@ -129,9 +524,73 @@ function TenantDetailModal({ tenantId, onClose, onToggleSuspend, togglingId }) {
     }
   }
 
+  function startEditTenant() {
+    setEditName(detail.tenant.name);
+    setEditSlug(detail.tenant.slug);
+    setEditPlan(detail.tenant.plan);
+    setEditingTenant(true);
+  }
+
+  async function handleSaveTenant(event) {
+    event.preventDefault();
+    setActionError('');
+    setSavingTenant(true);
+    try {
+      const { data } = await api.patch(`/super-admin/tenants/${tenantId}`, {
+        name: editName,
+        slug: editSlug,
+        plan: editPlan,
+      });
+      setDetail((prev) => ({ ...prev, tenant: { ...prev.tenant, ...data } }));
+      setEditingTenant(false);
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Impossible de modifier ce tenant.');
+    } finally {
+      setSavingTenant(false);
+    }
+  }
+
+  async function confirmDeleteTenant() {
+    setDeleting(true);
+    setActionError('');
+    try {
+      await api.delete(`/super-admin/tenants/${tenantId}`);
+      onDeleted(tenantId);
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Impossible de supprimer ce tenant.');
+      setDeleting(false);
+      setShowDeleteTenant(false);
+    }
+  }
+
+  async function handleUpdateUser(userId, update) {
+    setActionError('');
+    try {
+      await api.patch(`/super-admin/users/${userId}`, update);
+      await load();
+      return true;
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Impossible de modifier cet utilisateur.');
+      return false;
+    }
+  }
+
+  async function confirmDeleteUser() {
+    setActionError('');
+    try {
+      await api.delete(`/super-admin/users/${pendingDeleteUser.id}`);
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Impossible de supprimer cet utilisateur.');
+    }
+    setPendingDeleteUser(null);
+  }
+
+  const isOwnTenant = detail?.users.some((u) => u.id === currentUserId) ?? false;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">{detail?.tenant.name || 'Fiche tenant'}</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -140,41 +599,113 @@ function TenantDetailModal({ tenantId, onClose, onToggleSuspend, togglingId }) {
         </div>
 
         {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        {actionError && <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{actionError}</p>}
 
         {!detail && !error && <div className="h-48 animate-pulse rounded-xl bg-slate-100" />}
 
         {detail && (
           <div className="space-y-5">
-            <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-              <span>{detail.tenant.slug}</span>
-              <span>·</span>
-              <span>{PLAN_LABELS[detail.tenant.plan] || detail.tenant.plan}</span>
-              <span>·</span>
-              <span>Créé le {formatDate(detail.tenant.created_at)}</span>
-              {detail.tenant.is_suspended ? (
-                <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                  <Ban size={12} />
-                  Suspendu
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                  <CheckCircle2 size={12} />
-                  Actif
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={handleToggle}
-                disabled={togglingId === detail.tenant.id}
-                className={`ml-auto rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
-                  detail.tenant.is_suspended
-                    ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
-                    : 'border-red-300 text-red-700 hover:bg-red-50'
-                }`}
-              >
-                {togglingId === detail.tenant.id ? '...' : detail.tenant.is_suspended ? 'Réactiver' : 'Suspendre'}
-              </button>
-            </div>
+            {editingTenant ? (
+              <form onSubmit={handleSaveTenant} className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-3">
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <input
+                    type="text"
+                    required
+                    value={editName}
+                    onChange={(event) => setEditName(event.target.value)}
+                    placeholder="Nom"
+                    className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+                  />
+                  <input
+                    type="text"
+                    required
+                    value={editSlug}
+                    onChange={(event) => setEditSlug(event.target.value)}
+                    placeholder="Slug"
+                    className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+                  />
+                </div>
+                <select
+                  value={editPlan}
+                  onChange={(event) => setEditPlan(event.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
+                >
+                  {Object.entries(PLAN_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    disabled={savingTenant}
+                    className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+                  >
+                    {savingTenant ? 'Enregistrement...' : 'Enregistrer'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTenant(false)}
+                    className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
+                <span>{detail.tenant.slug}</span>
+                <span>·</span>
+                <span>{PLAN_LABELS[detail.tenant.plan] || detail.tenant.plan}</span>
+                <span>·</span>
+                <span>Créé le {formatDate(detail.tenant.created_at)}</span>
+                {detail.tenant.is_suspended ? (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+                    <Ban size={12} />
+                    Suspendu
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <CheckCircle2 size={12} />
+                    Actif
+                  </span>
+                )}
+                <div className="ml-auto flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={startEditTenant}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                  >
+                    <Pencil size={13} />
+                    Modifier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleToggle}
+                    disabled={togglingId === detail.tenant.id || isOwnTenant}
+                    title={isOwnTenant ? 'Impossible de suspendre votre propre tenant' : undefined}
+                    className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                      detail.tenant.is_suspended
+                        ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+                        : 'border-red-300 text-red-700 hover:bg-red-50'
+                    }`}
+                  >
+                    {togglingId === detail.tenant.id ? '...' : detail.tenant.is_suspended ? 'Réactiver' : 'Suspendre'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteTenant(true)}
+                    disabled={deleting || isOwnTenant}
+                    title={isOwnTenant ? 'Impossible de supprimer votre propre tenant' : undefined}
+                    className="inline-flex items-center gap-1 rounded-md border border-red-300 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    <Trash2 size={13} />
+                    {deleting ? '...' : 'Supprimer'}
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -191,25 +722,15 @@ function TenantDetailModal({ tenantId, onClose, onToggleSuspend, togglingId }) {
             </div>
 
             <div>
-              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Utilisateurs ({detail.users.length})
-              </h3>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Utilisateurs ({detail.users.length})
+                </h3>
+                <InviteUserForm tenantId={tenantId} onCreated={load} />
+              </div>
               <ul className="divide-y divide-slate-100 rounded-md border border-slate-200">
                 {detail.users.map((user) => (
-                  <li key={user.id} className="flex items-center justify-between gap-2 px-3 py-2 text-sm">
-                    <span className="text-slate-800">
-                      {user.full_name}
-                      {user.is_super_admin && (
-                        <span className="ml-1.5 rounded-full bg-purple-100 px-1.5 py-0.5 text-[11px] font-medium text-purple-700">
-                          Super admin
-                        </span>
-                      )}
-                    </span>
-                    <span className="flex items-center gap-2 text-xs text-slate-500">
-                      {ROLE_LABELS[user.role] || user.role}
-                      {!user.is_active && <span className="text-red-500">Inactif</span>}
-                    </span>
-                  </li>
+                  <UserRow key={user.id} user={user} currentUserId={currentUserId} onUpdate={handleUpdateUser} onDelete={setPendingDeleteUser} />
                 ))}
               </ul>
             </div>
@@ -234,18 +755,93 @@ function TenantDetailModal({ tenantId, onClose, onToggleSuspend, togglingId }) {
           </div>
         )}
       </div>
+
+      {showDeleteTenant && detail && (
+        <ConfirmTypedModal
+          title="Supprimer ce tenant"
+          message={`Cette action supprime définitivement "${detail.tenant.name}" et TOUTES ses données (documents, CAPA, utilisateurs...). Irréversible.`}
+          expectedText={detail.tenant.name}
+          onConfirm={confirmDeleteTenant}
+          onClose={() => setShowDeleteTenant(false)}
+        />
+      )}
+
+      {pendingDeleteUser && (
+        <ConfirmModal
+          title="Supprimer cet utilisateur"
+          message={`Supprimer définitivement le compte de "${pendingDeleteUser.full_name}" ? Cette action est irréversible.`}
+          confirmLabel="Supprimer"
+          onConfirm={confirmDeleteUser}
+          onClose={() => setPendingDeleteUser(null)}
+        />
+      )}
     </div>
   );
 }
 
-function TenantRow({ tenant, onOpenDetail, onToggleSuspend, togglingId }) {
+function TenantCard({ tenant, onOpenDetail, onToggleSuspend, togglingId, currentTenantId }) {
+  const isOwnTenant = tenant.id === currentTenantId;
+  return (
+    <div
+      onClick={() => onOpenDetail(tenant.id)}
+      className={`cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${tenant.is_suspended ? 'bg-red-50/50' : ''}`}
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate font-medium text-slate-800">{tenant.name}</p>
+          <p className="truncate text-xs text-slate-400">{tenant.slug}</p>
+        </div>
+        {tenant.is_suspended ? (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+            <Ban size={12} />
+            Suspendu
+          </span>
+        ) : (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            <CheckCircle2 size={12} />
+            Actif
+          </span>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+        <span>{PLAN_LABELS[tenant.plan] || tenant.plan}</span>
+        <span className="flex items-center gap-1">
+          <Users size={12} />
+          {tenant.user_count}
+        </span>
+        <span>Créé le {formatDate(tenant.created_at)}</span>
+      </div>
+
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onToggleSuspend(tenant);
+        }}
+        disabled={togglingId === tenant.id || isOwnTenant}
+        title={isOwnTenant ? 'Impossible de suspendre votre propre tenant' : undefined}
+        className={`mt-3 w-full rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+          tenant.is_suspended
+            ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
+            : 'border-red-300 text-red-700 hover:bg-red-50'
+        }`}
+      >
+        {togglingId === tenant.id ? '...' : tenant.is_suspended ? 'Réactiver' : 'Suspendre'}
+      </button>
+    </div>
+  );
+}
+
+function TenantRow({ tenant, onOpenDetail, onToggleSuspend, togglingId, currentTenantId }) {
+  const isOwnTenant = tenant.id === currentTenantId;
   return (
     <tr className={`cursor-pointer hover:bg-slate-50 ${tenant.is_suspended ? 'bg-red-50/50' : ''}`} onClick={() => onOpenDetail(tenant.id)}>
-      <td className="px-4 py-3">
+      <td className="whitespace-nowrap px-4 py-3">
         <p className="font-medium text-slate-800">{tenant.name}</p>
         <p className="text-xs text-slate-400">{tenant.slug}</p>
       </td>
-      <td className="px-4 py-3 text-slate-600">{PLAN_LABELS[tenant.plan] || tenant.plan}</td>
+      <td className="whitespace-nowrap px-4 py-3 text-slate-600">{PLAN_LABELS[tenant.plan] || tenant.plan}</td>
       <td className="px-4 py-3 text-slate-600">
         <span className="inline-flex items-center gap-1">
           <Users size={14} />
@@ -273,8 +869,9 @@ function TenantRow({ tenant, onOpenDetail, onToggleSuspend, togglingId }) {
             event.stopPropagation();
             onToggleSuspend(tenant);
           }}
-          disabled={togglingId === tenant.id}
-          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-60 ${
+          disabled={togglingId === tenant.id || isOwnTenant}
+          title={isOwnTenant ? 'Impossible de suspendre votre propre tenant' : undefined}
+          className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
             tenant.is_suspended
               ? 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'
               : 'border-red-300 text-red-700 hover:bg-red-50'
@@ -287,12 +884,22 @@ function TenantRow({ tenant, onOpenDetail, onToggleSuspend, togglingId }) {
   );
 }
 
-function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, togglingId }) {
+function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, onCreateTenant, togglingId, currentTenantId }) {
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <Building2 size={20} className="text-slate-400" />
-        <h2 className="text-base font-semibold text-slate-900">Tenants</h2>
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Building2 size={20} className="text-slate-400" />
+          <h2 className="text-base font-semibold text-slate-900">Tenants</h2>
+        </div>
+        <button
+          type="button"
+          onClick={onCreateTenant}
+          className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700"
+        >
+          <Plus size={14} />
+          Nouveau tenant
+        </button>
       </div>
       <p className="mt-1 text-sm text-slate-500">
         Toutes les entreprises clientes de la plateforme, tous tenants confondus. Cliquez une ligne pour la fiche détaillée.
@@ -309,31 +916,51 @@ function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, to
       ) : tenants.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucun tenant pour l'instant.</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Tenant</th>
-                <th className="px-4 py-3">Plan</th>
-                <th className="px-4 py-3">Utilisateurs</th>
-                <th className="px-4 py-3">Créé le</th>
-                <th className="px-4 py-3">Statut</th>
-                <th className="px-4 py-3 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {tenants.map((tenant) => (
-                <TenantRow
-                  key={tenant.id}
-                  tenant={tenant}
-                  onOpenDetail={onOpenDetail}
-                  onToggleSuspend={onToggleSuspend}
-                  togglingId={togglingId}
-                />
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <>
+          {/* Le tableau (colonnes Plan/Utilisateurs/Créé le/Statut/Action) ne tient pas sur un
+              écran de téléphone même avec défilement horizontal : les colonnes utiles restaient
+              hors champ sans aucun indice qu'il fallait faire défiler. Cartes empilées sur
+              mobile, tableau complet à partir de md — même pattern que Documents/CAPA. */}
+          <div className="mt-4 space-y-2 md:hidden">
+            {tenants.map((tenant) => (
+              <TenantCard
+                key={tenant.id}
+                tenant={tenant}
+                onOpenDetail={onOpenDetail}
+                onToggleSuspend={onToggleSuspend}
+                togglingId={togglingId}
+                currentTenantId={currentTenantId}
+              />
+            ))}
+          </div>
+
+          <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Tenant</th>
+                  <th className="px-4 py-3">Plan</th>
+                  <th className="px-4 py-3">Utilisateurs</th>
+                  <th className="px-4 py-3">Créé le</th>
+                  <th className="px-4 py-3">Statut</th>
+                  <th className="px-4 py-3 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {tenants.map((tenant) => (
+                  <TenantRow
+                    key={tenant.id}
+                    tenant={tenant}
+                    onOpenDetail={onOpenDetail}
+                    onToggleSuspend={onToggleSuspend}
+                    togglingId={togglingId}
+                    currentTenantId={currentTenantId}
+                  />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
     </div>
   );
@@ -469,6 +1096,220 @@ function AuditTab() {
   );
 }
 
+function formatBytes(bytes) {
+  if (!bytes) return '—';
+  return `${(bytes / 1024 / 1024).toFixed(2)} Mo`;
+}
+
+function SystemTab() {
+  const [driveBackups, setDriveBackups] = useState([]);
+  const [loadingDriveBackups, setLoadingDriveBackups] = useState(false);
+  const [driveError, setDriveError] = useState('');
+  const [busyAction, setBusyAction] = useState('');
+  const [message, setMessage] = useState(null);
+  const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
+
+  function loadDriveBackups() {
+    setLoadingDriveBackups(true);
+    setDriveError('');
+    api
+      .get('/super-admin/drive-backups')
+      .then(({ data }) => setDriveBackups(data))
+      .catch(() => setDriveError('Impossible de charger les sauvegardes Google Drive.'))
+      .finally(() => setLoadingDriveBackups(false));
+  }
+
+  useEffect(() => {
+    loadDriveBackups();
+  }, []);
+
+  async function handleManualBackup() {
+    setMessage(null);
+    setBusyAction('backup');
+    try {
+      const { data } = await api.post('/super-admin/backup');
+      const response = await api.get(data.download_url, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/sql' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = data.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      setMessage({ type: 'success', text: `Sauvegarde "${data.filename}" téléchargée.` });
+    } catch {
+      setMessage({ type: 'error', text: 'Impossible de créer la sauvegarde.' });
+    } finally {
+      setBusyAction('');
+    }
+  }
+
+  async function handleBackupToDrive() {
+    setMessage(null);
+    setBusyAction('backup-drive');
+    try {
+      const { data } = await api.post('/super-admin/backup-drive');
+      setMessage({ type: 'success', text: `Sauvegarde "${data.filename}" envoyée sur Google Drive.` });
+      loadDriveBackups();
+    } catch (err) {
+      setMessage({
+        type: 'error',
+        text: err.response?.data?.error || "Impossible d'envoyer la sauvegarde sur Google Drive.",
+      });
+    } finally {
+      setBusyAction('');
+    }
+  }
+
+  async function confirmRestore() {
+    const file = pendingRestoreFile;
+    setMessage(null);
+    setBusyAction(`restore-${file.id}`);
+    try {
+      const { data } = await api.post('/super-admin/restore-drive', { file_id: file.id, filename: file.name });
+      const orphanNote =
+        data.orphaned_profiles_removed > 0
+          ? ` (${data.orphaned_profiles_removed} profil${data.orphaned_profiles_removed > 1 ? 's' : ''} sans compte de connexion valide retiré${data.orphaned_profiles_removed > 1 ? 's' : ''})`
+          : '';
+      setMessage({ type: 'success', text: `Base de données restaurée depuis "${file.name}"${orphanNote}. Rechargement de la page...` });
+      // Une restauration change potentiellement toutes les données affichées (tenants,
+      // utilisateurs, stats...) partout dans l'appli — un simple refetch local ne suffit pas à
+      // tout invalider correctement, un rechargement complet est le seul moyen fiable de
+      // repartir d'un état cohérent avec la base restaurée.
+      setTimeout(() => window.location.reload(), 1500);
+    } catch (err) {
+      setMessage({ type: 'error', text: err.response?.data?.error || 'Impossible de restaurer cette sauvegarde.' });
+      setBusyAction('');
+      setPendingRestoreFile(null);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <Database size={20} className="text-slate-400" />
+        <h2 className="text-base font-semibold text-slate-900">Système</h2>
+      </div>
+      <p className="text-sm text-slate-500">
+        Sauvegarde et restauration de la base de données (données applicatives de tous les tenants). Une
+        sauvegarde de sécurité est prise automatiquement juste avant chaque restauration.
+      </p>
+
+      {message && (
+        <p
+          className={`rounded-md border px-3 py-2 text-sm ${
+            message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-600'
+          }`}
+        >
+          {message.text}
+        </p>
+      )}
+
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          onClick={handleManualBackup}
+          disabled={busyAction !== ''}
+          className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
+        >
+          <Download size={16} />
+          {busyAction === 'backup' ? 'Sauvegarde...' : 'Sauvegarde manuelle'}
+        </button>
+        <button
+          type="button"
+          onClick={handleBackupToDrive}
+          disabled={busyAction !== ''}
+          className="inline-flex items-center gap-1.5 rounded-md border border-emerald-300 px-3 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50 disabled:opacity-60"
+        >
+          <Cloud size={16} />
+          {busyAction === 'backup-drive' ? 'Envoi...' : 'Sauvegarder sur Google Drive'}
+        </button>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white">
+        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+            <Cloud size={16} className="text-slate-400" />
+            Sauvegardes Google Drive
+          </h3>
+          <button
+            type="button"
+            onClick={loadDriveBackups}
+            disabled={loadingDriveBackups}
+            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-700 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={loadingDriveBackups ? 'animate-spin' : ''} />
+            Actualiser
+          </button>
+        </div>
+
+        {driveError && <p className="px-4 py-3 text-sm text-red-600">{driveError}</p>}
+
+        {!driveError && driveBackups.length === 0 && (
+          <p className="px-4 py-6 text-center text-sm text-slate-500">
+            {loadingDriveBackups ? 'Chargement...' : 'Aucune sauvegarde sur Google Drive pour le moment.'}
+          </p>
+        )}
+
+        {driveBackups.length > 0 && (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-2">Fichier</th>
+                  <th className="px-4 py-2">Date</th>
+                  <th className="px-4 py-2">Taille</th>
+                  <th className="px-4 py-2 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {driveBackups.map((file) => (
+                  <tr key={file.id}>
+                    <td className="max-w-[220px] break-all px-4 py-3 text-slate-700">{file.name}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDateTime(file.created_at)}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatBytes(file.size_bytes)}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {file.web_view_link && (
+                          <a
+                            href={file.web_view_link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                          >
+                            Voir sur Drive
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setPendingRestoreFile(file)}
+                          disabled={busyAction !== ''}
+                          className="rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                        >
+                          {busyAction === `restore-${file.id}` ? 'Restauration...' : 'Restaurer'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {pendingRestoreFile && (
+        <ConfirmModal
+          title="Restaurer cette sauvegarde"
+          message={`Restaurer "${pendingRestoreFile.name}" ? Cette action écrase les données actuelles de TOUS les tenants de la plateforme et est irréversible.`}
+          confirmLabel="Restaurer"
+          onConfirm={confirmRestore}
+          onClose={() => setPendingRestoreFile(null)}
+        />
+      )}
+    </div>
+  );
+}
+
 export default function SuperAdmin() {
   const currentUser = useCurrentUser();
   const [activeTab, setActiveTab] = useState('tenants');
@@ -477,6 +1318,7 @@ export default function SuperAdmin() {
   const [error, setError] = useState('');
   const [togglingId, setTogglingId] = useState(null);
   const [detailTenantId, setDetailTenantId] = useState(null);
+  const [showCreateTenant, setShowCreateTenant] = useState(false);
 
   function loadTenants() {
     api
@@ -510,6 +1352,16 @@ export default function SuperAdmin() {
     } finally {
       setTogglingId(null);
     }
+  }
+
+  function handleTenantCreated(tenant) {
+    setTenants((prev) => [tenant, ...prev]);
+    setShowCreateTenant(false);
+  }
+
+  function handleTenantDeleted(tenantId) {
+    setTenants((prev) => prev.filter((t) => t.id !== tenantId));
+    setDetailTenantId(null);
   }
 
   return (
@@ -556,21 +1408,30 @@ export default function SuperAdmin() {
               error={error}
               onOpenDetail={setDetailTenantId}
               onToggleSuspend={handleToggleSuspend}
+              onCreateTenant={() => setShowCreateTenant(true)}
               togglingId={togglingId}
+              currentTenantId={currentUser?.tenant_id}
             />
           )}
           {activeTab === 'stats' && <StatsTab />}
           {activeTab === 'audit' && <AuditTab />}
+          {activeTab === 'system' && <SystemTab />}
         </div>
       </main>
 
       {detailTenantId && (
         <TenantDetailModal
           tenantId={detailTenantId}
+          currentUserId={currentUser?.id}
           onClose={() => setDetailTenantId(null)}
           onToggleSuspend={handleToggleSuspend}
+          onDeleted={handleTenantDeleted}
           togglingId={togglingId}
         />
+      )}
+
+      {showCreateTenant && (
+        <CreateTenantModal onClose={() => setShowCreateTenant(false)} onCreated={handleTenantCreated} />
       )}
     </div>
   );
