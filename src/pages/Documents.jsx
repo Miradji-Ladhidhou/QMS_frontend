@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Loader2, Plus, Search, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { getDocumentPublicUrl } from '../lib/storage.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
@@ -367,6 +366,8 @@ export default function Documents() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
+  const [downloadingId, setDownloadingId] = useState(null);
+  const [downloadError, setDownloadError] = useState('');
 
   async function loadData() {
     setLoading(true);
@@ -456,11 +457,20 @@ export default function Documents() {
     'desc'
   );
 
-  function handleDownload(event, doc) {
+  // file_path peut être un chemin Supabase ou un id de fichier Google Drive selon le provider
+  // du document (voir B3) — seul le backend sait lequel et construit l'URL correspondante,
+  // impossible à faire directement côté frontend comme avant (voir DocumentDetail.jsx).
+  async function handleDownload(event, doc) {
     event.stopPropagation();
-    const url = getDocumentPublicUrl(doc.file_path);
-    if (url) {
-      window.open(url, '_blank', 'noopener');
+    setDownloadError('');
+    setDownloadingId(doc.id);
+    try {
+      const { data } = await api.get(`/documents/${doc.id}/download`);
+      window.open(data.url, '_blank', 'noopener');
+    } catch (err) {
+      setDownloadError(err.response?.data?.error || 'Impossible de télécharger ce fichier.');
+    } finally {
+      setDownloadingId(null);
     }
   }
 
@@ -557,6 +567,9 @@ export default function Documents() {
       {exportPdfError && (
         <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
+      {downloadError && (
+        <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{downloadError}</p>
+      )}
 
       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
@@ -645,11 +658,11 @@ export default function Documents() {
                   <button
                     type="button"
                     onClick={(e) => handleDownload(e, doc)}
-                    disabled={!doc.file_path}
+                    disabled={!doc.file_path || downloadingId === doc.id}
                     aria-label="Télécharger"
                     className="shrink-0 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary disabled:opacity-30"
                   >
-                    <Download size={18} />
+                    {downloadingId === doc.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                   </button>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">

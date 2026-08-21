@@ -16,7 +16,6 @@ import {
   XCircle,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { getDocumentPublicUrl } from '../lib/storage.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useTenant } from '../lib/useTenant.js';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -258,6 +257,8 @@ export default function DocumentDetail() {
   const [showRestrictedList, setShowRestrictedList] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [downloadError, setDownloadError] = useState('');
+  const [downloadingKey, setDownloadingKey] = useState(null);
 
   async function loadDocument() {
     setLoading(true);
@@ -324,6 +325,24 @@ export default function DocumentDetail() {
     loadDocument();
   }
 
+  // Le lien de téléchargement ne peut plus être construit directement côté frontend depuis
+  // file_path (voir getDocumentPublicUrl, encore utilisé pour le logo tenant) : depuis B3, ce
+  // champ peut être un chemin Supabase OU un id de fichier Google Drive selon le provider du
+  // document — seul le backend sait lequel et sait construire l'URL correspondante (bug réel :
+  // "Bucket not found" quand un id Drive était passé tel quel à getPublicUrl).
+  async function handleDownload(path, key) {
+    setDownloadError('');
+    setDownloadingKey(key);
+    try {
+      const { data } = await api.get(path);
+      window.open(data.url, '_blank', 'noopener');
+    } catch (err) {
+      setDownloadError(err.response?.data?.error || 'Impossible de télécharger ce fichier.');
+    } finally {
+      setDownloadingKey(null);
+    }
+  }
+
   async function handleViewCertificate() {
     setCertificateError('');
     try {
@@ -361,8 +380,6 @@ export default function DocumentDetail() {
       </p>
     );
   }
-
-  const currentFileUrl = getDocumentPublicUrl(doc.file_path);
 
   const myPendingApproval =
     doc.workflow?.status === 'pending' && currentUser
@@ -408,6 +425,9 @@ export default function DocumentDetail() {
       {deleteError && (
         <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
       )}
+      {downloadError && (
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{downloadError}</p>
+      )}
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -439,16 +459,16 @@ export default function DocumentDetail() {
           </div>
 
           <div className="flex flex-wrap gap-2">
-            {currentFileUrl && (
-              <a
-                href={currentFileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            {doc.file_path && (
+              <button
+                type="button"
+                onClick={() => handleDownload(`/documents/${doc.id}/download`, 'current')}
+                disabled={downloadingKey === 'current'}
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
                 <Download size={16} />
-                Télécharger
-              </a>
+                {downloadingKey === 'current' ? 'Préparation...' : 'Télécharger'}
+              </button>
             )}
             {canSubmitForApproval && (
               <button
@@ -597,32 +617,29 @@ export default function DocumentDetail() {
             <p className="text-sm text-slate-500">Aucune version archivée pour l'instant.</p>
           ) : (
             <ul className="divide-y divide-slate-100">
-              {doc.versions.map((version) => {
-                const versionUrl = getDocumentPublicUrl(version.file_path);
-                return (
-                  <li key={version.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-slate-800">
-                        v{version.version}
-                        {version.changed_by_user?.full_name ? ` · ${version.changed_by_user.full_name}` : ''}
-                      </p>
-                      <p className="text-xs text-slate-500">{formatDateTime(version.created_at)}</p>
-                      {version.change_note && <p className="mt-1 text-sm text-slate-600">{version.change_note}</p>}
-                    </div>
-                    {versionUrl && (
-                      <a
-                        href={versionUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex shrink-0 items-center gap-2 self-start rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:self-auto"
-                      >
-                        <Download size={14} />
-                        Télécharger
-                      </a>
-                    )}
-                  </li>
-                );
-              })}
+              {doc.versions.map((version) => (
+                <li key={version.id} className="flex flex-col gap-2 py-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-slate-800">
+                      v{version.version}
+                      {version.changed_by_user?.full_name ? ` · ${version.changed_by_user.full_name}` : ''}
+                    </p>
+                    <p className="text-xs text-slate-500">{formatDateTime(version.created_at)}</p>
+                    {version.change_note && <p className="mt-1 text-sm text-slate-600">{version.change_note}</p>}
+                  </div>
+                  {version.file_path && (
+                    <button
+                      type="button"
+                      onClick={() => handleDownload(`/documents/${doc.id}/versions/${version.id}/download`, version.id)}
+                      disabled={downloadingKey === version.id}
+                      className="flex shrink-0 items-center gap-2 self-start rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60 sm:self-auto"
+                    >
+                      <Download size={14} />
+                      {downloadingKey === version.id ? 'Préparation...' : 'Télécharger'}
+                    </button>
+                  )}
+                </li>
+              ))}
             </ul>
           )}
         </div>
