@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, Plus, Search, Upload, X } from 'lucide-react';
+import { Download, HardDrive, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
@@ -12,6 +12,7 @@ import SearchSnippet from '../components/SearchSnippet.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -49,6 +50,33 @@ function MatchLocationBadge({ location }) {
   );
 }
 
+// Prompt F2 : indicateur discret de provenance, basé sur storage_provider DU DOCUMENT (pas du
+// tenant globalement) — un tenant peut avoir des documents historiques Supabase à côté de
+// nouveaux documents sur Drive. Seule l'icône Drive est cliquable (ouvre dans Drive) ; l'icône
+// Supabase est purement informative.
+function StorageProvenanceIcon({ doc, onOpenInDrive, opening }) {
+  if (doc.storage_provider === 'google_drive') {
+    return (
+      <button
+        type="button"
+        onClick={(e) => onOpenInDrive(e, doc)}
+        disabled={opening}
+        title="Ouvrir dans Google Drive"
+        aria-label="Ouvrir dans Google Drive"
+        className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-primary disabled:opacity-40"
+      >
+        {opening ? <Loader2 size={14} className="animate-spin" /> : <HardDrive size={14} />}
+      </button>
+    );
+  }
+
+  return (
+    <span title="Stocké sur nos serveurs" className="shrink-0 p-1.5 text-slate-300">
+      <Server size={14} />
+    </span>
+  );
+}
+
 function DocumentModal({ categories, onClose, onCreated }) {
   const [form, setForm] = useState({
     number: '',
@@ -59,7 +87,7 @@ function DocumentModal({ categories, onClose, onCreated }) {
     review_frequency_months: '',
   });
   const [file, setFile] = useState(null);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   function updateField(field, value) {
@@ -68,7 +96,7 @@ function DocumentModal({ categories, onClose, onCreated }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    setError('');
+    setError(null);
     setSubmitting(true);
 
     try {
@@ -84,7 +112,7 @@ function DocumentModal({ categories, onClose, onCreated }) {
       const { data } = await api.post('/documents', formData);
       onCreated(data);
     } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de créer le document.');
+      setError({ message: err.response?.data?.error || 'Impossible de créer le document.', code: err.response?.data?.code });
     } finally {
       setSubmitting(false);
     }
@@ -100,9 +128,7 @@ function DocumentModal({ categories, onClose, onCreated }) {
           </button>
         </div>
 
-        {error && (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        )}
+        <UploadErrorMessage error={error} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
@@ -368,6 +394,7 @@ export default function Documents() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadError, setDownloadError] = useState('');
+  const [openingDriveId, setOpeningDriveId] = useState(null);
 
   async function loadData() {
     setLoading(true);
@@ -471,6 +498,23 @@ export default function Documents() {
       setDownloadError(err.response?.data?.error || 'Impossible de télécharger ce fichier.');
     } finally {
       setDownloadingId(null);
+    }
+  }
+
+  // Prompt F2 : ouvre le document dans l'interface Google Drive (webViewLink) au lieu de le
+  // télécharger — repli silencieux sur le téléchargement habituel si le lien Drive échoue pour
+  // une raison quelconque, jamais un cul-de-sac pour l'utilisateur.
+  async function handleOpenInDrive(event, doc) {
+    event.stopPropagation();
+    setDownloadError('');
+    setOpeningDriveId(doc.id);
+    try {
+      const { data } = await api.get(`/documents/${doc.id}/drive-view-link`);
+      window.open(data.url, '_blank', 'noopener');
+    } catch {
+      await handleDownload(event, doc);
+    } finally {
+      setOpeningDriveId(null);
     }
   }
 
@@ -655,15 +699,20 @@ export default function Documents() {
                       {doc.number} · v{doc.version}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={(e) => handleDownload(e, doc)}
-                    disabled={!doc.file_path || downloadingId === doc.id}
-                    aria-label="Télécharger"
-                    className="shrink-0 rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary disabled:opacity-30"
-                  >
-                    {downloadingId === doc.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                  </button>
+                  <div className="flex shrink-0 items-center gap-1">
+                    {doc.file_path && (
+                      <StorageProvenanceIcon doc={doc} onOpenInDrive={handleOpenInDrive} opening={openingDriveId === doc.id} />
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => handleDownload(e, doc)}
+                      disabled={!doc.file_path || downloadingId === doc.id}
+                      aria-label="Télécharger"
+                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary disabled:opacity-30"
+                    >
+                      {downloadingId === doc.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                    </button>
+                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <CategoryBadge category={doc.category} />
@@ -706,15 +755,20 @@ export default function Documents() {
                       <StatusBadge status={doc.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button
-                        type="button"
-                        onClick={(e) => handleDownload(e, doc)}
-                        disabled={!doc.file_path}
-                        aria-label="Télécharger"
-                        className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary disabled:opacity-30"
-                      >
-                        <Download size={18} />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {doc.file_path && (
+                          <StorageProvenanceIcon doc={doc} onOpenInDrive={handleOpenInDrive} opening={openingDriveId === doc.id} />
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleDownload(e, doc)}
+                          disabled={!doc.file_path || downloadingId === doc.id}
+                          aria-label="Télécharger"
+                          className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary disabled:opacity-30"
+                        >
+                          {downloadingId === doc.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

@@ -24,6 +24,7 @@ import ApprovalStatusBadge from '../components/ApprovalStatusBadge.jsx';
 import DecisionModal from '../components/DecisionModal.jsx';
 import SubmitForApprovalModal from '../components/SubmitForApprovalModal.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
 
 const AUDIT_ACTION_LABELS = {
   submitted_for_approval: 'Soumis pour approbation',
@@ -54,18 +55,18 @@ function formatDateTime(dateStr) {
 function NewVersionModal({ documentId, onClose, onUploaded }) {
   const [file, setFile] = useState(null);
   const [changeNote, setChangeNote] = useState('');
-  const [error, setError] = useState('');
+  const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
 
     if (!file) {
-      setError('Un fichier est requis.');
+      setError({ message: 'Un fichier est requis.' });
       return;
     }
 
-    setError('');
+    setError(null);
     setSubmitting(true);
 
     try {
@@ -76,7 +77,7 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
       const { data } = await api.post(`/documents/${documentId}/versions`, formData);
       onUploaded(data);
     } catch (err) {
-      setError(err.response?.data?.error || "Impossible d'ajouter la version.");
+      setError({ message: err.response?.data?.error || "Impossible d'ajouter la version.", code: err.response?.data?.code });
     } finally {
       setSubmitting(false);
     }
@@ -92,9 +93,7 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
           </button>
         </div>
 
-        {error && (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        )}
+        <UploadErrorMessage error={error} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
