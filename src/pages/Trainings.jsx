@@ -1177,9 +1177,9 @@ export default function Trainings() {
                 )}
 
                 {isExpanded && (
-                  <ul className="mt-2 space-y-1.5 border-t border-slate-100 pt-2">
+                  <ul className="mt-2 space-y-2 border-t border-slate-100 pt-2">
                     {training.records.map((record) => (
-                      <li key={record.id} className="flex items-center justify-between gap-2 text-sm">
+                      <li key={record.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
                         <span className="text-slate-700">
                           {personName(record)}
                           {record.employee_id && (
@@ -1190,20 +1190,19 @@ export default function Trainings() {
                           {' — '}
                           {formatDate(record.completed_at)}
                         </span>
-                        <div className="flex shrink-0 gap-1">
+                        <div className="flex shrink-0 items-center gap-2">
                           <button
                             type="button"
                             onClick={() => handleDownloadCertificate(training, record)}
                             disabled={certificateDownloadingId === record.id}
-                            aria-label="Télécharger le certificat de réussite"
-                            title="Certificat de réussite"
-                            className="p-1 text-slate-400 hover:text-primary disabled:opacity-50"
+                            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
                           >
                             {certificateDownloadingId === record.id ? (
-                              <Loader2 size={14} className="animate-spin" />
+                              <Loader2 size={13} className="animate-spin" />
                             ) : (
-                              <Award size={14} />
+                              <Award size={13} />
                             )}
+                            Certificat
                           </button>
                           {canManage && (
                             <>
