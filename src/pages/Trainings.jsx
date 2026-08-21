@@ -22,6 +22,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import SortSelect from '../components/SortSelect.jsx';
+import AutoTextarea from '../components/AutoTextarea.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -127,6 +128,7 @@ function NewTrainingModal({ onClose, onCreated }) {
     location: '',
     instructor: '',
     duration: '',
+    description: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -148,6 +150,7 @@ function NewTrainingModal({ onClose, onCreated }) {
         location: form.location || undefined,
         instructor: form.instructor || undefined,
         duration: form.duration || undefined,
+        description: form.description || undefined,
       };
       const { data } = await api.post('/trainings', payload);
       onCreated(data);
@@ -239,6 +242,17 @@ function NewTrainingModal({ onClose, onCreated }) {
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Objet / contenu de la formation</label>
+            <AutoTextarea
+              rows={3}
+              placeholder="Ce que couvre la formation, ses objectifs..."
+              value={form.description}
+              onChange={(e) => updateField('description', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={submitting}
@@ -260,6 +274,7 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
     location: training.location || '',
     instructor: training.instructor || '',
     duration: training.duration || '',
+    description: training.description || '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -281,6 +296,7 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
         location: form.location || null,
         instructor: form.instructor || null,
         duration: form.duration || null,
+        description: form.description || null,
       });
       onUpdated(data);
     } catch (err) {
@@ -367,6 +383,17 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
               type="text"
               value={form.instructor}
               onChange={(e) => updateField('instructor', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Objet / contenu de la formation</label>
+            <AutoTextarea
+              rows={3}
+              placeholder="Ce que couvre la formation, ses objectifs..."
+              value={form.description}
+              onChange={(e) => updateField('description', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
@@ -1129,6 +1156,9 @@ export default function Trainings() {
                   <p className="mt-1 text-xs text-slate-400">
                     {[training.duration, training.instructor, training.location].filter(Boolean).join(' · ')}
                   </p>
+                )}
+                {training.description && (
+                  <p className="mt-1 line-clamp-2 text-xs text-slate-400">{training.description}</p>
                 )}
 
                 <button
