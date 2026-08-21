@@ -6,13 +6,28 @@ import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
+import { useSort } from '../lib/useSort.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+const COMPLAINT_SORT_OPTIONS = [
+  { key: 'received_date', label: 'date de réception' },
+  { key: 'customer_name', label: 'client' },
+  { key: 'assigned', label: 'responsable' },
+  { key: 'severity', label: 'gravité' },
+  { key: 'status', label: 'statut' },
+];
+
+function getComplaintSortValue(complaint, key) {
+  if (key === 'assigned') return complaint.assigned?.full_name || '';
+  return complaint[key];
 }
 
 function NewComplaintModal({ users, services, onClose, onCreated }) {
@@ -238,6 +253,13 @@ export default function Complaints() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
+  const { sorted: sortedComplaints, sortKey, direction, setSortKey, toggleSort } = useSort(
+    complaints,
+    getComplaintSortValue,
+    'received_date',
+    'desc'
+  );
+
   function handleCreated(complaint) {
     setIsModalOpen(false);
     navigate(`/complaints/${complaint.id}`);
@@ -321,7 +343,7 @@ export default function Complaints() {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap gap-2">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -334,6 +356,14 @@ export default function Complaints() {
             </option>
           ))}
         </select>
+
+        <SortSelect
+          options={COMPLAINT_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
       </div>
 
       {error && (
@@ -363,7 +393,7 @@ export default function Complaints() {
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          {complaints.map((complaint) => (
+          {sortedComplaints.map((complaint) => (
             <div
               key={complaint.id}
               onClick={() => navigate(`/complaints/${complaint.id}`)}

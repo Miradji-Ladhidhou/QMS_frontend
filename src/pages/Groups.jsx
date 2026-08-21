@@ -1,6 +1,18 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useSort } from '../lib/useSort.js';
+import SortSelect from '../components/SortSelect.jsx';
+
+const GROUP_SORT_OPTIONS = [
+  { key: 'name', label: 'nom' },
+  { key: 'members_count', label: 'nombre de membres' },
+];
+
+function getGroupSortValue(group, key) {
+  if (key === 'members_count') return group.members.length;
+  return group[key];
+}
 
 export default function Groups() {
   const [groups, setGroups] = useState([]);
@@ -14,6 +26,12 @@ export default function Groups() {
   const [expandedId, setExpandedId] = useState(null);
   const [addMemberValue, setAddMemberValue] = useState('');
   const [saving, setSaving] = useState(false);
+  const { sorted: sortedGroups, sortKey, direction, setSortKey, toggleSort } = useSort(
+    groups,
+    getGroupSortValue,
+    'name',
+    'asc'
+  );
 
   async function loadData() {
     setLoading(true);
@@ -175,6 +193,18 @@ export default function Groups() {
         </form>
       )}
 
+      {groups.length > 0 && (
+        <div className="mt-4">
+          <SortSelect
+            options={GROUP_SORT_OPTIONS}
+            sortKey={sortKey}
+            direction={direction}
+            onChangeKey={setSortKey}
+            onToggleDirection={() => toggleSort(sortKey)}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="mt-4 space-y-2">
           {[0, 1, 2].map((key) => (
@@ -185,7 +215,7 @@ export default function Groups() {
         <p className="mt-4 text-sm text-slate-500">Aucun groupe pour l'instant.</p>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100">
-          {groups.map((group) => {
+          {sortedGroups.map((group) => {
             const isExpanded = expandedId === group.id;
             const availableUsers = users.filter((u) => !group.members.some((m) => m.id === u.id));
 

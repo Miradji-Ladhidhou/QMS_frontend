@@ -14,13 +14,29 @@ import {
 } from '../lib/riskStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
+import { useSort } from '../lib/useSort.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
 import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+const RISK_SORT_OPTIONS = [
+  { key: 'risk_score', label: 'score de risque' },
+  { key: 'title', label: 'titre' },
+  { key: 'type', label: 'type' },
+  { key: 'owner', label: 'propriétaire' },
+  { key: 'review_date', label: 'date de revue' },
+  { key: 'status', label: 'statut' },
+];
+
+function getRiskSortValue(risk, key) {
+  if (key === 'owner') return risk.owner_user?.full_name || '';
+  return risk[key];
 }
 
 // Matrice 5x5 : gravité en ligne (5 en haut, 1 en bas — convention standard), probabilité en
@@ -316,6 +332,13 @@ export default function Risks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeFilter, statusFilter]);
 
+  const { sorted: sortedRisks, sortKey, direction, setSortKey, toggleSort } = useSort(
+    risks,
+    getRiskSortValue,
+    'risk_score',
+    'desc'
+  );
+
   function handleCreated(risk) {
     setIsModalOpen(false);
     navigate(`/risks/${risk.id}`);
@@ -439,6 +462,14 @@ export default function Risks() {
             </option>
           ))}
         </select>
+
+        <SortSelect
+          options={RISK_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
       </div>
 
       {loading ? (
@@ -463,7 +494,7 @@ export default function Risks() {
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          {risks.map((risk) => (
+          {sortedRisks.map((risk) => (
             <div
               key={risk.id}
               onClick={() => navigate(`/risks/${risk.id}`)}

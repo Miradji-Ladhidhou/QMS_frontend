@@ -2,13 +2,30 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Check, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useSort } from '../lib/useSort.js';
 import DecisionModal from '../components/DecisionModal.jsx';
+import SortSelect from '../components/SortSelect.jsx';
+
+const APPROVAL_SORT_OPTIONS = [
+  { key: 'title', label: 'titre du document' },
+  { key: 'number', label: 'numéro' },
+];
+
+function getApprovalSortValue(item, key) {
+  return item.workflow.document[key];
+}
 
 export default function MyApprovals() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [decisionTarget, setDecisionTarget] = useState(null);
+  const { sorted: sortedItems, sortKey, direction, setSortKey, toggleSort } = useSort(
+    items,
+    getApprovalSortValue,
+    'title',
+    'asc'
+  );
 
   async function loadPending() {
     setLoading(true);
@@ -36,6 +53,18 @@ export default function MyApprovals() {
     <div>
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Mes approbations</h1>
 
+      {items.length > 0 && (
+        <div className="mt-4">
+          <SortSelect
+            options={APPROVAL_SORT_OPTIONS}
+            sortKey={sortKey}
+            direction={direction}
+            onChangeKey={setSortKey}
+            onToggleDirection={() => toggleSort(sortKey)}
+          />
+        </div>
+      )}
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -50,7 +79,7 @@ export default function MyApprovals() {
         <p className="mt-6 text-sm text-slate-500">Aucune approbation en attente pour l'instant.</p>
       ) : (
         <div className="mt-4 space-y-3">
-          {items.map((item) => (
+          {sortedItems.map((item) => (
             <div
               key={item.id}
               className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"

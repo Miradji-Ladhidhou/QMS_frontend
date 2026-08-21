@@ -4,6 +4,8 @@ import { ArrowLeft, Check, Download, Loader2, Minus, RefreshCw, X as XIcon } fro
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
+import { useSort } from '../lib/useSort.js';
+import SortableTh from '../components/SortableTh.jsx';
 
 const CELL_STYLES = {
   up_to_date: 'bg-emerald-100 text-emerald-700',
@@ -60,6 +62,12 @@ export default function SkillMatrix() {
   // people : comptes utilisateurs ET personnel sans compte (voir trainings.js /matrix),
   // chaque entrée { id, full_name, kind: 'user' | 'employee' }.
   const people = matrix[0]?.people.map((entry) => entry.person) ?? [];
+  const { sorted: sortedPeople, sortKey, direction, toggleSort } = useSort(
+    people,
+    (person, key) => person[key],
+    'full_name',
+    'asc'
+  );
 
   function findEntry(training, personId) {
     return training.people.find((entry) => entry.person.id === personId);
@@ -155,7 +163,14 @@ export default function SkillMatrix() {
           <table className="text-left text-sm">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
-                <th className="sticky left-0 z-10 max-w-[110px] bg-slate-50 px-3 py-3 sm:max-w-none sm:px-4">Personnel</th>
+                <SortableTh
+                  label="Personnel"
+                  sortKey="full_name"
+                  activeKey={sortKey}
+                  direction={direction}
+                  onSort={toggleSort}
+                  className="sticky left-0 z-10 max-w-[110px] bg-slate-50 px-3 py-3 sm:max-w-none sm:px-4"
+                />
                 {matrix.map((entry) => (
                   <th key={entry.training.id} className="min-w-[110px] whitespace-nowrap px-3 py-3 sm:px-4">
                     {entry.training.title}
@@ -164,7 +179,7 @@ export default function SkillMatrix() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {people.map((person) => (
+              {sortedPeople.map((person) => (
                 <tr key={person.id}>
                   <td
                     title={person.full_name}

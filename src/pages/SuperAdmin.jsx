@@ -23,6 +23,17 @@ import {
 import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useSort } from '../lib/useSort.js';
+import SortableTh from '../components/SortableTh.jsx';
+import SortSelect from '../components/SortSelect.jsx';
+
+const TENANT_SORT_OPTIONS = [
+  { key: 'created_at', label: 'date de création' },
+  { key: 'name', label: 'nom' },
+  { key: 'plan', label: 'plan' },
+  { key: 'user_count', label: 'utilisateurs' },
+  { key: 'is_suspended', label: 'statut' },
+];
 
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
@@ -885,6 +896,13 @@ function TenantRow({ tenant, onOpenDetail, onToggleSuspend, togglingId, currentT
 }
 
 function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, onCreateTenant, togglingId, currentTenantId }) {
+  const { sorted: sortedTenants, sortKey, direction, setSortKey, toggleSort } = useSort(
+    tenants,
+    (tenant, key) => tenant[key],
+    'created_at',
+    'desc'
+  );
+
   return (
     <div>
       <div className="flex items-center justify-between gap-2">
@@ -905,6 +923,16 @@ function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, on
         Toutes les entreprises clientes de la plateforme, tous tenants confondus. Cliquez une ligne pour la fiche détaillée.
       </p>
 
+      <div className="mt-3">
+        <SortSelect
+          options={TENANT_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
+      </div>
+
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       {loading ? (
@@ -922,7 +950,7 @@ function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, on
               hors champ sans aucun indice qu'il fallait faire défiler. Cartes empilées sur
               mobile, tableau complet à partir de md — même pattern que Documents/CAPA. */}
           <div className="mt-4 space-y-2 md:hidden">
-            {tenants.map((tenant) => (
+            {sortedTenants.map((tenant) => (
               <TenantCard
                 key={tenant.id}
                 tenant={tenant}
@@ -938,16 +966,16 @@ function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, on
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Tenant</th>
-                  <th className="px-4 py-3">Plan</th>
-                  <th className="px-4 py-3">Utilisateurs</th>
-                  <th className="px-4 py-3">Créé le</th>
-                  <th className="px-4 py-3">Statut</th>
+                  <SortableTh label="Tenant" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Plan" sortKey="plan" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Utilisateurs" sortKey="user_count" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Créé le" sortKey="created_at" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Statut" sortKey="is_suspended" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <th className="px-4 py-3 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {tenants.map((tenant) => (
+                {sortedTenants.map((tenant) => (
                   <TenantRow
                     key={tenant.id}
                     tenant={tenant}

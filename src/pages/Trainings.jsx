@@ -6,10 +6,27 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useSort } from '../lib/useSort.js';
+import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+const TRAINING_SORT_OPTIONS = [
+  { key: 'title', label: 'titre' },
+  { key: 'type', label: 'type' },
+  { key: 'last_completed', label: 'dernière réalisation' },
+  { key: 'records_count', label: 'nombre de réalisations' },
+];
+
+function getTrainingSortValue(training, key) {
+  if (key === 'records_count') return training.records.length;
+  if (key === 'last_completed') {
+    return training.records.length ? training.records[training.records.length - 1]?.completed_at : null;
+  }
+  return training[key];
 }
 
 function NewTrainingModal({ onClose, onCreated }) {
@@ -539,6 +556,13 @@ export default function Trainings() {
 
   const hasAnyRecord = trainings.some((training) => training.records.length > 0);
 
+  const { sorted: sortedTrainings, sortKey, direction, setSortKey, toggleSort } = useSort(
+    trainings,
+    getTrainingSortValue,
+    'title',
+    'asc'
+  );
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -580,6 +604,16 @@ export default function Trainings() {
         </div>
       </div>
 
+      <div className="mt-4">
+        <SortSelect
+          options={TRAINING_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
+      </div>
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -597,7 +631,7 @@ export default function Trainings() {
         <p className="mt-6 text-sm text-slate-500">Aucune formation pour l'instant.</p>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {trainings.map((training) => {
+          {sortedTrainings.map((training) => {
             const isExpanded = expandedId === training.id;
 
             return (

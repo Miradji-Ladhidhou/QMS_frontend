@@ -8,13 +8,23 @@ import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SUPPLIER_STATUS_LABELS } from '../lib/supplierStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
+import { useSort } from '../lib/useSort.js';
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
+import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
+
+const SUPPLIER_SORT_OPTIONS = [
+  { key: 'name', label: 'nom' },
+  { key: 'category', label: 'catégorie' },
+  { key: 'next_evaluation_date', label: "prochaine évaluation" },
+  { key: 'criticality', label: 'criticité' },
+  { key: 'status', label: 'statut' },
+];
 
 function NewSupplierModal({ services, onClose, onCreated }) {
   const [form, setForm] = useState({
@@ -208,6 +218,13 @@ export default function Suppliers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
+  const { sorted: sortedSuppliers, sortKey, direction, setSortKey, toggleSort } = useSort(
+    suppliers,
+    (supplier, key) => supplier[key],
+    'name',
+    'asc'
+  );
+
   function handleCreated(supplier) {
     setIsModalOpen(false);
     navigate(`/suppliers/${supplier.id}`);
@@ -292,7 +309,7 @@ export default function Suppliers() {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap gap-2">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -305,6 +322,14 @@ export default function Suppliers() {
             </option>
           ))}
         </select>
+
+        <SortSelect
+          options={SUPPLIER_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
       </div>
 
       {error && (
@@ -336,7 +361,7 @@ export default function Suppliers() {
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          {suppliers.map((supplier) => (
+          {sortedSuppliers.map((supplier) => (
             <div
               key={supplier.id}
               onClick={() => navigate(`/suppliers/${supplier.id}`)}

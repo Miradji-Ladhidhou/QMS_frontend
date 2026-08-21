@@ -7,10 +7,38 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useSort } from '../lib/useSort.js';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import SortableTh from '../components/SortableTh.jsx';
+import SortSelect from '../components/SortSelect.jsx';
+
+const PRIORITY_RANK = Object.fromEntries(Object.keys(CAPA_PRIORITY_LABELS).map((key, i) => [key, i]));
+const STATUS_RANK = Object.fromEntries(Object.keys(CAPA_STATUS_LABELS).map((key, i) => [key, i]));
+
+const CAPA_SORT_OPTIONS = [
+  { key: 'due_date', label: 'échéance' },
+  { key: 'number', label: 'numéro' },
+  { key: 'title', label: 'objet' },
+  { key: 'service', label: 'service' },
+  { key: 'priority', label: 'gravité' },
+  { key: 'status', label: 'statut' },
+];
+
+function getCapaSortValue(capa, key) {
+  switch (key) {
+    case 'service':
+      return capa.service?.name || '';
+    case 'priority':
+      return PRIORITY_RANK[capa.priority] ?? -1;
+    case 'status':
+      return STATUS_RANK[capa.status] ?? -1;
+    default:
+      return capa[key];
+  }
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -454,6 +482,13 @@ export default function Capas() {
     [capas]
   );
 
+  const { sorted: sortedCapas, sortKey, direction, setSortKey, toggleSort } = useSort(
+    capas,
+    getCapaSortValue,
+    'due_date',
+    'asc'
+  );
+
   function handleExportCsv() {
     const headers = [
       'Numéro',
@@ -590,6 +625,16 @@ export default function Capas() {
         <CounterCard label="Clôturées" value={counters.closed} accent="text-emerald-700" />
       </div>
 
+      <div className="mt-4">
+        <SortSelect
+          options={CAPA_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
+      </div>
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -608,7 +653,7 @@ export default function Capas() {
       ) : (
         <>
           <div className="mt-4 space-y-3 md:hidden">
-            {capas.map((capa) => (
+            {sortedCapas.map((capa) => (
               <div
                 key={capa.id}
                 onClick={() => navigate(`/capas/${capa.id}`)}
@@ -655,17 +700,17 @@ export default function Capas() {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Numéro</th>
-                  <th className="px-4 py-3">Objet</th>
-                  <th className="px-4 py-3">Service</th>
-                  <th className="px-4 py-3">Gravité</th>
+                  <SortableTh label="Numéro" sortKey="number" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Objet" sortKey="title" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Service" sortKey="service" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Gravité" sortKey="priority" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <th className="px-4 py-3">Délai de traitement</th>
-                  <th className="px-4 py-3">Échéance</th>
-                  <th className="px-4 py-3">Statut</th>
+                  <SortableTh label="Échéance" sortKey="due_date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Statut" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {capas.map((capa) => (
+                {sortedCapas.map((capa) => (
                   <tr
                     key={capa.id}
                     onClick={() => navigate(`/capas/${capa.id}`)}

@@ -3,6 +3,13 @@ import { Navigate } from 'react-router-dom';
 import { Ban, CheckCircle2, Pencil, Plus, Trash2, UserMinus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useSort } from '../lib/useSort.js';
+import SortSelect from '../components/SortSelect.jsx';
+
+const SERVICE_SORT_OPTIONS = [
+  { key: 'name', label: 'nom' },
+  { key: 'is_active', label: 'statut' },
+];
 
 function ServiceModal({ service, onClose, onSaved }) {
   const isNew = !service;
@@ -290,6 +297,12 @@ export default function Services() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const { sorted: sortedServices, sortKey, direction, setSortKey, toggleSort } = useSort(
+    services,
+    (service, key) => service[key],
+    'name',
+    'asc'
+  );
 
   async function loadData() {
     setLoading(true);
@@ -344,6 +357,18 @@ export default function Services() {
         </button>
       </div>
 
+      {services.length > 0 && (
+        <div className="mt-4">
+          <SortSelect
+            options={SERVICE_SORT_OPTIONS}
+            sortKey={sortKey}
+            direction={direction}
+            onChangeKey={setSortKey}
+            onToggleDirection={() => toggleSort(sortKey)}
+          />
+        </div>
+      )}
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -358,7 +383,7 @@ export default function Services() {
         <p className="mt-6 text-sm text-slate-500">Aucun service pour l'instant.</p>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {services.map((service) => (
+          {sortedServices.map((service) => (
             <ServiceCard
               key={service.id}
               service={service}

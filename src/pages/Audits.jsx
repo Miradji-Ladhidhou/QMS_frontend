@@ -7,12 +7,28 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
+import { useSort } from '../lib/useSort.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+const AUDIT_SORT_OPTIONS = [
+  { key: 'planned_date', label: 'date planifiée' },
+  { key: 'title', label: 'titre' },
+  { key: 'service', label: 'service' },
+  { key: 'lead', label: 'auditeur' },
+  { key: 'status', label: 'statut' },
+];
+
+function getAuditSortValue(audit, key) {
+  if (key === 'service') return audit.service?.name || '';
+  if (key === 'lead') return audit.lead?.full_name || '';
+  return audit[key];
 }
 
 function NewAuditModal({ users, services, onClose, onCreated }) {
@@ -203,6 +219,13 @@ export default function Audits() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter]);
 
+  const { sorted: sortedAudits, sortKey, direction, setSortKey, toggleSort } = useSort(
+    audits,
+    getAuditSortValue,
+    'planned_date',
+    'desc'
+  );
+
   function handleCreated(audit) {
     setIsModalOpen(false);
     navigate(`/audits/${audit.id}`);
@@ -288,7 +311,7 @@ export default function Audits() {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-wrap gap-2">
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -301,6 +324,14 @@ export default function Audits() {
             </option>
           ))}
         </select>
+
+        <SortSelect
+          options={AUDIT_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
       </div>
 
       {error && (
@@ -332,7 +363,7 @@ export default function Audits() {
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          {audits.map((audit) => (
+          {sortedAudits.map((audit) => (
             <div
               key={audit.id}
               onClick={() => navigate(`/audits/${audit.id}`)}

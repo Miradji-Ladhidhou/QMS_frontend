@@ -43,7 +43,9 @@ import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiSt
 import { exportToCsv } from '../lib/csvExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useSort } from '../lib/useSort.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import SortableTh from '../components/SortableTh.jsx';
 
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
@@ -621,12 +623,22 @@ function SourceBadge({ source }) {
   );
 }
 
+function getRecordSortValue(record, key) {
+  if (key === 'recorded_by') return record.recorded_by_user?.full_name || '';
+  return record[key];
+}
+
 function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
-  const records = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
   const isImportBased = kpi.calculation_type === 'import';
   const seriesConfigs = kpi.calculation_configs || [];
   const showSeriesColumn = seriesConfigs.length > 1;
   const labelByConfigId = Object.fromEntries(seriesConfigs.map((c) => [c.id, c.label]));
+  const { sorted: records, sortKey, direction, toggleSort } = useSort(
+    kpi.records,
+    getRecordSortValue,
+    'period_date',
+    'desc'
+  );
 
   if (records.length === 0) {
     return <p className="py-3 text-sm text-slate-400">Aucune valeur enregistrée.</p>;
@@ -637,12 +649,12 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
       <table className="w-full text-left text-sm">
         <thead className="text-xs uppercase tracking-wide text-slate-500">
           <tr>
-            <th className="py-2 pr-3">Période</th>
+            <SortableTh label="Période" sortKey="period_date" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
             {showSeriesColumn && <th className="py-2 pr-3">Série</th>}
-            <th className="py-2 pr-3">Valeur</th>
+            <SortableTh label="Valeur" sortKey="value" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
             {isImportBased && <th className="py-2 pr-3">Source</th>}
             <th className="py-2 pr-3">Commentaire</th>
-            <th className="py-2 pr-3">Saisi par</th>
+            <SortableTh label="Saisi par" sortKey="recorded_by" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
             {canManage && <th className="py-2 pr-3 text-right">Actions</th>}
           </tr>
         </thead>

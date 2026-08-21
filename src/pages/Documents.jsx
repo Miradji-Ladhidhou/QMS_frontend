@@ -6,12 +6,30 @@ import { getDocumentPublicUrl } from '../lib/storage.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
+import { useSort } from '../lib/useSort.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import SearchSnippet from '../components/SearchSnippet.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import SortableTh from '../components/SortableTh.jsx';
+import SortSelect from '../components/SortSelect.jsx';
 
 const SEARCH_DEBOUNCE_MS = 300;
+
+const DOCUMENT_SORT_OPTIONS = [
+  { key: 'created_at', label: 'date de création' },
+  { key: 'number', label: 'numéro' },
+  { key: 'title', label: 'titre' },
+  { key: 'category', label: 'catégorie' },
+  { key: 'version', label: 'version' },
+  { key: 'status', label: 'statut' },
+  { key: 'review_date', label: 'date de révision' },
+];
+
+function getDocumentSortValue(doc, key) {
+  if (key === 'category') return doc.category?.name || '';
+  return doc[key];
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '';
@@ -257,6 +275,13 @@ export default function Documents() {
     });
   }, [documents, searchResultDocuments, statusFilter, categoryFilter]);
 
+  const { sorted: sortedDocuments, sortKey, direction, setSortKey, toggleSort } = useSort(
+    filteredDocuments,
+    getDocumentSortValue,
+    'created_at',
+    'desc'
+  );
+
   function handleDownload(event, doc) {
     event.stopPropagation();
     const url = getDocumentPublicUrl(doc.file_path);
@@ -391,6 +416,14 @@ export default function Documents() {
             </option>
           ))}
         </select>
+
+        <SortSelect
+          options={DOCUMENT_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
       </div>
 
       {(error || searchError) && (
@@ -414,7 +447,7 @@ export default function Documents() {
       ) : (
         <>
           <div className="mt-4 space-y-3 md:hidden">
-            {filteredDocuments.map((doc) => (
+            {sortedDocuments.map((doc) => (
               <div
                 key={doc.id}
                 onClick={() => navigate(`/documents/${doc.id}`)}
@@ -451,16 +484,16 @@ export default function Documents() {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
-                  <th className="px-4 py-3">Numéro</th>
-                  <th className="px-4 py-3">Titre</th>
-                  <th className="px-4 py-3">Catégorie</th>
-                  <th className="px-4 py-3">Version</th>
-                  <th className="px-4 py-3">Statut</th>
+                  <SortableTh label="Numéro" sortKey="number" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Titre" sortKey="title" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Catégorie" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Version" sortKey="version" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Statut" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredDocuments.map((doc) => (
+                {sortedDocuments.map((doc) => (
                   <tr key={doc.id} onClick={() => navigate(`/documents/${doc.id}`)} className="cursor-pointer hover:bg-slate-50">
                     <td className="px-4 py-3 font-medium text-slate-800">{doc.number}</td>
                     <td className="max-w-sm px-4 py-3 text-slate-700">

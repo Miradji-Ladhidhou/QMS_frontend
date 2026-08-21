@@ -2,6 +2,13 @@ import { useEffect, useState } from 'react';
 import { UserPlus } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { ASSIGNABLE_ROLES, ROLE_LABELS } from '../lib/roles.js';
+import { useSort } from '../lib/useSort.js';
+import SortSelect from './SortSelect.jsx';
+
+const USER_SORT_OPTIONS = [
+  { key: 'full_name', label: 'nom' },
+  { key: 'role', label: 'rôle' },
+];
 
 export default function UserManager({ currentUser, isAdmin }) {
   const [users, setUsers] = useState([]);
@@ -15,6 +22,12 @@ export default function UserManager({ currentUser, isAdmin }) {
   const [submittingInvite, setSubmittingInvite] = useState(false);
   const [resendingId, setResendingId] = useState(null);
   const [resendMessage, setResendMessage] = useState('');
+  const { sorted: sortedUsers, sortKey, direction, setSortKey, toggleSort } = useSort(
+    users,
+    (user, key) => user[key],
+    'full_name',
+    'asc'
+  );
 
   async function loadUsers() {
     setLoading(true);
@@ -199,6 +212,18 @@ export default function UserManager({ currentUser, isAdmin }) {
         </p>
       )}
 
+      {users.length > 0 && (
+        <div className="mt-4">
+          <SortSelect
+            options={USER_SORT_OPTIONS}
+            sortKey={sortKey}
+            direction={direction}
+            onChangeKey={setSortKey}
+            onToggleDirection={() => toggleSort(sortKey)}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="mt-4 space-y-2">
           {[0, 1, 2].map((key) => (
@@ -207,7 +232,7 @@ export default function UserManager({ currentUser, isAdmin }) {
         </div>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100">
-          {users.map((user) => {
+          {sortedUsers.map((user) => {
             const status = statusLabel(user);
             const isSelf = user.id === currentUser?.id;
             const isBusy = updatingId === user.id;

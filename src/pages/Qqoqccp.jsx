@@ -4,12 +4,20 @@ import { Download, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { QQOQCCP_STATUS_LABELS } from '../lib/qqoqccpStatus.js';
+import { useSort } from '../lib/useSort.js';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
+import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
+
+const QQOQCCP_SORT_OPTIONS = [
+  { key: 'created_at', label: 'date de création' },
+  { key: 'title', label: 'titre' },
+  { key: 'status', label: 'statut' },
+];
 
 function NewAnalysisModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('');
@@ -87,6 +95,13 @@ export default function Qqoqccp() {
       .finally(() => setLoading(false));
   }, []);
 
+  const { sorted: sortedAnalyses, sortKey, direction, setSortKey, toggleSort } = useSort(
+    analyses,
+    (analysis, key) => analysis[key],
+    'created_at',
+    'desc'
+  );
+
   function handleCreated(analysis) {
     setIsModalOpen(false);
     navigate(`/qqoqccp/${analysis.id}`);
@@ -127,6 +142,16 @@ export default function Qqoqccp() {
         </div>
       </div>
 
+      <div className="mt-4">
+        <SortSelect
+          options={QQOQCCP_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
+      </div>
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -154,7 +179,7 @@ export default function Qqoqccp() {
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          {analyses.map((analysis) => (
+          {sortedAnalyses.map((analysis) => (
             <div
               key={analysis.id}
               onClick={() => navigate(`/qqoqccp/${analysis.id}`)}

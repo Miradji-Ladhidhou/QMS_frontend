@@ -3,6 +3,13 @@ import { Navigate } from 'react-router-dom';
 import { Ban, CheckCircle2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useSort } from '../lib/useSort.js';
+import SortSelect from '../components/SortSelect.jsx';
+
+const EMPLOYEE_SORT_OPTIONS = [
+  { key: 'full_name', label: 'nom' },
+  { key: 'is_active', label: 'statut' },
+];
 
 function EmployeeModal({ employee, onClose, onSaved }) {
   const isNew = !employee;
@@ -106,6 +113,12 @@ export default function Employees() {
   const [editing, setEditing] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const { sorted: sortedEmployees, sortKey, direction, setSortKey, toggleSort } = useSort(
+    employees,
+    (employee, key) => employee[key],
+    'full_name',
+    'asc'
+  );
 
   async function loadEmployees() {
     setLoading(true);
@@ -187,6 +200,18 @@ export default function Employees() {
         </button>
       </div>
 
+      {employees.length > 0 && (
+        <div className="mt-4">
+          <SortSelect
+            options={EMPLOYEE_SORT_OPTIONS}
+            sortKey={sortKey}
+            direction={direction}
+            onChangeKey={setSortKey}
+            onToggleDirection={() => toggleSort(sortKey)}
+          />
+        </div>
+      )}
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -201,7 +226,7 @@ export default function Employees() {
         <p className="mt-6 text-sm text-slate-500">Aucune personne enregistrée pour l'instant.</p>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-          {employees.map((employee) => (
+          {sortedEmployees.map((employee) => (
             <li key={employee.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">

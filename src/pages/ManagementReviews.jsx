@@ -7,12 +7,20 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
+import { useSort } from '../lib/useSort.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
+import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
+
+const REVIEW_SORT_OPTIONS = [
+  { key: 'review_date', label: 'date de revue' },
+  { key: 'title', label: 'titre' },
+  { key: 'status', label: 'statut' },
+];
 
 function NewReviewModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('');
@@ -122,6 +130,13 @@ export default function ManagementReviews() {
       .finally(() => setLoading(false));
   }, []);
 
+  const { sorted: sortedReviews, sortKey, direction, setSortKey, toggleSort } = useSort(
+    reviews,
+    (review, key) => review[key],
+    'review_date',
+    'desc'
+  );
+
   function handleCreated(review) {
     setIsModalOpen(false);
     navigate(`/management-reviews/${review.id}`);
@@ -200,6 +215,16 @@ export default function ManagementReviews() {
         </div>
       </div>
 
+      <div className="mt-4">
+        <SortSelect
+          options={REVIEW_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
+      </div>
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -229,7 +254,7 @@ export default function ManagementReviews() {
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          {reviews.map((review) => (
+          {sortedReviews.map((review) => (
             <div
               key={review.id}
               onClick={() => navigate(`/management-reviews/${review.id}`)}
