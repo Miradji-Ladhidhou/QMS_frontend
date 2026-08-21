@@ -1,9 +1,23 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Download, Grid3x3, Loader2, Pencil, Plus, Trash2, UserCheck, X } from 'lucide-react';
+import {
+  Award,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  FileSignature,
+  Grid3x3,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  UserCheck,
+  UserX,
+  X,
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
@@ -12,6 +26,82 @@ import SortSelect from '../components/SortSelect.jsx';
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+const PERSON_KIND_LABEL = { user: 'Compte', employee: 'Sans compte' };
+
+function personKey(kind, id) {
+  return `${kind}:${id}`;
+}
+
+// Combine comptes et personnel sans compte en une seule liste triée, forme commune consommée
+// par PersonChecklist (enregistrement groupé + fiche de participation).
+function combinePeople(users, employees) {
+  return [
+    ...users.map((user) => ({ id: user.id, full_name: user.full_name, kind: 'user', training_exempt: user.training_exempt })),
+    ...employees.map((employee) => ({
+      id: employee.id,
+      full_name: employee.full_name,
+      kind: 'employee',
+      training_exempt: employee.training_exempt,
+    })),
+  ].sort((a, b) => a.full_name.localeCompare(b.full_name, 'fr'));
+}
+
+// Coche à cocher partagée par RecordModal (enregistrement groupé) et AttendanceSheetModal
+// (fiche de participation) : mêmes personnes, même geste de sélection.
+function PersonChecklist({ users, employees, selected, onToggle, onSetSelected }) {
+  const people = combinePeople(users, employees);
+  const eligibleKeys = people.filter((p) => !p.training_exempt).map((p) => personKey(p.kind, p.id));
+  const allEligibleSelected = eligibleKeys.length > 0 && eligibleKeys.every((key) => selected.has(key));
+
+  function toggleAll() {
+    onSetSelected(allEligibleSelected ? new Set() : new Set(eligibleKeys));
+  }
+
+  return (
+    <div>
+      <label className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+        <input
+          type="checkbox"
+          checked={allEligibleSelected}
+          onChange={toggleAll}
+          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+        />
+        Tous les utilisateurs
+      </label>
+      <div className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-slate-200 p-2">
+        {people.length === 0 && <p className="p-2 text-sm text-slate-400">Aucune personne disponible.</p>}
+        {people.map((person) => {
+          const key = personKey(person.kind, person.id);
+          return (
+            <label
+              key={key}
+              className={`flex items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50 ${
+                person.training_exempt ? 'opacity-60' : ''
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={selected.has(key)}
+                onChange={() => onToggle(key)}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+              />
+              <span className="flex-1 text-slate-800">{person.full_name}</span>
+              {person.kind === 'employee' && (
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                  Sans compte
+                </span>
+              )}
+              {person.training_exempt && (
+                <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700">Exclu</span>
+              )}
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
 }
 
 const TRAINING_SORT_OPTIONS = [
@@ -284,21 +374,24 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
 }
 
 function RecordModal({ training, users, employees, onClose, onRecorded }) {
-  const [source, setSource] = useState('user');
-  const [personId, setPersonId] = useState('');
+  const [selected, setSelected] = useState(new Set());
   const [completedAt, setCompletedAt] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  function handleSourceChange(next) {
-    setSource(next);
-    setPersonId('');
+  function toggle(key) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!personId) {
-      setError(source === 'user' ? 'Sélectionnez un utilisateur.' : 'Sélectionnez une personne.');
+    if (selected.size === 0) {
+      setError('Sélectionnez au moins une personne.');
       return;
     }
 
@@ -306,8 +399,13 @@ function RecordModal({ training, users, employees, onClose, onRecorded }) {
     setSubmitting(true);
 
     try {
-      const payload = source === 'user' ? { user_id: personId } : { employee_id: personId };
-      const { data } = await api.post(`/trainings/${training.id}/records`, { ...payload, completed_at: completedAt });
+      const userIds = [...selected].filter((key) => key.startsWith('user:')).map((key) => key.slice(5));
+      const employeeIds = [...selected].filter((key) => key.startsWith('employee:')).map((key) => key.slice(9));
+      const { data } = await api.post(`/trainings/${training.id}/records/bulk`, {
+        user_ids: userIds,
+        employee_ids: employeeIds,
+        completed_at: completedAt,
+      });
       onRecorded(data);
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer la réalisation.");
@@ -315,8 +413,6 @@ function RecordModal({ training, users, employees, onClose, onRecorded }) {
       setSubmitting(false);
     }
   }
-
-  const options = source === 'user' ? users : employees;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
@@ -336,49 +432,8 @@ function RecordModal({ training, users, employees, onClose, onRecorded }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Cette personne a-t-elle un compte ?</label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => handleSourceChange('user')}
-                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  source === 'user' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                Utilisateur du compte
-              </button>
-              <button
-                type="button"
-                onClick={() => handleSourceChange('employee')}
-                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  source === 'employee' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                Personnel sans compte
-              </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">
-              {source === 'user' ? 'Utilisateur' : 'Personne'}
-            </label>
-            <select
-              required
-              value={personId}
-              onChange={(e) => setPersonId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            >
-              <option value="">Sélectionner...</option>
-              {options.map((person) => (
-                <option key={person.id} value={person.id}>
-                  {person.full_name}
-                </option>
-              ))}
-            </select>
-            {source === 'employee' && options.length === 0 && (
-              <p className="mt-1 text-xs text-slate-400">Aucune personne enregistrée — ajoutez-la depuis Personnel.</p>
-            )}
+            <label className="mb-1 block text-sm font-medium text-slate-700">Participants</label>
+            <PersonChecklist users={users} employees={employees} selected={selected} onToggle={toggle} onSetSelected={setSelected} />
           </div>
 
           <div>
@@ -397,7 +452,191 @@ function RecordModal({ training, users, employees, onClose, onRecorded }) {
             disabled={submitting}
             className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
           >
-            {submitting ? 'Enregistrement...' : 'Enregistrer'}
+            {submitting
+              ? 'Enregistrement...'
+              : selected.size > 1
+                ? `Enregistrer pour ${selected.size} personnes`
+                : 'Enregistrer'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function AttendanceSheetModal({ training, users, employees, onClose }) {
+  const [selected, setSelected] = useState(new Set());
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [error, setError] = useState('');
+  const [downloading, setDownloading] = useState(false);
+
+  function toggle(key) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (selected.size === 0) {
+      setError('Sélectionnez au moins un participant.');
+      return;
+    }
+
+    setError('');
+    setDownloading(true);
+
+    try {
+      const userIds = [...selected].filter((key) => key.startsWith('user:')).map((key) => key.slice(5));
+      const employeeIds = [...selected].filter((key) => key.startsWith('employee:')).map((key) => key.slice(9));
+      await postForPdfDownload(
+        `/trainings/${training.id}/attendance-sheet/pdf`,
+        { user_ids: userIds, employee_ids: employeeIds, date },
+        `fiche-participation-${training.title.toLowerCase().replace(/\s+/g, '-')}-${date}.pdf`
+      );
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de générer la fiche de participation.');
+    } finally {
+      setDownloading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Fiche de participation</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-slate-500">{training.title}</p>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Participants</label>
+            <PersonChecklist users={users} employees={employees} selected={selected} onToggle={toggle} onSetSelected={setSelected} />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Date de la session</label>
+            <input
+              type="date"
+              required
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={downloading}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {downloading ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            {downloading ? 'Génération...' : 'Télécharger le PDF'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function ExcludePersonModal({ users, employees, onClose, onExcluded }) {
+  const [personKeyValue, setPersonKeyValue] = useState('');
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  const eligiblePeople = combinePeople(users, employees).filter((p) => !p.training_exempt);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!personKeyValue) {
+      setError('Sélectionnez une personne.');
+      return;
+    }
+
+    setError('');
+    setSubmitting(true);
+
+    const [kind, id] = personKeyValue.split(':');
+    try {
+      const { data } = await api.patch(`/${kind === 'user' ? 'users' : 'employees'}/${id}`, {
+        training_exempt: true,
+        training_exempt_reason: reason || undefined,
+      });
+      onExcluded(kind, data);
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'exclure cette personne.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Exclure du suivi formations</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-slate-500">
+          Cette personne n'apparaîtra plus comme en retard ou jamais formée dans la matrice des compétences ni dans les relances.
+        </p>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Personne</label>
+            <select
+              required
+              value={personKeyValue}
+              onChange={(e) => setPersonKeyValue(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Sélectionner...</option>
+              {eligiblePeople.map((person) => (
+                <option key={personKey(person.kind, person.id)} value={personKey(person.kind, person.id)}>
+                  {person.full_name} {person.kind === 'employee' ? '(sans compte)' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Motif (optionnel)</label>
+            <input
+              type="text"
+              placeholder="Ex : poste externe, congé longue durée..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Enregistrement...' : 'Exclure'}
           </button>
         </form>
       </div>
@@ -415,11 +654,14 @@ export default function Trainings() {
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [recordingTraining, setRecordingTraining] = useState(null);
+  const [attendanceSheetTraining, setAttendanceSheetTraining] = useState(null);
   const [editingTraining, setEditingTraining] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
+  const [isExcludeModalOpen, setIsExcludeModalOpen] = useState(false);
+  const [certificateDownloadingId, setCertificateDownloadingId] = useState(null);
 
   async function loadData() {
     setLoading(true);
@@ -451,13 +693,52 @@ export default function Trainings() {
     setIsNewModalOpen(false);
   }
 
-  function handleRecordCreated(record) {
+  function handleRecordCreated(records) {
     setTrainings((prev) =>
       prev.map((training) =>
-        training.id === recordingTraining.id ? { ...training, records: [...training.records, record] } : training
+        training.id === recordingTraining.id ? { ...training, records: [...training.records, ...records] } : training
       )
     );
     setRecordingTraining(null);
+  }
+
+  function handleExcluded(kind, updatedPerson) {
+    if (kind === 'user') {
+      setUsers((prev) => prev.map((u) => (u.id === updatedPerson.id ? updatedPerson : u)));
+    } else {
+      setEmployees((prev) => prev.map((e) => (e.id === updatedPerson.id ? updatedPerson : e)));
+    }
+    setIsExcludeModalOpen(false);
+  }
+
+  async function handleReinstate(person) {
+    try {
+      const { data } = await api.patch(`/${person.kind === 'user' ? 'users' : 'employees'}/${person.id}`, {
+        training_exempt: false,
+        training_exempt_reason: null,
+      });
+      if (person.kind === 'user') {
+        setUsers((prev) => prev.map((u) => (u.id === data.id ? data : u)));
+      } else {
+        setEmployees((prev) => prev.map((e) => (e.id === data.id ? data : e)));
+      }
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de réintégrer cette personne.');
+    }
+  }
+
+  async function handleDownloadCertificate(training, record) {
+    setCertificateDownloadingId(record.id);
+    try {
+      await getPdfDownload(
+        `/trainings/${training.id}/records/${record.id}/certificate/pdf`,
+        `certificat-${training.title.toLowerCase().replace(/\s+/g, '-')}-${personName(record).toLowerCase().replace(/\s+/g, '-')}.pdf`
+      );
+    } catch {
+      setError('Impossible de générer le certificat.');
+    } finally {
+      setCertificateDownloadingId(null);
+    }
   }
 
   function handleTrainingUpdated(updated) {
@@ -563,6 +844,8 @@ export default function Trainings() {
     'asc'
   );
 
+  const excludedPeople = combinePeople(users, employees).filter((p) => p.training_exempt);
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -613,6 +896,50 @@ export default function Trainings() {
           onToggleDirection={() => toggleSort(sortKey)}
         />
       </div>
+
+      {canManage && (
+        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <UserX size={18} className="text-slate-400" />
+              <h2 className="text-sm font-semibold text-slate-900">Personnel exclu des formations</h2>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsExcludeModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Plus size={14} />
+              Exclure
+            </button>
+          </div>
+
+          {excludedPeople.length === 0 ? (
+            <p className="mt-2 text-sm text-slate-400">Personne n'est exclue du suivi formations.</p>
+          ) : (
+            <ul className="mt-3 divide-y divide-slate-100">
+              {excludedPeople.map((person) => (
+                <li key={personKey(person.kind, person.id)} className="flex items-center justify-between gap-2 py-2 text-sm">
+                  <div className="min-w-0">
+                    <span className="font-medium text-slate-800">{person.full_name}</span>
+                    <span className="ml-1.5 text-xs text-slate-400">({PERSON_KIND_LABEL[person.kind]})</span>
+                    {person.training_exempt_reason && (
+                      <p className="truncate text-xs text-slate-400">{person.training_exempt_reason}</p>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleReinstate(person)}
+                    className="shrink-0 rounded-md border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Réintégrer
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
@@ -695,39 +1022,65 @@ export default function Trainings() {
                           {' — '}
                           {formatDate(record.completed_at)}
                         </span>
-                        {canManage && (
-                          <div className="flex shrink-0 gap-1">
-                            <button
-                              type="button"
-                              onClick={() => setEditingRecord({ training, record })}
-                              aria-label="Modifier la réalisation"
-                              className="p-1 text-slate-400 hover:text-primary"
-                            >
-                              <Pencil size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteRecord(training, record)}
-                              aria-label="Supprimer la réalisation"
-                              className="p-1 text-slate-400 hover:text-red-600"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </div>
-                        )}
+                        <div className="flex shrink-0 gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadCertificate(training, record)}
+                            disabled={certificateDownloadingId === record.id}
+                            aria-label="Télécharger le certificat de réussite"
+                            title="Certificat de réussite"
+                            className="p-1 text-slate-400 hover:text-primary disabled:opacity-50"
+                          >
+                            {certificateDownloadingId === record.id ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Award size={14} />
+                            )}
+                          </button>
+                          {canManage && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setEditingRecord({ training, record })}
+                                aria-label="Modifier la réalisation"
+                                className="p-1 text-slate-400 hover:text-primary"
+                              >
+                                <Pencil size={14} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteRecord(training, record)}
+                                aria-label="Supprimer la réalisation"
+                                className="p-1 text-slate-400 hover:text-red-600"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </li>
                     ))}
                   </ul>
                 )}
 
-                <button
-                  type="button"
-                  onClick={() => setRecordingTraining(training)}
-                  className="mt-4 flex items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  <UserCheck size={16} />
-                  Enregistrer une réalisation
-                </button>
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => setRecordingTraining(training)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <UserCheck size={16} />
+                    Enregistrer
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceSheetTraining(training)}
+                    className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    <FileSignature size={16} />
+                    Fiche de participation
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -743,6 +1096,24 @@ export default function Trainings() {
           employees={employees}
           onClose={() => setRecordingTraining(null)}
           onRecorded={handleRecordCreated}
+        />
+      )}
+
+      {attendanceSheetTraining && (
+        <AttendanceSheetModal
+          training={attendanceSheetTraining}
+          users={users}
+          employees={employees}
+          onClose={() => setAttendanceSheetTraining(null)}
+        />
+      )}
+
+      {isExcludeModalOpen && (
+        <ExcludePersonModal
+          users={users}
+          employees={employees}
+          onClose={() => setIsExcludeModalOpen(false)}
+          onExcluded={handleExcluded}
         />
       )}
 
