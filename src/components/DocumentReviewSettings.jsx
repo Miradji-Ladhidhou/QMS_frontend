@@ -12,6 +12,7 @@ export default function DocumentReviewSettings() {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [backfilledCount, setBackfilledCount] = useState(0);
 
   useEffect(() => {
     api
@@ -30,6 +31,7 @@ export default function DocumentReviewSettings() {
     try {
       const { data } = await api.patch('/tenant', { document_review_frequency_months: months || null });
       setMonths(data.document_review_frequency_months || '');
+      setBackfilledCount(data.backfilled_review_dates_count || 0);
       setSaved(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible d’enregistrer le paramétrage.');
@@ -56,6 +58,8 @@ export default function DocumentReviewSettings() {
       {saved && (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           Paramétrage enregistré.
+          {backfilledCount > 0 &&
+            ` Date de révision calculée pour ${backfilledCount} document${backfilledCount > 1 ? 's' : ''} qui n'en avait pas.`}
         </p>
       )}
 
