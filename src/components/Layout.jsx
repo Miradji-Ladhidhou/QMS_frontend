@@ -31,6 +31,19 @@ import { ROLE_LABELS } from '../lib/roles.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import NotificationBell from './NotificationBell.jsx';
 
+// Rafraîchie chaque minute (pas chaque seconde) : le menu n'affiche pas les secondes, inutile
+// de re-render 60x plus souvent que ce qui est visible.
+function useNow() {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(id);
+  }, []);
+
+  return now;
+}
+
 function initialsOf(fullName) {
   if (!fullName) return '?';
   return fullName
@@ -74,6 +87,13 @@ export default function Layout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
+  const now = useNow();
+  const timeZone = tenant?.timezone || 'UTC';
+  // Paramétrable via Paramètres > Informations de l'entreprise (voir CompanySettings.jsx) —
+  // formaté avec le fuseau du tenant plutôt que celui du navigateur, pour rester cohérent avec
+  // les échéances (CAPA, formations...) que le backend calcule selon ce même fuseau.
+  const timeLabel = new Intl.DateTimeFormat('fr-FR', { timeZone, hour: '2-digit', minute: '2-digit' }).format(now);
+  const dateLabel = new Intl.DateTimeFormat('fr-FR', { timeZone, day: 'numeric', month: 'long', year: 'numeric' }).format(now);
 
   useEffect(() => {
     api
@@ -130,6 +150,11 @@ export default function Layout() {
               <X size={22} />
             </button>
           </div>
+        </div>
+
+        <div className="mx-3 mb-3 flex items-baseline gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white/80">
+          <span className="text-base font-semibold tabular-nums text-white">{timeLabel}</span>
+          <span className="truncate text-xs capitalize">{dateLabel}</span>
         </div>
 
         {currentUser && (

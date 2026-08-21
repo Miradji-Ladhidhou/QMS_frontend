@@ -3,9 +3,14 @@ import { Upload } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 
+// Liste complète des fuseaux IANA fournie par le navigateur — évite de maintenir une liste à
+// la main, et garantit qu'Intl.DateTimeFormat sait toujours interpréter la valeur choisie.
+const TIMEZONES = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['UTC'];
+
 export default function CompanySettings({ isAdmin }) {
   const [tenant, setTenant] = useState(null);
   const [name, setName] = useState('');
+  const [timezone, setTimezone] = useState('UTC');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -19,6 +24,7 @@ export default function CompanySettings({ isAdmin }) {
       const { data } = await api.get('/tenant');
       setTenant(data);
       setName(data.name);
+      setTimezone(data.timezone || 'UTC');
     } catch {
       setError("Impossible de charger les informations de l'entreprise.");
     } finally {
@@ -37,11 +43,15 @@ export default function CompanySettings({ isAdmin }) {
     setSavingName(true);
 
     try {
-      const { data } = await api.patch('/tenant', { name });
+      const { data } = await api.patch('/tenant', { name, timezone });
       setTenant(data);
-      setSuccess('Nom mis à jour.');
+      // useTenant() (Layout.jsx, horloge du menu) ne recharge pas tout seul après ce PATCH —
+      // ce broadcast le prévient explicitement, sinon le fuseau affiché reste l'ancien tant
+      // qu'aucune navigation ne remonte le composant.
+      window.dispatchEvent(new CustomEvent('tenant-updated', { detail: data }));
+      setSuccess('Informations mises à jour.');
     } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de mettre à jour le nom.');
+      setError(err.response?.data?.error || 'Impossible de mettre à jour les informations.');
     } finally {
       setSavingName(false);
     }
@@ -122,6 +132,21 @@ export default function CompanySettings({ isAdmin }) {
             onChange={(e) => setName(e.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
           />
+        </div>
+        <div className="flex-1">
+          <label className="mb-1 block text-sm font-medium text-slate-700">Fuseau horaire</label>
+          <select
+            disabled={!isAdmin}
+            value={timezone}
+            onChange={(e) => setTimezone(e.target.value)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+          >
+            {TIMEZONES.map((tz) => (
+              <option key={tz} value={tz}>
+                {tz}
+              </option>
+            ))}
+          </select>
         </div>
         {isAdmin && (
           <button
