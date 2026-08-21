@@ -15,6 +15,7 @@ function EmployeeModal({ employee, onClose, onSaved }) {
   const isNew = !employee;
   const [fullName, setFullName] = useState(employee?.full_name || '');
   const [email, setEmail] = useState(employee?.email || '');
+  const [jobTitle, setJobTitle] = useState(employee?.job_title || '');
   const [isActive, setIsActive] = useState(employee?.is_active ?? true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -26,12 +27,17 @@ function EmployeeModal({ employee, onClose, onSaved }) {
 
     try {
       if (isNew) {
-        const { data } = await api.post('/employees', { full_name: fullName, email: email || undefined });
+        const { data } = await api.post('/employees', {
+          full_name: fullName,
+          email: email || undefined,
+          job_title: jobTitle || undefined,
+        });
         onSaved(data);
       } else {
         const { data } = await api.patch(`/employees/${employee.id}`, {
           full_name: fullName,
           email: email || null,
+          job_title: jobTitle || null,
           is_active: isActive,
         });
         onSaved(data);
@@ -75,6 +81,17 @@ function EmployeeModal({ employee, onClose, onSaved }) {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Fonction (optionnel)</label>
+            <input
+              type="text"
+              placeholder="Affichée sur la fiche de participation aux formations"
+              value={jobTitle}
+              onChange={(e) => setJobTitle(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>

@@ -120,7 +120,14 @@ function getTrainingSortValue(training, key) {
 }
 
 function NewTrainingModal({ onClose, onCreated }) {
-  const [form, setForm] = useState({ title: '', type: '', frequency_months: '' });
+  const [form, setForm] = useState({
+    title: '',
+    type: '',
+    frequency_months: '',
+    location: '',
+    instructor: '',
+    duration: '',
+  });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -138,6 +145,9 @@ function NewTrainingModal({ onClose, onCreated }) {
         title: form.title,
         type: form.type || undefined,
         frequency_months: form.frequency_months ? Number(form.frequency_months) : undefined,
+        location: form.location || undefined,
+        instructor: form.instructor || undefined,
+        duration: form.duration || undefined,
       };
       const { data } = await api.post('/trainings', payload);
       onCreated(data);
@@ -150,7 +160,7 @@ function NewTrainingModal({ onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Nouvelle formation</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -197,6 +207,38 @@ function NewTrainingModal({ onClose, onCreated }) {
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Durée</label>
+              <input
+                type="text"
+                placeholder="Ex : 3h30, 2 jours"
+                value={form.duration}
+                onChange={(e) => updateField('duration', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Lieu</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => updateField('location', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Formateur / intervenant</label>
+            <input
+              type="text"
+              value={form.instructor}
+              onChange={(e) => updateField('instructor', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
           <button
             type="submit"
             disabled={submitting}
@@ -215,6 +257,9 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
     title: training.title,
     type: training.type || '',
     frequency_months: training.frequency_months || '',
+    location: training.location || '',
+    instructor: training.instructor || '',
+    duration: training.duration || '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -233,6 +278,9 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
         title: form.title,
         type: form.type || null,
         frequency_months: form.frequency_months ? Number(form.frequency_months) : null,
+        location: form.location || null,
+        instructor: form.instructor || null,
+        duration: form.duration || null,
       });
       onUpdated(data);
     } catch (err) {
@@ -244,7 +292,7 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Modifier la formation</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -287,6 +335,38 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
               placeholder="Laisser vide si formation ponctuelle"
               value={form.frequency_months}
               onChange={(e) => updateField('frequency_months', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Durée</label>
+              <input
+                type="text"
+                placeholder="Ex : 3h30, 2 jours"
+                value={form.duration}
+                onChange={(e) => updateField('duration', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Lieu</label>
+              <input
+                type="text"
+                value={form.location}
+                onChange={(e) => updateField('location', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Formateur / intervenant</label>
+            <input
+              type="text"
+              value={form.instructor}
+              onChange={(e) => updateField('instructor', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
@@ -378,6 +458,10 @@ function RecordModal({ training, users, employees, onClose, onRecorded }) {
   const [completedAt, setCompletedAt] = useState(new Date().toISOString().slice(0, 10));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  // Renseigné après un enregistrement partiel (doublons ignorés) : le modal reste ouvert un
+  // instant pour que le manager voie clairement qui a été ignoré, plutôt que de se fermer sans
+  // rien dire — c'est exactement l'absence de retour qui a permis les doublons silencieux.
+  const [skippedNames, setSkippedNames] = useState(null);
 
   function toggle(key) {
     setSelected((prev) => {
@@ -386,6 +470,11 @@ function RecordModal({ training, users, employees, onClose, onRecorded }) {
       else next.add(key);
       return next;
     });
+  }
+
+  function resolveNames(ids, kind) {
+    const source = kind === 'user' ? users : employees;
+    return ids.map((id) => source.find((p) => p.id === id)?.full_name || '?');
   }
 
   async function handleSubmit(event) {
@@ -406,12 +495,54 @@ function RecordModal({ training, users, employees, onClose, onRecorded }) {
         employee_ids: employeeIds,
         completed_at: completedAt,
       });
-      onRecorded(data);
+
+      const skipped = [
+        ...resolveNames(data.skipped.user_ids, 'user'),
+        ...resolveNames(data.skipped.employee_ids, 'employee'),
+      ];
+
+      // onRecorded ne fait que verser les réalisations créées dans le state du parent — c'est
+      // onClose qui ferme le modal, appelé ici tout de suite (cas courant) ou par le bouton
+      // "Fermer" de l'écran récapitulatif ci-dessous (pour laisser le temps de lire les
+      // doublons ignorés avant que le modal ne disparaisse).
+      onRecorded(data.created);
+      if (skipped.length > 0) {
+        setSkippedNames(skipped);
+      } else {
+        onClose();
+      }
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer la réalisation.");
     } finally {
       setSubmitting(false);
     }
+  }
+
+  if (skippedNames) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+        <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-slate-900">Réalisation enregistrée</h2>
+            <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+              <X size={20} />
+            </button>
+          </div>
+          <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            {skippedNames.length} personne{skippedNames.length > 1 ? 's' : ''} déjà enregistrée
+            {skippedNames.length > 1 ? 's' : ''} pour cette formation à cette date {skippedNames.length > 1 ? 'ont' : 'a'} été
+            ignorée{skippedNames.length > 1 ? 's' : ''} : {skippedNames.join(', ')}.
+          </p>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            Fermer
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -693,13 +824,15 @@ export default function Trainings() {
     setIsNewModalOpen(false);
   }
 
+  // Ne ferme plus le modal lui-même (voir RecordModal) : après un enregistrement partiel, il
+  // reste ouvert le temps d'afficher qui a été ignoré comme doublon, puis se ferme via son
+  // propre bouton "Fermer" (onClose={() => setRecordingTraining(null)}, déjà câblé plus bas).
   function handleRecordCreated(records) {
     setTrainings((prev) =>
       prev.map((training) =>
         training.id === recordingTraining.id ? { ...training, records: [...training.records, ...records] } : training
       )
     );
-    setRecordingTraining(null);
   }
 
   function handleExcluded(kind, updatedPerson) {
@@ -992,6 +1125,11 @@ export default function Trainings() {
                     ? `Renouvellement tous les ${training.frequency_months} mois`
                     : 'Formation ponctuelle'}
                 </p>
+                {(training.duration || training.instructor || training.location) && (
+                  <p className="mt-1 text-xs text-slate-400">
+                    {[training.duration, training.instructor, training.location].filter(Boolean).join(' · ')}
+                  </p>
+                )}
 
                 <button
                   type="button"

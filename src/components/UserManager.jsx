@@ -60,6 +60,23 @@ export default function UserManager({ currentUser, isAdmin }) {
     }
   }
 
+  async function handleJobTitleBlur(user, value) {
+    const jobTitle = value.trim();
+    if (jobTitle === (user.job_title || '')) return;
+
+    setUpdatingId(user.id);
+    setError('');
+
+    try {
+      const { data } = await api.patch(`/users/${user.id}`, { job_title: jobTitle || null });
+      setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, ...data } : item)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de mettre à jour la fonction.');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   async function handleToggleActive(user) {
     setUpdatingId(user.id);
     setError('');
@@ -250,6 +267,19 @@ export default function UserManager({ currentUser, isAdmin }) {
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2">
+                  {isAdmin && (
+                    <input
+                      key={`${user.id}-${user.job_title || ''}`}
+                      type="text"
+                      defaultValue={user.job_title || ''}
+                      onBlur={(e) => handleJobTitleBlur(user, e.target.value)}
+                      disabled={isBusy}
+                      placeholder="Fonction"
+                      title="Fonction (affichée sur la fiche de participation aux formations)"
+                      className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+                    />
+                  )}
+
                   {isAdmin && user.invitation_pending && user.is_active && (
                     <button
                       type="button"
