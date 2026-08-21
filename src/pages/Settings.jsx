@@ -6,6 +6,7 @@ import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
 import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
 import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
+import DriveStorageSettings from '../components/DriveStorageSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import Groups from './Groups.jsx';
 
@@ -22,7 +23,13 @@ const TABS = [
 
 export default function Settings() {
   const [currentUser, setCurrentUser] = useState(null);
-  const [activeTab, setActiveTab] = useState('company');
+  // Le callback OAuth Google Drive (backend) redirige vers /settings?drive=connected|error —
+  // sans ce cas particulier, l'utilisateur atterrirait sur l'onglet "Entreprise" par défaut et
+  // ne verrait jamais la confirmation d'activation ni l'erreur, puisque DriveStorageSettings
+  // ne serait pas monté.
+  const [activeTab, setActiveTab] = useState(() =>
+    new URLSearchParams(window.location.search).has('drive') ? 'documents' : 'company'
+  );
 
   function loadCurrentUser() {
     api
@@ -62,7 +69,12 @@ export default function Settings() {
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}
-        {activeTab === 'documents' && isAdmin && <DocumentReviewSettings />}
+        {activeTab === 'documents' && isAdmin && (
+          <div className="space-y-4">
+            <DocumentReviewSettings />
+            <DriveStorageSettings />
+          </div>
+        )}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />
         )}
