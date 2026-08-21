@@ -48,8 +48,9 @@ export default function DocumentReviewSettings() {
     <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
       <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Révision documentaire</h2>
       <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-        Fréquence par défaut, en mois, à laquelle un document doit être révisé — la date de révision se recalcule
-        automatiquement à chaque nouvelle version. Ajustable pour un document précis depuis sa fiche.
+        Fréquence par défaut, en mois, à laquelle un document doit être révisé. Enregistrer ici recalcule
+        immédiatement la date de révision de tous les documents qui n'ont pas leur propre fréquence — ajustable
+        pour un document précis depuis sa fiche, ce qui le protège de ce défaut.
       </p>
 
       {error && (
@@ -59,7 +60,7 @@ export default function DocumentReviewSettings() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
           Paramétrage enregistré.
           {backfilledCount > 0 &&
-            ` Date de révision calculée pour ${backfilledCount} document${backfilledCount > 1 ? 's' : ''} qui n'en avait pas.`}
+            ` Date de révision recalculée pour ${backfilledCount} document${backfilledCount > 1 ? 's' : ''} (sans fréquence propre).`}
         </p>
       )}
 
