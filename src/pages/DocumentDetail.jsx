@@ -18,6 +18,7 @@ import {
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import { isManagerRole } from '../lib/roles.js';
+import { useTenant } from '../lib/useTenant.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import ApprovalStatusBadge from '../components/ApprovalStatusBadge.jsx';
@@ -240,6 +241,7 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const tenant = useTenant();
   const [doc, setDoc] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [users, setUsers] = useState([]);
@@ -372,6 +374,12 @@ export default function DocumentDetail() {
   const otherUsers = users.filter((user) => user.id !== currentUser?.id);
   const canManage = isManagerRole(currentUser?.role);
 
+  // Un document sans fréquence propre suit le défaut du tenant (voir Paramètres > Documents) —
+  // le libellé doit refléter laquelle des deux s'applique, jamais dire "spécifique à ce
+  // document" pour un réglage qui vient en réalité du défaut global.
+  const usesOwnFrequency = Boolean(doc.review_frequency_months);
+  const effectiveReviewFrequency = doc.review_frequency_months || tenant?.document_review_frequency_months || null;
+
   return (
     <div>
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -480,7 +488,8 @@ export default function DocumentDetail() {
         <p className="mt-4 text-sm text-slate-500">
           Créé le {formatDate(doc.created_at)}
           {doc.review_date && ` · Date de révision : ${formatDate(doc.review_date)}`}
-          {doc.review_frequency_months && ` (tous les ${doc.review_frequency_months} mois, spécifique à ce document)`}
+          {effectiveReviewFrequency &&
+            ` (tous les ${effectiveReviewFrequency} mois, ${usesOwnFrequency ? 'spécifique à ce document' : 'réglage par défaut'})`}
         </p>
 
         {restrictedAccess && (
