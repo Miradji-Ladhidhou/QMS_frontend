@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, Loader2, RefreshCw, Sparkles } from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, Loader2, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -282,6 +282,8 @@ export default function QqoqccpDetail() {
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [capaError, setCapaError] = useState('');
   const [creatingCapa, setCreatingCapa] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   useEffect(() => {
     setLoading(true);
@@ -498,6 +500,21 @@ export default function QqoqccpDetail() {
     );
   }
 
+  async function handleDelete() {
+    if (!window.confirm(`Supprimer définitivement l'analyse "${analysis.title}" ? Cette action est irréversible.`)) return;
+
+    setDeleteError('');
+    setDeleting(true);
+
+    try {
+      await api.delete(`/qqoqccp/${id}`);
+      navigate('/qqoqccp');
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || 'Impossible de supprimer cette analyse.');
+      setDeleting(false);
+    }
+  }
+
   async function handleExportPdf() {
     setExportError('');
     setExportingPdf(true);
@@ -546,9 +563,21 @@ export default function QqoqccpDetail() {
             {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             Exporter PDF
           </button>
+          {isManagerRole(currentUser?.role) && (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+            >
+              <Trash2 size={16} />
+              {deleting ? 'Suppression...' : 'Supprimer'}
+            </button>
+          )}
         </div>
       </div>
       {exportError && <p className="mt-2 text-sm text-red-600">{exportError}</p>}
+      {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
 
       <div className="mt-4 space-y-4">
         {QUESTIONS.map(({ key, label, placeholder }) => (
