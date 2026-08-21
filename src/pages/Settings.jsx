@@ -5,6 +5,7 @@ import CategoryManager from '../components/CategoryManager.jsx';
 import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
 import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
+import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import Groups from './Groups.jsx';
 
@@ -14,6 +15,7 @@ const TABS = [
   { id: 'users', label: 'Utilisateurs' },
   { id: 'groups', label: 'Groupes', adminOnly: true },
   { id: 'capa', label: 'CAPA', adminOnly: true },
+  { id: 'documents', label: 'Documents', adminOnly: true },
   { id: 'profile', label: 'Mon profil' },
   { id: 'notifications', label: 'Notifications' },
 ];
@@ -60,6 +62,7 @@ export default function Settings() {
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}
+        {activeTab === 'documents' && isAdmin && <DocumentReviewSettings />}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />
         )}

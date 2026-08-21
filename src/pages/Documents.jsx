@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, Plus, Search, X } from 'lucide-react';
+import { Download, Loader2, Plus, Search, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
@@ -51,7 +51,14 @@ function MatchLocationBadge({ location }) {
 }
 
 function DocumentModal({ categories, onClose, onCreated }) {
-  const [form, setForm] = useState({ number: '', title: '', description: '', category_id: '', review_date: '' });
+  const [form, setForm] = useState({
+    number: '',
+    title: '',
+    description: '',
+    category_id: '',
+    review_date: '',
+    review_frequency_months: '',
+  });
   const [file, setFile] = useState(null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -72,6 +79,7 @@ function DocumentModal({ categories, onClose, onCreated }) {
       if (form.description) formData.append('description', form.description);
       if (form.category_id) formData.append('category_id', form.category_id);
       if (form.review_date) formData.append('review_date', form.review_date);
+      if (form.review_frequency_months) formData.append('review_frequency_months', form.review_frequency_months);
       if (file) formData.append('file', file);
 
       const { data } = await api.post('/documents', formData);
@@ -146,14 +154,28 @@ function DocumentModal({ categories, onClose, onCreated }) {
             </select>
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Date de révision</label>
-            <input
-              type="date"
-              value={form.review_date}
-              onChange={(e) => updateField('review_date', e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Date de révision</label>
+              <input
+                type="date"
+                value={form.review_date}
+                onChange={(e) => updateField('review_date', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+              <p className="mt-1 text-xs text-slate-400">Laisser vide pour calculer depuis la fréquence par défaut.</p>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence de révision (mois)</label>
+              <input
+                type="number"
+                min="1"
+                placeholder="Défaut du tenant"
+                value={form.review_frequency_months}
+                onChange={(e) => updateField('review_frequency_months', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
           </div>
 
           <div>
@@ -178,6 +200,157 @@ function DocumentModal({ categories, onClose, onCreated }) {
   );
 }
 
+const RESULT_STATUS_STYLES = {
+  created: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+  warning: 'bg-amber-50 text-amber-700 border-amber-200',
+  error: 'bg-red-50 text-red-700 border-red-200',
+};
+const RESULT_STATUS_LABELS = { created: 'Créé', warning: 'Créé (avec avertissement)', error: 'Erreur' };
+
+function ImportDocumentsModal({ onClose, onImported }) {
+  const [file, setFile] = useState(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState(null);
+
+  async function handleDownloadTemplate() {
+    setError('');
+    setDownloadingTemplate(true);
+    try {
+      const response = await api.get('/documents/import-template.xlsx', { responseType: 'blob' });
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'modele-import-documents.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch {
+      setError('Impossible de télécharger le modèle.');
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (!file) {
+      setError('Sélectionnez le fichier Excel rempli.');
+      return;
+    }
+
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const { data } = await api.post('/documents/import', formData);
+      setResult(data);
+      if (data.created_count > 0) onImported();
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'importer le fichier.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Importer des documents</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {!result ? (
+          <>
+            <p className="mb-4 text-sm text-slate-500">
+              Téléchargez le modèle, remplissez une ligne par document, puis renvoyez le fichier. Aucun fichier
+              associé n'est créé par cet import — ajoutez-le ensuite depuis chaque fiche document.
+            </p>
+
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              disabled={downloadingTemplate}
+              className="mb-4 flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {downloadingTemplate ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+              Télécharger le modèle Excel
+            </button>
+
+            {error && (
+              <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Fichier rempli (.xlsx)</label>
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  required
+                  onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                  className="w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+              >
+                {submitting ? 'Import en cours...' : 'Importer'}
+              </button>
+            </form>
+          </>
+        ) : (
+          <>
+            <p className="mb-4 text-sm text-slate-600">
+              <span className="font-medium text-emerald-700">{result.created_count} document(s) créé(s)</span>
+              {result.error_count > 0 && (
+                <span className="text-red-600"> · {result.error_count} ligne(s) en erreur</span>
+              )}
+            </p>
+
+            <ul className="max-h-80 space-y-1.5 overflow-y-auto">
+              {result.results.map((row) => (
+                <li
+                  key={row.row}
+                  className={`flex items-start justify-between gap-2 rounded-md border px-3 py-2 text-sm ${RESULT_STATUS_STYLES[row.status]}`}
+                >
+                  <span>
+                    <span className="font-medium">Ligne {row.row}</span>
+                    {row.title ? ` — ${row.title}` : row.number ? ` — ${row.number}` : ''}
+                    {row.message && <span className="block text-xs opacity-90">{row.message}</span>}
+                  </span>
+                  <span className="shrink-0 text-xs font-medium">{RESULT_STATUS_LABELS[row.status]}</span>
+                </li>
+              ))}
+            </ul>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700"
+            >
+              Fermer
+            </button>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Documents() {
   const navigate = useNavigate();
   const [documents, setDocuments] = useState([]);
@@ -191,6 +364,7 @@ export default function Documents() {
   const [statusFilter, setStatusFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
 
@@ -364,6 +538,14 @@ export default function Documents() {
           </button>
           <button
             type="button"
+            onClick={() => setIsImportModalOpen(true)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
+          >
+            <Upload size={18} />
+            Importer
+          </button>
+          <button
+            type="button"
             onClick={() => setIsModalOpen(true)}
             className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
           >
@@ -531,6 +713,10 @@ export default function Documents() {
 
       {isModalOpen && (
         <DocumentModal categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+      )}
+
+      {isImportModalOpen && (
+        <ImportDocumentsModal onClose={() => setIsImportModalOpen(false)} onImported={loadData} />
       )}
     </div>
   );

@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, BadgeCheck, Check, ChevronDown, ChevronUp, Download, Lock, Send, Trash2, Upload, X, XCircle } from 'lucide-react';
+import {
+  ArrowLeft,
+  BadgeCheck,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Download,
+  Lock,
+  Pencil,
+  Send,
+  Trash2,
+  Upload,
+  X,
+  XCircle,
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { getDocumentPublicUrl } from '../lib/storage.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -18,7 +32,14 @@ const AUDIT_ACTION_LABELS = {
   downloaded: 'Téléchargé',
   status_changed_manually: 'Statut modifié manuellement',
   certificate_generated: 'Certificat généré',
+  metadata_edited_manually: 'Informations administratives modifiées manuellement',
+  created_via_import: 'Créé par import en masse',
 };
+
+// yyyy-mm-ddThh:mm:ss... -> yyyy-mm-dd, pour un <input type="date">.
+function toDateInputValue(dateStr) {
+  return dateStr ? dateStr.slice(0, 10) : '';
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -109,6 +130,113 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
   );
 }
 
+// Réservé à l'administration documentaire : version, date de création, révision — jamais
+// titre/numéro/description/fichier, gérés par leurs propres flux (nouvelle version, statut).
+function EditMetadataModal({ doc, onClose, onUpdated }) {
+  const [version, setVersion] = useState(doc.version);
+  const [createdAt, setCreatedAt] = useState(toDateInputValue(doc.created_at));
+  const [reviewDate, setReviewDate] = useState(toDateInputValue(doc.review_date));
+  const [reviewFrequencyMonths, setReviewFrequencyMonths] = useState(doc.review_frequency_months || '');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    try {
+      const { data } = await api.patch(`/documents/${doc.id}/metadata`, {
+        version,
+        created_at: createdAt ? new Date(`${createdAt}T00:00:00`).toISOString() : undefined,
+        review_date: reviewDate || null,
+        review_frequency_months: reviewFrequencyMonths || null,
+      });
+      onUpdated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de modifier ces informations.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Informations administratives</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Version</label>
+            <input
+              type="text"
+              required
+              value={version}
+              onChange={(e) => setVersion(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Date de création</label>
+            <input
+              type="date"
+              required
+              value={createdAt}
+              onChange={(e) => setCreatedAt(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Date de révision</label>
+              <input
+                type="date"
+                value={reviewDate}
+                onChange={(e) => setReviewDate(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence (mois)</label>
+              <input
+                type="number"
+                min="1"
+                placeholder="Défaut du tenant"
+                value={reviewFrequencyMonths}
+                onChange={(e) => setReviewFrequencyMonths(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </div>
+          <p className="text-xs text-slate-400">
+            La fréquence propre à ce document remplace le défaut du tenant, et sert à recalculer la date de révision
+            à chaque nouvelle version.
+          </p>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Enregistrement...' : 'Enregistrer'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -120,6 +248,7 @@ export default function DocumentDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMetadataModalOpen, setIsEditMetadataModalOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [decisionModal, setDecisionModal] = useState(null);
   const [certificateError, setCertificateError] = useState('');
@@ -175,6 +304,11 @@ export default function DocumentDetail() {
 
   function handleUploaded() {
     setIsModalOpen(false);
+    loadDocument();
+  }
+
+  function handleMetadataUpdated() {
+    setIsEditMetadataModalOpen(false);
     loadDocument();
   }
 
@@ -326,14 +460,28 @@ export default function DocumentDetail() {
               <Upload size={16} />
               Nouvelle version
             </button>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setIsEditMetadataModalOpen(true)}
+                aria-label="Modifier les informations administratives"
+                title="Version, date de création, révision"
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <Pencil size={16} />
+                Modifier
+              </button>
+            )}
           </div>
         </div>
 
         {doc.description && <p className="mt-4 text-sm text-slate-600">{doc.description}</p>}
 
-        {doc.review_date && (
-          <p className="mt-4 text-sm text-slate-500">Date de révision : {formatDate(doc.review_date)}</p>
-        )}
+        <p className="mt-4 text-sm text-slate-500">
+          Créé le {formatDate(doc.created_at)}
+          {doc.review_date && ` · Date de révision : ${formatDate(doc.review_date)}`}
+          {doc.review_frequency_months && ` (tous les ${doc.review_frequency_months} mois, spécifique à ce document)`}
+        </p>
 
         {restrictedAccess && (
           <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 p-3">
@@ -495,6 +643,10 @@ export default function DocumentDetail() {
 
       {isModalOpen && (
         <NewVersionModal documentId={doc.id} onClose={() => setIsModalOpen(false)} onUploaded={handleUploaded} />
+      )}
+
+      {isEditMetadataModalOpen && (
+        <EditMetadataModal doc={doc} onClose={() => setIsEditMetadataModalOpen(false)} onUpdated={handleMetadataUpdated} />
       )}
 
       {isSubmitModalOpen && (
