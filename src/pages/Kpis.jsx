@@ -345,17 +345,21 @@ function KpiFormModal({ kpi, folderId, onClose, onSaved }) {
       payload.folder_id = folderId || null;
     }
 
+    // onSaved() volontairement hors du try : un bug dans le handler du parent (ex. state React
+    // mal câblé) ne doit jamais se faire passer pour un échec de l'appel API — c'est exactement
+    // ce qui s'est produit avec un setHasAnyKpi orphelin qui affichait "Impossible de créer le
+    // KPI." alors que la création avait réussi.
+    let response;
     try {
-      const { data } = isEditing
-        ? await api.patch(`/kpis/${kpi.id}`, payload)
-        : await api.post('/kpis', payload);
-      onSaved(data, isEditing);
+      response = isEditing ? await api.patch(`/kpis/${kpi.id}`, payload) : await api.post('/kpis', payload);
     } catch (err) {
       setFieldErrors(fieldErrorsFromResponse(err));
       setError(err.response?.data?.error || `Impossible ${isEditing ? 'de modifier' : 'de créer'} le KPI.`);
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onSaved(response.data, isEditing);
   }
 
   return (
@@ -509,11 +513,13 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
       comment: comment || null,
     };
 
+    // onSaved() hors du try, même raison qu'ailleurs dans ce fichier : un bug du handler
+    // parent ne doit jamais être rapporté comme un échec de l'appel API.
+    let response;
     try {
-      const { data } = isEditing
+      response = isEditing
         ? await api.patch(`/kpis/${kpi.id}/records/${activeRecord.id}`, payload)
         : await api.post(`/kpis/${kpi.id}/records`, payload);
-      onSaved(data, isEditing);
     } catch (err) {
       if (!isEditing && err.response?.status === 409) {
         setError('Une valeur existe déjà pour cette période.');
@@ -521,9 +527,11 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
       } else {
         setError(err.response?.data?.error || `Impossible ${isEditing ? 'de modifier' : "d'enregistrer"} cette valeur.`);
       }
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onSaved(response.data, isEditing);
   }
 
   function handleSwitchToEdit() {
@@ -2847,9 +2855,6 @@ export default function Kpis() {
   const [proofModal, setProofModal] = useState(null); // { kpi, record } — preuve derrière un point du graphique
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
-  // Indépendant du dossier parcouru : le bouton rapport porte sur TOUS les KPI du tenant
-  // (voir GET /kpis/report), donc ne doit pas se désactiver juste parce qu'un dossier vide
-  // est affiché. Optimiste tant que non chargé, pour éviter un flash désactivé au montage.
   const [currentFolderId, setCurrentFolderId] = useState(null); // null = racine
   const [breadcrumb, setBreadcrumb] = useState([]); // ancêtres du dossier courant, racine → courant
   const [folders, setFolders] = useState([]); // sous-dossiers directs du dossier courant
@@ -2975,7 +2980,6 @@ export default function Kpis() {
       setKpis((prev) => prev.map((kpi) => (kpi.id === data.id ? { ...kpi, ...data } : kpi)));
     } else {
       setKpis((prev) => [...prev, { ...data, records: [] }]);
-      setHasAnyKpi(true);
     }
     setFormModal(null);
   }
