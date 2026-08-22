@@ -18,7 +18,14 @@ export default function CategoryVisibilityField({
         <button
           type="button"
           disabled={disabled}
-          onClick={() => onIsPrivateChange(false)}
+          onClick={() => {
+            // En sortant de "Uniquement moi", categoryId contient encore l'id de la catégorie
+            // personnelle (masquée, jamais affichée dans le sélecteur) : sans ce reset, un
+            // retour à "Tout le monde" sans re-choisir de catégorie laisserait l'élément privé
+            // en silence malgré le bouton affiché.
+            if (isPrivate) onCategoryIdChange('');
+            onIsPrivateChange(false);
+          }}
           className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-60 ${
             !isPrivate ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
           }`}
