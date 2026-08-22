@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, HardDrive, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useTenant } from '../lib/useTenant.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
@@ -378,6 +379,7 @@ function ImportDocumentsModal({ onClose, onImported }) {
 
 export default function Documents() {
   const navigate = useNavigate();
+  const tenant = useTenant();
   const [documents, setDocuments] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -608,6 +610,12 @@ export default function Documents() {
           </button>
         </div>
       </div>
+      {tenant?.storage_provider === 'google_drive' && (
+        <p className="mt-2 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
+          <HardDrive size={16} className="shrink-0" />
+          Les documents de votre entreprise sont stockés sur son compte Google Drive.
+        </p>
+      )}
       {exportPdfError && (
         <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
       )}
