@@ -1,12 +1,16 @@
 import { Link } from 'react-router-dom';
+import AppLogo from './AppLogo.jsx';
 
 export default function LegalPageLayout({ title, updatedAt, children }) {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-slate-100">
         <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link to="/" className="text-lg font-semibold text-primary">
-            QMS SaaS
+          <Link to="/" className="flex items-center gap-2">
+            <AppLogo className="h-8 w-8 rounded-lg" />
+            <span className="text-lg font-semibold text-slate-900">
+              QMS <span className="font-normal text-slate-400">SaaS</span>
+            </span>
           </Link>
           <Link to="/" className="text-sm font-medium text-slate-600 hover:text-primary">
             Retour
