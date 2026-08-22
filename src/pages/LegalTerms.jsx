@@ -20,9 +20,10 @@ export default function LegalTerms() {
       <LegalSection title="2. Description du service">
         <p>
           QMS SaaS est un logiciel de gestion d'un système de management de la qualité : gestion documentaire,
-          traitement des non-conformités (CAPA), suivi des formations, indicateurs qualité (KPI) et diagnostic
-          structuré (QQOQCCP). Le Service est accessible en ligne, en mode multi-locataires, chaque Client
-          disposant d'un espace de données isolé.
+          traitement des non-conformités (CAPA) et des réclamations clients, diagnostic structuré (QQOQCCP),
+          suivi des formations, indicateurs qualité (KPI), audits internes, registre des risques, évaluation
+          des fournisseurs, revues de direction et planning unifié. Le Service est accessible en ligne, en
+          mode multi-locataires, chaque Client disposant d'un espace de données isolé.
         </p>
       </LegalSection>
 

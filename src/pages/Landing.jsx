@@ -3,13 +3,20 @@ import {
   ArrowRight,
   BarChart3,
   Bell,
+  CalendarClock,
   CheckCircle2,
+  ClipboardCheck,
   ClipboardList,
+  Eye,
   FileText,
   GraduationCap,
   HelpCircle,
   Lock,
+  MessageSquareWarning,
+  ShieldAlert,
+  Truck,
   Users,
+  Users2,
 } from 'lucide-react';
 import AppLogo from '../components/AppLogo.jsx';
 
@@ -22,7 +29,17 @@ const MODULES = [
   {
     icon: ClipboardList,
     title: 'Non-conformités traitées',
-    description: 'Ouvrez une CAPA, assignez-la, suivez son traitement jusqu\'à la vérification d\'efficacité.',
+    description: "Ouvrez une CAPA, assignez-la, suivez son traitement jusqu'à la vérification d'efficacité.",
+  },
+  {
+    icon: MessageSquareWarning,
+    title: 'Réclamations clients',
+    description: 'Enregistrez une réclamation, assignez-la, suivez sa résolution jusqu\'à la satisfaction du client.',
+  },
+  {
+    icon: HelpCircle,
+    title: 'Diagnostic guidé',
+    description: "Structurez un problème en 7 questions, laissez l'IA proposer une synthèse, ouvrez la CAPA en un clic.",
   },
   {
     icon: GraduationCap,
@@ -35,9 +52,29 @@ const MODULES = [
     description: 'Importez vos fichiers, calculez vos taux automatiquement, comparez plusieurs séries sur un même graphique.',
   },
   {
-    icon: HelpCircle,
-    title: 'Diagnostic guidé',
-    description: "Structurez un problème en 7 questions, laissez l'IA proposer une synthèse, ouvrez la CAPA en un clic.",
+    icon: ClipboardCheck,
+    title: 'Audits internes',
+    description: 'Planifiez un audit, consignez ses constats, transformez-les en CAPA en un clic si nécessaire.',
+  },
+  {
+    icon: ShieldAlert,
+    title: 'Registre des risques',
+    description: 'Identifiez un risque ou une opportunité, évaluez-le, suivez son traitement dans le temps.',
+  },
+  {
+    icon: Truck,
+    title: 'Évaluation fournisseurs',
+    description: 'Votre référentiel fournisseurs et leur historique d\'évaluations, avec rappel des échéances.',
+  },
+  {
+    icon: Users2,
+    title: 'Revues de direction',
+    description: "État des lieux du SMQ capturé automatiquement, actions décidées suivies jusqu'à leur clôture.",
+  },
+  {
+    icon: CalendarClock,
+    title: 'Planning unifié',
+    description: 'Toutes vos échéances réunies dans un seul agenda, plus vos tâches manuelles.',
   },
 ];
 
@@ -46,6 +83,11 @@ const DIFFERENTIATORS = [
     icon: Lock,
     title: 'Vos données, cloisonnées',
     description: 'Chaque entreprise cliente dispose de son propre espace, strictement isolé des autres.',
+  },
+  {
+    icon: Eye,
+    title: 'Visibilité sur mesure',
+    description: 'Ouvert à tous par défaut, restreint à quelques personnes si besoin — ou gardé privé en un clic, sans y mêler un administrateur.',
   },
   {
     icon: Bell,
@@ -97,7 +139,7 @@ export default function Landing() {
               Toute votre démarche qualité, enfin réunie.
             </h1>
             <p className="mt-5 text-base text-slate-600 sm:text-lg">
-              Documents maîtrisés, non-conformités traitées, formations suivies et indicateurs à jour — sans
+              Documents, non-conformités, réclamations, audits, risques, fournisseurs, formations, indicateurs — sans
               tableurs éparpillés ni relances par email.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -120,7 +162,7 @@ export default function Landing() {
 
         <section className="border-t border-slate-100 bg-slate-50">
           <div className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
-            <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Cinq modules, un seul endroit</h2>
+            <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Tous vos outils qualité, un seul endroit</h2>
             <div className="mt-8 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
               {MODULES.map(({ icon: Icon, title, description }) => (
                 <div key={title} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -137,7 +179,7 @@ export default function Landing() {
 
         <section className="mx-auto max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
           <h2 className="text-xl font-semibold text-slate-900 sm:text-2xl">Pensé pour une équipe qualité</h2>
-          <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-3">
+          <div className="mt-8 grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-4">
             {DIFFERENTIATORS.map(({ icon: Icon, title, description }) => (
               <div key={title} className="flex gap-3.5">
                 <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary">

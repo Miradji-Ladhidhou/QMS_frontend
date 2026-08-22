@@ -19,7 +19,8 @@ export default function LegalPrivacy() {
           <li>Données d'identification : nom complet, adresse email, rôle au sein de votre organisation.</li>
           <li>
             Données saisies dans le cadre de l'utilisation du Service : documents qualité, fiches de
-            non-conformité (CAPA), données de formation, indicateurs, analyses QQOQCCP — dont vous, ou votre
+            non-conformité (CAPA), réclamations clients, analyses QQOQCCP, données de formation, indicateurs,
+            audits, risques, évaluations fournisseurs et revues de direction — dont vous, ou votre
             organisation, restez seuls responsables du contenu.
           </li>
           <li>Données techniques : journaux de connexion et d'audit nécessaires à la sécurité et à la traçabilité du Service.</li>
