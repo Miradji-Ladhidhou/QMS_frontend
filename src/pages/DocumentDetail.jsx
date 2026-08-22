@@ -487,14 +487,16 @@ export default function DocumentDetail() {
                 Soumettre pour approbation
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
-            >
-              <Upload size={16} />
-              Nouvelle version
-            </button>
+            {doc.can_edit && (
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
+              >
+                <Upload size={16} />
+                Nouvelle version
+              </button>
+            )}
             {canManage && (
               <button
                 type="button"
