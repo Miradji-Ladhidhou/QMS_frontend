@@ -11,6 +11,8 @@ import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
@@ -150,18 +152,36 @@ export default function ManagementReviews() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
 
-  useEffect(() => {
+  function loadReviews() {
+    setLoading(true);
     api
       .get('/management-reviews')
       .then(({ data }) => setReviews(data))
       .catch(() => setError('Impossible de charger les revues de direction.'))
       .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadReviews();
     api
       .get('/module-categories', { params: { resource_type: 'management_review' } })
       .then(({ data }) => setCategories(data))
       .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleBulkMoved() {
+    setIsBulkMoveModalOpen(false);
+    setSelectedIds([]);
+    loadReviews();
+  }
 
   const { sorted: sortedReviews, sortKey, direction, setSortKey, toggleSort } = useSort(
     reviews,
@@ -258,6 +278,14 @@ export default function ManagementReviews() {
         />
       </div>
 
+      {canManage && (
+        <BulkSelectionBar
+          count={selectedIds.length}
+          onMove={() => setIsBulkMoveModalOpen(true)}
+          onClear={() => setSelectedIds([])}
+        />
+      )}
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -293,6 +321,15 @@ export default function ManagementReviews() {
               onClick={() => navigate(`/management-reviews/${review.id}`)}
               className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
             >
+              {canManage && (
+                <input
+                  type="checkbox"
+                  checked={selectedIds.includes(review.id)}
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={() => toggleSelect(review.id)}
+                  className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                />
+              )}
               <div className="min-w-0">
                 <p className="truncate font-medium text-slate-900">{review.title}</p>
                 <p className="text-sm text-slate-500">{formatDate(review.review_date)}</p>
@@ -305,6 +342,17 @@ export default function ManagementReviews() {
 
       {isModalOpen && (
         <NewReviewModal categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+      )}
+
+      {isBulkMoveModalOpen && (
+        <BulkMoveCategoryModal
+          resourceType="management_review"
+          endpoint="/management-reviews/bulk-category"
+          categories={categories}
+          selectedIds={selectedIds}
+          onClose={() => setIsBulkMoveModalOpen(false)}
+          onMoved={handleBulkMoved}
+        />
       )}
     </div>
   );

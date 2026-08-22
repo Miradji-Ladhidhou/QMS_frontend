@@ -28,6 +28,8 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 
 const TYPE_CONFIG = {
   capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700' },
@@ -249,6 +251,7 @@ export default function Planning() {
   const currentUser = useCurrentUser();
   const role = currentUser?.role;
   const canFilterByService = role === 'admin' || role === 'manager';
+  const canManage = isManagerRole(role);
 
   const [items, setItems] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -263,6 +266,18 @@ export default function Planning() {
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
+  const [selectedTaskIds, setSelectedTaskIds] = useState([]);
+  const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+
+  function toggleSelectTask(id) {
+    setSelectedTaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleBulkMoved() {
+    setIsBulkMoveModalOpen(false);
+    setSelectedTaskIds([]);
+    loadPlanning(selectedServiceIds);
+  }
 
   async function loadPlanning(serviceIds) {
     setError('');
@@ -487,6 +502,14 @@ export default function Planning() {
         </div>
       )}
 
+      {canManage && (
+        <BulkSelectionBar
+          count={selectedTaskIds.length}
+          onMove={() => setIsBulkMoveModalOpen(true)}
+          onClear={() => setSelectedTaskIds([])}
+        />
+      )}
+
       {loading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
@@ -514,6 +537,16 @@ export default function Planning() {
                         item.is_overdue ? 'border-red-200' : 'border-slate-200'
                       }`}
                     >
+                      {isTask && canManage && (
+                        <input
+                          type="checkbox"
+                          checked={selectedTaskIds.includes(item.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelectTask(item.id)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                      )}
+
                       {isTask && editable ? (
                         <button
                           type="button"
@@ -615,6 +648,17 @@ export default function Planning() {
           categories={taskCategories}
           onClose={() => setEditingTaskId(null)}
           onSaved={handleTaskSaved}
+        />
+      )}
+
+      {isBulkMoveModalOpen && (
+        <BulkMoveCategoryModal
+          resourceType="task"
+          endpoint="/tasks/bulk-category"
+          categories={taskCategories}
+          selectedIds={selectedTaskIds}
+          onClose={() => setIsBulkMoveModalOpen(false)}
+          onMoved={handleBulkMoved}
         />
       )}
     </div>

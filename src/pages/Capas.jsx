@@ -14,6 +14,8 @@ import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
@@ -476,6 +478,18 @@ export default function Capas() {
   const [updatingId, setUpdatingId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleBulkMoved() {
+    setIsBulkMoveModalOpen(false);
+    setSelectedIds([]);
+    loadData();
+  }
 
   async function loadData() {
     setLoading(true);
@@ -670,6 +684,14 @@ export default function Capas() {
         />
       </div>
 
+      {canManage && (
+        <BulkSelectionBar
+          count={selectedIds.length}
+          onMove={() => setIsBulkMoveModalOpen(true)}
+          onClear={() => setSelectedIds([])}
+        />
+      )}
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -697,11 +719,22 @@ export default function Capas() {
                 }`}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-900">{capa.title}</p>
-                    <p className="text-sm text-slate-500">
-                      {capa.number} · {capa.service?.name || 'Service non précisé'}
-                    </p>
+                  <div className="flex items-start gap-2">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(capa.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(capa.id)}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium text-slate-900">{capa.title}</p>
+                      <p className="text-sm text-slate-500">
+                        {capa.number} · {capa.service?.name || 'Service non précisé'}
+                      </p>
+                    </div>
                   </div>
                   <CapaPriorityBadge priority={capa.priority} />
                 </div>
@@ -735,6 +768,7 @@ export default function Capas() {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
+                  {canManage && <th className="w-8 px-4 py-3" />}
                   <SortableTh label="Numéro" sortKey="number" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Objet" sortKey="title" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Service" sortKey="service" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -751,6 +785,16 @@ export default function Capas() {
                     onClick={() => navigate(`/capas/${capa.id}`)}
                     className={`cursor-pointer hover:bg-slate-50 ${capa.status === 'overdue' ? 'bg-red-50/50' : ''}`}
                   >
+                    {canManage && (
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(capa.id)}
+                          onChange={() => toggleSelect(capa.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-medium text-slate-800">{capa.number}</td>
                     <td className="px-4 py-3 text-slate-700">{capa.title}</td>
                     <td className="px-4 py-3 text-slate-600">{capa.service?.name || '—'}</td>
@@ -816,6 +860,17 @@ export default function Capas() {
 
       {isGuidedModalOpen && (
         <GuidedDiagnosticModal onClose={() => setIsGuidedModalOpen(false)} onCreated={handleGuidedCreated} />
+      )}
+
+      {isBulkMoveModalOpen && (
+        <BulkMoveCategoryModal
+          resourceType="capa"
+          endpoint="/capas/bulk-category"
+          categories={categories}
+          selectedIds={selectedIds}
+          onClose={() => setIsBulkMoveModalOpen(false)}
+          onMoved={handleBulkMoved}
+        />
       )}
     </div>
   );

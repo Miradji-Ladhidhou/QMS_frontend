@@ -48,6 +48,8 @@ import { openBlankTab } from '../lib/openInNewTab.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 
 const LINE_COLOR = '#1F3864';
@@ -2222,6 +2224,8 @@ function KpiCard({
   onOpenImportModal,
   onOpenConfigModal,
   onViewProof,
+  isSelected,
+  onToggleSelect,
 }) {
   const [showHistory, setShowHistory] = useState(false);
   const [showImports, setShowImports] = useState(false);
@@ -2334,18 +2338,28 @@ function KpiCard({
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="break-words font-medium text-slate-900">{kpi.name}</p>
-          {hasTarget && (
-            <p className="text-sm text-slate-500">
-              Objectif : {targetDirection === 'max' ? '≤' : '≥'} {kpi.target} {kpi.unit || ''}
-            </p>
+        <div className="flex min-w-0 items-start gap-2">
+          {canManage && (
+            <input
+              type="checkbox"
+              checked={isSelected}
+              onChange={onToggleSelect}
+              className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+            />
           )}
-          {kpi.frequency && (
-            <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-              {FREQUENCY_LABELS[kpi.frequency] || kpi.frequency}
-            </span>
-          )}
+          <div className="min-w-0">
+            <p className="break-words font-medium text-slate-900">{kpi.name}</p>
+            {hasTarget && (
+              <p className="text-sm text-slate-500">
+                Objectif : {targetDirection === 'max' ? '≤' : '≥'} {kpi.target} {kpi.unit || ''}
+              </p>
+            )}
+            {kpi.frequency && (
+              <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                {FREQUENCY_LABELS[kpi.frequency] || kpi.frequency}
+              </span>
+            )}
+          </div>
         </div>
 
         <div className="flex shrink-0 items-start gap-1">
@@ -2935,6 +2949,18 @@ export default function Kpis() {
   const [folderModal, setFolderModal] = useState(null); // null fermé, 'new' création, objet dossier édition
   const [moveModal, setMoveModal] = useState(null); // le kpi en cours de déplacement, ou null
   const [categories, setCategories] = useState([]);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleBulkMoved() {
+    setIsBulkMoveModalOpen(false);
+    setSelectedIds([]);
+    loadKpis(currentFolderId);
+  }
 
   async function loadKpis(folderId) {
     setLoading(true);
@@ -3182,6 +3208,14 @@ export default function Kpis() {
             </button>
           </div>
 
+          {canManage && (
+            <BulkSelectionBar
+              count={selectedIds.length}
+              onMove={() => setIsBulkMoveModalOpen(true)}
+              onClear={() => setSelectedIds([])}
+            />
+          )}
+
           {kpis.length === 0 && folders.length === 0 ? (
             <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
               <BarChart3 size={40} className="text-slate-300" />
@@ -3219,6 +3253,8 @@ export default function Kpis() {
                   onOpenImportModal={setImportModal}
                   onOpenConfigModal={setConfigModal}
                   onViewProof={(kpiArg, record) => setProofModal({ kpi: kpiArg, record })}
+                  isSelected={selectedIds.includes(kpi.id)}
+                  onToggleSelect={() => toggleSelect(kpi.id)}
                 />
               ))}
             </div>
@@ -3276,6 +3312,17 @@ export default function Kpis() {
 
       {proofModal && (
         <RecordProofModal kpi={proofModal.kpi} record={proofModal.record} onClose={() => setProofModal(null)} />
+      )}
+
+      {isBulkMoveModalOpen && (
+        <BulkMoveCategoryModal
+          resourceType="kpi"
+          endpoint="/kpis/bulk-category"
+          categories={categories}
+          selectedIds={selectedIds}
+          onClose={() => setIsBulkMoveModalOpen(false)}
+          onMoved={handleBulkMoved}
+        />
       )}
     </div>
   );

@@ -24,6 +24,8 @@ import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SortSelect from '../components/SortSelect.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 
 function formatDate(dateStr) {
@@ -887,6 +889,18 @@ export default function Trainings() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [isExcludeModalOpen, setIsExcludeModalOpen] = useState(false);
   const [certificateDownloadingId, setCertificateDownloadingId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleBulkMoved() {
+    setIsBulkMoveModalOpen(false);
+    setSelectedIds([]);
+    loadData();
+  }
 
   async function loadData() {
     setLoading(true);
@@ -1127,6 +1141,14 @@ export default function Trainings() {
       </div>
 
       {canManage && (
+        <BulkSelectionBar
+          count={selectedIds.length}
+          onMove={() => setIsBulkMoveModalOpen(true)}
+          onClear={() => setSelectedIds([])}
+        />
+      )}
+
+      {canManage && (
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
@@ -1193,7 +1215,17 @@ export default function Trainings() {
             return (
               <div key={training.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                 <div className="flex items-start justify-between gap-2">
-                  <p className="font-medium text-slate-900">{training.title}</p>
+                  <div className="flex items-start gap-2">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(training.id)}
+                        onChange={() => toggleSelect(training.id)}
+                        className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <p className="font-medium text-slate-900">{training.title}</p>
+                  </div>
                   {canManage && (
                     <div className="flex shrink-0 gap-1">
                       <button
@@ -1370,6 +1402,17 @@ export default function Trainings() {
           record={editingRecord.record}
           onClose={() => setEditingRecord(null)}
           onUpdated={(updated) => handleRecordUpdated(editingRecord.training, updated)}
+        />
+      )}
+
+      {isBulkMoveModalOpen && (
+        <BulkMoveCategoryModal
+          resourceType="training"
+          endpoint="/trainings/bulk-category"
+          categories={categories}
+          selectedIds={selectedIds}
+          onClose={() => setIsBulkMoveModalOpen(false)}
+          onMoved={handleBulkMoved}
         />
       )}
     </div>
