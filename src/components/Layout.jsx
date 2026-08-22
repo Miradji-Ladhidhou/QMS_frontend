@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
+  BookOpen,
   CheckSquare,
   ClipboardCheck,
   ClipboardList,
@@ -83,6 +84,10 @@ export const NAV_ITEMS = [
   { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
   { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
+  // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
+  // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
+  // rester joignable quel que soit ce que l'admin a caché pour ce rôle.
+  { to: '/prise-en-main', label: 'Prise en main', icon: BookOpen, alwaysVisible: true },
   // Configurables comme les autres (Paramètres > Visibilité), mais masquées par défaut pour
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
   // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations
@@ -212,7 +217,8 @@ export default function Layout() {
         <nav className="flex-1 space-y-1 px-3">
           {NAV_ITEMS.filter(
             (item) =>
-              (!item.adminOnly || role === 'admin') && (item.adminOnly || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
+              (!item.adminOnly || role === 'admin') &&
+              (item.adminOnly || item.alwaysVisible || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
           ).map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}

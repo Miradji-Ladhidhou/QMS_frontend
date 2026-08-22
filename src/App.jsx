@@ -41,6 +41,7 @@ const Settings = lazy(() => import('./pages/Settings.jsx'));
 const Services = lazy(() => import('./pages/Services.jsx'));
 const Employees = lazy(() => import('./pages/Employees.jsx'));
 const MyApprovals = lazy(() => import('./pages/MyApprovals.jsx'));
+const GettingStarted = lazy(() => import('./pages/GettingStarted.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 
 function RouteFallback() {
@@ -113,6 +114,7 @@ export default function App() {
               <Route path="services" element={<Services />} />
               <Route path="employees" element={<Employees />} />
               <Route path="my-approvals" element={<MyApprovals />} />
+              <Route path="prise-en-main" element={<GettingStarted />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
