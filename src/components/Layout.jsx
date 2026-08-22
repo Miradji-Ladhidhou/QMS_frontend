@@ -13,6 +13,7 @@ import {
   LogOut,
   Menu,
   MessageSquareWarning,
+  RefreshCw,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -137,6 +138,14 @@ export default function Layout() {
           <span className="truncate text-lg font-semibold">{tenant?.name || 'QMS SaaS'}</span>
         </div>
         <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            aria-label="Recharger la page"
+            className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white"
+          >
+            <RefreshCw size={20} />
+          </button>
           <NotificationBell variant="mobile" />
           <button type="button" onClick={() => setIsMenuOpen(true)} aria-label="Ouvrir le menu" className="-mr-2 p-2">
             <Menu size={24} />
@@ -159,6 +168,14 @@ export default function Layout() {
             <span className="truncate text-xl font-semibold">{tenant?.name || 'QMS SaaS'}</span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => window.location.reload()}
+              aria-label="Recharger la page"
+              className="rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white"
+            >
+              <RefreshCw size={18} />
+            </button>
             <div className="hidden md:block">
               <NotificationBell variant="sidebar" />
             </div>
