@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import AppLogo from '../components/AppLogo.jsx';
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -30,6 +31,13 @@ export default function ForgotPassword() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
+        <div className="flex flex-col items-center mb-6">
+          <AppLogo className="h-12 w-12 rounded-xl mb-3" />
+          <p className="text-lg font-semibold text-slate-900">
+            QMS <span className="font-normal text-slate-400">SaaS</span>
+          </p>
+        </div>
+
         <h1 className="text-2xl font-semibold text-primary text-center mb-2">Mot de passe oublié</h1>
 
         {sent ? (

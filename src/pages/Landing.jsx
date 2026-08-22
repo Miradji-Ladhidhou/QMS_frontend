@@ -11,6 +11,7 @@ import {
   Lock,
   Users,
 } from 'lucide-react';
+import AppLogo from '../components/AppLogo.jsx';
 
 const MODULES = [
   {
@@ -63,7 +64,12 @@ export default function Landing() {
     <div className="min-h-screen bg-white">
       <header className="border-b border-slate-100">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <span className="text-lg font-semibold text-primary">QMS SaaS</span>
+          <div className="flex items-center gap-2">
+            <AppLogo className="h-8 w-8 rounded-lg" />
+            <span className="text-lg font-semibold text-slate-900">
+              QMS <span className="font-normal text-slate-400">SaaS</span>
+            </span>
+          </div>
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/login"

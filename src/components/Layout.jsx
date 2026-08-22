@@ -32,6 +32,7 @@ import { useMenuVisibility } from '../lib/useMenuVisibility.js';
 import { ROLE_LABELS } from '../lib/roles.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import NotificationBell from './NotificationBell.jsx';
+import AppLogo from './AppLogo.jsx';
 
 // Rafraîchie chaque minute (pas chaque seconde) : le menu n'affiche pas les secondes, inutile
 // de re-render 60x plus souvent que ce qui est visible.
@@ -132,8 +133,10 @@ export default function Layout() {
     <div className="min-h-screen bg-slate-50 md:flex">
       <header className="sticky top-0 z-30 flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
         <div className="flex min-w-0 items-center gap-2">
-          {logoUrl && (
+          {logoUrl ? (
             <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded bg-white/10 object-contain p-0.5" />
+          ) : (
+            <AppLogo className="h-7 w-7 shrink-0 rounded" />
           )}
           <span className="truncate text-lg font-semibold">{tenant?.name || 'QMS SaaS'}</span>
         </div>
@@ -162,8 +165,10 @@ export default function Layout() {
       >
         <div className="flex items-center justify-between px-6 py-5">
           <div className="flex min-w-0 items-center gap-2">
-            {logoUrl && (
+            {logoUrl ? (
               <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 rounded bg-white/10 object-contain p-0.5" />
+            ) : (
+              <AppLogo className="h-8 w-8 shrink-0 rounded" />
             )}
             <span className="truncate text-xl font-semibold">{tenant?.name || 'QMS SaaS'}</span>
           </div>
