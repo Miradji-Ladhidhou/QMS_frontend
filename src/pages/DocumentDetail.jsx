@@ -26,6 +26,7 @@ import SubmitForApprovalModal from '../components/SubmitForApprovalModal.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
+import { openBlankTab } from '../lib/openInNewTab.js';
 
 const AUDIT_ACTION_LABELS = {
   submitted_for_approval: 'Soumis pour approbation',
@@ -338,12 +339,14 @@ export default function DocumentDetail() {
   // document — seul le backend sait lequel et sait construire l'URL correspondante (bug réel :
   // "Bucket not found" quand un id Drive était passé tel quel à getPublicUrl).
   async function handleDownload(path, key) {
+    const tab = openBlankTab();
     setDownloadError('');
     setDownloadingKey(key);
     try {
       const { data } = await api.get(path);
-      window.open(data.url, '_blank', 'noopener');
+      if (tab) tab.location.href = data.url;
     } catch (err) {
+      tab?.close();
       setDownloadError(err.response?.data?.error || 'Impossible de télécharger ce fichier.');
     } finally {
       setDownloadingKey(null);
@@ -351,12 +354,14 @@ export default function DocumentDetail() {
   }
 
   async function handleViewCertificate() {
+    const tab = openBlankTab();
     setCertificateError('');
     try {
       const response = await api.get(`/documents/${doc.id}/certificate`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      window.open(url, '_blank', 'noopener');
+      if (tab) tab.location.href = url;
     } catch {
+      tab?.close();
       setCertificateError('Impossible de générer le certificat.');
     }
   }

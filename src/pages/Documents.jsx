@@ -14,6 +14,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
+import { openBlankTab } from '../lib/openInNewTab.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -493,14 +494,16 @@ export default function Documents() {
   // file_path peut être un chemin Supabase ou un id de fichier Google Drive selon le provider
   // du document (voir B3) — seul le backend sait lequel et construit l'URL correspondante,
   // impossible à faire directement côté frontend comme avant (voir DocumentDetail.jsx).
-  async function handleDownload(event, doc) {
+  async function handleDownload(event, doc, existingTab) {
     event.stopPropagation();
+    const tab = existingTab ?? openBlankTab();
     setDownloadError('');
     setDownloadingId(doc.id);
     try {
       const { data } = await api.get(`/documents/${doc.id}/download`);
-      window.open(data.url, '_blank', 'noopener');
+      if (tab) tab.location.href = data.url;
     } catch (err) {
+      tab?.close();
       setDownloadError(err.response?.data?.error || 'Impossible de télécharger ce fichier.');
     } finally {
       setDownloadingId(null);
@@ -509,16 +512,19 @@ export default function Documents() {
 
   // Prompt F2 : ouvre le document dans l'interface Google Drive (webViewLink) au lieu de le
   // télécharger — repli silencieux sur le téléchargement habituel si le lien Drive échoue pour
-  // une raison quelconque, jamais un cul-de-sac pour l'utilisateur.
+  // une raison quelconque, jamais un cul-de-sac pour l'utilisateur. Le même onglet (déjà ouvert
+  // avant tout await, pour Safari iOS — voir openInNewTab.js) est réutilisé pour le repli, au
+  // lieu d'en ouvrir un second.
   async function handleOpenInDrive(event, doc) {
     event.stopPropagation();
+    const tab = openBlankTab();
     setDownloadError('');
     setOpeningDriveId(doc.id);
     try {
       const { data } = await api.get(`/documents/${doc.id}/drive-view-link`);
-      window.open(data.url, '_blank', 'noopener');
+      if (tab) tab.location.href = data.url;
     } catch {
-      await handleDownload(event, doc);
+      await handleDownload(event, doc, tab);
     } finally {
       setOpeningDriveId(null);
     }

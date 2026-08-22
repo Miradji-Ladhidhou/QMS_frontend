@@ -9,6 +9,7 @@ import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
+import { openBlankTab } from '../lib/openInNewTab.js';
 
 // Mêmes noms de champs que qqoqccp_analyses (schema.sql) et que le corps attendu par
 // PATCH /api/qqoqccp/:id — voir backend/src/routes/qqoqccp.js.
@@ -517,13 +518,15 @@ export default function QqoqccpDetail() {
   }
 
   async function handleExportPdf() {
+    const tab = openBlankTab();
     setExportError('');
     setExportingPdf(true);
     try {
       const response = await api.get(`/qqoqccp/${id}/pdf`, { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      window.open(url, '_blank', 'noopener');
+      if (tab) tab.location.href = url;
     } catch {
+      tab?.close();
       setExportError("Impossible d'exporter cette analyse en PDF.");
     } finally {
       setExportingPdf(false);

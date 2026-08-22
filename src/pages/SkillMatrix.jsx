@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
 import { useSort } from '../lib/useSort.js';
+import { openBlankTab } from '../lib/openInNewTab.js';
 import SortableTh from '../components/SortableTh.jsx';
 
 const CELL_STYLES = {
@@ -89,13 +90,15 @@ export default function SkillMatrix() {
   }
 
   async function handleExportPdf() {
+    const tab = openBlankTab();
     setExportError('');
     setExportingPdf(true);
     try {
       const response = await api.get('/trainings/matrix/pdf', { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      window.open(url, '_blank', 'noopener');
+      if (tab) tab.location.href = url;
     } catch {
+      tab?.close();
       setExportError('Impossible d\'exporter la matrice en PDF.');
     } finally {
       setExportingPdf(false);

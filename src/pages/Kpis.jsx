@@ -44,6 +44,7 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
+import { openBlankTab } from '../lib/openInNewTab.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 
@@ -3070,6 +3071,7 @@ export default function Kpis() {
   // doit toujours correspondre à ce que l'utilisateur regarde à l'écran, jamais à tout le
   // tenant en vrac si un dossier est ouvert — voir GET /kpis/report côté backend.
   async function handleGenerateReport() {
+    const tab = openBlankTab();
     setError('');
     setGeneratingReport(true);
     try {
@@ -3078,8 +3080,9 @@ export default function Kpis() {
         responseType: 'blob',
       });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      window.open(url, '_blank', 'noopener');
+      if (tab) tab.location.href = url;
     } catch {
+      tab?.close();
       setError('Impossible de générer le rapport.');
     } finally {
       setGeneratingReport(false);
