@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Download, HardDrive, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { isManagerRole } from '../lib/roles.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
@@ -14,6 +16,8 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
+import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import DocumentBulkMoveModal from '../components/DocumentBulkMoveModal.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -385,6 +389,8 @@ function ImportDocumentsModal({ onClose, onImported }) {
 export default function Documents() {
   const navigate = useNavigate();
   const tenant = useTenant();
+  const currentUser = useCurrentUser();
+  const canManage = isManagerRole(currentUser?.role);
   const [documents, setDocuments] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -402,6 +408,33 @@ export default function Documents() {
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadError, setDownloadError] = useState('');
   const [openingDriveId, setOpeningDriveId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleBulkMoved() {
+    setIsBulkMoveModalOpen(false);
+    setSelectedIds([]);
+    loadData();
+  }
+
+  async function handleCategoryChange(event, doc) {
+    event.stopPropagation();
+    const categoryId = event.target.value || null;
+    setUpdatingCategoryId(doc.id);
+    try {
+      const { data } = await api.patch(`/documents/${doc.id}/category`, { category_id: categoryId });
+      setDocuments((prev) => prev.map((d) => (d.id === doc.id ? data : d)));
+    } catch {
+      setError('Impossible de changer la catégorie de ce document.');
+    } finally {
+      setUpdatingCategoryId(null);
+    }
+  }
 
   async function loadData() {
     setLoading(true);
@@ -683,6 +716,14 @@ export default function Documents() {
         />
       </div>
 
+      {canManage && (
+        <BulkSelectionBar
+          count={selectedIds.length}
+          onMove={() => setIsBulkMoveModalOpen(true)}
+          onClear={() => setSelectedIds([])}
+        />
+      )}
+
       {(error || searchError) && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
           {error || searchError}
@@ -711,11 +752,22 @@ export default function Documents() {
                 className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
               >
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-900">{doc.title}</p>
-                    <p className="text-sm text-slate-500">
-                      {doc.number} · v{doc.version}
-                    </p>
+                  <div className="flex items-start gap-2">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(doc.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(doc.id)}
+                        className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <div>
+                      <p className="font-medium text-slate-900">{doc.title}</p>
+                      <p className="text-sm text-slate-500">
+                        {doc.number} · v{doc.version}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
                     {doc.file_path && (
@@ -737,6 +789,22 @@ export default function Documents() {
                   <StatusBadge status={doc.status} />
                   <MatchLocationBadge location={doc.match_location} />
                 </div>
+                {canManage && (
+                  <select
+                    value={doc.category_id || ''}
+                    disabled={updatingCategoryId === doc.id}
+                    onClick={(e) => e.stopPropagation()}
+                    onChange={(e) => handleCategoryChange(e, doc)}
+                    className="mt-3 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  >
+                    <option value="">Aucune catégorie</option>
+                    {categories.map((category) => (
+                      <option key={category.id} value={category.id}>
+                        {category.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <SearchSnippet snippet={doc.snippet} />
               </div>
             ))}
@@ -746,6 +814,7 @@ export default function Documents() {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
+                  {canManage && <th className="w-8 px-4 py-3" />}
                   <SortableTh label="Numéro" sortKey="number" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Titre" sortKey="title" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Catégorie" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -757,6 +826,16 @@ export default function Documents() {
               <tbody className="divide-y divide-slate-100">
                 {sortedDocuments.map((doc) => (
                   <tr key={doc.id} onClick={() => navigate(`/documents/${doc.id}`)} className="cursor-pointer hover:bg-slate-50">
+                    {canManage && (
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(doc.id)}
+                          onChange={() => toggleSelect(doc.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                      </td>
+                    )}
                     <td className="px-4 py-3 font-medium text-slate-800">{doc.number}</td>
                     <td className="max-w-sm px-4 py-3 text-slate-700">
                       <div className="flex items-center gap-2">
@@ -766,7 +845,25 @@ export default function Documents() {
                       <SearchSnippet snippet={doc.snippet} />
                     </td>
                     <td className="px-4 py-3">
-                      <CategoryBadge category={doc.category} />
+                      <div className="flex items-center gap-2">
+                        <CategoryBadge category={doc.category} />
+                        {canManage && (
+                          <select
+                            value={doc.category_id || ''}
+                            disabled={updatingCategoryId === doc.id}
+                            onClick={(e) => e.stopPropagation()}
+                            onChange={(e) => handleCategoryChange(e, doc)}
+                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          >
+                            <option value="">Aucune catégorie</option>
+                            {categories.map((category) => (
+                              <option key={category.id} value={category.id}>
+                                {category.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-slate-600">{doc.version}</td>
                     <td className="px-4 py-3">
@@ -802,6 +899,15 @@ export default function Documents() {
 
       {isImportModalOpen && (
         <ImportDocumentsModal onClose={() => setIsImportModalOpen(false)} onImported={loadData} />
+      )}
+
+      {isBulkMoveModalOpen && (
+        <DocumentBulkMoveModal
+          categories={categories}
+          selectedIds={selectedIds}
+          onClose={() => setIsBulkMoveModalOpen(false)}
+          onMoved={handleBulkMoved}
+        />
       )}
     </div>
   );
