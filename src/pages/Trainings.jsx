@@ -120,7 +120,7 @@ function getTrainingSortValue(training, key) {
   return training[key];
 }
 
-function NewTrainingModal({ onClose, onCreated }) {
+function NewTrainingModal({ categories, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     type: '',
@@ -129,6 +129,7 @@ function NewTrainingModal({ onClose, onCreated }) {
     instructor: '',
     duration: '',
     description: '',
+    category_id: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -150,6 +151,7 @@ function NewTrainingModal({ onClose, onCreated }) {
       instructor: form.instructor || undefined,
       duration: form.duration || undefined,
       description: form.description || undefined,
+      category_id: form.category_id || undefined,
     };
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
@@ -258,6 +260,24 @@ function NewTrainingModal({ onClose, onCreated }) {
             />
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune catégorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -271,7 +291,7 @@ function NewTrainingModal({ onClose, onCreated }) {
   );
 }
 
-function EditTrainingModal({ training, onClose, onUpdated }) {
+function EditTrainingModal({ training, categories, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: training.title,
     type: training.type || '',
@@ -280,6 +300,7 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
     instructor: training.instructor || '',
     duration: training.duration || '',
     description: training.description || '',
+    category_id: training.category_id || '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -305,6 +326,7 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
         instructor: form.instructor || null,
         duration: form.duration || null,
         description: form.description || null,
+        category_id: form.category_id || null,
       }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier la formation.');
@@ -406,6 +428,24 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
+
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune catégorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <button
             type="submit"
@@ -828,6 +868,7 @@ export default function Trainings() {
   const [trainings, setTrainings] = useState([]);
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -845,16 +886,18 @@ export default function Trainings() {
     setLoading(true);
     setError('');
     try {
-      const [trainingsRes, usersRes, employeesRes] = await Promise.all([
+      const [trainingsRes, usersRes, employeesRes, categoriesRes] = await Promise.all([
         api.get('/trainings'),
         api.get('/users'),
         api.get('/employees'),
+        api.get('/module-categories', { params: { resource_type: 'training' } }),
       ]);
       setTrainings(trainingsRes.data);
       setUsers(usersRes.data);
       // GET /employees renvoie aussi les inactifs (utile à la page de gestion du personnel) —
       // ce sélecteur d'enregistrement de réalisation ne doit proposer que les actifs.
       setEmployees(employeesRes.data.filter((employee) => employee.is_active));
+      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les formations.');
     } finally {
@@ -1274,7 +1317,9 @@ export default function Trainings() {
         </div>
       )}
 
-      {isNewModalOpen && <NewTrainingModal onClose={() => setIsNewModalOpen(false)} onCreated={handleTrainingCreated} />}
+      {isNewModalOpen && (
+        <NewTrainingModal categories={categories} onClose={() => setIsNewModalOpen(false)} onCreated={handleTrainingCreated} />
+      )}
 
       {recordingTraining && (
         <RecordModal
@@ -1307,6 +1352,7 @@ export default function Trainings() {
       {editingTraining && (
         <EditTrainingModal
           training={editingTraining}
+          categories={categories}
           onClose={() => setEditingTraining(null)}
           onUpdated={handleTrainingUpdated}
         />

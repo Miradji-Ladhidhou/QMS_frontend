@@ -19,8 +19,9 @@ const QQOQCCP_SORT_OPTIONS = [
   { key: 'status', label: 'statut' },
 ];
 
-function NewAnalysisModal({ onClose, onCreated }) {
+function NewAnalysisModal({ categories, onClose, onCreated }) {
   const [title, setTitle] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,7 +34,7 @@ function NewAnalysisModal({ onClose, onCreated }) {
     // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
     let response;
     try {
-      response = await api.post('/qqoqccp', { title });
+      response = await api.post('/qqoqccp', { title, category_id: categoryId || undefined });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de créer l'analyse.");
       setSubmitting(false);
@@ -71,6 +72,24 @@ function NewAnalysisModal({ onClose, onCreated }) {
             />
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune catégorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -87,6 +106,7 @@ function NewAnalysisModal({ onClose, onCreated }) {
 export default function Qqoqccp() {
   const navigate = useNavigate();
   const [analyses, setAnalyses] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,6 +117,10 @@ export default function Qqoqccp() {
       .then(({ data }) => setAnalyses(data))
       .catch(() => setError('Impossible de charger les analyses QQOQCCP.'))
       .finally(() => setLoading(false));
+    api
+      .get('/module-categories', { params: { resource_type: 'qqoqccp' } })
+      .then(({ data }) => setCategories(data))
+      .catch(() => {});
   }, []);
 
   const { sorted: sortedAnalyses, sortKey, direction, setSortKey, toggleSort } = useSort(
@@ -199,7 +223,9 @@ export default function Qqoqccp() {
         </div>
       )}
 
-      {isModalOpen && <NewAnalysisModal onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />}
+      {isModalOpen && (
+        <NewAnalysisModal categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+      )}
     </div>
   );
 }

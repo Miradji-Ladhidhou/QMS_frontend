@@ -26,7 +26,7 @@ const SUPPLIER_SORT_OPTIONS = [
   { key: 'status', label: 'statut' },
 ];
 
-function NewSupplierModal({ services, onClose, onCreated }) {
+function NewSupplierModal({ services, categories, onClose, onCreated }) {
   const [form, setForm] = useState({
     name: '',
     category: '',
@@ -35,6 +35,7 @@ function NewSupplierModal({ services, onClose, onCreated }) {
     contact_phone: '',
     criticality: 'medium',
     service_id: '',
+    category_id: '',
     next_evaluation_date: '',
   });
   const [error, setError] = useState('');
@@ -57,6 +58,7 @@ function NewSupplierModal({ services, onClose, onCreated }) {
       contact_phone: form.contact_phone || undefined,
       criticality: form.criticality,
       service_id: form.service_id || undefined,
+      category_id: form.category_id || undefined,
       next_evaluation_date: form.next_evaluation_date || undefined,
     };
 
@@ -165,6 +167,24 @@ function NewSupplierModal({ services, onClose, onCreated }) {
             </div>
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune catégorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Prochaine évaluation</label>
             <input
@@ -194,6 +214,7 @@ export default function Suppliers() {
   const canManage = isManagerRole(currentUser?.role);
   const [suppliers, setSuppliers] = useState([]);
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -205,12 +226,14 @@ export default function Suppliers() {
     setLoading(true);
     setError('');
     try {
-      const [suppliersRes, servicesRes] = await Promise.all([
+      const [suppliersRes, servicesRes, categoriesRes] = await Promise.all([
         api.get('/suppliers', { params: statusFilter ? { status: statusFilter } : {} }),
         api.get('/services'),
+        api.get('/module-categories', { params: { resource_type: 'supplier' } }),
       ]);
       setSuppliers(suppliersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
+      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les fournisseurs.');
     } finally {
@@ -388,7 +411,14 @@ export default function Suppliers() {
         </div>
       )}
 
-      {isModalOpen && <NewSupplierModal services={services} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />}
+      {isModalOpen && (
+        <NewSupplierModal
+          services={services}
+          categories={categories}
+          onClose={() => setIsModalOpen(false)}
+          onCreated={handleCreated}
+        />
+      )}
     </div>
   );
 }

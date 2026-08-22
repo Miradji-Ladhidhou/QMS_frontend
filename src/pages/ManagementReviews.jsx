@@ -22,10 +22,11 @@ const REVIEW_SORT_OPTIONS = [
   { key: 'status', label: 'statut' },
 ];
 
-function NewReviewModal({ onClose, onCreated }) {
+function NewReviewModal({ categories, onClose, onCreated }) {
   const [title, setTitle] = useState('');
   const [reviewDate, setReviewDate] = useState(new Date().toISOString().slice(0, 10));
   const [participants, setParticipants] = useState('');
+  const [categoryId, setCategoryId] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -42,6 +43,7 @@ function NewReviewModal({ onClose, onCreated }) {
         title,
         review_date: reviewDate,
         participants: participants || undefined,
+        category_id: categoryId || undefined,
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la revue de direction.');
@@ -102,6 +104,24 @@ function NewReviewModal({ onClose, onCreated }) {
             />
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -120,6 +140,7 @@ export default function ManagementReviews() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [reviews, setReviews] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -132,6 +153,10 @@ export default function ManagementReviews() {
       .then(({ data }) => setReviews(data))
       .catch(() => setError('Impossible de charger les revues de direction.'))
       .finally(() => setLoading(false));
+    api
+      .get('/module-categories', { params: { resource_type: 'management_review' } })
+      .then(({ data }) => setCategories(data))
+      .catch(() => {});
   }, []);
 
   const { sorted: sortedReviews, sortKey, direction, setSortKey, toggleSort } = useSort(
@@ -274,7 +299,9 @@ export default function ManagementReviews() {
         </div>
       )}
 
-      {isModalOpen && <NewReviewModal onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />}
+      {isModalOpen && (
+        <NewReviewModal categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+      )}
     </div>
   );
 }
