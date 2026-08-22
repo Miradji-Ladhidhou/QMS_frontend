@@ -10,6 +10,7 @@ import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -567,6 +568,7 @@ export default function ComplaintDetail() {
               >
                 <Pencil size={16} />
               </button>
+              <ShareRecordPanel resourceType="complaint" resourceId={complaint.id} compact />
               <button
                 type="button"
                 onClick={handleDelete}

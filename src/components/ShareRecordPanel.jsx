@@ -10,11 +10,12 @@ function nonAdminUsers(users) {
   return users.filter((user) => user.role !== 'admin');
 }
 
-// Bouton + modal réutilisables pour donner l'accès à UN élément précis (document, CAPA...) à
-// un rôle ou une personne qui n'y aurait normalement pas accès — voir record_shares côté
-// backend. Utilisé sur DocumentDetail.jsx et CapaDetail.jsx, admin/manager uniquement (le
-// backend refuse de toute façon 403 à un membre, ce bouton n'est juste pas montré aux autres).
-export default function ShareRecordPanel({ resourceType, resourceId }) {
+// Bouton + modal réutilisables pour donner l'accès à UN élément précis (document, CAPA,
+// réclamation...) à un rôle ou une personne qui n'y aurait normalement pas accès — voir
+// record_shares côté backend. Admin/manager uniquement (le backend refuse de toute façon 403 à
+// un membre, ce bouton n'est juste pas montré aux autres). compact : icône seule, pour s'aligner
+// sur les boutons Modifier/Supprimer déjà en icône seule d'une page (ex. ComplaintDetail.jsx).
+export default function ShareRecordPanel({ resourceType, resourceId, compact = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [shares, setShares] = useState(null);
   const [users, setUsers] = useState([]);
@@ -79,14 +80,25 @@ export default function ShareRecordPanel({ resourceType, resourceId }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setIsOpen(true)}
-        className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-      >
-        <Share2 size={16} />
-        Partager
-      </button>
+      {compact ? (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          aria-label="Partager"
+          className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+        >
+          <Share2 size={16} />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setIsOpen(true)}
+          className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          <Share2 size={16} />
+          Partager
+        </button>
+      )}
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
