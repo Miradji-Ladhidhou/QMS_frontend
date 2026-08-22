@@ -186,10 +186,11 @@ function GuidedDiagnosticModal({ onClose, onCreated }) {
   );
 }
 
-function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
+function NewCapaModal({ users, services, categories, priorityDelays, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     service_id: '',
+    category_id: '',
     description: '',
     origin: '',
     priority: 'medium',
@@ -240,6 +241,7 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
     const payload = {
       title: form.title,
       service_id: form.service_id || undefined,
+      category_id: form.category_id || undefined,
       description: form.description || undefined,
       priority: form.priority,
       // severity reste en base (voir schema.sql) mais n'est plus un champ distinct dans
@@ -422,6 +424,24 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
             </div>
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune catégorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -442,6 +462,7 @@ export default function Capas() {
   const [capas, setCapas] = useState([]);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -456,11 +477,12 @@ export default function Capas() {
     setLoading(true);
     setError('');
     try {
-      const [capasRes, usersRes, delaysRes, servicesRes] = await Promise.all([
+      const [capasRes, usersRes, delaysRes, servicesRes, categoriesRes] = await Promise.all([
         api.get('/capas'),
         api.get('/users'),
         api.get('/capas/priority-delays'),
         api.get('/services'),
+        api.get('/module-categories', { params: { resource_type: 'capa' } }),
       ]);
       setCapas(capasRes.data);
       setUsers(usersRes.data);
@@ -468,6 +490,7 @@ export default function Capas() {
       // GET /services renvoie aussi les services désactivés (nécessaire à la page de
       // gestion) — un formulaire de création ne doit proposer que les actifs.
       setServices(servicesRes.data.filter((service) => service.is_active));
+      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les CAPA.');
     } finally {
@@ -766,6 +789,7 @@ export default function Capas() {
         <NewCapaModal
           users={users}
           services={services}
+          categories={categories}
           priorityDelays={priorityDelays}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}

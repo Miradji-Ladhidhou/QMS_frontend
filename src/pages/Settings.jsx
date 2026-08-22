@@ -8,12 +8,14 @@ import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
 import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
 import DriveStorageSettings from '../components/DriveStorageSettings.jsx';
 import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
+import ModuleCategoriesSettings from '../components/ModuleCategoriesSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import Groups from './Groups.jsx';
 
 const TABS = [
   { id: 'company', label: 'Entreprise' },
-  { id: 'categories', label: 'Catégories' },
+  { id: 'categories', label: 'Catégories documents' },
+  { id: 'module-categories', label: 'Catégories modules' },
   { id: 'users', label: 'Utilisateurs' },
   { id: 'groups', label: 'Groupes', adminOnly: true },
   { id: 'capa', label: 'CAPA', adminOnly: true },
@@ -68,6 +70,7 @@ export default function Settings() {
       <div className="mt-4">
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
         {activeTab === 'categories' && <CategoryManager isAdmin={isAdmin} />}
+        {activeTab === 'module-categories' && <ModuleCategoriesSettings isAdmin={isAdmin} />}
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}

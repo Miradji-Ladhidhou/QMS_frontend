@@ -24,11 +24,12 @@ function selectValueToEffectiveness(value) {
   return null;
 }
 
-const TREATMENT_FIELDS = ['service_id', 'description', 'root_cause', 'corrective_action', 'preventive_action', 'comment'];
+const TREATMENT_FIELDS = ['service_id', 'category_id', 'description', 'root_cause', 'corrective_action', 'preventive_action', 'comment'];
 
 function buildTreatmentForm(capa) {
   return {
     service_id: capa.service_id || '',
+    category_id: capa.category_id || '',
     description: capa.description || '',
     root_cause: capa.root_cause || '',
     corrective_action: capa.corrective_action || '',
@@ -60,6 +61,7 @@ export default function CapaDetail() {
   const canManage = isManagerRole(currentUser?.role);
   const [capa, setCapa] = useState(null);
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -108,6 +110,10 @@ export default function CapaDetail() {
       // GET /services renvoie aussi les services désactivés (nécessaire à la page de
       // gestion) — ce formulaire ne doit proposer que les actifs.
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
+      .catch(() => {});
+    api
+      .get('/module-categories', { params: { resource_type: 'capa' } })
+      .then(({ data }) => setCategories(data))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -316,6 +322,25 @@ export default function CapaDetail() {
               ))}
             </select>
           </div>
+
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={treatmentForm.category_id}
+                onChange={(e) => setTreatmentForm((prev) => ({ ...prev, category_id: e.target.value }))}
+                disabled={!canManage}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+              >
+                <option value="">Aucune catégorie</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description de la non-conformité</label>

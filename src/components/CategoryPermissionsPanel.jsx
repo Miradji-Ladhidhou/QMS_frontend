@@ -11,7 +11,10 @@ const LEVELS = [
 
 const DEFAULT_LEVELS = { can_view: true, can_edit: false, can_approve: false, can_delete: false };
 
-export default function CategoryPermissionsPanel({ categoryId }) {
+// baseUrl : '/categories' pour les catégories de documents (défaut), '/module-categories'
+// pour les catégories génériques (CAPA, réclamations, QQOQCCP, fournisseurs, formations,
+// revues) — même composant réutilisé plutôt que dupliqué par module, voir ModuleCategoryManager.jsx.
+export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categories' }) {
   const [permissions, setPermissions] = useState([]);
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -27,7 +30,7 @@ export default function CategoryPermissionsPanel({ categoryId }) {
     setError('');
     try {
       const [permsRes, usersRes, groupsRes] = await Promise.all([
-        api.get(`/categories/${categoryId}/permissions`),
+        api.get(`${baseUrl}/${categoryId}/permissions`),
         api.get('/users'),
         api.get('/groups'),
       ]);
@@ -57,7 +60,7 @@ export default function CategoryPermissionsPanel({ categoryId }) {
     setSaving(true);
     setError('');
     try {
-      const { data } = await api.post(`/categories/${categoryId}/permissions`, {
+      const { data } = await api.post(`${baseUrl}/${categoryId}/permissions`, {
         subject_type: subjectType,
         subject_id: subjectId,
         ...levels,
@@ -78,7 +81,7 @@ export default function CategoryPermissionsPanel({ categoryId }) {
     setPermissions((prev) => prev.map((p) => (p.id === permission.id ? updated : p)));
 
     try {
-      await api.post(`/categories/${categoryId}/permissions`, {
+      await api.post(`${baseUrl}/${categoryId}/permissions`, {
         subject_type: permission.subject_type,
         subject_id: permission.subject_id,
         can_view: updated.can_view,
@@ -94,7 +97,7 @@ export default function CategoryPermissionsPanel({ categoryId }) {
 
   async function handleRevoke(permission) {
     try {
-      await api.delete(`/categories/${categoryId}/permissions/${permission.id}`);
+      await api.delete(`${baseUrl}/${categoryId}/permissions/${permission.id}`);
       setPermissions((prev) => prev.filter((p) => p.id !== permission.id));
     } catch {
       setError('Impossible de révoquer cet accès.');
