@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { Bell, Check } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -20,7 +21,9 @@ function formatRelativeTime(dateStr) {
 export default function NotificationBell({ variant = 'sidebar' }) {
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
-  const containerRef = useRef(null);
+  const [position, setPosition] = useState(null);
+  const buttonRef = useRef(null);
+  const dropdownRef = useRef(null);
 
   async function loadNotifications() {
     try {
@@ -37,9 +40,16 @@ export default function NotificationBell({ variant = 'sidebar' }) {
     return () => clearInterval(interval);
   }, []);
 
+  // Clic en dehors : le panneau est maintenant en portal (voir plus bas), donc il n'est plus un
+  // descendant DOM du bouton — il faut vérifier les deux refs séparément, pas un seul conteneur
+  // englobant comme avant.
   useEffect(() => {
     function handleClickOutside(event) {
-      if (containerRef.current && !containerRef.current.contains(event.target)) {
+      if (
+        buttonRef.current &&
+        !buttonRef.current.contains(event.target) &&
+        !(dropdownRef.current && dropdownRef.current.contains(event.target))
+      ) {
         setIsOpen(false);
       }
     }
@@ -68,14 +78,33 @@ export default function NotificationBell({ variant = 'sidebar' }) {
     }
   }
 
+  // Le bouton vit dans la sidebar, qui a overflow-x-hidden/overflow-y-auto (pour son propre
+  // défilement) — un panneau simplement `absolute` à l'intérieur s'y retrouve rogné dès qu'il
+  // dépasse (w-80 = 320px, sidebar = 256px), invisible malgré son z-index (bug réel rapporté :
+  // "le modal est caché derrière la page"). Rendu en portal dans document.body + positionné en
+  // `fixed` depuis le rect du bouton : échappe entièrement à l'overflow et au transform de la
+  // sidebar (transition-transform pour le slide-in mobile crée aussi un containing block pour
+  // les descendants fixed, donc rester dans l'arbre ne suffirait pas même avec position: fixed).
+  function toggle() {
+    if (!isOpen && buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      setPosition(
+        variant === 'sidebar'
+          ? { top: rect.bottom + 8, left: rect.left }
+          : { top: rect.bottom + 8, right: window.innerWidth - rect.right }
+      );
+    }
+    setIsOpen((prev) => !prev);
+  }
+
   const iconButtonClass =
     variant === 'sidebar'
       ? 'relative rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white'
       : 'relative -mr-1 rounded-md p-2 text-white hover:bg-white/10';
 
   return (
-    <div className="relative" ref={containerRef}>
-      <button type="button" onClick={() => setIsOpen((prev) => !prev)} aria-label="Notifications" className={iconButtonClass}>
+    <>
+      <button ref={buttonRef} type="button" onClick={toggle} aria-label="Notifications" className={iconButtonClass}>
         <Bell size={20} />
         {unreadCount > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white">
@@ -84,53 +113,56 @@ export default function NotificationBell({ variant = 'sidebar' }) {
         )}
       </button>
 
-      {isOpen && (
-        <div
-          className={`absolute z-50 mt-2 w-80 max-w-[85vw] rounded-xl border border-slate-200 bg-white text-slate-900 shadow-lg ${
-            variant === 'sidebar' ? 'left-0' : 'right-0'
-          }`}
-        >
-          <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-            <span className="text-sm font-semibold text-slate-900">Notifications</span>
-            {unreadCount > 0 && (
-              <button
-                type="button"
-                onClick={markAllAsRead}
-                className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-              >
-                <Check size={12} />
-                Tout marquer comme lu
-              </button>
-            )}
-          </div>
+      {isOpen &&
+        position &&
+        createPortal(
+          <div
+            ref={dropdownRef}
+            style={{ top: position.top, left: position.left, right: position.right }}
+            className="fixed z-50 w-80 max-w-[85vw] rounded-xl border border-slate-200 bg-white text-slate-900 shadow-lg"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <span className="text-sm font-semibold text-slate-900">Notifications</span>
+              {unreadCount > 0 && (
+                <button
+                  type="button"
+                  onClick={markAllAsRead}
+                  className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <Check size={12} />
+                  Tout marquer comme lu
+                </button>
+              )}
+            </div>
 
-          {visibleNotifications.length === 0 ? (
-            <p className="px-4 py-6 text-center text-sm text-slate-500">Aucune notification.</p>
-          ) : (
-            <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto overflow-x-hidden">
-              {visibleNotifications.map((notification) => (
-                <li key={notification.id}>
-                  <Link
-                    to={notification.link || '#'}
-                    onClick={() => {
-                      setIsOpen(false);
-                      if (!notification.read) markAsRead(notification.id);
-                    }}
-                    className={`block px-4 py-3 hover:bg-slate-50 ${notification.read ? '' : 'bg-blue-50/60'}`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="text-sm font-medium text-slate-900">{notification.title}</p>
-                      {!notification.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
-                    </div>
-                    {notification.message && <p className="mt-0.5 text-sm text-slate-600">{notification.message}</p>}
-                    <p className="mt-1 text-xs text-slate-400">{formatRelativeTime(notification.created_at)}</p>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
-    </div>
+            {visibleNotifications.length === 0 ? (
+              <p className="px-4 py-6 text-center text-sm text-slate-500">Aucune notification.</p>
+            ) : (
+              <ul className="max-h-80 divide-y divide-slate-100 overflow-y-auto overflow-x-hidden">
+                {visibleNotifications.map((notification) => (
+                  <li key={notification.id}>
+                    <Link
+                      to={notification.link || '#'}
+                      onClick={() => {
+                        setIsOpen(false);
+                        if (!notification.read) markAsRead(notification.id);
+                      }}
+                      className={`block px-4 py-3 hover:bg-slate-50 ${notification.read ? '' : 'bg-blue-50/60'}`}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="text-sm font-medium text-slate-900">{notification.title}</p>
+                        {!notification.read && <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />}
+                      </div>
+                      {notification.message && <p className="mt-0.5 text-sm text-slate-600">{notification.message}</p>}
+                      <p className="mt-1 text-xs text-slate-400">{formatRelativeTime(notification.created_at)}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
