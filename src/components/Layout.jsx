@@ -81,9 +81,16 @@ export const NAV_ITEMS = [
   { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
   { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
-  // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
-  { to: '/services', label: 'Services', icon: Wrench, adminOnly: true },
-  { to: '/employees', label: 'Personnel', icon: Contact, adminOnly: true },
+  // Configurables comme les autres (Paramètres > Visibilité), mais masquées par défaut pour
+  // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
+  // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations
+  // restent réservées à l'admin (voir services.js/employees.js), donc pas de risque de casser
+  // la page en l'ouvrant à d'autres rôles.
+  { key: 'services', to: '/services', label: 'Services', icon: Wrench },
+  { key: 'employees', to: '/employees', label: 'Personnel', icon: Contact },
+  // Jamais configurable, contrairement aux deux au-dessus : c'est le seul endroit qui permet
+  // de corriger ce réglage, donc aucune combinaison de règles ne doit jamais pouvoir le faire
+  // disparaître pour un admin.
   { to: '/settings', label: 'Paramètres', icon: Settings, adminOnly: true },
 ];
 
