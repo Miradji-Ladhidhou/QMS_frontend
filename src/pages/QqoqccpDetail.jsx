@@ -8,6 +8,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 // Mêmes noms de champs que qqoqccp_analyses (schema.sql) et que le corps attendu par
 // PATCH /api/qqoqccp/:id — voir backend/src/routes/qqoqccp.js.
@@ -564,15 +565,18 @@ export default function QqoqccpDetail() {
             Exporter PDF
           </button>
           {isManagerRole(currentUser?.role) && (
-            <button
-              type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
-            >
-              <Trash2 size={16} />
-              {deleting ? 'Suppression...' : 'Supprimer'}
-            </button>
+            <>
+              <ShareRecordPanel resourceType="qqoqccp" resourceId={analysis.id} />
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 transition-colors hover:bg-red-50 disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {deleting ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </>
           )}
         </div>
       </div>
