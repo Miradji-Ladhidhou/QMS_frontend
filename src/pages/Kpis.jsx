@@ -1076,6 +1076,11 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   const [configWarning, setConfigWarning] = useState('');
   const [applying, setApplying] = useState(false);
   const [suggested, setSuggested] = useState(false);
+  // Mode simple par défaut : quand la détection auto trouve une recette complète pour une
+  // nouvelle série, on saute le formulaire de recette (type de calcul, filtres, group-by) et on
+  // montre directement un résumé + l'aperçu — le formulaire complet reste à un clic via
+  // "Ajuster manuellement" pour les cas où la détection se trompe ou ne suffit pas.
+  const [simpleMode, setSimpleMode] = useState(true);
 
   const [livePreview, setLivePreview] = useState(null);
   const [livePreviewLoading, setLivePreviewLoading] = useState(false);
@@ -1096,6 +1101,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     if (id === 'new') {
       setConfigForm(EMPTY_CONFIG_FORM);
       setSuggested(false);
+      setSimpleMode(true);
     } else {
       const series = existingSeries.find((s) => s.id === id);
       if (series) setConfigForm(configToForm(series));
@@ -1123,6 +1129,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     setUploadError('');
     setImportData(null);
     setSuggested(false);
+    setSimpleMode(true);
   }
 
   function handleDownloadTemplate() {
@@ -1146,6 +1153,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
       const { data } = await api.get(`/kpi-imports/${importId}`);
       setImportData(data);
       setSuggested(false);
+      setSimpleMode(true);
     } catch (err) {
       setUploadError(err.response?.data?.error || "Impossible de charger cet import.");
     } finally {
@@ -1190,6 +1198,11 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   const periodReady = Boolean(configForm.period_column || manualPeriod);
   const configComplete = isConfigComplete(configForm);
   const canProceed = configComplete && periodReady;
+  // Éligible au mode simple seulement pour une nouvelle série dont la détection auto a produit
+  // une recette déjà complète (configComplete, pas canProceed : la période peut encore manquer
+  // et se saisir manuellement sans repasser par le formulaire de recette) — sinon (série
+  // existante, détection ratée ou incomplète) le formulaire complet reste le seul chemin.
+  const showSimpleMode = simpleMode && selectedSeriesId === 'new' && suggested && configComplete;
   const blockingIssues = [
     ...configIssues(configForm),
     ...(periodReady ? [] : ['la période est requise (colonne détectée ou date saisie manuellement)']),
@@ -1527,18 +1540,38 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                   </div>
                 )}
 
-                {suggested && selectedSeriesId === 'new' && (
+                {suggested && selectedSeriesId === 'new' && !showSimpleMode && (
                   <p className="mb-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">
                     Configuration pré-remplie automatiquement d'après votre fichier — vérifiez et ajustez si besoin.
                   </p>
                 )}
 
-                <CalculationConfigFields
-                  form={configForm}
-                  onChange={setConfigForm}
-                  columns={importData.columns}
-                  sampleRows={importData.sample}
-                />
+                {showSimpleMode ? (
+                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+                    <p className="text-sm font-medium text-slate-800">{configForm.label}</p>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      {CALC_TYPE_LABELS[configForm.calc_type]}
+                      {describeFiltersShort(configForm.filters, configForm.filter_logic)
+                        ? ` — ${describeFiltersShort(configForm.filters, configForm.filter_logic)}`
+                        : ''}
+                      {configForm.period_column ? ` · période : colonne "${configForm.period_column}"` : ''}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setSimpleMode(false)}
+                      className="mt-2 text-xs font-medium text-primary hover:underline"
+                    >
+                      Ajuster manuellement
+                    </button>
+                  </div>
+                ) : (
+                  <CalculationConfigFields
+                    form={configForm}
+                    onChange={setConfigForm}
+                    columns={importData.columns}
+                    sampleRows={importData.sample}
+                  />
+                )}
 
                 {!configForm.period_column && (
                   <div className="mt-4">
