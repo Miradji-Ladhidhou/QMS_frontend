@@ -7,6 +7,7 @@ import NotificationPreferences from '../components/NotificationPreferences.jsx';
 import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
 import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
 import DriveStorageSettings from '../components/DriveStorageSettings.jsx';
+import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import Groups from './Groups.jsx';
 
@@ -17,6 +18,7 @@ const TABS = [
   { id: 'groups', label: 'Groupes', adminOnly: true },
   { id: 'capa', label: 'CAPA', adminOnly: true },
   { id: 'documents', label: 'Documents', adminOnly: true },
+  { id: 'visibility', label: 'Visibilité', adminOnly: true },
   { id: 'profile', label: 'Mon profil' },
   { id: 'notifications', label: 'Notifications' },
 ];
@@ -75,6 +77,7 @@ export default function Settings() {
             <DriveStorageSettings />
           </div>
         )}
+        {activeTab === 'visibility' && isAdmin && <MenuVisibilitySettings />}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />
         )}

@@ -27,6 +27,7 @@ import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useRole } from '../lib/useRole.js';
+import { useMenuVisibility } from '../lib/useMenuVisibility.js';
 import { ROLE_LABELS } from '../lib/roles.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import NotificationBell from './NotificationBell.jsx';
@@ -59,20 +60,27 @@ function initialsOf(fullName) {
 // seul ("Audits", "Risques", "Revues") ne dit pas ce que la page fait, alors que son propre
 // titre a déjà été choisi pour être clair — le menu doit rester cohérent avec lui plutôt que
 // d'en inventer une version raccourcie et plus ambiguë.
-const NAV_ITEMS = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
-  { to: '/planning', label: 'Planning', icon: CalendarClock },
-  { to: '/documents', label: 'Documents', icon: FileText },
-  { to: '/capas', label: 'CAPA', icon: ClipboardList },
-  { to: '/complaints', label: 'Réclamations clients', icon: MessageSquareWarning },
-  { to: '/trainings', label: 'Formations', icon: GraduationCap },
-  { to: '/kpis', label: 'KPIs', icon: BarChart3 },
-  { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
-  { to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
-  { to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
-  { to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
-  { to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
-  { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
+// key : identifiant stable pour la visibilité configurable par rôle/utilisateur (Paramètres >
+// Visibilité, voir MenuVisibilitySettings.jsx) — indépendant de `to`, pour ne jamais casser un
+// réglage déjà enregistré si une route change un jour. Dupliqué côté backend
+// (routes/tenant.js#MENU_ITEM_KEYS) : deux repos séparés, pas de package partagé. Les entrées
+// adminOnly n'ont pas besoin de key : réservées à l'admin de façon fixe, jamais configurables.
+// Exporté pour MenuVisibilitySettings.jsx (Paramètres > Visibilité), qui a besoin des mêmes
+// libellés/icônes pour lister les sections configurables sans les redéfinir à côté.
+export const NAV_ITEMS = [
+  { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
+  { key: 'planning', to: '/planning', label: 'Planning', icon: CalendarClock },
+  { key: 'documents', to: '/documents', label: 'Documents', icon: FileText },
+  { key: 'capas', to: '/capas', label: 'CAPA', icon: ClipboardList },
+  { key: 'complaints', to: '/complaints', label: 'Réclamations clients', icon: MessageSquareWarning },
+  { key: 'trainings', to: '/trainings', label: 'Formations', icon: GraduationCap },
+  { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
+  { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
+  { key: 'audits', to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
+  { key: 'risks', to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
+  { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
+  { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
+  { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Gestion des services/personnel/catégories/utilisateurs — réservé à l'admin (voir useRole.js).
   { to: '/services', label: 'Services', icon: Wrench, adminOnly: true },
   { to: '/employees', label: 'Personnel', icon: Contact, adminOnly: true },
@@ -83,6 +91,7 @@ export default function Layout() {
   const currentUser = useCurrentUser();
   const tenant = useTenant();
   const role = useRole();
+  const visibleMenuKeys = useMenuVisibility();
   const logoUrl = getTenantLogoPublicUrl(tenant?.logo_url);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
@@ -172,7 +181,10 @@ export default function Layout() {
         )}
 
         <nav className="flex-1 space-y-1 px-3">
-          {NAV_ITEMS.filter((item) => !item.adminOnly || role === 'admin').map(({ to, label, icon: Icon, end }) => (
+          {NAV_ITEMS.filter(
+            (item) =>
+              (!item.adminOnly || role === 'admin') && (item.adminOnly || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
+          ).map(({ to, label, icon: Icon, end }) => (
             <NavLink
               key={to}
               to={to}
