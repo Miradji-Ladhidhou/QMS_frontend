@@ -6,9 +6,11 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -79,6 +81,7 @@ function EditReviewModal({ review, categories, onClose, onUpdated }) {
     improvement_opportunities: review.improvement_opportunities || '',
     conclusions: review.conclusions || '',
   });
+  const [isPrivate, setIsPrivate] = useState(Boolean(review.is_private_to_me));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -91,11 +94,22 @@ function EditReviewModal({ review, categories, onClose, onUpdated }) {
     setError('');
     setSubmitting(true);
 
+    let categoryId = form.category_id;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('management_review');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
     let response;
     try {
-      response = await api.patch(`/management-reviews/${review.id}`, form);
+      response = await api.patch(`/management-reviews/${review.id}`, { ...form, category_id: categoryId });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier cette revue.');
       setSubmitting(false);
@@ -153,23 +167,13 @@ function EditReviewModal({ review, categories, onClose, onUpdated }) {
             </div>
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           {TEXT_SECTIONS.map(({ key, label }) => (
             <div key={key}>

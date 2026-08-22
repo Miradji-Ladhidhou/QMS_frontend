@@ -5,7 +5,9 @@ import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { QQOQCCP_STATUS_LABELS } from '../lib/qqoqccpStatus.js';
 import { useSort } from '../lib/useSort.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
@@ -22,6 +24,7 @@ const QQOQCCP_SORT_OPTIONS = [
 function NewAnalysisModal({ categories, onClose, onCreated }) {
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -30,11 +33,22 @@ function NewAnalysisModal({ categories, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    let finalCategoryId = categoryId || undefined;
+    if (isPrivate) {
+      try {
+        finalCategoryId = await resolvePersonalCategoryId('qqoqccp');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
     let response;
     try {
-      response = await api.post('/qqoqccp', { title, category_id: categoryId || undefined });
+      response = await api.post('/qqoqccp', { title, category_id: finalCategoryId });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de créer l'analyse.");
       setSubmitting(false);
@@ -72,23 +86,13 @@ function NewAnalysisModal({ categories, onClose, onCreated }) {
             />
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune catégorie</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={categoryId}
+            onCategoryIdChange={setCategoryId}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"

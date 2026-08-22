@@ -15,9 +15,11 @@ import {
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
 import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
@@ -107,6 +109,7 @@ function NewRiskModal({ users, services, categories, onClose, onCreated }) {
     review_date: '',
     category_id: '',
   });
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -119,6 +122,17 @@ function NewRiskModal({ users, services, categories, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    let categoryId = form.category_id || undefined;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('risk');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const payload = {
       title: form.title,
       type: form.type,
@@ -129,7 +143,7 @@ function NewRiskModal({ users, services, categories, onClose, onCreated }) {
       likelihood: Number(form.likelihood),
       impact: Number(form.impact),
       review_date: form.review_date || undefined,
-      category_id: form.category_id || undefined,
+      category_id: categoryId,
     };
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
@@ -284,23 +298,13 @@ function NewRiskModal({ users, services, categories, onClose, onCreated }) {
             />
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"

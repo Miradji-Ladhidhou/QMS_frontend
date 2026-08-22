@@ -5,9 +5,11 @@ import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
@@ -70,6 +72,7 @@ export default function CapaDetail() {
   const [submittingComment, setSubmittingComment] = useState(false);
 
   const [treatmentForm, setTreatmentForm] = useState(null);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [savingTreatment, setSavingTreatment] = useState(false);
   const [treatmentSaved, setTreatmentSaved] = useState(false);
   const [treatmentError, setTreatmentError] = useState('');
@@ -90,6 +93,7 @@ export default function CapaDetail() {
       const { data } = await api.get(`/capas/${id}`);
       setCapa(data);
       setTreatmentForm(buildTreatmentForm(data));
+      setIsPrivate(Boolean(data.is_private_to_me));
       setEffectivenessVerified(effectivenessToSelectValue(data.effectiveness_verified));
       setEffectivenessNotes(data.effectiveness_notes || '');
     } catch {
@@ -128,6 +132,9 @@ export default function CapaDetail() {
       const payload = {};
       for (const field of TREATMENT_FIELDS) {
         payload[field] = treatmentForm[field] || null;
+      }
+      if (isPrivate) {
+        payload.category_id = await resolvePersonalCategoryId('capa');
       }
       const { data } = await api.patch(`/capas/${id}`, payload);
       // PATCH ne renvoie pas les commentaires de suivi (contrairement à GET /capas/:id) —
@@ -323,24 +330,14 @@ export default function CapaDetail() {
             </select>
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={treatmentForm.category_id}
-                onChange={(e) => setTreatmentForm((prev) => ({ ...prev, category_id: e.target.value }))}
-                disabled={!canManage}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
-              >
-                <option value="">Aucune catégorie</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={treatmentForm.category_id}
+            onCategoryIdChange={(value) => setTreatmentForm((prev) => ({ ...prev, category_id: value }))}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+            disabled={!canManage}
+          />
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Description de la non-conformité</label>

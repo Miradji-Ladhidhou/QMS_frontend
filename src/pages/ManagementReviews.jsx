@@ -8,7 +8,9 @@ import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
 function formatDate(dateStr) {
@@ -27,6 +29,7 @@ function NewReviewModal({ categories, onClose, onCreated }) {
   const [reviewDate, setReviewDate] = useState(new Date().toISOString().slice(0, 10));
   const [participants, setParticipants] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -34,6 +37,17 @@ function NewReviewModal({ categories, onClose, onCreated }) {
     event.preventDefault();
     setError('');
     setSubmitting(true);
+
+    let finalCategoryId = categoryId || undefined;
+    if (isPrivate) {
+      try {
+        finalCategoryId = await resolvePersonalCategoryId('management_review');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
@@ -43,7 +57,7 @@ function NewReviewModal({ categories, onClose, onCreated }) {
         title,
         review_date: reviewDate,
         participants: participants || undefined,
-        category_id: categoryId || undefined,
+        category_id: finalCategoryId,
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la revue de direction.');
@@ -104,23 +118,13 @@ function NewReviewModal({ categories, onClose, onCreated }) {
             />
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={categoryId}
+            onCategoryIdChange={setCategoryId}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"

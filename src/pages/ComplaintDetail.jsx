@@ -6,10 +6,12 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
@@ -46,6 +48,7 @@ function EditComplaintModal({ complaint, users, services, categories, onClose, o
     resolution_date: complaint.resolution_date || '',
     customer_satisfied: complaint.customer_satisfied === null ? '' : String(complaint.customer_satisfied),
   });
+  const [isPrivate, setIsPrivate] = useState(Boolean(complaint.is_private_to_me));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -58,12 +61,24 @@ function EditComplaintModal({ complaint, users, services, categories, onClose, o
     setError('');
     setSubmitting(true);
 
+    let categoryId = form.category_id;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('complaint');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
     let response;
     try {
       response = await api.patch(`/complaints/${complaint.id}`, {
         ...form,
+        category_id: categoryId,
         customer_satisfied: form.customer_satisfied === '' ? null : form.customer_satisfied === 'true',
       });
     } catch (err) {
@@ -182,23 +197,13 @@ function EditComplaintModal({ complaint, users, services, categories, onClose, o
             </div>
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune catégorie</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>

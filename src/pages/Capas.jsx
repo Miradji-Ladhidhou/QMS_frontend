@@ -8,10 +8,12 @@ import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
@@ -201,6 +203,7 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
     preventive_action: '',
   });
   const [dueDateTouched, setDueDateTouched] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -238,10 +241,21 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
     setError('');
     setSubmitting(true);
 
+    let categoryId = form.category_id || undefined;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('capa');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const payload = {
       title: form.title,
       service_id: form.service_id || undefined,
-      category_id: form.category_id || undefined,
+      category_id: categoryId,
       description: form.description || undefined,
       priority: form.priority,
       // severity reste en base (voir schema.sql) mais n'est plus un champ distinct dans
@@ -424,23 +438,13 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
             </div>
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune catégorie</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"

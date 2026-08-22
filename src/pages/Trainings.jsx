@@ -21,8 +21,10 @@ import { exportToPdf, postForPdfDownload, getPdfDownload } from '../lib/pdfExpor
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SortSelect from '../components/SortSelect.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -131,6 +133,7 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
     description: '',
     category_id: '',
   });
+  const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -143,6 +146,17 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    let categoryId = form.category_id || undefined;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('training');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const payload = {
       title: form.title,
       type: form.type || undefined,
@@ -151,7 +165,7 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
       instructor: form.instructor || undefined,
       duration: form.duration || undefined,
       description: form.description || undefined,
-      category_id: form.category_id || undefined,
+      category_id: categoryId,
     };
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
@@ -260,23 +274,13 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
             />
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune catégorie</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"
@@ -302,6 +306,7 @@ function EditTrainingModal({ training, categories, onClose, onUpdated }) {
     description: training.description || '',
     category_id: training.category_id || '',
   });
+  const [isPrivate, setIsPrivate] = useState(Boolean(training.is_private_to_me));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -313,6 +318,17 @@ function EditTrainingModal({ training, categories, onClose, onUpdated }) {
     event.preventDefault();
     setError('');
     setSubmitting(true);
+
+    let categoryId = form.category_id || null;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('training');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
 
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le handler du parent ne doit pas se faire passer pour un échec de modification.
@@ -326,7 +342,7 @@ function EditTrainingModal({ training, categories, onClose, onUpdated }) {
         instructor: form.instructor || null,
         duration: form.duration || null,
         description: form.description || null,
-        category_id: form.category_id || null,
+        category_id: categoryId,
       }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier la formation.');
@@ -429,23 +445,13 @@ function EditTrainingModal({ training, categories, onClose, onUpdated }) {
             />
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune catégorie</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"

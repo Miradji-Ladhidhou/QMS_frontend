@@ -45,7 +45,9 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 
 const LINE_COLOR = '#1F3864';
@@ -308,6 +310,7 @@ function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
     calculation_type: kpi?.calculation_type || 'manual',
     category_id: kpi?.category_id || '',
   });
+  const [isPrivate, setIsPrivate] = useState(Boolean(kpi?.is_private_to_me));
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -330,6 +333,17 @@ function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
     setFieldErrors({});
     setSubmitting(true);
 
+    let categoryId = form.category_id || null;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('kpi');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     const payload = {
       name: form.name,
       unit: form.unit || null,
@@ -339,7 +353,7 @@ function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
       target_direction: hasTarget ? form.target_direction : undefined,
       frequency: form.frequency || null,
       calculation_type: form.calculation_type,
-      category_id: form.category_id || null,
+      category_id: categoryId,
     };
     // Le déplacement d'un KPI existant passe par l'action dédiée "Déplacer" (menu de la
     // carte), pas par ce formulaire — seule la création place le KPI dans le dossier
@@ -475,24 +489,14 @@ function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
             {fieldErrors.frequency && <p className="mt-1 text-xs text-red-600">{fieldErrors.frequency}</p>}
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className={inputClassName('category_id')}
-              >
-                <option value="">Aucune</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.category_id && <p className="mt-1 text-xs text-red-600">{fieldErrors.category_id}</p>}
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
+          {fieldErrors.category_id && <p className="text-xs text-red-600">{fieldErrors.category_id}</p>}
 
           <button
             type="submit"

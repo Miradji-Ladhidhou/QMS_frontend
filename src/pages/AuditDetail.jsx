@@ -6,10 +6,12 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import FindingTypeBadge from '../components/FindingTypeBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -40,6 +42,7 @@ function EditAuditModal({ audit, users, services, categories, onClose, onUpdated
     conclusion: audit.conclusion || '',
     category_id: audit.category_id || '',
   });
+  const [isPrivate, setIsPrivate] = useState(Boolean(audit.is_private_to_me));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,6 +54,17 @@ function EditAuditModal({ audit, users, services, categories, onClose, onUpdated
     event.preventDefault();
     setError('');
     setSubmitting(true);
+
+    let categoryId = form.category_id || null;
+    if (isPrivate) {
+      try {
+        categoryId = await resolvePersonalCategoryId('audit');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
 
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
     // un bug dans le parent ne doit jamais se faire passer pour un échec de la modification.
@@ -65,7 +79,7 @@ function EditAuditModal({ audit, users, services, categories, onClose, onUpdated
         planned_date: form.planned_date,
         completed_date: form.completed_date || null,
         conclusion: form.conclusion || null,
-        category_id: form.category_id || null,
+        category_id: categoryId,
       }));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de modifier l'audit.");
@@ -192,23 +206,13 @@ function EditAuditModal({ audit, users, services, categories, onClose, onUpdated
             />
           </div>
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={form.category_id}
-                onChange={(e) => updateField('category_id', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={form.category_id}
+            onCategoryIdChange={(value) => updateField('category_id', value)}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"

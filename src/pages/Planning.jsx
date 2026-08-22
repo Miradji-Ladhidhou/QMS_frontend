@@ -25,7 +25,9 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { exportToPdf } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 
 const TYPE_CONFIG = {
   capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700' },
@@ -68,6 +70,7 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
   const [source, setSource] = useState(initialSource);
   const [personId, setPersonId] = useState(task?.assigned_to || task?.assigned_employee_id || '');
   const [categoryId, setCategoryId] = useState(task?.category_id || '');
+  const [isPrivate, setIsPrivate] = useState(Boolean(task?.is_private_to_me));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -88,6 +91,17 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
           ? { assigned_to: null, assigned_employee_id: personId }
           : { assigned_to: null, assigned_employee_id: null };
 
+    let finalCategoryId = categoryId || undefined;
+    if (isPrivate) {
+      try {
+        finalCategoryId = await resolvePersonalCategoryId('task');
+      } catch {
+        setError('Impossible de préparer la visibilité personnelle.');
+        setSubmitting(false);
+        return;
+      }
+    }
+
     // onSaved() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
     let response;
@@ -97,14 +111,14 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
             title,
             description: description || null,
             due_date: dueDate,
-            category_id: categoryId || null,
+            category_id: finalCategoryId || null,
             ...assignment,
           })
         : await api.post('/tasks', {
             title,
             description: description || undefined,
             due_date: dueDate,
-            category_id: categoryId || undefined,
+            category_id: finalCategoryId,
             ...assignment,
           });
     } catch (err) {
@@ -210,23 +224,13 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
             </div>
           )}
 
-          {categories.length > 0 && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-              <select
-                value={categoryId}
-                onChange={(e) => setCategoryId(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              >
-                <option value="">Aucune</option>
-                {categories.map((category) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+          <CategoryVisibilityField
+            categories={categories}
+            categoryId={categoryId}
+            onCategoryIdChange={setCategoryId}
+            isPrivate={isPrivate}
+            onIsPrivateChange={setIsPrivate}
+          />
 
           <button
             type="submit"
