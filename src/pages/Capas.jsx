@@ -227,6 +227,8 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
     if (suggestion.overall_priority) handlePriorityChange(suggestion.overall_priority);
     setForm((prev) => ({
       ...prev,
+      title: suggestion.title || prev.title,
+      description: suggestion.synthesis || prev.description,
       root_cause: suggestion.root_causes?.length ? suggestion.root_causes.map((c) => `- ${c}`).join('\n') : prev.root_cause,
       preventive_action: suggestion.preventive_actions?.length
         ? suggestion.preventive_actions.map((a) => `- ${a}`).join('\n')
