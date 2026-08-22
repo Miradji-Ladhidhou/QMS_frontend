@@ -31,7 +31,7 @@ function getAuditSortValue(audit, key) {
   return audit[key];
 }
 
-function NewAuditModal({ users, services, onClose, onCreated }) {
+function NewAuditModal({ users, services, categories, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     audit_type: 'process',
@@ -39,6 +39,7 @@ function NewAuditModal({ users, services, onClose, onCreated }) {
     service_id: '',
     lead_auditor: '',
     planned_date: '',
+    category_id: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -59,6 +60,7 @@ function NewAuditModal({ users, services, onClose, onCreated }) {
       service_id: form.service_id || undefined,
       lead_auditor: form.lead_auditor || undefined,
       planned_date: form.planned_date,
+      category_id: form.category_id || undefined,
     };
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
@@ -173,6 +175,24 @@ function NewAuditModal({ users, services, onClose, onCreated }) {
             </div>
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -193,6 +213,7 @@ export default function Audits() {
   const [audits, setAudits] = useState([]);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -204,14 +225,16 @@ export default function Audits() {
     setLoading(true);
     setError('');
     try {
-      const [auditsRes, usersRes, servicesRes] = await Promise.all([
+      const [auditsRes, usersRes, servicesRes, categoriesRes] = await Promise.all([
         api.get('/audits', { params: statusFilter ? { status: statusFilter } : {} }),
         api.get('/users'),
         api.get('/services'),
+        api.get('/module-categories', { params: { resource_type: 'audit' } }),
       ]);
       setAudits(auditsRes.data);
       setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
+      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les audits.');
     } finally {
@@ -389,7 +412,13 @@ export default function Audits() {
       )}
 
       {isModalOpen && (
-        <NewAuditModal users={users} services={services} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewAuditModal
+          users={users}
+          services={services}
+          categories={categories}
+          onClose={() => setIsModalOpen(false)}
+          onCreated={handleCreated}
+        />
       )}
     </div>
   );

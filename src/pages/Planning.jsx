@@ -58,7 +58,7 @@ function canDeleteTask(task, currentUser) {
   return isManagerRole(currentUser.role) || task.created_by === currentUser.id;
 }
 
-function TaskFormModal({ task, users, employees, onClose, onSaved }) {
+function TaskFormModal({ task, users, employees, categories, onClose, onSaved }) {
   const isEditing = Boolean(task);
   const initialSource = task?.assigned_to ? 'user' : task?.assigned_employee_id ? 'employee' : 'none';
 
@@ -67,6 +67,7 @@ function TaskFormModal({ task, users, employees, onClose, onSaved }) {
   const [dueDate, setDueDate] = useState(task?.due_date || new Date().toISOString().slice(0, 10));
   const [source, setSource] = useState(initialSource);
   const [personId, setPersonId] = useState(task?.assigned_to || task?.assigned_employee_id || '');
+  const [categoryId, setCategoryId] = useState(task?.category_id || '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -96,9 +97,16 @@ function TaskFormModal({ task, users, employees, onClose, onSaved }) {
             title,
             description: description || null,
             due_date: dueDate,
+            category_id: categoryId || null,
             ...assignment,
           })
-        : await api.post('/tasks', { title, description: description || undefined, due_date: dueDate, ...assignment });
+        : await api.post('/tasks', {
+            title,
+            description: description || undefined,
+            due_date: dueDate,
+            category_id: categoryId || undefined,
+            ...assignment,
+          });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer cette tâche.");
       setSubmitting(false);
@@ -202,6 +210,24 @@ function TaskFormModal({ task, users, employees, onClose, onSaved }) {
             </div>
           )}
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -224,6 +250,7 @@ export default function Planning() {
   const [tasks, setTasks] = useState([]);
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
+  const [taskCategories, setTaskCategories] = useState([]);
   const [allServices, setAllServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -256,13 +283,18 @@ export default function Planning() {
       setLoading(true);
 
       try {
-        const [usersRes, employeesRes] = await Promise.all([api.get('/users'), api.get('/employees')]);
+        const [usersRes, employeesRes, categoriesRes] = await Promise.all([
+          api.get('/users'),
+          api.get('/employees'),
+          api.get('/module-categories', { params: { resource_type: 'task' } }),
+        ]);
         if (!cancelled) {
           setUsers(usersRes.data);
           setEmployees(employeesRes.data.filter((employee) => employee.is_active));
+          setTaskCategories(categoriesRes.data);
         }
       } catch {
-        // Non bloquant : le formulaire de tâche fonctionne sans assigné si ces listes échouent.
+        // Non bloquant : le formulaire de tâche fonctionne sans assigné/catégorie si ces listes échouent.
       }
 
       if (role !== 'member') {
@@ -565,6 +597,7 @@ export default function Planning() {
         <TaskFormModal
           users={users}
           employees={employees}
+          categories={taskCategories}
           onClose={() => setIsNewModalOpen(false)}
           onSaved={handleTaskSaved}
         />
@@ -575,6 +608,7 @@ export default function Planning() {
           task={editingTask}
           users={users}
           employees={employees}
+          categories={taskCategories}
           onClose={() => setEditingTaskId(null)}
           onSaved={handleTaskSaved}
         />

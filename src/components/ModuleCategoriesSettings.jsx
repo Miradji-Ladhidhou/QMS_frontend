@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import ModuleCategoryManager from './ModuleCategoryManager.jsx';
 
-// Audits et Risques absents : transparence totale assumée pour ces deux modules (voir
-// routes/audits.js et routes/risks.js) — pas de catégories restreintes possibles dessus.
 const RESOURCE_TABS = [
   { id: 'capa', label: 'CAPA' },
   { id: 'complaint', label: 'Réclamations clients' },
@@ -10,6 +8,10 @@ const RESOURCE_TABS = [
   { id: 'supplier', label: 'Fournisseurs' },
   { id: 'training', label: 'Formations' },
   { id: 'management_review', label: 'Revues de direction' },
+  { id: 'audit', label: 'Audits' },
+  { id: 'risk', label: 'Risques' },
+  { id: 'task', label: 'Tâches' },
+  { id: 'kpi', label: 'KPI' },
 ];
 
 export default function ModuleCategoriesSettings({ isAdmin }) {

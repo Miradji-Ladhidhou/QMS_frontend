@@ -297,7 +297,7 @@ function fieldErrorsFromResponse(err) {
   return Object.fromEntries(details.map((detail) => [detail.path, detail.msg]));
 }
 
-function KpiFormModal({ kpi, folderId, onClose, onSaved }) {
+function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
   const isEditing = Boolean(kpi);
   const [form, setForm] = useState({
     name: kpi?.name || '',
@@ -306,6 +306,7 @@ function KpiFormModal({ kpi, folderId, onClose, onSaved }) {
     target_direction: kpi?.target_direction || 'min',
     frequency: kpi?.frequency || '',
     calculation_type: kpi?.calculation_type || 'manual',
+    category_id: kpi?.category_id || '',
   });
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
@@ -338,6 +339,7 @@ function KpiFormModal({ kpi, folderId, onClose, onSaved }) {
       target_direction: hasTarget ? form.target_direction : undefined,
       frequency: form.frequency || null,
       calculation_type: form.calculation_type,
+      category_id: form.category_id || null,
     };
     // Le déplacement d'un KPI existant passe par l'action dédiée "Déplacer" (menu de la
     // carte), pas par ce formulaire — seule la création place le KPI dans le dossier
@@ -472,6 +474,25 @@ function KpiFormModal({ kpi, folderId, onClose, onSaved }) {
             </select>
             {fieldErrors.frequency && <p className="mt-1 text-xs text-red-600">{fieldErrors.frequency}</p>}
           </div>
+
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className={inputClassName('category_id')}
+              >
+                <option value="">Aucune</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+              {fieldErrors.category_id && <p className="mt-1 text-xs text-red-600">{fieldErrors.category_id}</p>}
+            </div>
+          )}
 
           <button
             type="submit"
@@ -2909,6 +2930,7 @@ export default function Kpis() {
   const [foldersLoading, setFoldersLoading] = useState(true);
   const [folderModal, setFolderModal] = useState(null); // null fermé, 'new' création, objet dossier édition
   const [moveModal, setMoveModal] = useState(null); // le kpi en cours de déplacement, ou null
+  const [categories, setCategories] = useState([]);
 
   async function loadKpis(folderId) {
     setLoading(true);
@@ -2953,6 +2975,13 @@ export default function Kpis() {
     loadFolders(currentFolderId);
     loadBreadcrumb(currentFolderId);
   }, [currentFolderId]);
+
+  useEffect(() => {
+    api
+      .get('/module-categories', { params: { resource_type: 'kpi' } })
+      .then(({ data }) => setCategories(data))
+      .catch(() => {});
+  }, []);
 
 
   function navigateToFolder(folderId) {
@@ -3206,6 +3235,7 @@ export default function Kpis() {
         <KpiFormModal
           kpi={formModal === 'new' ? null : formModal}
           folderId={currentFolderId}
+          categories={categories}
           onClose={() => setFormModal(null)}
           onSaved={handleSaved}
         />

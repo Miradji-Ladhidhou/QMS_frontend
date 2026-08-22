@@ -94,7 +94,7 @@ function RiskMatrix({ risks }) {
   );
 }
 
-function NewRiskModal({ users, services, onClose, onCreated }) {
+function NewRiskModal({ users, services, categories, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     type: 'risk',
@@ -105,6 +105,7 @@ function NewRiskModal({ users, services, onClose, onCreated }) {
     likelihood: '3',
     impact: '3',
     review_date: '',
+    category_id: '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -128,6 +129,7 @@ function NewRiskModal({ users, services, onClose, onCreated }) {
       likelihood: Number(form.likelihood),
       impact: Number(form.impact),
       review_date: form.review_date || undefined,
+      category_id: form.category_id || undefined,
     };
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
@@ -282,6 +284,24 @@ function NewRiskModal({ users, services, onClose, onCreated }) {
             />
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -302,6 +322,7 @@ export default function Risks() {
   const [risks, setRisks] = useState([]);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -317,14 +338,16 @@ export default function Risks() {
       const params = {};
       if (typeFilter) params.type = typeFilter;
       if (statusFilter) params.status = statusFilter;
-      const [risksRes, usersRes, servicesRes] = await Promise.all([
+      const [risksRes, usersRes, servicesRes, categoriesRes] = await Promise.all([
         api.get('/risks', { params }),
         api.get('/users'),
         api.get('/services'),
+        api.get('/module-categories', { params: { resource_type: 'risk' } }),
       ]);
       setRisks(risksRes.data);
       setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
+      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger le registre des risques.');
     } finally {
@@ -524,7 +547,13 @@ export default function Risks() {
       )}
 
       {isModalOpen && (
-        <NewRiskModal users={users} services={services} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewRiskModal
+          users={users}
+          services={services}
+          categories={categories}
+          onClose={() => setIsModalOpen(false)}
+          onCreated={handleCreated}
+        />
       )}
     </div>
   );

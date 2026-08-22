@@ -28,7 +28,7 @@ function getDelayDays(priority, priorityDelays) {
   return priorityDelays?.[priority] ?? null;
 }
 
-function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
+function EditAuditModal({ audit, users, services, categories, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: audit.title,
     audit_type: audit.audit_type,
@@ -38,6 +38,7 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
     planned_date: audit.planned_date,
     completed_date: audit.completed_date || '',
     conclusion: audit.conclusion || '',
+    category_id: audit.category_id || '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -64,6 +65,7 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
         planned_date: form.planned_date,
         completed_date: form.completed_date || null,
         conclusion: form.conclusion || null,
+        category_id: form.category_id || null,
       }));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de modifier l'audit.");
@@ -190,6 +192,24 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
             />
           </div>
 
+          {categories.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
+              <select
+                value={form.category_id}
+                onChange={(e) => updateField('category_id', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              >
+                <option value="">Aucune</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>
+                    {category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <button
             type="submit"
             disabled={submitting}
@@ -211,6 +231,7 @@ export default function AuditDetail() {
   const [audit, setAudit] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -242,6 +263,10 @@ export default function AuditDetail() {
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
+    api
+      .get('/module-categories', { params: { resource_type: 'audit' } })
+      .then(({ data }) => setCategories(data))
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -459,6 +484,7 @@ export default function AuditDetail() {
           audit={audit}
           users={users}
           services={services}
+          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setAudit((prev) => ({ ...prev, ...data }));
