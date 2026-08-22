@@ -1710,31 +1710,37 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
     setError('');
     setWarning('');
     setSubmitting(true);
+
+    const payload = {
+      label: form.label,
+      calc_type: form.calc_type,
+      source_column: form.source_column || null,
+      filters: form.filters,
+      filter_logic: form.filter_logic,
+      group_by_column: form.group_by_column || null,
+      period_column: form.period_column || null,
+    };
+
+    // onSaved() volontairement hors du try : voir KpiFormModal pour l'incident de référence —
+    // un bug du handler parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let data;
     try {
-      const payload = {
-        label: form.label,
-        calc_type: form.calc_type,
-        source_column: form.source_column || null,
-        filters: form.filters,
-        filter_logic: form.filter_logic,
-        group_by_column: form.group_by_column || null,
-        period_column: form.period_column || null,
-      };
-      const { data } =
+      ({ data } =
         editingId === 'new'
           ? await api.post(`/kpis/${kpi.id}/series`, payload)
-          : await api.patch(`/kpis/${kpi.id}/series/${editingId}`, payload);
-      onSaved();
-      loadSeries();
-      if (data.warning) {
-        setWarning(data.warning);
-      } else {
-        setEditingId(null);
-      }
+          : await api.patch(`/kpis/${kpi.id}/series/${editingId}`, payload));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer la série.");
-    } finally {
       setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+    onSaved();
+    loadSeries();
+    if (data.warning) {
+      setWarning(data.warning);
+    } else {
+      setEditingId(null);
     }
   }
 
@@ -1744,15 +1750,18 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
     }
     setError('');
     setDeletingId(s.id);
+
+    // onSaved() volontairement hors du try : voir KpiFormModal pour l'incident de référence.
     try {
       await api.delete(`/kpis/${kpi.id}/series/${s.id}`);
-      onSaved();
-      loadSeries();
     } catch {
       setError('Impossible de supprimer cette série.');
-    } finally {
       setDeletingId(null);
+      return;
     }
+    setDeletingId(null);
+    onSaved();
+    loadSeries();
   }
 
   const isFormView = editingId !== null;
@@ -2700,16 +2709,21 @@ function FolderFormModal({ folder, parentId, onClose, onSaved }) {
     event.preventDefault();
     setError('');
     setSubmitting(true);
+
+    // onSaved() volontairement hors du try : voir KpiFormModal pour l'incident de référence —
+    // un bug du handler parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let data;
     try {
-      const { data } = isEditing
+      ({ data } = isEditing
         ? await api.patch(`/kpi-folders/${folder.id}`, { name })
-        : await api.post('/kpi-folders', { name, parent_id: parentId || undefined });
-      onSaved(data, isEditing);
+        : await api.post('/kpi-folders', { name, parent_id: parentId || undefined }));
     } catch (err) {
       setError(err.response?.data?.error || `Impossible ${isEditing ? 'de renommer' : 'de créer'} le dossier.`);
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onSaved(data, isEditing);
   }
 
   return (

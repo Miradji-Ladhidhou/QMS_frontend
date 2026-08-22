@@ -52,22 +52,27 @@ function NewAuditModal({ users, services, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      audit_type: form.audit_type,
+      scope: form.scope || undefined,
+      service_id: form.service_id || undefined,
+      lead_auditor: form.lead_auditor || undefined,
+      planned_date: form.planned_date,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
+    // un bug dans le parent ne doit jamais se faire passer pour un échec de la création.
+    let data;
     try {
-      const payload = {
-        title: form.title,
-        audit_type: form.audit_type,
-        scope: form.scope || undefined,
-        service_id: form.service_id || undefined,
-        lead_auditor: form.lead_auditor || undefined,
-        planned_date: form.planned_date,
-      };
-      const { data } = await api.post('/audits', payload);
-      onCreated(data);
+      ({ data } = await api.post('/audits', payload));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de créer l'audit.");
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (

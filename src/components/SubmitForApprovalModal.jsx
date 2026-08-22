@@ -22,14 +22,18 @@ export default function SubmitForApprovalModal({ documentId, users, onClose, onS
     setError('');
     setSubmitting(true);
 
+    // onSubmitted() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
+    // un bug dans le parent ne doit jamais se faire passer pour un échec de la soumission.
+    let data;
     try {
-      const { data } = await api.post(`/documents/${documentId}/submit-for-approval`, { approver_ids: selectedIds });
-      onSubmitted(data);
+      ({ data } = await api.post(`/documents/${documentId}/submit-for-approval`, { approver_ids: selectedIds }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de soumettre le document pour approbation.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onSubmitted(data);
   }
 
   return (

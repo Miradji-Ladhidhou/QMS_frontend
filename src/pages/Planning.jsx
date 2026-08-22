@@ -87,24 +87,25 @@ function TaskFormModal({ task, users, employees, onClose, onSaved }) {
           ? { assigned_to: null, assigned_employee_id: personId }
           : { assigned_to: null, assigned_employee_id: null };
 
+    // onSaved() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      if (isEditing) {
-        const { data } = await api.patch(`/tasks/${task.id}`, {
-          title,
-          description: description || null,
-          due_date: dueDate,
-          ...assignment,
-        });
-        onSaved(data);
-      } else {
-        const { data } = await api.post('/tasks', { title, description: description || undefined, due_date: dueDate, ...assignment });
-        onSaved(data);
-      }
+      response = isEditing
+        ? await api.patch(`/tasks/${task.id}`, {
+            title,
+            description: description || null,
+            due_date: dueDate,
+            ...assignment,
+          })
+        : await api.post('/tasks', { title, description: description || undefined, due_date: dueDate, ...assignment });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer cette tâche.");
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onSaved(response.data);
   }
 
   const options = source === 'user' ? users : source === 'employee' ? employees : [];

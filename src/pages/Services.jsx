@@ -23,19 +23,20 @@ function ServiceModal({ service, onClose, onSaved }) {
     setError('');
     setSaving(true);
 
+    // onSaved() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      if (isNew) {
-        const { data } = await api.post('/services', { name });
-        onSaved(data);
-      } else {
-        const { data } = await api.patch(`/services/${service.id}`, { name, is_active: isActive });
-        onSaved(data);
-      }
+      response = isNew
+        ? await api.post('/services', { name })
+        : await api.patch(`/services/${service.id}`, { name, is_active: isActive });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer le service.");
-    } finally {
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    onSaved(response.data);
   }
 
   return (
@@ -116,14 +117,19 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
   async function handleToggleActive() {
     setError('');
     setToggling(true);
+
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const { data } = await api.patch(`/services/${service.id}`, { is_active: !service.is_active });
-      onUpdated(data);
+      response = await api.patch(`/services/${service.id}`, { is_active: !service.is_active });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le service.');
-    } finally {
       setToggling(false);
+      return;
     }
+    setToggling(false);
+    onUpdated(response.data);
   }
 
   async function handleDelete() {
@@ -131,14 +137,18 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
 
     setError('');
     setDeleting(true);
+
+    // onDeleted() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
     try {
       await api.delete(`/services/${service.id}`);
-      onDeleted(service.id);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer ce service.');
-    } finally {
       setDeleting(false);
+      return;
     }
+    setDeleting(false);
+    onDeleted(service.id);
   }
 
   async function handleAssign(event) {

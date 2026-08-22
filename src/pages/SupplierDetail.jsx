@@ -60,14 +60,18 @@ function EditSupplierModal({ supplier, services, onClose, onUpdated }) {
     setError('');
     setSubmitting(true);
 
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
+    // un bug dans le parent ne doit jamais se faire passer pour un échec de la modification.
+    let data;
     try {
-      const { data } = await api.patch(`/suppliers/${supplier.id}`, form);
-      onUpdated(data);
+      ({ data } = await api.patch(`/suppliers/${supplier.id}`, form));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier ce fournisseur.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUpdated(data);
   }
 
   return (
@@ -250,25 +254,30 @@ function CreateCapaFromEvaluationModal({ supplierId, supplierName, evaluation, u
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      service_id: form.service_id || undefined,
+      priority: form.priority,
+      severity: form.severity,
+      assigned_to: form.assigned_to || undefined,
+      due_date: form.due_date || undefined,
+      root_cause: form.root_cause || undefined,
+      corrective_action: form.corrective_action || undefined,
+      preventive_action: form.preventive_action || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
+    // un bug dans le parent ne doit jamais se faire passer pour un échec de la création.
+    let data;
     try {
-      const payload = {
-        title: form.title,
-        service_id: form.service_id || undefined,
-        priority: form.priority,
-        severity: form.severity,
-        assigned_to: form.assigned_to || undefined,
-        due_date: form.due_date || undefined,
-        root_cause: form.root_cause || undefined,
-        corrective_action: form.corrective_action || undefined,
-        preventive_action: form.preventive_action || undefined,
-      };
-      const { data } = await api.post(`/suppliers/${supplierId}/evaluations/${evaluation.id}/create-capa`, payload);
-      onCreated(data);
+      ({ data } = await api.post(`/suppliers/${supplierId}/evaluations/${evaluation.id}/create-capa`, payload));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la CAPA.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (

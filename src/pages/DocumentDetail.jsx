@@ -69,18 +69,22 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
     setError(null);
     setSubmitting(true);
 
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-      if (changeNote) formData.append('change_note', changeNote);
+    const formData = new FormData();
+    formData.append('file', file);
+    if (changeNote) formData.append('change_note', changeNote);
 
-      const { data } = await api.post(`/documents/${documentId}/versions`, formData);
-      onUploaded(data);
+    // onUploaded() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le handler du parent ne doit pas se faire passer pour un échec d'upload.
+    let data;
+    try {
+      ({ data } = await api.post(`/documents/${documentId}/versions`, formData));
     } catch (err) {
       setError({ message: err.response?.data?.error || "Impossible d'ajouter la version.", code: err.response?.data?.code });
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUploaded(data);
   }
 
   return (
@@ -144,19 +148,22 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
     setError('');
     setSubmitting(true);
 
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence.
+    let data;
     try {
-      const { data } = await api.patch(`/documents/${doc.id}/metadata`, {
+      ({ data } = await api.patch(`/documents/${doc.id}/metadata`, {
         version,
         created_at: createdAt ? new Date(`${createdAt}T00:00:00`).toISOString() : undefined,
         review_date: reviewDate || null,
         review_frequency_months: reviewFrequencyMonths || null,
-      });
-      onUpdated(data);
+      }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier ces informations.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUpdated(data);
   }
 
   return (

@@ -263,14 +263,19 @@ function CreateTenantModal({ onClose, onCreated }) {
     event.preventDefault();
     setError('');
     setSaving(true);
+
+    // onCreated() volontairement hors du try : voir KpiFormModal (Kpis.jsx) pour l'incident de
+    // référence — un bug du handler parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let data;
     try {
-      const { data } = await api.post('/super-admin/tenants', { name, plan });
-      onCreated(data);
+      ({ data } = await api.post('/super-admin/tenants', { name, plan }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer ce tenant.');
-    } finally {
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    onCreated(data);
   }
 
   return (
@@ -325,18 +330,22 @@ function InviteUserForm({ tenantId, onCreated }) {
     event.preventDefault();
     setError('');
     setSaving(true);
+
+    // onCreated() volontairement hors du try : voir KpiFormModal (Kpis.jsx) pour l'incident de
+    // référence — un bug du handler parent ne doit jamais se faire passer pour un échec de l'appel API.
     try {
       await api.post(`/super-admin/tenants/${tenantId}/users`, { email, full_name: fullName, role });
-      setEmail('');
-      setFullName('');
-      setRole('member');
-      setOpen(false);
-      onCreated();
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'inviter cet utilisateur.");
-    } finally {
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    setEmail('');
+    setFullName('');
+    setRole('member');
+    setOpen(false);
+    onCreated();
   }
 
   if (!open) {
@@ -564,14 +573,18 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
   async function confirmDeleteTenant() {
     setDeleting(true);
     setActionError('');
+
+    // onDeleted() volontairement hors du try : voir KpiFormModal (Kpis.jsx) pour l'incident de
+    // référence — un bug du handler parent ne doit jamais se faire passer pour un échec de l'appel API.
     try {
       await api.delete(`/super-admin/tenants/${tenantId}`);
-      onDeleted(tenantId);
     } catch (err) {
       setActionError(err.response?.data?.error || 'Impossible de supprimer ce tenant.');
       setDeleting(false);
       setShowDeleteTenant(false);
+      return;
     }
+    onDeleted(tenantId);
   }
 
   async function handleUpdateUser(userId, update) {

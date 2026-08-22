@@ -90,14 +90,18 @@ function EditReviewModal({ review, onClose, onUpdated }) {
     setError('');
     setSubmitting(true);
 
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const { data } = await api.patch(`/management-reviews/${review.id}`, form);
-      onUpdated(data);
+      response = await api.patch(`/management-reviews/${review.id}`, form);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier cette revue.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUpdated(response.data);
   }
 
   return (
@@ -224,25 +228,30 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      service_id: form.service_id || undefined,
+      priority: form.priority,
+      severity: form.severity,
+      assigned_to: form.assigned_to || undefined,
+      due_date: form.due_date || undefined,
+      root_cause: form.root_cause || undefined,
+      corrective_action: form.corrective_action || undefined,
+      preventive_action: form.preventive_action || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const payload = {
-        title: form.title,
-        service_id: form.service_id || undefined,
-        priority: form.priority,
-        severity: form.severity,
-        assigned_to: form.assigned_to || undefined,
-        due_date: form.due_date || undefined,
-        root_cause: form.root_cause || undefined,
-        corrective_action: form.corrective_action || undefined,
-        preventive_action: form.preventive_action || undefined,
-      };
-      const { data } = await api.post(`/management-reviews/${reviewId}/actions/${action.id}/create-capa`, payload);
-      onCreated(data);
+      response = await api.post(`/management-reviews/${reviewId}/actions/${action.id}/create-capa`, payload);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la CAPA.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(response.data);
   }
 
   return (

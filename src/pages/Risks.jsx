@@ -118,25 +118,30 @@ function NewRiskModal({ users, services, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      type: form.type,
+      category: form.category || undefined,
+      description: form.description || undefined,
+      service_id: form.service_id || undefined,
+      owner: form.owner || undefined,
+      likelihood: Number(form.likelihood),
+      impact: Number(form.impact),
+      review_date: form.review_date || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const payload = {
-        title: form.title,
-        type: form.type,
-        category: form.category || undefined,
-        description: form.description || undefined,
-        service_id: form.service_id || undefined,
-        owner: form.owner || undefined,
-        likelihood: Number(form.likelihood),
-        impact: Number(form.impact),
-        review_date: form.review_date || undefined,
-      };
-      const { data } = await api.post('/risks', payload);
-      onCreated(data);
+      response = await api.post('/risks', payload);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer le risque.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(response.data);
   }
 
   return (

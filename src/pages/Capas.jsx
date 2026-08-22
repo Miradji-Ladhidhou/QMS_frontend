@@ -131,14 +131,18 @@ function GuidedDiagnosticModal({ onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — une
+    // redirection ratée dans le parent ne doit pas se faire passer pour un échec de l'API.
+    let data;
     try {
-      const { data } = await api.post('/qqoqccp/quick-start', { title });
-      onCreated(data);
+      ({ data } = await api.post('/qqoqccp/quick-start', { title }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de démarrer le diagnostic.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (
@@ -233,30 +237,34 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      service_id: form.service_id || undefined,
+      description: form.description || undefined,
+      priority: form.priority,
+      // severity reste en base (voir schema.sql) mais n'est plus un champ distinct dans
+      // aucun formulaire de création CAPA — toujours miroir de la gravité choisie, comme
+      // les 5 flux "créer une CAPA depuis X" et QqoqccpDetail.jsx.
+      severity: form.priority,
+      origin: form.origin || undefined,
+      due_date: form.due_date || undefined,
+      assigned_to: form.assigned_to || undefined,
+      root_cause: form.root_cause || undefined,
+      corrective_action: form.corrective_action || undefined,
+      preventive_action: form.preventive_action || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence.
+    let data;
     try {
-      const payload = {
-        title: form.title,
-        service_id: form.service_id || undefined,
-        description: form.description || undefined,
-        priority: form.priority,
-        // severity reste en base (voir schema.sql) mais n'est plus un champ distinct dans
-        // aucun formulaire de création CAPA — toujours miroir de la gravité choisie, comme
-        // les 5 flux "créer une CAPA depuis X" et QqoqccpDetail.jsx.
-        severity: form.priority,
-        origin: form.origin || undefined,
-        due_date: form.due_date || undefined,
-        assigned_to: form.assigned_to || undefined,
-        root_cause: form.root_cause || undefined,
-        corrective_action: form.corrective_action || undefined,
-        preventive_action: form.preventive_action || undefined,
-      };
-      const { data } = await api.post('/capas', payload);
-      onCreated(data);
+      ({ data } = await api.post('/capas', payload));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la CAPA.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (

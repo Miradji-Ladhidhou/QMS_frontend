@@ -25,28 +25,29 @@ function EmployeeModal({ employee, onClose, onSaved }) {
     setError('');
     setSaving(true);
 
+    // onSaved() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      if (isNew) {
-        const { data } = await api.post('/employees', {
-          full_name: fullName,
-          email: email || undefined,
-          job_title: jobTitle || undefined,
-        });
-        onSaved(data);
-      } else {
-        const { data } = await api.patch(`/employees/${employee.id}`, {
-          full_name: fullName,
-          email: email || null,
-          job_title: jobTitle || null,
-          is_active: isActive,
-        });
-        onSaved(data);
-      }
+      response = isNew
+        ? await api.post('/employees', {
+            full_name: fullName,
+            email: email || undefined,
+            job_title: jobTitle || undefined,
+          })
+        : await api.patch(`/employees/${employee.id}`, {
+            full_name: fullName,
+            email: email || null,
+            job_title: jobTitle || null,
+            is_active: isActive,
+          });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer cette entrée.");
-    } finally {
       setSaving(false);
+      return;
     }
+    setSaving(false);
+    onSaved(response.data);
   }
 
   return (

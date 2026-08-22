@@ -56,17 +56,21 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
     setError('');
     setSubmitting(true);
 
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const { data } = await api.patch(`/complaints/${complaint.id}`, {
+      response = await api.patch(`/complaints/${complaint.id}`, {
         ...form,
         customer_satisfied: form.customer_satisfied === '' ? null : form.customer_satisfied === 'true',
       });
-      onUpdated(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier cette réclamation.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUpdated(response.data);
   }
 
   return (
@@ -284,25 +288,30 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      service_id: form.service_id || undefined,
+      priority: form.priority,
+      severity: form.severity,
+      assigned_to: form.assigned_to || undefined,
+      due_date: form.due_date || undefined,
+      root_cause: form.root_cause || undefined,
+      corrective_action: form.corrective_action || undefined,
+      preventive_action: form.preventive_action || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const payload = {
-        title: form.title,
-        service_id: form.service_id || undefined,
-        priority: form.priority,
-        severity: form.severity,
-        assigned_to: form.assigned_to || undefined,
-        due_date: form.due_date || undefined,
-        root_cause: form.root_cause || undefined,
-        corrective_action: form.corrective_action || undefined,
-        preventive_action: form.preventive_action || undefined,
-      };
-      const { data } = await api.post(`/complaints/${complaintId}/create-capa`, payload);
-      onCreated(data);
+      response = await api.post(`/complaints/${complaintId}/create-capa`, payload);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la CAPA.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(response.data);
   }
 
   return (

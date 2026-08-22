@@ -51,8 +51,11 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
     setError('');
     setSubmitting(true);
 
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
+    // un bug dans le parent ne doit jamais se faire passer pour un échec de la modification.
+    let data;
     try {
-      const { data } = await api.patch(`/audits/${audit.id}`, {
+      ({ data } = await api.patch(`/audits/${audit.id}`, {
         title: form.title,
         audit_type: form.audit_type,
         scope: form.scope || null,
@@ -61,13 +64,14 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
         planned_date: form.planned_date,
         completed_date: form.completed_date || null,
         conclusion: form.conclusion || null,
-      });
-      onUpdated(data);
+      }));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de modifier l'audit.");
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUpdated(data);
   }
 
   return (
@@ -584,25 +588,30 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, priorit
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      service_id: form.service_id || undefined,
+      priority: form.priority,
+      severity: form.severity,
+      assigned_to: form.assigned_to || undefined,
+      due_date: form.due_date || undefined,
+      root_cause: form.root_cause || undefined,
+      corrective_action: form.corrective_action || undefined,
+      preventive_action: form.preventive_action || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
+    // un bug dans le parent ne doit jamais se faire passer pour un échec de la création.
+    let data;
     try {
-      const payload = {
-        title: form.title,
-        service_id: form.service_id || undefined,
-        priority: form.priority,
-        severity: form.severity,
-        assigned_to: form.assigned_to || undefined,
-        due_date: form.due_date || undefined,
-        root_cause: form.root_cause || undefined,
-        corrective_action: form.corrective_action || undefined,
-        preventive_action: form.preventive_action || undefined,
-      };
-      const { data } = await api.post(`/audits/${auditId}/findings/${finding.id}/create-capa`, payload);
-      onCreated(data);
+      ({ data } = await api.post(`/audits/${auditId}/findings/${finding.id}/create-capa`, payload));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la CAPA.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (

@@ -142,23 +142,28 @@ function NewTrainingModal({ onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      title: form.title,
+      type: form.type || undefined,
+      frequency_months: form.frequency_months ? Number(form.frequency_months) : undefined,
+      location: form.location || undefined,
+      instructor: form.instructor || undefined,
+      duration: form.duration || undefined,
+      description: form.description || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le handler du parent ne doit pas se faire passer pour un échec de création.
+    let data;
     try {
-      const payload = {
-        title: form.title,
-        type: form.type || undefined,
-        frequency_months: form.frequency_months ? Number(form.frequency_months) : undefined,
-        location: form.location || undefined,
-        instructor: form.instructor || undefined,
-        duration: form.duration || undefined,
-        description: form.description || undefined,
-      };
-      const { data } = await api.post('/trainings', payload);
-      onCreated(data);
+      ({ data } = await api.post('/trainings', payload));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la formation.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (
@@ -288,8 +293,11 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
     setError('');
     setSubmitting(true);
 
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le handler du parent ne doit pas se faire passer pour un échec de modification.
+    let data;
     try {
-      const { data } = await api.patch(`/trainings/${training.id}`, {
+      ({ data } = await api.patch(`/trainings/${training.id}`, {
         title: form.title,
         type: form.type || null,
         frequency_months: form.frequency_months ? Number(form.frequency_months) : null,
@@ -297,13 +305,14 @@ function EditTrainingModal({ training, onClose, onUpdated }) {
         instructor: form.instructor || null,
         duration: form.duration || null,
         description: form.description || null,
-      });
-      onUpdated(data);
+      }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier la formation.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUpdated(data);
   }
 
   return (
@@ -425,16 +434,19 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
     setError('');
     setSubmitting(true);
 
+    // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence.
+    let data;
     try {
-      const { data } = await api.patch(`/trainings/${training.id}/records/${record.id}`, {
+      ({ data } = await api.patch(`/trainings/${training.id}/records/${record.id}`, {
         completed_at: completedAt,
-      });
-      onUpdated(data);
+      }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier cette réalisation.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onUpdated(data);
   }
 
   return (
@@ -647,20 +659,24 @@ function AttendanceSheetModal({ training, users, employees, onClose }) {
     setError('');
     setDownloading(true);
 
+    const userIds = [...selected].filter((key) => key.startsWith('user:')).map((key) => key.slice(5));
+    const employeeIds = [...selected].filter((key) => key.startsWith('employee:')).map((key) => key.slice(9));
+
+    // onClose() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un bug
+    // dans la fermeture du modal ne doit pas se faire passer pour un échec de génération du PDF.
     try {
-      const userIds = [...selected].filter((key) => key.startsWith('user:')).map((key) => key.slice(5));
-      const employeeIds = [...selected].filter((key) => key.startsWith('employee:')).map((key) => key.slice(9));
       await postForPdfDownload(
         `/trainings/${training.id}/attendance-sheet/pdf`,
         { user_ids: userIds, employee_ids: employeeIds, date },
         `fiche-participation-${training.title.toLowerCase().replace(/\s+/g, '-')}-${date}.pdf`
       );
-      onClose();
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de générer la fiche de participation.');
-    } finally {
       setDownloading(false);
+      return;
     }
+    setDownloading(false);
+    onClose();
   }
 
   return (
@@ -729,17 +745,21 @@ function ExcludePersonModal({ users, employees, onClose, onExcluded }) {
     setSubmitting(true);
 
     const [kind, id] = personKeyValue.split(':');
+
+    // onExcluded() volontairement hors du try : voir Kpis.jsx pour l'incident de référence.
+    let data;
     try {
-      const { data } = await api.patch(`/${kind === 'user' ? 'users' : 'employees'}/${id}`, {
+      ({ data } = await api.patch(`/${kind === 'user' ? 'users' : 'employees'}/${id}`, {
         training_exempt: true,
         training_exempt_reason: reason || undefined,
-      });
-      onExcluded(kind, data);
+      }));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'exclure cette personne.");
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onExcluded(kind, data);
   }
 
   return (

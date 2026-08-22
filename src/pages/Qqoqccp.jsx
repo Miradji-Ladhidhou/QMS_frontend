@@ -29,14 +29,18 @@ function NewAnalysisModal({ onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const { data } = await api.post('/qqoqccp', { title });
-      onCreated(data);
+      response = await api.post('/qqoqccp', { title });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de créer l'analyse.");
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(response.data);
   }
 
   return (

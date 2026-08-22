@@ -54,25 +54,30 @@ function NewComplaintModal({ users, services, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      customer_name: form.customer_name,
+      customer_contact: form.customer_contact || undefined,
+      received_date: form.received_date,
+      due_date: form.due_date || undefined,
+      description: form.description,
+      product_service: form.product_service || undefined,
+      severity: form.severity,
+      service_id: form.service_id || undefined,
+      assigned_to: form.assigned_to || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const payload = {
-        customer_name: form.customer_name,
-        customer_contact: form.customer_contact || undefined,
-        received_date: form.received_date,
-        due_date: form.due_date || undefined,
-        description: form.description,
-        product_service: form.product_service || undefined,
-        severity: form.severity,
-        service_id: form.service_id || undefined,
-        assigned_to: form.assigned_to || undefined,
-      };
-      const { data } = await api.post('/complaints', payload);
-      onCreated(data);
+      response = await api.post('/complaints', payload);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la réclamation.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(response.data);
   }
 
   return (

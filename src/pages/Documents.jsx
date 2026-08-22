@@ -100,23 +100,27 @@ function DocumentModal({ categories, onClose, onCreated }) {
     setError(null);
     setSubmitting(true);
 
-    try {
-      const formData = new FormData();
-      formData.append('number', form.number);
-      formData.append('title', form.title);
-      if (form.description) formData.append('description', form.description);
-      if (form.category_id) formData.append('category_id', form.category_id);
-      if (form.review_date) formData.append('review_date', form.review_date);
-      if (form.review_frequency_months) formData.append('review_frequency_months', form.review_frequency_months);
-      if (file) formData.append('file', file);
+    const formData = new FormData();
+    formData.append('number', form.number);
+    formData.append('title', form.title);
+    if (form.description) formData.append('description', form.description);
+    if (form.category_id) formData.append('category_id', form.category_id);
+    if (form.review_date) formData.append('review_date', form.review_date);
+    if (form.review_frequency_months) formData.append('review_frequency_months', form.review_frequency_months);
+    if (file) formData.append('file', file);
 
-      const { data } = await api.post('/documents', formData);
-      onCreated(data);
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le handler du parent ne doit pas se faire passer pour un échec d'upload.
+    let data;
+    try {
+      ({ data } = await api.post('/documents', formData));
     } catch (err) {
       setError({ message: err.response?.data?.error || 'Impossible de créer le document.', code: err.response?.data?.code });
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (

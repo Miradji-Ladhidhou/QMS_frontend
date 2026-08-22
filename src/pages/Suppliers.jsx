@@ -49,24 +49,29 @@ function NewSupplierModal({ services, onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    const payload = {
+      name: form.name,
+      category: form.category || undefined,
+      contact_name: form.contact_name || undefined,
+      contact_email: form.contact_email || undefined,
+      contact_phone: form.contact_phone || undefined,
+      criticality: form.criticality,
+      service_id: form.service_id || undefined,
+      next_evaluation_date: form.next_evaluation_date || undefined,
+    };
+
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
+    // un bug dans le parent ne doit jamais se faire passer pour un échec de la création.
+    let data;
     try {
-      const payload = {
-        name: form.name,
-        category: form.category || undefined,
-        contact_name: form.contact_name || undefined,
-        contact_email: form.contact_email || undefined,
-        contact_phone: form.contact_phone || undefined,
-        criticality: form.criticality,
-        service_id: form.service_id || undefined,
-        next_evaluation_date: form.next_evaluation_date || undefined,
-      };
-      const { data } = await api.post('/suppliers', payload);
-      onCreated(data);
+      ({ data } = await api.post('/suppliers', payload));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer le fournisseur.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(data);
   }
 
   return (

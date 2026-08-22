@@ -34,18 +34,22 @@ function NewReviewModal({ onClose, onCreated }) {
     setError('');
     setSubmitting(true);
 
+    // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
+    // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    let response;
     try {
-      const { data } = await api.post('/management-reviews', {
+      response = await api.post('/management-reviews', {
         title,
         review_date: reviewDate,
         participants: participants || undefined,
       });
-      onCreated(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer la revue de direction.');
-    } finally {
       setSubmitting(false);
+      return;
     }
+    setSubmitting(false);
+    onCreated(response.data);
   }
 
   return (
