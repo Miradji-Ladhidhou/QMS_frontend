@@ -8,6 +8,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
 // un <select>, seul moyen simple de distinguer "non vérifiée" d'un false explicite.
@@ -212,15 +213,18 @@ export default function CapaDetail() {
         </button>
 
         {canManage && (
-          <button
-            type="button"
-            onClick={handleDelete}
-            disabled={deleting}
-            className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
-          >
-            <Trash2 size={16} />
-            {deleting ? 'Suppression...' : 'Supprimer'}
-          </button>
+          <div className="flex items-center gap-2">
+            <ShareRecordPanel resourceType="capa" resourceId={capa.id} />
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={deleting}
+              className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+            >
+              <Trash2 size={16} />
+              {deleting ? 'Suppression...' : 'Supprimer'}
+            </button>
+          </div>
         )}
       </div>
 

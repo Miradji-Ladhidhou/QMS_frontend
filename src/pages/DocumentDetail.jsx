@@ -25,6 +25,7 @@ import DecisionModal from '../components/DecisionModal.jsx';
 import SubmitForApprovalModal from '../components/SubmitForApprovalModal.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 const AUDIT_ACTION_LABELS = {
   submitted_for_approval: 'Soumis pour approbation',
@@ -506,6 +507,7 @@ export default function DocumentDetail() {
                 Modifier
               </button>
             )}
+            {canManage && <ShareRecordPanel resourceType="document" resourceId={doc.id} />}
           </div>
         </div>
 
