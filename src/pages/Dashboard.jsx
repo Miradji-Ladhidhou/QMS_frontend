@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useMenuVisibility } from '../lib/useMenuVisibility.js';
 
 // Se met à jour toutes les 30s plutôt qu'à chaque seconde : l'heure affichée n'a besoin
 // d'être qu'approximativement fraîche ici, pas d'un vrai chronomètre — inutile de re-render
@@ -103,6 +104,10 @@ export default function Dashboard() {
   const currentUser = useCurrentUser();
   const role = currentUser?.role;
   const isMember = role === 'member';
+  // null tant que non chargé => tout afficher, comme Layout.jsx (évite un flash "carte visible
+  // puis disparaît" pendant le court instant avant que /tenant/menu ait répondu).
+  const visibleMenuKeys = useMenuVisibility();
+  const isModuleVisible = (key) => !visibleMenuKeys || visibleMenuKeys.includes(key);
   const canFilterByService = role === 'admin' || role === 'manager';
   const now = useLiveClock();
 
@@ -283,15 +288,20 @@ export default function Dashboard() {
         </Link>
       )}
 
-      <h2 className="mt-6 text-sm font-semibold text-slate-900 sm:text-base">{capaTitle}</h2>
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-        {loading || !stats
-          ? [0, 1, 2, 3].map((key) => <StatSkeleton key={key} />)
-          : capaCards.map((card) => <StatCard key={card.id} {...card} value={stats.capas[card.id]} />)}
-      </div>
+      {isModuleVisible('capas') && (
+        <>
+          <h2 className="mt-6 text-sm font-semibold text-slate-900 sm:text-base">{capaTitle}</h2>
+          <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+            {loading || !stats
+              ? [0, 1, 2, 3].map((key) => <StatSkeleton key={key} />)
+              : capaCards.map((card) => <StatCard key={card.id} {...card} value={stats.capas[card.id]} />)}
+          </div>
+        </>
+      )}
 
       <div className={`mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 ${isMember ? '' : 'lg:grid-cols-3'}`}>
         {!isMember &&
+          isModuleVisible('documents') &&
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
@@ -300,15 +310,17 @@ export default function Dashboard() {
             </WidgetCard>
           ))}
 
-        {loading || !stats ? (
-          <WidgetSkeleton />
-        ) : (
-          <WidgetCard title={trainingsTitle} to="/trainings">
-            <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" />
-          </WidgetCard>
-        )}
+        {isModuleVisible('trainings') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title={trainingsTitle} to="/trainings">
+              <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" />
+            </WidgetCard>
+          ))}
 
         {!isMember &&
+          isModuleVisible('kpis') &&
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
@@ -320,43 +332,47 @@ export default function Dashboard() {
             </WidgetCard>
           ))}
 
-        {loading || !stats ? (
-          <WidgetSkeleton />
-        ) : (
-          <WidgetCard title={auditsTitle} to="/audits">
-            <div className="flex items-baseline gap-2">
-              <ClipboardCheck size={20} className="text-slate-300" />
-              <BigNumber value={stats.audits.active} suffix="audit(s) en cours" />
-            </div>
-            <OverdueNote count={stats.audits.overdue} />
-          </WidgetCard>
-        )}
+        {isModuleVisible('audits') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title={auditsTitle} to="/audits">
+              <div className="flex items-baseline gap-2">
+                <ClipboardCheck size={20} className="text-slate-300" />
+                <BigNumber value={stats.audits.active} suffix="audit(s) en cours" />
+              </div>
+              <OverdueNote count={stats.audits.overdue} />
+            </WidgetCard>
+          ))}
 
-        {loading || !stats ? (
-          <WidgetSkeleton />
-        ) : (
-          <WidgetCard title={complaintsTitle} to="/complaints">
-            <div className="flex items-baseline gap-2">
-              <MessageSquareWarning size={20} className="text-slate-300" />
-              <BigNumber value={stats.complaints.active} suffix="réclamation(s) ouverte(s)" />
-            </div>
-            <OverdueNote count={stats.complaints.overdue} />
-          </WidgetCard>
-        )}
+        {isModuleVisible('complaints') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title={complaintsTitle} to="/complaints">
+              <div className="flex items-baseline gap-2">
+                <MessageSquareWarning size={20} className="text-slate-300" />
+                <BigNumber value={stats.complaints.active} suffix="réclamation(s) ouverte(s)" />
+              </div>
+              <OverdueNote count={stats.complaints.overdue} />
+            </WidgetCard>
+          ))}
 
-        {loading || !stats ? (
-          <WidgetSkeleton />
-        ) : (
-          <WidgetCard title={risksTitle} to="/risks">
-            <div className="flex items-baseline gap-2">
-              <ShieldAlert size={20} className="text-slate-300" />
-              <BigNumber value={stats.risks.active} suffix="risque(s) actif(s)" />
-            </div>
-            <OverdueNote count={stats.risks.overdue} />
-          </WidgetCard>
-        )}
+        {isModuleVisible('risks') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title={risksTitle} to="/risks">
+              <div className="flex items-baseline gap-2">
+                <ShieldAlert size={20} className="text-slate-300" />
+                <BigNumber value={stats.risks.active} suffix="risque(s) actif(s)" />
+              </div>
+              <OverdueNote count={stats.risks.overdue} />
+            </WidgetCard>
+          ))}
 
         {!isMember &&
+          isModuleVisible('suppliers') &&
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
@@ -370,6 +386,7 @@ export default function Dashboard() {
           ))}
 
         {!isMember &&
+          isModuleVisible('management-reviews') &&
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
