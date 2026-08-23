@@ -1,17 +1,17 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase.js';
+import { Link } from 'react-router-dom';
+import { Mail } from 'lucide-react';
 import { api } from '../lib/api.js';
 import AppLogo from '../components/AppLogo.jsx';
 
 export default function Register() {
-  const navigate = useNavigate();
   const [fullName, setFullName] = useState('');
   const [companyName, setCompanyName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [submittedEmail, setSubmittedEmail] = useState('');
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -20,18 +20,38 @@ export default function Register() {
 
     try {
       await api.post('/auth/register', { fullName, companyName, email, password });
-
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-      if (authError) {
-        throw authError;
-      }
-
-      navigate('/');
+      setSubmittedEmail(email);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer le compte.');
     } finally {
       setLoading(false);
     }
+  }
+
+  if (submittedEmail) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
+        <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8 text-center">
+          <div className="flex flex-col items-center mb-6">
+            <AppLogo className="h-12 w-12 rounded-xl mb-3" />
+            <p className="text-lg font-semibold text-slate-900">
+              QMS <span className="font-normal text-slate-400">SaaS</span>
+            </p>
+          </div>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+            <Mail size={22} className="text-primary" />
+          </div>
+          <h1 className="text-xl font-semibold text-slate-900 mb-2">Vérifiez votre email</h1>
+          <p className="text-sm text-slate-600 mb-6">
+            Un email de confirmation a été envoyé à <strong>{submittedEmail}</strong>. Cliquez sur le lien qu'il
+            contient pour activer votre compte et pouvoir vous connecter.
+          </p>
+          <Link to="/login" className="text-primary font-medium hover:underline text-sm">
+            Retour à la connexion
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

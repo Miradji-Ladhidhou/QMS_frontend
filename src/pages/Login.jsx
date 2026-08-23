@@ -22,7 +22,11 @@ export default function Login() {
     setLoading(false);
 
     if (authError) {
-      setError('Email ou mot de passe incorrect.');
+      if (authError.code === 'email_not_confirmed' || /email not confirmed/i.test(authError.message || '')) {
+        setError('Confirmez votre adresse email avant de vous connecter — vérifiez votre boîte de réception.');
+      } else {
+        setError('Email ou mot de passe incorrect.');
+      }
       return;
     }
 
