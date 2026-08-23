@@ -594,7 +594,7 @@ export default function DocumentDetail() {
             <ul className="space-y-1.5">
               {doc.workflow.approvals.map((approval) => (
                 <li key={approval.id} className="flex items-center justify-between text-sm">
-                  <span className="text-slate-700">{approval.approver?.full_name || 'Utilisateur'}</span>
+                  <span className="text-slate-700">{approval.approver?.full_name || 'Utilisateur supprimé'}</span>
                   <ApprovalStatusBadge decision={approval.decision} />
                 </li>
               ))}

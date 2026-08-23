@@ -91,6 +91,28 @@ export default function UserManager({ currentUser, isAdmin }) {
     }
   }
 
+  async function handleDelete(user) {
+    if (
+      !window.confirm(
+        `Supprimer définitivement le compte de ${user.full_name} (${user.email}) ? Cette action est irréversible — contrairement à "Désactiver", elle libère son adresse email pour un nouveau compte.`
+      )
+    ) {
+      return;
+    }
+
+    setUpdatingId(user.id);
+    setError('');
+
+    try {
+      await api.delete(`/users/${user.id}`);
+      setUsers((prev) => prev.filter((item) => item.id !== user.id));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ce compte.');
+    } finally {
+      setUpdatingId(null);
+    }
+  }
+
   async function handleResendInvite(user) {
     setResendingId(user.id);
     setResendMessage('');
@@ -303,6 +325,18 @@ export default function UserManager({ currentUser, isAdmin }) {
                       }`}
                     >
                       {user.is_active ? 'Désactiver' : 'Réactiver'}
+                    </button>
+                  )}
+
+                  {isAdmin && !isSelf && (
+                    <button
+                      type="button"
+                      disabled={isBusy}
+                      onClick={() => handleDelete(user)}
+                      title="Suppression définitive — libère l'adresse email"
+                      className="rounded-md border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                    >
+                      Supprimer
                     </button>
                   )}
 
