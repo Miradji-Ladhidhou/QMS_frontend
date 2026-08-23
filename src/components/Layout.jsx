@@ -30,10 +30,15 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useRole } from '../lib/useRole.js';
 import { useMenuVisibility } from '../lib/useMenuVisibility.js';
+import { useInactivityLogout } from '../lib/useInactivityLogout.js';
 import { ROLE_LABELS } from '../lib/roles.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import NotificationBell from './NotificationBell.jsx';
 import AppLogo from './AppLogo.jsx';
+
+// Déconnexion automatique après une heure sans interaction (souris, clavier, scroll, tactile) —
+// voir useInactivityLogout.js.
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
 
 // Rafraîchie chaque minute (pas chaque seconde) : le menu n'affiche pas les secondes, inutile
 // de re-render 60x plus souvent que ce qui est visible.
@@ -102,6 +107,7 @@ export const NAV_ITEMS = [
 ];
 
 export default function Layout() {
+  useInactivityLogout(INACTIVITY_TIMEOUT_MS);
   const currentUser = useCurrentUser();
   const tenant = useTenant();
   const role = useRole();
