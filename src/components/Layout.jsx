@@ -38,9 +38,7 @@ import AppLogo from './AppLogo.jsx';
 
 // Déconnexion automatique après une heure sans interaction (souris, clavier, scroll, tactile) —
 // voir useInactivityLogout.js.
-// TEMPORAIRE (debug) : 20s au lieu d'1h, pour vérifier rapidement que le mécanisme fonctionne
-// sans attendre une heure à chaque test. À remettre à 60 * 60 * 1000 une fois confirmé.
-const INACTIVITY_TIMEOUT_MS = 20 * 1000;
+const INACTIVITY_TIMEOUT_MS = 60 * 60 * 1000;
 
 // Rafraîchie chaque minute (pas chaque seconde) : le menu n'affiche pas les secondes, inutile
 // de re-render 60x plus souvent que ce qui est visible.
