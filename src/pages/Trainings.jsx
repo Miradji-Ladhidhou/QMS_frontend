@@ -25,6 +25,7 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SortSelect from '../components/SortSelect.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 
@@ -1156,6 +1157,14 @@ export default function Trainings() {
           onToggleDirection={() => toggleSort(sortKey)}
         />
       </div>
+
+      {canManage && (
+        <SelectAllToggle
+          ids={sortedTrainings.map((training) => training.id)}
+          selectedIds={selectedIds}
+          onChange={setSelectedIds}
+        />
+      )}
 
       {canManage && (
         <BulkSelectionBar

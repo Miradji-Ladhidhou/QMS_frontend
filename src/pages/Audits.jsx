@@ -13,6 +13,7 @@ import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
@@ -394,6 +395,10 @@ export default function Audits() {
           onToggleDirection={() => toggleSort(sortKey)}
         />
       </div>
+
+      {canManage && (
+        <SelectAllToggle ids={sortedAudits.map((audit) => audit.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+      )}
 
       {canManage && (
         <BulkSelectionBar

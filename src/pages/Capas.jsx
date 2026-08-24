@@ -15,6 +15,7 @@ import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
@@ -700,6 +701,10 @@ export default function Capas() {
           onToggleDirection={() => toggleSort(sortKey)}
         />
       </div>
+
+      {canManage && (
+        <SelectAllToggle ids={sortedCapas.map((capa) => capa.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+      )}
 
       {canManage && (
         <BulkSelectionBar

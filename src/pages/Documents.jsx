@@ -17,6 +17,7 @@ import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import DocumentBulkMoveModal from '../components/DocumentBulkMoveModal.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 
@@ -735,6 +736,10 @@ export default function Documents() {
           onToggleDirection={() => toggleSort(sortKey)}
         />
       </div>
+
+      {canManage && (
+        <SelectAllToggle ids={sortedDocuments.map((doc) => doc.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+      )}
 
       {canManage && (
         <BulkSelectionBar

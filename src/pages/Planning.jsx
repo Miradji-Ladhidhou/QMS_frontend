@@ -29,6 +29,7 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 
 const TYPE_CONFIG = {
@@ -517,6 +518,14 @@ export default function Planning() {
             </div>
           )}
         </div>
+      )}
+
+      {canManage && (
+        <SelectAllToggle
+          ids={items.filter((item) => item.type === 'task').map((item) => item.id)}
+          selectedIds={selectedTaskIds}
+          onChange={setSelectedTaskIds}
+        />
       )}
 
       {canManage && (

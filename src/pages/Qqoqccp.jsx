@@ -11,6 +11,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
@@ -223,6 +224,14 @@ export default function Qqoqccp() {
           onToggleDirection={() => toggleSort(sortKey)}
         />
       </div>
+
+      {canManage && (
+        <SelectAllToggle
+          ids={sortedAnalyses.map((analysis) => analysis.id)}
+          selectedIds={selectedIds}
+          onChange={setSelectedIds}
+        />
+      )}
 
       {canManage && (
         <BulkSelectionBar

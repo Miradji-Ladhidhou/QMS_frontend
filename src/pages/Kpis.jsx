@@ -49,6 +49,7 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 
@@ -3224,6 +3225,10 @@ export default function Kpis() {
               <span className="text-sm font-medium">Nouveau dossier</span>
             </button>
           </div>
+
+          {canManage && (
+            <SelectAllToggle ids={kpis.map((kpi) => kpi.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+          )}
 
           {canManage && (
             <BulkSelectionBar

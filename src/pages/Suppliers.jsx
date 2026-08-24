@@ -14,6 +14,7 @@ import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 
@@ -394,6 +395,14 @@ export default function Suppliers() {
           onToggleDirection={() => toggleSort(sortKey)}
         />
       </div>
+
+      {canManage && (
+        <SelectAllToggle
+          ids={sortedSuppliers.map((supplier) => supplier.id)}
+          selectedIds={selectedIds}
+          onChange={setSelectedIds}
+        />
+      )}
 
       {canManage && (
         <BulkSelectionBar
