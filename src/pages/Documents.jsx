@@ -425,6 +425,21 @@ export default function Documents() {
     loadData();
   }
 
+  async function handleBulkDelete() {
+    if (
+      !window.confirm(`Supprimer définitivement ${selectedIds.length} document(s) sélectionné(s) ? Cette action est irréversible.`)
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/documents/bulk', { data: { ids: selectedIds } });
+      setDocuments((prev) => prev.filter((doc) => !selectedIds.includes(doc.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces documents.');
+    }
+  }
+
   async function handleCategoryChange(event, doc) {
     event.stopPropagation();
     const categoryId = event.target.value || null;
@@ -571,9 +586,10 @@ export default function Documents() {
     setIsModalOpen(false);
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
     const headers = ['Numéro', 'Titre', 'Catégorie', 'Version', 'Statut', 'Prochaine révision', 'Créé le'];
-    const rows = filteredDocuments.map((doc) => [
+    const rows = source.map((doc) => [
       doc.number,
       doc.title,
       doc.category?.name || '',
@@ -585,7 +601,8 @@ export default function Documents() {
     exportToCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -597,7 +614,7 @@ export default function Documents() {
         { key: 'status', label: 'Statut', width: 0.13 },
         { key: 'review_date', label: 'Proch. révision', width: 0.13 },
       ];
-      const rows = filteredDocuments.map((doc) => ({
+      const rows = source.map((doc) => ({
         number: doc.number,
         title: doc.title,
         category: doc.category?.name || '',
@@ -606,7 +623,7 @@ export default function Documents() {
         review_date: formatDate(doc.review_date),
       }));
       await exportToPdf(`documents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Documents', columns, rows, {
-        subtitle: `${filteredDocuments.length} document${filteredDocuments.length > 1 ? 's' : ''}`,
+        subtitle: `${source.length} document${source.length > 1 ? 's' : ''}`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -622,7 +639,7 @@ export default function Documents() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={filteredDocuments.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
@@ -631,7 +648,7 @@ export default function Documents() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || filteredDocuments.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
@@ -723,6 +740,10 @@ export default function Documents() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}
