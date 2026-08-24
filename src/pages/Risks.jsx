@@ -349,6 +349,19 @@ export default function Risks() {
     loadData();
   }
 
+  async function handleBulkDelete() {
+    if (!window.confirm(`Supprimer définitivement ${selectedIds.length} risque(s) sélectionné(s) ? Cette action est irréversible.`)) {
+      return;
+    }
+    try {
+      await api.delete('/risks/bulk', { data: { ids: selectedIds } });
+      setRisks((prev) => prev.filter((risk) => !selectedIds.includes(risk.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces risques.');
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     setError('');
@@ -390,9 +403,10 @@ export default function Risks() {
     navigate(`/risks/${risk.id}`);
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
     const headers = ['Titre', 'Type', 'Catégorie', 'Statut', 'Score', 'Responsable', 'Prochaine revue'];
-    const rows = risks.map((risk) => [
+    const rows = source.map((risk) => [
       risk.title,
       RISK_TYPE_LABELS[risk.type] || risk.type,
       risk.category || '',
@@ -404,7 +418,8 @@ export default function Risks() {
     exportToCsv(`risques-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -416,7 +431,7 @@ export default function Risks() {
         { key: 'owner', label: 'Responsable', width: 0.16 },
         { key: 'review_date', label: 'Revue', width: 0.16 },
       ];
-      const rows = risks.map((risk) => ({
+      const rows = source.map((risk) => ({
         title: risk.title,
         type: RISK_TYPE_LABELS[risk.type] || risk.type,
         status: RISK_STATUS_LABELS[risk.status] || risk.status,
@@ -425,7 +440,7 @@ export default function Risks() {
         review_date: formatDate(risk.review_date),
       }));
       await exportToPdf(`risques-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des risques', columns, rows, {
-        subtitle: `${risks.length} risque${risks.length > 1 ? 's' : ''}`,
+        subtitle: `${source.length} risque${source.length > 1 ? 's' : ''}`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -441,7 +456,7 @@ export default function Risks() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={risks.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -450,7 +465,7 @@ export default function Risks() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || risks.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -522,6 +537,10 @@ export default function Risks() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

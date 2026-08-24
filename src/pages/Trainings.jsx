@@ -902,6 +902,21 @@ export default function Trainings() {
     loadData();
   }
 
+  async function handleBulkDelete() {
+    if (
+      !window.confirm(`Supprimer définitivement ${selectedIds.length} formation(s) sélectionnée(s) ? Cette action est irréversible.`)
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/trainings/bulk', { data: { ids: selectedIds } });
+      setTrainings((prev) => prev.filter((training) => !selectedIds.includes(training.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces formations.');
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     setError('');
@@ -1034,9 +1049,10 @@ export default function Trainings() {
     }
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
     const headers = ['Formation', 'Type', 'Personne', 'Statut personnel', 'Date de réalisation'];
-    const rows = trainings.flatMap((training) =>
+    const rows = source.flatMap((training) =>
       training.records.map((record) => [
         training.title,
         training.type || '',
@@ -1048,7 +1064,8 @@ export default function Trainings() {
     exportToCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -1059,7 +1076,7 @@ export default function Trainings() {
         { key: 'status', label: 'Statut', width: 0.13 },
         { key: 'completed_at', label: 'Réalisation', width: 0.17 },
       ];
-      const rows = trainings.flatMap((training) =>
+      const rows = source.flatMap((training) =>
         training.records.map((record) => ({
           training: training.title,
           type: training.type || '',
@@ -1096,7 +1113,7 @@ export default function Trainings() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={!hasAnyRecord}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -1105,7 +1122,7 @@ export default function Trainings() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || !hasAnyRecord}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -1144,6 +1161,10 @@ export default function Trainings() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

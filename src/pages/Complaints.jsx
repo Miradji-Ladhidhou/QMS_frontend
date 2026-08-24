@@ -277,6 +277,21 @@ export default function Complaints() {
     loadData();
   }
 
+  async function handleBulkDelete() {
+    if (
+      !window.confirm(`Supprimer définitivement ${selectedIds.length} réclamation(s) sélectionnée(s) ? Cette action est irréversible.`)
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/complaints/bulk', { data: { ids: selectedIds } });
+      setComplaints((prev) => prev.filter((complaint) => !selectedIds.includes(complaint.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces réclamations.');
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     setError('');
@@ -315,9 +330,10 @@ export default function Complaints() {
     navigate(`/complaints/${complaint.id}`);
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
     const headers = ['Client', 'Description', 'Gravité', 'Statut', 'Date de réception', 'Échéance de réponse', 'Assigné'];
-    const rows = complaints.map((complaint) => [
+    const rows = source.map((complaint) => [
       complaint.customer_name,
       complaint.description || '',
       CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
@@ -329,7 +345,8 @@ export default function Complaints() {
     exportToCsv(`reclamations-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -341,7 +358,7 @@ export default function Complaints() {
         { key: 'due_date', label: 'Échéance', width: 0.12 },
         { key: 'assigned', label: 'Assigné', width: 0.1 },
       ];
-      const rows = complaints.map((complaint) => ({
+      const rows = source.map((complaint) => ({
         customer_name: complaint.customer_name,
         description: complaint.description || '',
         severity: CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
@@ -350,7 +367,7 @@ export default function Complaints() {
         assigned: complaint.assigned?.full_name || '',
       }));
       await exportToPdf(`reclamations-${new Date().toISOString().slice(0, 10)}.pdf`, 'Réclamations clients', columns, rows, {
-        subtitle: `${complaints.length} réclamation${complaints.length > 1 ? 's' : ''}`,
+        subtitle: `${source.length} réclamation${source.length > 1 ? 's' : ''}`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -366,7 +383,7 @@ export default function Complaints() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={complaints.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -375,7 +392,7 @@ export default function Complaints() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || complaints.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -420,6 +437,10 @@ export default function Complaints() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

@@ -259,6 +259,21 @@ export default function Suppliers() {
     loadData();
   }
 
+  async function handleBulkDelete() {
+    if (
+      !window.confirm(`Supprimer définitivement ${selectedIds.length} fournisseur(s) sélectionné(s) ? Cette action est irréversible.`)
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/suppliers/bulk', { data: { ids: selectedIds } });
+      setSuppliers((prev) => prev.filter((supplier) => !selectedIds.includes(supplier.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces fournisseurs.');
+    }
+  }
+
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,9 +291,10 @@ export default function Suppliers() {
     navigate(`/suppliers/${supplier.id}`);
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
     const headers = ['Nom', 'Catégorie', 'Criticité', 'Statut', 'Contact', 'Prochaine évaluation'];
-    const rows = suppliers.map((supplier) => [
+    const rows = source.map((supplier) => [
       supplier.name,
       supplier.category || '',
       CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
@@ -289,7 +305,8 @@ export default function Suppliers() {
     exportToCsv(`fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -301,7 +318,7 @@ export default function Suppliers() {
         { key: 'contact', label: 'Contact', width: 0.14 },
         { key: 'next_evaluation_date', label: 'Prochaine éval.', width: 0.14 },
       ];
-      const rows = suppliers.map((supplier) => ({
+      const rows = source.map((supplier) => ({
         name: supplier.name,
         category: supplier.category || '',
         criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
@@ -310,7 +327,7 @@ export default function Suppliers() {
         next_evaluation_date: formatDate(supplier.next_evaluation_date),
       }));
       await exportToPdf(`fournisseurs-${new Date().toISOString().slice(0, 10)}.pdf`, 'Évaluation fournisseurs', columns, rows, {
-        subtitle: `${suppliers.length} fournisseur${suppliers.length > 1 ? 's' : ''}`,
+        subtitle: `${source.length} fournisseur${source.length > 1 ? 's' : ''}`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -326,7 +343,7 @@ export default function Suppliers() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={suppliers.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -335,7 +352,7 @@ export default function Suppliers() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || suppliers.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -382,6 +399,10 @@ export default function Suppliers() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

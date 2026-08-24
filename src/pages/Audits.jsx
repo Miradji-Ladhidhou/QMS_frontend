@@ -239,6 +239,19 @@ export default function Audits() {
     loadData();
   }
 
+  async function handleBulkDelete() {
+    if (!window.confirm(`Supprimer définitivement ${selectedIds.length} audit(s) sélectionné(s) ? Cette action est irréversible.`)) {
+      return;
+    }
+    try {
+      await api.delete('/audits/bulk', { data: { ids: selectedIds } });
+      setAudits((prev) => prev.filter((audit) => !selectedIds.includes(audit.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces audits.');
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     setError('');
@@ -277,9 +290,10 @@ export default function Audits() {
     navigate(`/audits/${audit.id}`);
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? audits.filter((audit) => scopeIds.includes(audit.id)) : audits;
     const headers = ['Titre', 'Type', 'Statut', 'Service', 'Auditeur', 'Date planifiée', 'Date réalisée'];
-    const rows = audits.map((audit) => [
+    const rows = source.map((audit) => [
       audit.title,
       AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
       AUDIT_STATUS_LABELS[audit.status] || audit.status,
@@ -291,7 +305,8 @@ export default function Audits() {
     exportToCsv(`audits-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? audits.filter((audit) => scopeIds.includes(audit.id)) : audits;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -303,7 +318,7 @@ export default function Audits() {
         { key: 'auditor', label: 'Auditeur', width: 0.1 },
         { key: 'planned_date', label: 'Date', width: 0.12 },
       ];
-      const rows = audits.map((audit) => ({
+      const rows = source.map((audit) => ({
         title: audit.title,
         type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
         status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
@@ -312,7 +327,7 @@ export default function Audits() {
         planned_date: formatDate(audit.planned_date),
       }));
       await exportToPdf(`audits-${new Date().toISOString().slice(0, 10)}.pdf`, 'Audits internes', columns, rows, {
-        subtitle: `${audits.length} audit${audits.length > 1 ? 's' : ''}`,
+        subtitle: `${source.length} audit${source.length > 1 ? 's' : ''}`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -328,7 +343,7 @@ export default function Audits() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={audits.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -337,7 +352,7 @@ export default function Audits() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || audits.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -384,6 +399,10 @@ export default function Audits() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

@@ -183,6 +183,19 @@ export default function ManagementReviews() {
     loadReviews();
   }
 
+  async function handleBulkDelete() {
+    if (!window.confirm(`Supprimer définitivement ${selectedIds.length} revue(s) sélectionnée(s) ? Cette action est irréversible.`)) {
+      return;
+    }
+    try {
+      await api.delete('/management-reviews/bulk', { data: { ids: selectedIds } });
+      setReviews((prev) => prev.filter((review) => !selectedIds.includes(review.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces revues.');
+    }
+  }
+
   const { sorted: sortedReviews, sortKey, direction, setSortKey, toggleSort } = useSort(
     reviews,
     (review, key) => review[key],
@@ -195,9 +208,10 @@ export default function ManagementReviews() {
     navigate(`/management-reviews/${review.id}`);
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? reviews.filter((review) => scopeIds.includes(review.id)) : reviews;
     const headers = ['Titre', 'Date de revue', 'Statut', 'Participants'];
-    const rows = reviews.map((review) => [
+    const rows = source.map((review) => [
       review.title,
       formatDate(review.review_date),
       REVIEW_STATUS_LABELS[review.status] || review.status,
@@ -206,7 +220,8 @@ export default function ManagementReviews() {
     exportToCsv(`revues-direction-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? reviews.filter((review) => scopeIds.includes(review.id)) : reviews;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -216,14 +231,14 @@ export default function ManagementReviews() {
         { key: 'status', label: 'Statut', width: 0.18 },
         { key: 'participants', label: 'Participants', width: 0.28 },
       ];
-      const rows = reviews.map((review) => ({
+      const rows = source.map((review) => ({
         title: review.title,
         review_date: formatDate(review.review_date),
         status: REVIEW_STATUS_LABELS[review.status] || review.status,
         participants: review.participants || '',
       }));
       await exportToPdf(`revues-direction-${new Date().toISOString().slice(0, 10)}.pdf`, 'Revues de direction', columns, rows, {
-        subtitle: `${reviews.length} revue${reviews.length > 1 ? 's' : ''}`,
+        subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -239,7 +254,7 @@ export default function ManagementReviews() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={reviews.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -248,7 +263,7 @@ export default function ManagementReviews() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || reviews.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
@@ -282,6 +297,10 @@ export default function ManagementReviews() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

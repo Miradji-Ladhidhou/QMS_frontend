@@ -493,6 +493,19 @@ export default function Capas() {
     loadData();
   }
 
+  async function handleBulkDelete() {
+    if (!window.confirm(`Supprimer définitivement ${selectedIds.length} CAPA sélectionnée(s) ? Cette action est irréversible.`)) {
+      return;
+    }
+    try {
+      await api.delete('/capas/bulk', { data: { ids: selectedIds } });
+      setCapas((prev) => prev.filter((capa) => !selectedIds.includes(capa.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces CAPA.');
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     setError('');
@@ -540,7 +553,8 @@ export default function Capas() {
     'asc'
   );
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
     const headers = [
       'Numéro',
       'Date',
@@ -558,7 +572,7 @@ export default function Capas() {
       'Date clôture',
       'Commentaire',
     ];
-    const rows = capas.map((capa) => [
+    const rows = source.map((capa) => [
       capa.number,
       formatDate(capa.created_at),
       capa.service?.name || '',
@@ -579,7 +593,8 @@ export default function Capas() {
     exportToCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -591,7 +606,7 @@ export default function Capas() {
         { key: 'due_date', label: 'Échéance', width: 0.13 },
         { key: 'assigned', label: 'Responsable', width: 0.24 },
       ];
-      const rows = capas.map((capa) => ({
+      const rows = source.map((capa) => ({
         number: capa.number,
         title: capa.title,
         priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
@@ -600,7 +615,7 @@ export default function Capas() {
         assigned: capa.assigned?.full_name || '',
       }));
       await exportToPdf(`capa-${new Date().toISOString().slice(0, 10)}.pdf`, 'CAPA', columns, rows, {
-        subtitle: `${capas.length} CAPA`,
+        subtitle: `${source.length} CAPA`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -641,7 +656,7 @@ export default function Capas() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={capas.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
@@ -650,7 +665,7 @@ export default function Capas() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || capas.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
@@ -690,6 +705,10 @@ export default function Capas() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

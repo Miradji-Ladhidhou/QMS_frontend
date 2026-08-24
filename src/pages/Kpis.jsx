@@ -2962,6 +2962,23 @@ export default function Kpis() {
     loadKpis(currentFolderId);
   }
 
+  async function handleBulkDelete() {
+    if (
+      !window.confirm(
+        `Supprimer définitivement ${selectedIds.length} KPI sélectionné(s) ? Cette action supprimera aussi toutes leurs valeurs enregistrées, et est irréversible.`
+      )
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/kpis/bulk', { data: { ids: selectedIds } });
+      setKpis((prev) => prev.filter((kpi) => !selectedIds.includes(kpi.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces KPI.');
+    }
+  }
+
   async function loadKpis(folderId) {
     setLoading(true);
     setError('');
@@ -3212,6 +3229,7 @@ export default function Kpis() {
             <BulkSelectionBar
               count={selectedIds.length}
               onMove={() => setIsBulkMoveModalOpen(true)}
+              onDelete={handleBulkDelete}
               onClear={() => setSelectedIds([])}
             />
           )}

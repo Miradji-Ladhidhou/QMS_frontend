@@ -151,6 +151,21 @@ export default function Qqoqccp() {
     loadAnalyses();
   }
 
+  async function handleBulkDelete() {
+    if (
+      !window.confirm(`Supprimer définitivement ${selectedIds.length} analyse(s) sélectionnée(s) ? Cette action est irréversible.`)
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/qqoqccp/bulk', { data: { ids: selectedIds } });
+      setAnalyses((prev) => prev.filter((analysis) => !selectedIds.includes(analysis.id)));
+      setSelectedIds([]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces analyses.');
+    }
+  }
+
   const { sorted: sortedAnalyses, sortKey, direction, setSortKey, toggleSort } = useSort(
     analyses,
     (analysis, key) => analysis[key],
@@ -163,9 +178,10 @@ export default function Qqoqccp() {
     navigate(`/qqoqccp/${analysis.id}`);
   }
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? analyses.filter((analysis) => scopeIds.includes(analysis.id)) : analyses;
     const headers = ['Titre', 'Statut', 'Créée le'];
-    const rows = analyses.map((analysis) => [
+    const rows = source.map((analysis) => [
       analysis.title,
       QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
       formatDate(analysis.created_at),
@@ -180,7 +196,7 @@ export default function Qqoqccp() {
         <div className="flex gap-2">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={analyses.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
@@ -212,6 +228,8 @@ export default function Qqoqccp() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
       )}

@@ -279,6 +279,21 @@ export default function Planning() {
     loadPlanning(selectedServiceIds);
   }
 
+  async function handleBulkDeleteTasks() {
+    if (
+      !window.confirm(`Supprimer définitivement ${selectedTaskIds.length} tâche(s) sélectionnée(s) ? Cette action est irréversible.`)
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/tasks/bulk', { data: { ids: selectedTaskIds } });
+      setSelectedTaskIds([]);
+      await loadPlanning(selectedServiceIds);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces tâches.');
+    }
+  }
+
   async function loadPlanning(serviceIds) {
     setError('');
     try {
@@ -390,13 +405,15 @@ export default function Planning() {
   }, {});
   const dates = Object.keys(grouped).sort();
 
-  function handleExportCsv() {
+  function handleExportCsv(scopeIds) {
+    const source = scopeIds ? items.filter((item) => scopeIds.includes(item.id)) : items;
     const headers = ['Date', 'Type', 'Titre', 'En retard'];
-    const rows = items.map((item) => [item.date, TYPE_CONFIG[item.type].label, item.title, item.is_overdue ? 'Oui' : 'Non']);
+    const rows = source.map((item) => [item.date, TYPE_CONFIG[item.type].label, item.title, item.is_overdue ? 'Oui' : 'Non']);
     exportToCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? items.filter((item) => scopeIds.includes(item.id)) : items;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -406,14 +423,14 @@ export default function Planning() {
         { key: 'title', label: 'Titre', width: 0.5 },
         { key: 'overdue', label: 'En retard', width: 0.15 },
       ];
-      const rows = items.map((item) => ({
+      const rows = source.map((item) => ({
         date: item.date,
         type: TYPE_CONFIG[item.type].label,
         title: item.title,
         overdue: item.is_overdue ? 'Oui' : 'Non',
       }));
       await exportToPdf(`planning-${new Date().toISOString().slice(0, 10)}.pdf`, 'Planning', columns, rows, {
-        subtitle: `${items.length} élément${items.length > 1 ? 's' : ''}`,
+        subtitle: `${source.length} élément${source.length > 1 ? 's' : ''}`,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
@@ -429,7 +446,7 @@ export default function Planning() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={handleExportCsv}
+            onClick={() => handleExportCsv()}
             disabled={items.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
@@ -438,7 +455,7 @@ export default function Planning() {
           </button>
           <button
             type="button"
-            onClick={handleExportPdf}
+            onClick={() => handleExportPdf()}
             disabled={exportingPdf || items.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
@@ -506,6 +523,10 @@ export default function Planning() {
         <BulkSelectionBar
           count={selectedTaskIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedTaskIds)}
+          onExportPdf={() => handleExportPdf(selectedTaskIds)}
+          exportingPdf={exportingPdf}
+          onDelete={handleBulkDeleteTasks}
           onClear={() => setSelectedTaskIds([])}
         />
       )}
