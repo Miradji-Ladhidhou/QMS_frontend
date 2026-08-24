@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { supabase } from '../lib/supabase.js';
 import AutoTextarea from './AutoTextarea.jsx';
 
 export default function DecisionModal({ workflowId, decision, onClose, onDecided }) {
   const isApproval = decision === 'approved';
-  const [password, setPassword] = useState('');
   const [comment, setComment] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -17,20 +15,6 @@ export default function DecisionModal({ workflowId, decision, onClose, onDecided
     setSubmitting(true);
 
     try {
-      if (isApproval) {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        const email = session?.user?.email;
-
-        const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-        if (authError) {
-          setError('Mot de passe incorrect.');
-          setSubmitting(false);
-          return;
-        }
-      }
-
       const { data } = await api.post(`/workflows/${workflowId}/decide`, {
         decision,
         comment: comment || undefined,
@@ -61,20 +45,7 @@ export default function DecisionModal({ workflowId, decision, onClose, onDecided
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {isApproval ? (
-            <div>
-              <p className="mb-3 text-sm text-slate-600">
-                Pour valoir signature électronique, ressaisissez votre mot de passe afin de confirmer votre identité.
-              </p>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Mot de passe</label>
-              <input
-                type="password"
-                required
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
+            <p className="text-sm text-slate-600">Confirmez pour enregistrer votre approbation.</p>
           ) : (
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Motif du rejet</label>
