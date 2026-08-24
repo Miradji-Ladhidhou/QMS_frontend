@@ -29,7 +29,7 @@ const DOCUMENT_SORT_OPTIONS = [
   { key: 'category', label: 'catégorie' },
   { key: 'version', label: 'version' },
   { key: 'status', label: 'statut' },
-  { key: 'review_date', label: 'date de révision' },
+  { key: 'review_date', label: 'prochaine révision' },
 ];
 
 function getDocumentSortValue(doc, key) {
@@ -191,7 +191,7 @@ function DocumentModal({ categories, onClose, onCreated }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Date de révision</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Prochaine révision</label>
               <input
                 type="date"
                 value={form.review_date}
@@ -578,7 +578,7 @@ export default function Documents() {
   }
 
   function handleExportCsv() {
-    const headers = ['Numéro', 'Titre', 'Catégorie', 'Version', 'Statut', 'Date de révision', 'Créé le'];
+    const headers = ['Numéro', 'Titre', 'Catégorie', 'Version', 'Statut', 'Prochaine révision', 'Créé le'];
     const rows = filteredDocuments.map((doc) => [
       doc.number,
       doc.title,
@@ -601,7 +601,7 @@ export default function Documents() {
         { key: 'category', label: 'Catégorie', width: 0.18 },
         { key: 'version', label: 'Version', width: 0.09 },
         { key: 'status', label: 'Statut', width: 0.13 },
-        { key: 'review_date', label: 'Révision', width: 0.13 },
+        { key: 'review_date', label: 'Proch. révision', width: 0.13 },
       ];
       const rows = filteredDocuments.map((doc) => ({
         number: doc.number,

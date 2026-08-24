@@ -207,7 +207,7 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Date de révision</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Prochaine révision</label>
               <input
                 type="date"
                 value={reviewDate}
@@ -228,7 +228,7 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
             </div>
           </div>
           <p className="text-xs text-slate-400">
-            La fréquence propre à ce document remplace le défaut du tenant, et sert à recalculer la date de révision
+            La fréquence propre à ce document remplace le défaut du tenant, et sert à recalculer la prochaine révision
             à chaque nouvelle version.
           </p>
 
@@ -522,7 +522,7 @@ export default function DocumentDetail() {
 
         <p className="mt-4 text-sm text-slate-500">
           Créé le {formatDate(doc.created_at)}
-          {doc.review_date && ` · Date de révision : ${formatDate(doc.review_date)}`}
+          {doc.review_date && ` · Prochaine révision : ${formatDate(doc.review_date)}`}
           {effectiveReviewFrequency &&
             ` (tous les ${effectiveReviewFrequency} mois, ${usesOwnFrequency ? 'spécifique à ce document' : 'réglage par défaut'})`}
         </p>
