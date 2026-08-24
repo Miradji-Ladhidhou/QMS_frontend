@@ -215,7 +215,7 @@ export default function CapaDetail() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
           onClick={() => navigate('/capas')}
@@ -226,7 +226,7 @@ export default function CapaDetail() {
         </button>
 
         {canManage && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <ShareRecordPanel resourceType="capa" resourceId={capa.id} />
             <button
               type="button"

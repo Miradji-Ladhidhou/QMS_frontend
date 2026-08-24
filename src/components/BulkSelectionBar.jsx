@@ -6,7 +6,7 @@ export default function BulkSelectionBar({ count, onMove, onClear }) {
   if (count === 0) return null;
 
   return (
-    <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
+    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2">
       <p className="text-sm font-medium text-primary">
         {count} sélectionné{count > 1 ? 's' : ''}
       </p>

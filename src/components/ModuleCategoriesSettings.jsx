@@ -25,14 +25,16 @@ export default function ModuleCategoriesSettings({ isAdmin }) {
         même principe que les catégories de documents.
       </p>
 
-      <div className="mt-4 flex gap-1 overflow-x-auto border-b border-slate-200">
+      <div className="mt-4 flex flex-wrap gap-1.5 border-b border-slate-200 pb-4">
         {RESOURCE_TABS.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveResource(tab.id)}
-            className={`shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-              activeResource === tab.id ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
+            className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
+              activeResource === tab.id
+                ? 'border-primary bg-primary/5 text-primary'
+                : 'border-slate-300 text-slate-600 hover:bg-slate-50'
             }`}
           >
             {tab.label}

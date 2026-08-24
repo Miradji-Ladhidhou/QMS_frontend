@@ -639,7 +639,7 @@ export default function RiskDetail() {
 
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{risk.title}</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs text-slate-500">{RISK_TYPE_LABELS[risk.type]}</span>
           {canManage ? (
             <select
