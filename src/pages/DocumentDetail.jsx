@@ -54,7 +54,7 @@ function formatDateTime(dateStr) {
   return new Date(dateStr).toLocaleString('fr-FR');
 }
 
-function NewVersionModal({ documentId, onClose, onUploaded }) {
+function NewVersionModal({ documentId, onClose, onUploaded, isFirstUpload }) {
   const [file, setFile] = useState(null);
   const [changeNote, setChangeNote] = useState('');
   const [error, setError] = useState(null);
@@ -93,7 +93,7 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Nouvelle version</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{isFirstUpload ? 'Ajouter un document' : 'Nouvelle version'}</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
             <X size={20} />
           </button>
@@ -127,7 +127,7 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
             disabled={submitting}
             className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
           >
-            {submitting ? 'Envoi...' : 'Ajouter la version'}
+            {submitting ? 'Envoi...' : isFirstUpload ? 'Ajouter le document' : 'Ajouter la version'}
           </button>
         </form>
       </div>
@@ -499,7 +499,7 @@ export default function DocumentDetail() {
                 className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
               >
                 <Upload size={16} />
-                Nouvelle version
+                {doc.file_path ? 'Nouvelle version' : 'Ajouter un document'}
               </button>
             )}
             {canManage && (
@@ -683,7 +683,12 @@ export default function DocumentDetail() {
       )}
 
       {isModalOpen && (
-        <NewVersionModal documentId={doc.id} onClose={() => setIsModalOpen(false)} onUploaded={handleUploaded} />
+        <NewVersionModal
+          documentId={doc.id}
+          onClose={() => setIsModalOpen(false)}
+          onUploaded={handleUploaded}
+          isFirstUpload={!doc.file_path}
+        />
       )}
 
       {isEditMetadataModalOpen && (
