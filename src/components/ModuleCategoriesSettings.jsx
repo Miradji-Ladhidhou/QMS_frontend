@@ -10,6 +10,7 @@ const RESOURCE_TABS = [
   { id: 'management_review', label: 'Revues de direction' },
   { id: 'audit', label: 'Audits' },
   { id: 'risk', label: 'Risques' },
+  { id: 'haccp_plan', label: 'HACCP' },
   { id: 'task', label: 'Planning' },
   { id: 'kpi', label: 'KPI' },
 ];

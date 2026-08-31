@@ -35,6 +35,8 @@ const Complaints = lazy(() => import('./pages/Complaints.jsx'));
 const ComplaintDetail = lazy(() => import('./pages/ComplaintDetail.jsx'));
 const Risks = lazy(() => import('./pages/Risks.jsx'));
 const RiskDetail = lazy(() => import('./pages/RiskDetail.jsx'));
+const Haccp = lazy(() => import('./pages/Haccp.jsx'));
+const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
@@ -106,6 +108,8 @@ export default function App() {
               <Route path="audits/:id" element={<AuditDetail />} />
               <Route path="risks" element={<Risks />} />
               <Route path="risks/:id" element={<RiskDetail />} />
+              <Route path="haccp" element={<Haccp />} />
+              <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />
               <Route path="suppliers/:id" element={<SupplierDetail />} />
               <Route path="management-reviews" element={<ManagementReviews />} />
