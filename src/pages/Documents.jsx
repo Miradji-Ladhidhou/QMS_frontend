@@ -539,8 +539,8 @@ export default function Documents() {
   const { sorted: sortedDocuments, sortKey, direction, setSortKey, toggleSort } = useSort(
     filteredDocuments,
     getDocumentSortValue,
-    'created_at',
-    'desc'
+    'number',
+    'asc'
   );
 
   // file_path peut être un chemin Supabase ou un id de fichier Google Drive selon le provider
@@ -587,41 +587,55 @@ export default function Documents() {
     setIsModalOpen(false);
   }
 
+  // Toujours trié par numéro croissant, indépendamment du tri affiché à l'écran — cohérence
+  // demandée entre CSV et PDF, quel que soit l'ordre choisi sur la page au moment de l'export.
+  function sortByNumber(docs) {
+    return [...docs].sort((a, b) => String(a.number ?? '').localeCompare(String(b.number ?? ''), 'fr', { numeric: true }));
+  }
+
   function handleExportCsv(scopeIds) {
-    const source = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
-    const headers = ['Numéro', 'Titre', 'Catégorie', 'Version', 'Statut', 'Prochaine révision', 'Créé le'];
+    const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
+    const source = sortByNumber(scoped);
+    const headers = ['Numéro', 'Titre', 'Description', 'Catégorie', 'Version', 'Statut', 'Prochaine révision', 'Créé le', 'Commentaire dernière version'];
     const rows = source.map((doc) => [
       doc.number,
       doc.title,
+      doc.description || '',
       doc.category?.name || '',
       doc.version,
       STATUS_LABELS[doc.status] || doc.status,
       formatDate(doc.review_date),
       formatDate(doc.created_at),
+      doc.latest_version_comment || '',
     ]);
     exportToCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
   async function handleExportPdf(scopeIds) {
-    const source = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
+    const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
+    const source = sortByNumber(scoped);
     setExportingPdf(true);
     setExportPdfError('');
     try {
       const columns = [
-        { key: 'number', label: 'Numéro', width: 0.13 },
-        { key: 'title', label: 'Titre', width: 0.34 },
-        { key: 'category', label: 'Catégorie', width: 0.18 },
-        { key: 'version', label: 'Version', width: 0.09 },
-        { key: 'status', label: 'Statut', width: 0.13 },
-        { key: 'review_date', label: 'Proch. révision', width: 0.13 },
+        { key: 'number', label: 'Numéro', width: 0.09 },
+        { key: 'title', label: 'Titre', width: 0.18 },
+        { key: 'description', label: 'Description', width: 0.18 },
+        { key: 'category', label: 'Catégorie', width: 0.11 },
+        { key: 'version', label: 'Version', width: 0.06 },
+        { key: 'status', label: 'Statut', width: 0.09 },
+        { key: 'review_date', label: 'Proch. révision', width: 0.11 },
+        { key: 'latest_version_comment', label: 'Commentaire dernière version', width: 0.18 },
       ];
       const rows = source.map((doc) => ({
         number: doc.number,
         title: doc.title,
+        description: doc.description || '',
         category: doc.category?.name || '',
         version: doc.version,
         status: STATUS_LABELS[doc.status] || doc.status,
         review_date: formatDate(doc.review_date),
+        latest_version_comment: doc.latest_version_comment || '',
       }));
       await exportToPdf(`documents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Documents', columns, rows, {
         subtitle: `${source.length} document${source.length > 1 ? 's' : ''}`,
@@ -818,6 +832,9 @@ export default function Documents() {
                   <StatusBadge status={doc.status} />
                   <MatchLocationBadge location={doc.match_location} />
                 </div>
+                {doc.review_date && (
+                  <p className="mt-2 text-xs text-slate-500">Prochaine révision : {formatDate(doc.review_date)}</p>
+                )}
                 {canManage && (
                   <select
                     value={doc.category_id || ''}
@@ -849,6 +866,7 @@ export default function Documents() {
                   <SortableTh label="Catégorie" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Version" sortKey="version" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Statut" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Prochaine révision" sortKey="review_date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <th className="px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
@@ -898,6 +916,7 @@ export default function Documents() {
                     <td className="px-4 py-3">
                       <StatusBadge status={doc.status} />
                     </td>
+                    <td className="px-4 py-3 text-slate-600">{formatDate(doc.review_date) || '—'}</td>
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-1">
                         {doc.file_path && (
