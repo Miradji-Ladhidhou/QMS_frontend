@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Download, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { openBlankTab } from '../lib/openInNewTab.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -830,6 +831,7 @@ export default function HaccpDetail() {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('analysis');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
   const [stepModal, setStepModal] = useState(null); // { step } | { new: true } | null
   const [hazardModal, setHazardModal] = useState(null); // { stepId, hazard? }
   const [ccpModal, setCcpModal] = useState(null); // { hazardId, ccp? }
@@ -866,6 +868,22 @@ export default function HaccpDetail() {
       setPlan((prev) => ({ ...prev, ...data }));
     } catch {
       setError('Impossible de mettre à jour le statut.');
+    }
+  }
+
+  async function handleExportPdf() {
+    const tab = openBlankTab();
+    setError('');
+    setExportingPdf(true);
+    try {
+      const response = await api.get(`/haccp/plans/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      if (tab) tab.location.href = url;
+    } catch {
+      tab?.close();
+      setError("Impossible d'exporter ce plan en PDF.");
+    } finally {
+      setExportingPdf(false);
     }
   }
 
@@ -938,6 +956,15 @@ export default function HaccpDetail() {
           ) : (
             <PlanStatusBadge status={plan.status} />
           )}
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Exporter en PDF
+          </button>
           {canManage && (
             <>
               <button type="button" onClick={() => setIsEditModalOpen(true)} aria-label="Modifier" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary">

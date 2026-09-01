@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, Plus, X } from 'lucide-react';
+import { ClipboardCheck, Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { openBlankTab } from '../lib/openInNewTab.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { PLAN_STATUS_LABELS } from '../lib/haccpStatus.js';
@@ -189,6 +190,7 @@ export default function Haccp() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
+  const [exportingAuditPdf, setExportingAuditPdf] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
 
@@ -293,6 +295,26 @@ export default function Haccp() {
     }
   }
 
+  // Distinct de handleExportPdf ci-dessus (qui ne liste que titre/statut/service) : celui-ci
+  // génère le rapport d'audit détaillé (étapes, dangers, CCP, synthèse de surveillance) via
+  // POST /haccp/plans/pdf — la même route que le bouton "Exporter en PDF" de HaccpDetail.jsx
+  // pour un seul plan.
+  async function handleExportAuditPdf(scopeIds) {
+    const tab = openBlankTab();
+    setError('');
+    setExportingAuditPdf(true);
+    try {
+      const response = await api.post('/haccp/plans/pdf', { ids: scopeIds || undefined }, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      if (tab) tab.location.href = url;
+    } catch {
+      tab?.close();
+      setError("Impossible d'exporter l'analyse complète en PDF.");
+    } finally {
+      setExportingAuditPdf(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -315,6 +337,16 @@ export default function Haccp() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportAuditPdf(selectedIds.length > 0 ? selectedIds : undefined)}
+            disabled={exportingAuditPdf || plans.length === 0}
+            title="Rapport détaillé (étapes, dangers, CCP, surveillance) — pour un audit"
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingAuditPdf ? <Loader2 size={18} className="animate-spin" /> : <ClipboardCheck size={18} />}
+            Exporter l'analyse complète
           </button>
           {canManage && (
             <button
