@@ -2,8 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
+  Calendar,
   Check,
   CheckSquare,
+  ChevronLeft,
+  ChevronRight,
   Circle,
   ClipboardCheck,
   ClipboardList,
@@ -11,6 +14,7 @@ import {
   Filter,
   FileText,
   GraduationCap,
+  List,
   Loader2,
   MessageSquareWarning,
   Pencil,
@@ -35,15 +39,17 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 
 const TYPE_CONFIG = {
-  capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700' },
-  document: { label: 'Document', icon: FileText, className: 'bg-purple-100 text-purple-700' },
-  training: { label: 'Formation', icon: GraduationCap, className: 'bg-emerald-100 text-emerald-700' },
-  task: { label: 'Tâche', icon: CheckSquare, className: 'bg-amber-100 text-amber-700' },
-  audit: { label: 'Audit', icon: ClipboardCheck, className: 'bg-sky-100 text-sky-700' },
-  complaint: { label: 'Réclamation', icon: MessageSquareWarning, className: 'bg-rose-100 text-rose-700' },
-  risk: { label: 'Risque', icon: ShieldAlert, className: 'bg-orange-100 text-orange-700' },
-  supplier: { label: 'Fournisseur', icon: Truck, className: 'bg-teal-100 text-teal-700' },
+  capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
+  document: { label: 'Document', icon: FileText, className: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
+  training: { label: 'Formation', icon: GraduationCap, className: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+  task: { label: 'Tâche', icon: CheckSquare, className: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+  audit: { label: 'Audit', icon: ClipboardCheck, className: 'bg-sky-100 text-sky-700', dot: 'bg-sky-500' },
+  complaint: { label: 'Réclamation', icon: MessageSquareWarning, className: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500' },
+  risk: { label: 'Risque', icon: ShieldAlert, className: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
+  supplier: { label: 'Fournisseur', icon: Truck, className: 'bg-teal-100 text-teal-700', dot: 'bg-teal-500' },
 };
+
+const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
 
 const PRIORITY_CONFIG = {
   low: { label: 'Basse', border: 'border-l-slate-300', dot: 'bg-slate-400' },
@@ -400,6 +406,199 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
   );
 }
 
+// Construite à partir de getFullYear/getMonth/getDate (jamais toISOString, qui convertit en
+// UTC et peut décaler la date d'un jour selon le fuseau du navigateur) — même précaution que
+// nextDueDate côté backend.
+function formatIsoDate(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function getMonthCells(year, month) {
+  const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // lundi = 0
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < firstWeekday; i++) cells.push(null);
+  for (let day = 1; day <= daysInMonth; day++) cells.push(new Date(year, month, day));
+  while (cells.length % 7 !== 0) cells.push(null);
+  return cells;
+}
+
+function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSelect, onMarkDone, onEdit, onDelete }) {
+  const config = TYPE_CONFIG[item.type];
+  const Icon = config.icon;
+  const isTask = item.type === 'task';
+  const editable = isTask && canEditTask(item, currentUser);
+  const deletable = isTask && canDeleteTask(item, currentUser);
+
+  const priorityBorder = isTask ? PRIORITY_CONFIG[item.priority]?.border : null;
+  const checklistDone = isTask ? (item.checklist || []).filter((entry) => entry.done).length : 0;
+  const checklistTotal = isTask ? (item.checklist || []).length : 0;
+
+  const content = (
+    <div
+      className={`flex items-center gap-3 rounded-xl border bg-white p-3 shadow-sm sm:p-4 ${
+        item.is_overdue ? 'border-red-200' : 'border-slate-200'
+      } ${priorityBorder ? `border-l-4 ${priorityBorder}` : ''}`}
+    >
+      {isTask && canManage && (
+        <input
+          type="checkbox"
+          checked={selected}
+          onClick={(e) => e.stopPropagation()}
+          onChange={onToggleSelect}
+          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+        />
+      )}
+
+      {isTask && editable ? (
+        <button
+          type="button"
+          onClick={() => onMarkDone(item)}
+          aria-label="Marquer comme terminée"
+          className="shrink-0 text-slate-400 hover:text-emerald-600"
+        >
+          <Circle size={20} />
+        </button>
+      ) : (
+        <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${config.className}`}>
+          <Icon size={16} />
+        </span>
+      )}
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-slate-900">{item.title}</p>
+        <div className="mt-0.5 flex items-center gap-2">
+          <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${config.className}`}>
+            {config.label}
+          </span>
+          {item.is_overdue && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
+              <AlertTriangle size={11} />
+              En retard
+            </span>
+          )}
+          {isTask && item.recurrence && item.recurrence !== 'none' && (
+            <span className="inline-flex items-center text-slate-400" title={`Récurrence : ${RECURRENCE_LABELS[item.recurrence]}`}>
+              <Repeat size={12} />
+            </span>
+          )}
+          {isTask && checklistTotal > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+              <CheckSquare size={11} />
+              {checklistDone}/{checklistTotal}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {isTask && (editable || deletable) && (
+        <div className="flex shrink-0 gap-1">
+          {editable && (
+            <button
+              type="button"
+              onClick={() => onEdit(item.id)}
+              aria-label="Modifier la tâche"
+              className="p-1.5 text-slate-400 hover:text-primary"
+            >
+              <Pencil size={16} />
+            </button>
+          )}
+          {deletable && (
+            <button
+              type="button"
+              onClick={() => onDelete(item)}
+              aria-label="Supprimer la tâche"
+              className="p-1.5 text-slate-400 hover:text-red-600"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  if (item.type === 'capa' || item.type === 'document') {
+    return <Link to={item.link}>{content}</Link>;
+  }
+  return <div>{content}</div>;
+}
+
+function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selectedDate, onSelectDate }) {
+  const cells = getMonthCells(year, month);
+  const today = formatIsoDate(new Date());
+  const monthLabel = new Date(year, month, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+
+  return (
+    <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mb-3 flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onPrevMonth}
+          aria-label="Mois précédent"
+          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+        >
+          <ChevronLeft size={18} />
+        </button>
+        <p className="text-sm font-semibold capitalize text-slate-900">{monthLabel}</p>
+        <button
+          type="button"
+          onClick={onNextMonth}
+          aria-label="Mois suivant"
+          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100"
+        >
+          <ChevronRight size={18} />
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-slate-400">
+        {WEEKDAY_LABELS.map((label) => (
+          <div key={label}>{label}</div>
+        ))}
+      </div>
+
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {cells.map((date, index) => {
+          if (!date) return <div key={`empty-${index}`} />;
+          const iso = formatIsoDate(date);
+          const dayItems = grouped[iso] || [];
+          const visibleTypes = [...new Set(dayItems.map((item) => item.type))];
+          const isSelected = selectedDate === iso;
+          const isToday = iso === today;
+
+          return (
+            <button
+              type="button"
+              key={iso}
+              onClick={() => onSelectDate(iso)}
+              className={`flex min-h-14 flex-col items-center gap-1 rounded-lg border p-1.5 text-xs transition-colors sm:min-h-16 ${
+                isSelected
+                  ? 'border-primary bg-primary/5'
+                  : isToday
+                    ? 'border-slate-300 bg-slate-50'
+                    : 'border-transparent hover:bg-slate-50'
+              }`}
+            >
+              <span className={`font-medium ${isToday ? 'text-primary' : 'text-slate-700'}`}>{date.getDate()}</span>
+              {visibleTypes.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-0.5">
+                  {visibleTypes.slice(0, 3).map((type) => (
+                    <span key={type} className={`h-1.5 w-1.5 rounded-full ${TYPE_CONFIG[type].dot}`} />
+                  ))}
+                  {visibleTypes.length > 3 && <span className="text-[9px] text-slate-400">+{visibleTypes.length - 3}</span>}
+                </div>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function Planning() {
   const currentUser = useCurrentUser();
   const role = currentUser?.role;
@@ -426,6 +625,9 @@ export default function Planning() {
   const [overdueOnly, setOverdueOnly] = useState(() => searchParams.get('overdue') === '1');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [searchText, setSearchText] = useState('');
+  const [viewMode, setViewMode] = useState('list');
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => formatIsoDate(new Date()));
 
   function toggleTypeFilter(type) {
     setTypeFilter((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
@@ -755,6 +957,29 @@ export default function Planning() {
         )}
       </div>
 
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={() => setViewMode('list')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+            viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <List size={16} />
+          Liste
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('calendar')}
+          className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+            viewMode === 'calendar' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          <Calendar size={16} />
+          Calendrier
+        </button>
+      </div>
+
       {canManage && (
         <SelectAllToggle
           ids={filteredItems.filter((item) => item.type === 'task').map((item) => item.id)}
@@ -781,6 +1006,40 @@ export default function Planning() {
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
+      ) : viewMode === 'calendar' ? (
+        <>
+          <CalendarView
+            year={calendarDate.getFullYear()}
+            month={calendarDate.getMonth()}
+            grouped={grouped}
+            onPrevMonth={() => setCalendarDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+            onNextMonth={() => setCalendarDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            selectedDate={selectedCalendarDate}
+            onSelectDate={setSelectedCalendarDate}
+          />
+          <div className="mt-4">
+            <h2 className="mb-2 text-sm font-semibold text-slate-500">{formatDateHeading(selectedCalendarDate)}</h2>
+            {(grouped[selectedCalendarDate] || []).length === 0 ? (
+              <p className="text-sm text-slate-500">Rien ce jour-là.</p>
+            ) : (
+              <div className="space-y-2">
+                {grouped[selectedCalendarDate].map((item) => (
+                  <PlanningItemCard
+                    key={`${item.type}-${item.id}`}
+                    item={item}
+                    currentUser={currentUser}
+                    canManage={canManage}
+                    selected={selectedTaskIds.includes(item.id)}
+                    onToggleSelect={() => toggleSelectTask(item.id)}
+                    onMarkDone={handleMarkDone}
+                    onEdit={setEditingTaskId}
+                    onDelete={handleDeleteTask}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        </>
       ) : dates.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Rien à venir pour l'instant.</p>
       ) : (
@@ -789,124 +1048,19 @@ export default function Planning() {
             <div key={date}>
               <h2 className="mb-2 text-sm font-semibold text-slate-500">{formatDateHeading(date)}</h2>
               <div className="space-y-2">
-                {grouped[date].map((item) => {
-                  const config = TYPE_CONFIG[item.type];
-                  const Icon = config.icon;
-                  const isTask = item.type === 'task';
-                  const editable = isTask && canEditTask(item, currentUser);
-                  const deletable = isTask && canDeleteTask(item, currentUser);
-
-                  const priorityBorder = isTask ? PRIORITY_CONFIG[item.priority]?.border : null;
-                  const checklistDone = isTask ? (item.checklist || []).filter((entry) => entry.done).length : 0;
-                  const checklistTotal = isTask ? (item.checklist || []).length : 0;
-
-                  const content = (
-                    <div
-                      className={`flex items-center gap-3 rounded-xl border bg-white p-3 shadow-sm sm:p-4 ${
-                        item.is_overdue ? 'border-red-200' : 'border-slate-200'
-                      } ${priorityBorder ? `border-l-4 ${priorityBorder}` : ''}`}
-                    >
-                      {isTask && canManage && (
-                        <input
-                          type="checkbox"
-                          checked={selectedTaskIds.includes(item.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleSelectTask(item.id)}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                      )}
-
-                      {isTask && editable ? (
-                        <button
-                          type="button"
-                          onClick={() => handleMarkDone(item)}
-                          aria-label="Marquer comme terminée"
-                          className="shrink-0 text-slate-400 hover:text-emerald-600"
-                        >
-                          <Circle size={20} />
-                        </button>
-                      ) : (
-                        <span
-                          className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${config.className}`}
-                        >
-                          <Icon size={16} />
-                        </span>
-                      )}
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium text-slate-900">{item.title}</p>
-                        <div className="mt-0.5 flex items-center gap-2">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${config.className}`}
-                          >
-                            {config.label}
-                          </span>
-                          {item.is_overdue && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
-                              <AlertTriangle size={11} />
-                              En retard
-                            </span>
-                          )}
-                          {isTask && item.recurrence && item.recurrence !== 'none' && (
-                            <span
-                              className="inline-flex items-center text-slate-400"
-                              title={`Récurrence : ${RECURRENCE_LABELS[item.recurrence]}`}
-                            >
-                              <Repeat size={12} />
-                            </span>
-                          )}
-                          {isTask && checklistTotal > 0 && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
-                              <CheckSquare size={11} />
-                              {checklistDone}/{checklistTotal}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {isTask && (editable || deletable) && (
-                        <div className="flex shrink-0 gap-1">
-                          {editable && (
-                            <button
-                              type="button"
-                              onClick={() => setEditingTaskId(item.id)}
-                              aria-label="Modifier la tâche"
-                              className="p-1.5 text-slate-400 hover:text-primary"
-                            >
-                              <Pencil size={16} />
-                            </button>
-                          )}
-                          {deletable && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteTask(item)}
-                              aria-label="Supprimer la tâche"
-                              className="p-1.5 text-slate-400 hover:text-red-600"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-
-                  if (item.type === 'capa') {
-                    return (
-                      <Link key={`${item.type}-${item.id}`} to={item.link}>
-                        {content}
-                      </Link>
-                    );
-                  }
-                  if (item.type === 'document') {
-                    return (
-                      <Link key={`${item.type}-${item.id}`} to={item.link}>
-                        {content}
-                      </Link>
-                    );
-                  }
-                  return <div key={`${item.type}-${item.id}`}>{content}</div>;
-                })}
+                {grouped[date].map((item) => (
+                  <PlanningItemCard
+                    key={`${item.type}-${item.id}`}
+                    item={item}
+                    currentUser={currentUser}
+                    canManage={canManage}
+                    selected={selectedTaskIds.includes(item.id)}
+                    onToggleSelect={() => toggleSelectTask(item.id)}
+                    onMarkDone={handleMarkDone}
+                    onEdit={setEditingTaskId}
+                    onDelete={handleDeleteTask}
+                  />
+                ))}
               </div>
             </div>
           ))}
