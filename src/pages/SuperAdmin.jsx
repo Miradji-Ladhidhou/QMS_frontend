@@ -1142,10 +1142,54 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(2)} Mo`;
 }
 
+// La sauvegarde locale automatique tourne tous les jours à 2h (voir backupJob.js) : au-delà de
+// 26h (marge au-delà des 24h attendues) sans nouvelle sauvegarde, le job planifié est
+// probablement en échec silencieux — signalé en orange plutôt qu'enfoui dans les logs Render.
+const STALE_BACKUP_THRESHOLD_MS = 26 * 60 * 60 * 1000;
+
+function BackupStatusPanel({ status }) {
+  const local = status.last_local_backup;
+  const drive = status.last_drive_backup;
+  const isStale = local && Date.now() - new Date(local.created_at).getTime() > STALE_BACKUP_THRESHOLD_MS;
+
+  return (
+    <div
+      className={`grid grid-cols-1 gap-3 rounded-xl border p-4 sm:grid-cols-2 ${
+        isStale ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-white'
+      }`}
+    >
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Dernière sauvegarde locale</p>
+        {local ? (
+          <>
+            <p className={`text-sm font-medium ${isStale ? 'text-amber-800' : 'text-slate-800'}`}>
+              {formatDateTime(local.created_at)} · {formatBytes(local.size_bytes)}
+            </p>
+            {isStale && <p className="mt-0.5 text-xs text-amber-700">Plus de 24h — vérifier que le job planifié tourne toujours.</p>}
+          </>
+        ) : (
+          <p className="text-sm text-slate-400">Aucune sauvegarde locale pour l'instant.</p>
+        )}
+      </div>
+      <div>
+        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Dernière sauvegarde Google Drive</p>
+        {drive ? (
+          <p className="text-sm font-medium text-slate-800">
+            {formatDateTime(drive.created_at)} · {formatBytes(drive.size_bytes)}
+          </p>
+        ) : (
+          <p className="text-sm text-slate-400">Aucune sauvegarde sur Drive pour l'instant.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SystemTab() {
   const [driveBackups, setDriveBackups] = useState([]);
   const [loadingDriveBackups, setLoadingDriveBackups] = useState(false);
   const [driveError, setDriveError] = useState('');
+  const [backupStatus, setBackupStatus] = useState(null);
   const [busyAction, setBusyAction] = useState('');
   const [message, setMessage] = useState(null);
   const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
@@ -1160,8 +1204,19 @@ function SystemTab() {
       .finally(() => setLoadingDriveBackups(false));
   }
 
+  // Lu directement sur disque / sur Drive (voir GET /backup-status) — repère un job planifié
+  // silencieusement en échec (ex: dernière sauvegarde locale vieille de plusieurs jours) sans
+  // avoir à éplucher les logs Render.
+  function loadBackupStatus() {
+    api
+      .get('/super-admin/backup-status')
+      .then(({ data }) => setBackupStatus(data))
+      .catch(() => setBackupStatus(null));
+  }
+
   useEffect(() => {
     loadDriveBackups();
+    loadBackupStatus();
   }, []);
 
   async function handleManualBackup() {
@@ -1177,6 +1232,7 @@ function SystemTab() {
       link.click();
       URL.revokeObjectURL(url);
       setMessage({ type: 'success', text: `Sauvegarde "${data.filename}" téléchargée.` });
+      loadBackupStatus();
     } catch {
       setMessage({ type: 'error', text: 'Impossible de créer la sauvegarde.' });
     } finally {
@@ -1191,6 +1247,7 @@ function SystemTab() {
       const { data } = await api.post('/super-admin/backup-drive');
       setMessage({ type: 'success', text: `Sauvegarde "${data.filename}" envoyée sur Google Drive.` });
       loadDriveBackups();
+      loadBackupStatus();
     } catch (err) {
       setMessage({
         type: 'error',
@@ -1232,8 +1289,11 @@ function SystemTab() {
       </div>
       <p className="text-sm text-slate-500">
         Sauvegarde et restauration de la base de données (données applicatives de tous les tenants). Une
-        sauvegarde de sécurité est prise automatiquement juste avant chaque restauration.
+        sauvegarde de sécurité est prise automatiquement juste avant chaque restauration. Sauvegarde locale
+        automatique tous les jours à 2h.
       </p>
+
+      {backupStatus && <BackupStatusPanel status={backupStatus} />}
 
       {message && (
         <p
