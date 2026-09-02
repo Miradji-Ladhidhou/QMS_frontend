@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, Plus, X } from 'lucide-react';
+import { Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -24,6 +24,7 @@ import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import AiRiskSuggestion from '../components/AiRiskSuggestion.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -322,6 +323,57 @@ function NewRiskModal({ users, services, categories, onClose, onCreated }) {
   );
 }
 
+function AnalyzeServiceModal({ services, onClose, onAdded }) {
+  const [serviceId, setServiceId] = useState('');
+  const [context, setContext] = useState('');
+
+  const serviceName = services.find((service) => service.id === serviceId)?.name || '';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Analyser un service avec l'IA</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
+            <select
+              value={serviceId}
+              onChange={(e) => setServiceId(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Choisir un service</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Description de l'activité</label>
+            <AutoTextarea
+              rows={3}
+              placeholder="Ex : Réception des matières premières, stockage en entrepôt, préparation et expédition des commandes clients..."
+              value={context}
+              onChange={(e) => setContext(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <AiRiskSuggestion serviceId={serviceId || undefined} serviceName={serviceName} context={context} onAdded={onAdded} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Risks() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
@@ -332,6 +384,7 @@ export default function Risks() {
   const [categories, setCategories] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [serviceFilter, setServiceFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -339,6 +392,7 @@ export default function Risks() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const [isAnalyzeModalOpen, setIsAnalyzeModalOpen] = useState(false);
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -370,6 +424,7 @@ export default function Risks() {
       const params = {};
       if (typeFilter) params.type = typeFilter;
       if (statusFilter) params.status = statusFilter;
+      if (serviceFilter) params.service_id = serviceFilter;
       const [risksRes, usersRes, servicesRes, categoriesRes] = await Promise.all([
         api.get('/risks', { params }),
         api.get('/users'),
@@ -390,7 +445,7 @@ export default function Risks() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [typeFilter, statusFilter]);
+  }, [typeFilter, statusFilter, serviceFilter]);
 
   const { sorted: sortedRisks, sortKey, direction, setSortKey, toggleSort } = useSort(
     risks,
@@ -476,6 +531,16 @@ export default function Risks() {
           {canManage && (
             <button
               type="button"
+              onClick={() => setIsAnalyzeModalOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-md border border-purple-300 px-4 py-2.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50"
+            >
+              <Sparkles size={18} />
+              Analyser un service avec l'IA
+            </button>
+          )}
+          {canManage && (
+            <button
+              type="button"
               onClick={() => setIsModalOpen(true)}
               className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
             >
@@ -521,6 +586,18 @@ export default function Risks() {
           {Object.entries(RISK_STATUS_LABELS).map(([value, label]) => (
             <option key={value} value={value}>
               {label}
+            </option>
+          ))}
+        </select>
+        <select
+          value={serviceFilter}
+          onChange={(e) => setServiceFilter(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Tous les services</option>
+          {services.map((service) => (
+            <option key={service.id} value={service.id}>
+              {service.name}
             </option>
           ))}
         </select>
@@ -613,6 +690,10 @@ export default function Risks() {
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />
+      )}
+
+      {isAnalyzeModalOpen && (
+        <AnalyzeServiceModal services={services} onClose={() => setIsAnalyzeModalOpen(false)} onAdded={loadData} />
       )}
 
       {isBulkMoveModalOpen && (
