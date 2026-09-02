@@ -9,6 +9,7 @@ import {
   Filter,
   MessageSquareWarning,
   ShieldAlert,
+  Thermometer,
   TrendingDown,
   Truck,
   Users2,
@@ -96,6 +97,47 @@ function BigNumber({ value, suffix }) {
     <div className="flex items-baseline gap-2">
       <span className="text-3xl font-semibold text-slate-900">{value}</span>
       <span className="text-sm text-slate-500">{suffix}</span>
+    </div>
+  );
+}
+
+const SPARKLINE_WIDTH = 72;
+const SPARKLINE_HEIGHT = 24;
+
+// SVG à la main plutôt que recharts : ce widget n'a besoin que d'un tracé minimal (pas d'axes,
+// pas d'infobulle), et Dashboard.jsx ne charge sinon aucun morceau du gros chunk recharts —
+// pas de raison de l'y faire entrer pour trois points de données.
+function Sparkline({ values, stroke }) {
+  if (!values || values.length < 2) return null;
+
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const step = SPARKLINE_WIDTH / (values.length - 1);
+  const points = values
+    .map((value, i) => `${i * step},${SPARKLINE_HEIGHT - ((value - min) / range) * SPARKLINE_HEIGHT}`)
+    .join(' ');
+  const lastX = (values.length - 1) * step;
+  const lastY = SPARKLINE_HEIGHT - ((values[values.length - 1] - min) / range) * SPARKLINE_HEIGHT;
+
+  return (
+    <svg width={SPARKLINE_WIDTH} height={SPARKLINE_HEIGHT} viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`} className="shrink-0">
+      <polyline points={points} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lastX} cy={lastY} r="2" fill={stroke} />
+    </svg>
+  );
+}
+
+function KpiPreviewRow({ kpi }) {
+  return (
+    <div className="flex items-center justify-between gap-3 py-1.5">
+      <div className="min-w-0">
+        <p className="truncate text-sm text-slate-700">{kpi.name}</p>
+        <p className="text-xs text-slate-400">
+          {kpi.average} {kpi.unit || ''}
+        </p>
+      </div>
+      <Sparkline values={kpi.sparkline} stroke="#dc2626" />
     </div>
   );
 }
@@ -328,6 +370,26 @@ export default function Dashboard() {
               <div className="flex items-baseline gap-2">
                 <TrendingDown size={20} className={stats.kpis.off_target > 0 ? 'text-red-600' : 'text-slate-300'} />
                 <BigNumber value={stats.kpis.off_target} suffix="indicateur(s) sous l'objectif" />
+              </div>
+              {stats.kpis.preview?.length > 0 && (
+                <div className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
+                  {stats.kpis.preview.map((kpi) => (
+                    <KpiPreviewRow key={kpi.id} kpi={kpi} />
+                  ))}
+                </div>
+              )}
+            </WidgetCard>
+          ))}
+
+        {!isMember &&
+          isModuleVisible('haccp') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title="Plans HACCP actifs" to="/haccp">
+              <div className="flex items-baseline gap-2">
+                <Thermometer size={20} className="text-slate-300" />
+                <BigNumber value={stats.haccp.active_plans} suffix="plan(s) actif(s)" />
               </div>
             </WidgetCard>
           ))}
