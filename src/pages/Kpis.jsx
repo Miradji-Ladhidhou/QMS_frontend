@@ -520,12 +520,16 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
   const [activeRecord, setActiveRecord] = useState(record);
   const isEditing = Boolean(activeRecord);
   const inputType = kpi.frequency === 'monthly' ? 'month' : 'date';
+  // Uniquement les séries manuelles (calc_type 'manual') : une série de calcul importée n'a
+  // pas vocation à recevoir une valeur saisie à la main par-dessus son pipeline d'import.
+  const seriesOptions = (kpi.calculation_configs || []).filter((c) => c.calc_type === 'manual');
 
   const [periodDate, setPeriodDate] = useState(
     toInputPeriodValue(record?.period_date || new Date().toISOString().slice(0, 10), kpi.frequency)
   );
   const [value, setValue] = useState(record ? String(record.value) : '');
   const [comment, setComment] = useState(record?.comment || '');
+  const [configId, setConfigId] = useState(record?.config_id || '');
   const [error, setError] = useState('');
   const [showConflictAction, setShowConflictAction] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -540,6 +544,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
       period_date: fromInputPeriodValue(periodDate, kpi.frequency),
       value: Number(value),
       comment: comment || null,
+      config_id: configId || undefined,
     };
 
     // onSaved() hors du try, même raison qu'ailleurs dans ce fichier : un bug du handler
@@ -551,7 +556,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
         : await api.post(`/kpis/${kpi.id}/records`, payload);
     } catch (err) {
       if (!isEditing && err.response?.status === 409) {
-        setError('Une valeur existe déjà pour cette période.');
+        setError('Une valeur existe déjà pour cette période et cette série.');
         setShowConflictAction(true);
       } else {
         setError(err.response?.data?.error || `Impossible ${isEditing ? 'de modifier' : "d'enregistrer"} cette valeur.`);
@@ -565,7 +570,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
 
   function handleSwitchToEdit() {
     const targetPeriod = fromInputPeriodValue(periodDate, kpi.frequency);
-    const existing = kpi.records.find((r) => r.period_date === targetPeriod);
+    const existing = kpi.records.find((r) => r.period_date === targetPeriod && (r.config_id || '') === (configId || ''));
     if (!existing) return;
 
     setActiveRecord(existing);
@@ -603,6 +608,26 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          {seriesOptions.length > 0 && (
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Série</label>
+              <select
+                required
+                disabled={isEditing}
+                value={configId}
+                onChange={(e) => setConfigId(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+              >
+                <option value="">Choisir une série</option>
+                {seriesOptions.map((series) => (
+                  <option key={series.id} value={series.id}>
+                    {series.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Période</label>
             <input
@@ -1905,6 +1930,156 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
   );
 }
 
+// Calqué sur SeriesManagerModal (séries de calcul, KPI import) mais bien plus simple : une
+// série manuelle n'est qu'un label (calc_type fixé à 'manual' côté serveur), pas de recette de
+// calcul à construire — voir POST /kpis/:id/series et RecordModal, qui liste ces séries dans
+// son sélecteur dès qu'il y en a au moins une.
+function ManualSeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
+  const [loading, setLoading] = useState(true);
+  const [series, setSeries] = useState([]);
+  const [creating, setCreating] = useState(false);
+  const [label, setLabel] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  function loadSeries() {
+    setLoading(true);
+    api
+      .get(`/kpis/${kpi.id}/series`)
+      .then(({ data }) => setSeries(data.filter((s) => s.calc_type === 'manual')))
+      .catch(() => setError('Impossible de charger les séries.'))
+      .finally(() => setLoading(false));
+  }
+
+  useEffect(() => {
+    loadSeries();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kpi.id]);
+
+  async function handleCreate(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    try {
+      await api.post(`/kpis/${kpi.id}/series`, { label, calc_type: 'manual' });
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible de créer cette série.");
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+    setLabel('');
+    setCreating(false);
+    onSaved();
+    loadSeries();
+  }
+
+  async function handleDelete(s) {
+    if (!window.confirm(`Supprimer la série "${s.label}" ? Les valeurs saisies sous cette courbe seront supprimées avec elle.`)) {
+      return;
+    }
+    setError('');
+    setDeletingId(s.id);
+
+    try {
+      await api.delete(`/kpis/${kpi.id}/series/${s.id}`);
+    } catch {
+      setError('Impossible de supprimer cette série.');
+      setDeletingId(null);
+      return;
+    }
+    setDeletingId(null);
+    onSaved();
+    loadSeries();
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Séries (courbes)</h2>
+            <p className="text-sm text-slate-500">{kpi.name}</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {loading ? (
+          <div className="space-y-2">
+            {[0, 1].map((key) => (
+              <div key={key} className="h-14 animate-pulse rounded-md bg-slate-100" />
+            ))}
+          </div>
+        ) : (
+          <div>
+            {series.length === 0 ? (
+              <p className="mb-4 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Aucune série pour l'instant — chaque valeur saisie forme une seule courbe. Ajoutez-en plusieurs pour comparer
+                différentes courbes sur le même graphique (ex : "Ligne A", "Ligne B").
+              </p>
+            ) : (
+              <div className="mb-4 space-y-2">
+                {series.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 p-3">
+                    <p className="min-w-0 break-words text-sm font-medium text-slate-800">{s.label}</p>
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(s)}
+                        disabled={deletingId === s.id}
+                        aria-label="Supprimer"
+                        className="shrink-0 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+            {creating ? (
+              <form onSubmit={handleCreate} className="flex items-center gap-2">
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  placeholder="Ex : Ligne A"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="shrink-0 rounded-md bg-primary px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+                >
+                  {submitting ? '...' : 'Ajouter'}
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCreating(true)}
+                className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <Plus size={16} />
+                Nouvelle série
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ImportsHistoryTable({ imports, kpi }) {
   if (imports === null) {
     return (
@@ -2224,6 +2399,7 @@ function KpiCard({
   onDeleteRecord,
   onOpenImportModal,
   onOpenConfigModal,
+  onOpenManualSeriesModal,
   onViewProof,
   isSelected,
   onToggleSelect,
@@ -2400,7 +2576,10 @@ function KpiCard({
             )}
           </div>
 
-          {(canManage || isImportBased) && (
+          {/* Toujours au moins une entrée : Modifier/Déplacer/Supprimer si canManage, "Séries de
+              calcul" pour un KPI import, "Séries (courbes)" pour un KPI manuel — ces deux
+              derniers ouverts à tout rôle, comme la saisie manuelle elle-même (POST
+              /:id/records n'a pas de garde de rôle côté backend). */}
           <div className="relative">
             <button
               type="button"
@@ -2439,6 +2618,19 @@ function KpiCard({
                     >
                       <Settings size={14} />
                       Séries de calcul
+                    </button>
+                  )}
+                  {!isImportBased && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onOpenManualSeriesModal(kpi);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <Settings size={14} />
+                      Séries (courbes)
                     </button>
                   )}
                   {canManage && (
@@ -2940,6 +3132,7 @@ export default function Kpis() {
   const [formModal, setFormModal] = useState(null); // null fermé, 'new' création, objet kpi édition
   const [importModal, setImportModal] = useState(null); // le kpi en cours d'import, ou null
   const [configModal, setConfigModal] = useState(null); // le kpi dont on édite la recette, ou null
+  const [manualSeriesModal, setManualSeriesModal] = useState(null); // le kpi dont on gère les séries manuelles, ou null
   const [proofModal, setProofModal] = useState(null); // { kpi, record } — preuve derrière un point du graphique
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
@@ -3198,7 +3391,7 @@ export default function Kpis() {
       )}
 
       {loading || foldersLoading ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
@@ -3260,7 +3453,7 @@ export default function Kpis() {
           ) : kpis.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">Aucun KPI directement dans ce dossier.</p>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {kpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
@@ -3275,6 +3468,7 @@ export default function Kpis() {
                   onDeleteRecord={handleDeleteRecord}
                   onOpenImportModal={setImportModal}
                   onOpenConfigModal={setConfigModal}
+                  onOpenManualSeriesModal={setManualSeriesModal}
                   onViewProof={(kpiArg, record) => setProofModal({ kpi: kpiArg, record })}
                   isSelected={selectedIds.includes(kpi.id)}
                   onToggleSelect={() => toggleSelect(kpi.id)}
@@ -3319,6 +3513,15 @@ export default function Kpis() {
           canManage={canManage}
           onClose={() => setConfigModal(null)}
           onSaved={() => refreshKpi(configModal.id)}
+        />
+      )}
+
+      {manualSeriesModal && (
+        <ManualSeriesManagerModal
+          kpi={manualSeriesModal}
+          canManage={canManage}
+          onClose={() => setManualSeriesModal(null)}
+          onSaved={() => refreshKpi(manualSeriesModal.id)}
         />
       )}
 
