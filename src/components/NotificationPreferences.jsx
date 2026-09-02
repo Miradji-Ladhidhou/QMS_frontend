@@ -6,6 +6,7 @@ const TOGGLE_LABELS = {
   email_capa_overdue: 'CAPA en retard',
   email_training_renewal: 'Renouvellement de formation',
   email_approval_requests: "Demandes d'approbation",
+  email_task_due: 'Tâches à échéance',
 };
 
 const FREQUENCY_LABELS = {
