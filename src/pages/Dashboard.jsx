@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Check,
   CheckCircle2,
   ClipboardCheck,
@@ -34,14 +36,32 @@ function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-function StatCard({ icon: Icon, label, value, accent }) {
+// Neutre (gris) plutôt que rouge/vert : le sens "mieux/moins bien" d'une variation dépend du
+// compteur (plus de CAPA clôturées = bien, plus de CAPA en retard = mal) — pas de règle unique
+// fiable à coder en dur sans se tromper sur au moins un widget. delta undefined/null (pas
+// d'instantané assez ancien, ou vue filtrée par service) => rien affiché.
+function TrendBadge({ delta }) {
+  if (delta === undefined || delta === null || delta === 0) return null;
+  const Icon = delta > 0 ? ArrowUp : ArrowDown;
+  return (
+    <span className="inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
+      <Icon size={11} />
+      {Math.abs(delta)}
+    </span>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, accent, trend }) {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${accent}`}>
         <Icon size={22} />
       </div>
       <div>
-        <p className="text-2xl font-semibold text-slate-900">{value}</p>
+        <div className="flex items-center gap-1.5">
+          <p className="text-2xl font-semibold text-slate-900">{value}</p>
+          <TrendBadge delta={trend} />
+        </div>
         <p className="text-sm text-slate-500">{label}</p>
       </div>
     </div>
@@ -83,6 +103,69 @@ function OverdueNote({ count }) {
   return <p className="mt-1 text-xs font-medium text-red-600">{count} en retard</p>;
 }
 
+const ACTIVITY_MODULE_LABELS = {
+  capas: 'CAPA',
+  audits: 'Audit',
+  complaints: 'Réclamation',
+  risks: 'Risque',
+  documents: 'Document',
+  haccp: 'HACCP',
+};
+
+function formatRelativeTime(dateStr) {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "à l'instant";
+  if (minutes < 60) return `il y a ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `il y a ${hours}h`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `il y a ${days}j`;
+  return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+function RecentActivityPanel({ items }) {
+  if (items === null) {
+    return (
+      <div className="mt-6 animate-pulse rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-4 h-4 w-40 rounded bg-slate-200" />
+        <div className="space-y-2">
+          {[0, 1, 2].map((key) => (
+            <div key={key} className="h-5 rounded bg-slate-100" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-6 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <h2 className="mb-3 text-sm font-semibold text-slate-900 sm:text-base">Activité récente</h2>
+      {items.length === 0 ? (
+        <p className="text-sm text-slate-500">Aucune activité récente.</p>
+      ) : (
+        <ul className="divide-y divide-slate-100">
+          {items.map((item) => (
+            <li key={`${item.module}-${item.id}`}>
+              <Link to={item.link} className="flex items-center justify-between gap-3 py-2 hover:text-primary">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                    {ACTIVITY_MODULE_LABELS[item.module] || item.module}
+                  </span>
+                  <span className="truncate text-sm text-slate-700">
+                    {item.action === 'created' ? 'Créé' : 'Modifié'} — {item.label}
+                  </span>
+                </div>
+                <span className="shrink-0 text-xs text-slate-400">{formatRelativeTime(item.timestamp)}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function WidgetSkeleton() {
   return (
     <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -92,11 +175,12 @@ function WidgetSkeleton() {
   );
 }
 
-function BigNumber({ value, suffix }) {
+function BigNumber({ value, suffix, trend }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-3xl font-semibold text-slate-900">{value}</span>
       <span className="text-sm text-slate-500">{suffix}</span>
+      <TrendBadge delta={trend} />
     </div>
   );
 }
@@ -158,6 +242,7 @@ export default function Dashboard() {
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [recentActivity, setRecentActivity] = useState(null);
 
   async function loadStats(serviceIds) {
     setError('');
@@ -168,6 +253,15 @@ export default function Dashboard() {
       setStats(data);
     } catch {
       setError('Impossible de charger le tableau de bord.');
+    }
+  }
+
+  async function loadRecentActivity() {
+    try {
+      const { data } = await api.get('/dashboard/recent-activity');
+      setRecentActivity(data);
+    } catch {
+      setRecentActivity([]);
     }
   }
 
@@ -204,6 +298,7 @@ export default function Dashboard() {
       if (cancelled) return;
       setSelectedServiceIds(initialSelected);
       await loadStats([]);
+      if (canFilterByService) loadRecentActivity();
       if (!cancelled) setLoading(false);
     }
 
@@ -318,9 +413,12 @@ export default function Dashboard() {
             {stats.overdue.total > 0 ? <AlertTriangle size={22} /> : <CheckCircle2 size={22} />}
           </div>
           <div>
-            <p className={`text-2xl font-semibold ${stats.overdue.total > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
-              {stats.overdue.total}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className={`text-2xl font-semibold ${stats.overdue.total > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
+                {stats.overdue.total}
+              </p>
+              <TrendBadge delta={stats.trends?.['overdue.total']} />
+            </div>
             <p className="text-sm text-slate-600">
               {stats.overdue.total > 0
                 ? `Élément${stats.overdue.total > 1 ? 's' : ''} en retard, tous outils confondus — voir le planning`
@@ -336,7 +434,9 @@ export default function Dashboard() {
           <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {loading || !stats
               ? [0, 1, 2, 3].map((key) => <StatSkeleton key={key} />)
-              : capaCards.map((card) => <StatCard key={card.id} {...card} value={stats.capas[card.id]} />)}
+              : capaCards.map((card) => (
+                  <StatCard key={card.id} {...card} value={stats.capas[card.id]} trend={stats.trends?.[`capas.${card.id}`]} />
+                ))}
           </div>
         </>
       )}
@@ -348,7 +448,7 @@ export default function Dashboard() {
             <WidgetSkeleton />
           ) : (
             <WidgetCard title="Documents à réviser" to="/documents">
-              <BigNumber value={stats.documents.to_review} suffix="document(s) à réviser sous 30 jours" />
+              <BigNumber value={stats.documents.to_review} suffix="document(s) à réviser sous 30 jours" trend={stats.trends?.['documents.to_review']} />
             </WidgetCard>
           ))}
 
@@ -357,7 +457,7 @@ export default function Dashboard() {
             <WidgetSkeleton />
           ) : (
             <WidgetCard title={trainingsTitle} to="/trainings">
-              <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" />
+              <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" trend={stats.trends?.['trainings.to_renew']} />
             </WidgetCard>
           ))}
 
@@ -369,7 +469,7 @@ export default function Dashboard() {
             <WidgetCard title="KPI hors objectif" to="/kpis">
               <div className="flex items-baseline gap-2">
                 <TrendingDown size={20} className={stats.kpis.off_target > 0 ? 'text-red-600' : 'text-slate-300'} />
-                <BigNumber value={stats.kpis.off_target} suffix="indicateur(s) sous l'objectif" />
+                <BigNumber value={stats.kpis.off_target} suffix="indicateur(s) sous l'objectif" trend={stats.trends?.['kpis.off_target']} />
               </div>
               {stats.kpis.preview?.length > 0 && (
                 <div className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
@@ -389,7 +489,7 @@ export default function Dashboard() {
             <WidgetCard title="Plans HACCP actifs" to="/haccp">
               <div className="flex items-baseline gap-2">
                 <Thermometer size={20} className="text-slate-300" />
-                <BigNumber value={stats.haccp.active_plans} suffix="plan(s) actif(s)" />
+                <BigNumber value={stats.haccp.active_plans} suffix="plan(s) actif(s)" trend={stats.trends?.['haccp.active_plans']} />
               </div>
             </WidgetCard>
           ))}
@@ -401,7 +501,7 @@ export default function Dashboard() {
             <WidgetCard title={auditsTitle} to="/audits">
               <div className="flex items-baseline gap-2">
                 <ClipboardCheck size={20} className="text-slate-300" />
-                <BigNumber value={stats.audits.active} suffix="audit(s) en cours" />
+                <BigNumber value={stats.audits.active} suffix="audit(s) en cours" trend={stats.trends?.['audits.active']} />
               </div>
               <OverdueNote count={stats.audits.overdue} />
             </WidgetCard>
@@ -414,7 +514,7 @@ export default function Dashboard() {
             <WidgetCard title={complaintsTitle} to="/complaints">
               <div className="flex items-baseline gap-2">
                 <MessageSquareWarning size={20} className="text-slate-300" />
-                <BigNumber value={stats.complaints.active} suffix="réclamation(s) ouverte(s)" />
+                <BigNumber value={stats.complaints.active} suffix="réclamation(s) ouverte(s)" trend={stats.trends?.['complaints.active']} />
               </div>
               <OverdueNote count={stats.complaints.overdue} />
             </WidgetCard>
@@ -427,7 +527,7 @@ export default function Dashboard() {
             <WidgetCard title={risksTitle} to="/risks">
               <div className="flex items-baseline gap-2">
                 <ShieldAlert size={20} className="text-slate-300" />
-                <BigNumber value={stats.risks.active} suffix="risque(s) actif(s)" />
+                <BigNumber value={stats.risks.active} suffix="risque(s) actif(s)" trend={stats.trends?.['risks.active']} />
               </div>
               <OverdueNote count={stats.risks.overdue} />
             </WidgetCard>
@@ -441,7 +541,7 @@ export default function Dashboard() {
             <WidgetCard title="Fournisseurs à évaluer" to="/suppliers">
               <div className="flex items-baseline gap-2">
                 <Truck size={20} className="text-slate-300" />
-                <BigNumber value={stats.suppliers.active} suffix="évaluation(s) à planifier" />
+                <BigNumber value={stats.suppliers.active} suffix="évaluation(s) à planifier" trend={stats.trends?.['suppliers.active']} />
               </div>
               <OverdueNote count={stats.suppliers.overdue} />
             </WidgetCard>
@@ -455,11 +555,17 @@ export default function Dashboard() {
             <WidgetCard title="Revues de direction à clôturer" to="/management-reviews">
               <div className="flex items-baseline gap-2">
                 <Users2 size={20} className="text-slate-300" />
-                <BigNumber value={stats.management_reviews.draft} suffix="revue(s) en attente de clôture" />
+                <BigNumber
+                  value={stats.management_reviews.draft}
+                  suffix="revue(s) en attente de clôture"
+                  trend={stats.trends?.['management_reviews.draft']}
+                />
               </div>
             </WidgetCard>
           ))}
       </div>
+
+      {canFilterByService && <RecentActivityPanel items={recentActivity} />}
     </div>
   );
 }
