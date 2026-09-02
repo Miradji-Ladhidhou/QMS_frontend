@@ -15,6 +15,7 @@ import {
   MessageSquareWarning,
   Pencil,
   Plus,
+  Repeat,
   Search,
   ShieldAlert,
   Trash2,
@@ -42,6 +43,20 @@ const TYPE_CONFIG = {
   complaint: { label: 'Réclamation', icon: MessageSquareWarning, className: 'bg-rose-100 text-rose-700' },
   risk: { label: 'Risque', icon: ShieldAlert, className: 'bg-orange-100 text-orange-700' },
   supplier: { label: 'Fournisseur', icon: Truck, className: 'bg-teal-100 text-teal-700' },
+};
+
+const PRIORITY_CONFIG = {
+  low: { label: 'Basse', border: 'border-l-slate-300', dot: 'bg-slate-400' },
+  normal: { label: 'Normale', border: 'border-l-sky-400', dot: 'bg-sky-500' },
+  high: { label: 'Haute', border: 'border-l-amber-400', dot: 'bg-amber-500' },
+  urgent: { label: 'Urgente', border: 'border-l-red-500', dot: 'bg-red-600' },
+};
+
+const RECURRENCE_LABELS = {
+  none: 'Aucune',
+  daily: 'Quotidienne',
+  weekly: 'Hebdomadaire',
+  monthly: 'Mensuelle',
 };
 
 function formatDateHeading(dateStr) {
@@ -75,12 +90,32 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
   const [personId, setPersonId] = useState(task?.assigned_to || task?.assigned_employee_id || '');
   const [categoryId, setCategoryId] = useState(task?.category_id || '');
   const [isPrivate, setIsPrivate] = useState(Boolean(task?.is_private_to_me));
+  const [priority, setPriority] = useState(task?.priority || 'normal');
+  const [checklist, setChecklist] = useState(task?.checklist || []);
+  const [checklistDraft, setChecklistDraft] = useState('');
+  const [recurrence, setRecurrence] = useState(task?.recurrence || 'none');
+  const [recurrenceInterval, setRecurrenceInterval] = useState(task?.recurrence_interval || 1);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   function handleSourceChange(next) {
     setSource(next);
     setPersonId('');
+  }
+
+  function handleAddChecklistItem() {
+    const text = checklistDraft.trim();
+    if (!text) return;
+    setChecklist((prev) => [...prev, { text, done: false }]);
+    setChecklistDraft('');
+  }
+
+  function handleToggleChecklistItem(index) {
+    setChecklist((prev) => prev.map((entry, i) => (i === index ? { ...entry, done: !entry.done } : entry)));
+  }
+
+  function handleRemoveChecklistItem(index) {
+    setChecklist((prev) => prev.filter((_, i) => i !== index));
   }
 
   async function handleSubmit(event) {
@@ -116,6 +151,10 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
             description: description || null,
             due_date: dueDate,
             category_id: finalCategoryId || null,
+            priority,
+            checklist,
+            recurrence,
+            recurrence_interval: recurrenceInterval,
             ...assignment,
           })
         : await api.post('/tasks', {
@@ -123,6 +162,10 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
             description: description || undefined,
             due_date: dueDate,
             category_id: finalCategoryId,
+            priority,
+            checklist,
+            recurrence,
+            recurrence_interval: recurrenceInterval,
             ...assignment,
           });
     } catch (err) {
@@ -184,6 +227,27 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
+            <div className="grid grid-cols-4 gap-2">
+              {Object.entries(PRIORITY_CONFIG).map(([value, config]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setPriority(value)}
+                  className={`flex items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-sm font-medium transition-colors ${
+                    priority === value
+                      ? 'border-primary bg-primary/5 text-primary'
+                      : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${config.dot}`} />
+                  {config.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Assigner à</label>
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -227,6 +291,93 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
               </select>
             </div>
           )}
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Checklist</label>
+            {checklist.length > 0 && (
+              <ul className="mb-2 space-y-1.5">
+                {checklist.map((entry, index) => (
+                  <li key={index} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChecklistItem(index)}
+                      aria-label={entry.done ? 'Marquer comme à faire' : 'Marquer comme fait'}
+                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
+                        entry.done ? 'border-primary bg-primary text-white' : 'border-slate-300'
+                      }`}
+                    >
+                      {entry.done && <Check size={12} />}
+                    </button>
+                    <span className={`flex-1 text-sm ${entry.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                      {entry.text}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveChecklistItem(index)}
+                      aria-label="Supprimer cette ligne"
+                      className="p-1 text-slate-400 hover:text-red-600"
+                    >
+                      <X size={14} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={checklistDraft}
+                onChange={(e) => setChecklistDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddChecklistItem();
+                  }
+                }}
+                placeholder="Ajouter une étape..."
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+              <button
+                type="button"
+                onClick={handleAddChecklistItem}
+                className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Ajouter
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Récurrence</label>
+            <div className="flex gap-2">
+              <select
+                value={recurrence}
+                onChange={(e) => setRecurrence(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
+              >
+                {Object.entries(RECURRENCE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              {recurrence !== 'none' && (
+                <input
+                  type="number"
+                  min="1"
+                  value={recurrenceInterval}
+                  onChange={(e) => setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))}
+                  aria-label="Intervalle de récurrence"
+                  className="w-20 shrink-0 rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
+                />
+              )}
+            </div>
+            {recurrence !== 'none' && (
+              <p className="mt-1 text-xs text-slate-500">
+                À la clôture, une nouvelle tâche est recréée automatiquement à l'échéance suivante.
+              </p>
+            )}
+          </div>
 
           <CategoryVisibilityField
             categories={categories}
@@ -645,11 +796,15 @@ export default function Planning() {
                   const editable = isTask && canEditTask(item, currentUser);
                   const deletable = isTask && canDeleteTask(item, currentUser);
 
+                  const priorityBorder = isTask ? PRIORITY_CONFIG[item.priority]?.border : null;
+                  const checklistDone = isTask ? (item.checklist || []).filter((entry) => entry.done).length : 0;
+                  const checklistTotal = isTask ? (item.checklist || []).length : 0;
+
                   const content = (
                     <div
                       className={`flex items-center gap-3 rounded-xl border bg-white p-3 shadow-sm sm:p-4 ${
                         item.is_overdue ? 'border-red-200' : 'border-slate-200'
-                      }`}
+                      } ${priorityBorder ? `border-l-4 ${priorityBorder}` : ''}`}
                     >
                       {isTask && canManage && (
                         <input
@@ -690,6 +845,20 @@ export default function Planning() {
                             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
                               <AlertTriangle size={11} />
                               En retard
+                            </span>
+                          )}
+                          {isTask && item.recurrence && item.recurrence !== 'none' && (
+                            <span
+                              className="inline-flex items-center text-slate-400"
+                              title={`Récurrence : ${RECURRENCE_LABELS[item.recurrence]}`}
+                            >
+                              <Repeat size={12} />
+                            </span>
+                          )}
+                          {isTask && checklistTotal > 0 && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                              <CheckSquare size={11} />
+                              {checklistDone}/{checklistTotal}
                             </span>
                           )}
                         </div>
