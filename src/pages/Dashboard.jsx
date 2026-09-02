@@ -398,7 +398,7 @@ export default function Dashboard() {
         <div className="mt-4 h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
       ) : (
         <Link
-          to="/planning"
+          to={stats.overdue.total > 0 ? '/planning?overdue=1' : '/planning'}
           className={`mt-4 flex items-center gap-4 rounded-xl border p-4 shadow-sm transition-colors sm:p-5 ${
             stats.overdue.total > 0
               ? 'border-red-200 bg-red-50 hover:bg-red-100'

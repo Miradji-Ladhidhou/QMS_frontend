@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Check,
@@ -15,6 +15,7 @@ import {
   MessageSquareWarning,
   Pencil,
   Plus,
+  Search,
   ShieldAlert,
   Trash2,
   Truck,
@@ -253,6 +254,7 @@ export default function Planning() {
   const role = currentUser?.role;
   const canFilterByService = role === 'admin' || role === 'manager';
   const canManage = isManagerRole(role);
+  const [searchParams] = useSearchParams();
 
   const [items, setItems] = useState([]);
   const [tasks, setTasks] = useState([]);
@@ -269,6 +271,24 @@ export default function Planning() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const [typeFilter, setTypeFilter] = useState([]);
+  const [overdueOnly, setOverdueOnly] = useState(() => searchParams.get('overdue') === '1');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [searchText, setSearchText] = useState('');
+
+  function toggleTypeFilter(type) {
+    setTypeFilter((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+  }
+
+  const filteredItems = useMemo(() => {
+    return items.filter((item) => {
+      if (typeFilter.length > 0 && !typeFilter.includes(item.type)) return false;
+      if (overdueOnly && !item.is_overdue) return false;
+      if (assigneeFilter && !(item.type === 'task' && item.assigned_to === assigneeFilter)) return false;
+      if (searchText.trim() && !item.title.toLowerCase().includes(searchText.trim().toLowerCase())) return false;
+      return true;
+    });
+  }, [items, typeFilter, overdueOnly, assigneeFilter, searchText]);
 
   function toggleSelectTask(id) {
     setSelectedTaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -400,21 +420,21 @@ export default function Planning() {
 
   const editingTask = editingTaskId ? tasks.find((task) => task.id === editingTaskId) : null;
 
-  const grouped = items.reduce((acc, item) => {
+  const grouped = filteredItems.reduce((acc, item) => {
     (acc[item.date] ||= []).push(item);
     return acc;
   }, {});
   const dates = Object.keys(grouped).sort();
 
   function handleExportCsv(scopeIds) {
-    const source = scopeIds ? items.filter((item) => scopeIds.includes(item.id)) : items;
+    const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
     const headers = ['Date', 'Type', 'Titre', 'En retard'];
     const rows = source.map((item) => [item.date, TYPE_CONFIG[item.type].label, item.title, item.is_overdue ? 'Oui' : 'Non']);
     exportToCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
   }
 
   async function handleExportPdf(scopeIds) {
-    const source = scopeIds ? items.filter((item) => scopeIds.includes(item.id)) : items;
+    const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -448,7 +468,7 @@ export default function Planning() {
           <button
             type="button"
             onClick={() => handleExportCsv()}
-            disabled={items.length === 0}
+            disabled={filteredItems.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
             <Download size={18} />
@@ -457,7 +477,7 @@ export default function Planning() {
           <button
             type="button"
             onClick={() => handleExportPdf()}
-            disabled={exportingPdf || items.length === 0}
+            disabled={exportingPdf || filteredItems.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
@@ -520,9 +540,73 @@ export default function Planning() {
         </div>
       )}
 
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+          <Filter size={16} />
+          Filtres
+        </div>
+
+        <div className="relative mb-3">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            placeholder="Rechercher un titre..."
+            className="w-full rounded-md border border-slate-300 py-2.5 pl-9 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          />
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <label
+            className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+              overdueOnly ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <input type="checkbox" checked={overdueOnly} onChange={() => setOverdueOnly((prev) => !prev)} className="sr-only" />
+            {overdueOnly && <Check size={14} />}
+            En retard uniquement
+          </label>
+
+          {Object.entries(TYPE_CONFIG).map(([type, config]) => {
+            const checked = typeFilter.includes(type);
+            return (
+              <label
+                key={type}
+                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                  checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                }`}
+              >
+                <input type="checkbox" checked={checked} onChange={() => toggleTypeFilter(type)} className="sr-only" />
+                {checked && <Check size={14} />}
+                {config.label}
+              </label>
+            );
+          })}
+        </div>
+
+        {users.length > 0 && (
+          <div className="mt-3">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Assigné (tâches)</label>
+            <select
+              value={assigneeFilter}
+              onChange={(e) => setAssigneeFilter(e.target.value)}
+              className="w-full max-w-xs rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
+            >
+              <option value="">Tous</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+      </div>
+
       {canManage && (
         <SelectAllToggle
-          ids={items.filter((item) => item.type === 'task').map((item) => item.id)}
+          ids={filteredItems.filter((item) => item.type === 'task').map((item) => item.id)}
           selectedIds={selectedTaskIds}
           onChange={setSelectedTaskIds}
         />
