@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Check, Download, Loader2, Pencil, Plus, Send, Trash2, X, XCircle } from 'lucide-react';
+import { Archive, ArrowLeft, Check, Download, Loader2, Pencil, Plus, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -32,7 +32,16 @@ function formatDateTime(dateStr) {
 // Nouvelle version : même principe que la création de procédure (Procedures.jsx) — un seul
 // POST /:id/versions avec le contenu déjà rédigé, il n'existe pas de route pour modifier le
 // contenu d'une version existante après coup (seulement submit/validate/reject).
-function NewVersionModal({ procedureId, procedureTitle, procedureProcess, template, previousContent, onClose, onCreated }) {
+function NewVersionModal({
+  procedureId,
+  procedureTitle,
+  procedureProcess,
+  template,
+  previousContent,
+  rationale,
+  onClose,
+  onCreated,
+}) {
   const [content, setContent] = useState(previousContent || EMPTY_CONTENT);
   const [aiGenerated, setAiGenerated] = useState(false);
   const [error, setError] = useState('');
@@ -79,6 +88,11 @@ function NewVersionModal({ procedureId, procedureTitle, procedureProcess, templa
 
         {error && (
           <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+        {rationale && (
+          <p className="mb-4 rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800">
+            <span className="font-medium">Suggéré depuis le CAPA lié</span> — {rationale}
+          </p>
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -308,6 +322,11 @@ export default function ProcedureDetail() {
   const [actionError, setActionError] = useState('');
   const [actingVersionId, setActingVersionId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [generatingSheet, setGeneratingSheet] = useState(false);
+  const [sheetError, setSheetError] = useState('');
+  const [suggestingRevisionFor, setSuggestingRevisionFor] = useState(null);
+  const [suggestedRevisionContent, setSuggestedRevisionContent] = useState(null);
+  const [suggestedRevisionRationale, setSuggestedRevisionRationale] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
@@ -349,7 +368,15 @@ export default function ProcedureDetail() {
 
   function handleVersionCreated() {
     setIsNewVersionModalOpen(false);
+    setSuggestedRevisionContent(null);
+    setSuggestedRevisionRationale('');
     loadProcedure();
+  }
+
+  function closeNewVersionModal() {
+    setIsNewVersionModalOpen(false);
+    setSuggestedRevisionContent(null);
+    setSuggestedRevisionRationale('');
   }
 
   function handleVersionUpdated() {
@@ -408,6 +435,46 @@ export default function ProcedureDetail() {
       setExportPdfError("Impossible d'exporter cette procédure en PDF.");
     } finally {
       setExportingPdf(false);
+    }
+  }
+
+  async function handleGenerateDistributionSheet() {
+    setSheetError('');
+    setGeneratingSheet(true);
+    try {
+      await api.post(`/procedures/${id}/versions/${currentVersion.id}/distribution-sheet`, {});
+      await loadProcedure();
+    } catch (err) {
+      setSheetError(err.response?.data?.error || 'Impossible de générer la fiche de diffusion.');
+    } finally {
+      setGeneratingSheet(false);
+    }
+  }
+
+  // Fusionne les sections suggérées par l'IA (voir suggest-revision-from-capa) dans le
+  // contenu de la version en vigueur — mêmes clés que la fusion d'un brouillon IA
+  // (handleAiGenerated), mais la source est ici une CAPA liée plutôt qu'une génération libre.
+  function applySuggestedChanges(baseContent, suggestedChanges) {
+    const base = baseContent || EMPTY_CONTENT;
+    const sections = (base.sections || []).map((section) => {
+      const change = suggestedChanges.find((c) => c.section_key === section.key);
+      return change ? { ...section, content: change.suggested_content } : section;
+    });
+    return { ...base, sections };
+  }
+
+  async function handleSuggestRevision(capaId) {
+    setLinksError('');
+    setSuggestingRevisionFor(capaId);
+    try {
+      const { data } = await api.post(`/procedures/${id}/suggest-revision-from-capa`, { capa_id: capaId });
+      setSuggestedRevisionContent(applySuggestedChanges(currentVersion?.content, data.suggested_changes || []));
+      setSuggestedRevisionRationale(data.rationale || '');
+      setIsNewVersionModalOpen(true);
+    } catch (err) {
+      setLinksError(err.response?.data?.error || 'Impossible de générer une suggestion de révision.');
+    } finally {
+      setSuggestingRevisionFor(null);
     }
   }
 
@@ -576,25 +643,58 @@ export default function ProcedureDetail() {
         )}
 
         {procedure.current_version_id && (
-          <div className="mt-4 flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between">
-            {procedure.my_acknowledgment ? (
-              <p className="text-sm text-sky-800">
-                Lu et accusé réception le {formatDateTime(procedure.my_acknowledgment.acknowledged_at)}.
-              </p>
+          <div className="mt-4 rounded-md border border-sky-200 bg-sky-50 p-4">
+            {/* Fiche de diffusion en priorité, quand elle existe : c'est exactement son rôle
+                — un résumé condensé pour quelqu'un qui doit connaître la procédure sans
+                nécessairement la lire en entier, voir generateProcedureDistributionSheet. */}
+            {currentVersion?.distribution_sheet ? (
+              <div className="mb-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-sky-700">Fiche de diffusion</p>
+                <p className="mt-1 text-sm text-sky-900">{currentVersion.distribution_sheet.summary}</p>
+                {currentVersion.distribution_sheet.key_points?.length > 0 && (
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-5 text-sm text-sky-800">
+                    {currentVersion.distribution_sheet.key_points.map((point, i) => (
+                      <li key={i}>{point}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             ) : (
-              <>
-                <p className="text-sm text-sky-800">Merci de confirmer avoir lu la version en vigueur de cette procédure.</p>
-                <button
-                  type="button"
-                  onClick={handleAcknowledge}
-                  disabled={acknowledging}
-                  className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
-                >
-                  <Check size={16} />
-                  {acknowledging ? 'Enregistrement...' : "J'ai lu et compris"}
-                </button>
-              </>
+              canManage && (
+                <div className="mb-3">
+                  <button
+                    type="button"
+                    onClick={handleGenerateDistributionSheet}
+                    disabled={generatingSheet}
+                    className="text-sm font-medium text-sky-700 hover:text-sky-900 disabled:opacity-60"
+                  >
+                    {generatingSheet ? 'Génération...' : 'Générer une fiche de diffusion avec l\'IA'}
+                  </button>
+                  {sheetError && <p className="mt-1 text-sm text-red-600">{sheetError}</p>}
+                </div>
+              )
             )}
+
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              {procedure.my_acknowledgment ? (
+                <p className="text-sm text-sky-800">
+                  Lu et accusé réception le {formatDateTime(procedure.my_acknowledgment.acknowledged_at)}.
+                </p>
+              ) : (
+                <>
+                  <p className="text-sm text-sky-800">Merci de confirmer avoir lu la version en vigueur de cette procédure.</p>
+                  <button
+                    type="button"
+                    onClick={handleAcknowledge}
+                    disabled={acknowledging}
+                    className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+                  >
+                    <Check size={16} />
+                    {acknowledging ? 'Enregistrement...' : "J'ai lu et compris"}
+                  </button>
+                </>
+              )}
+            </div>
           </div>
         )}
         {acknowledgeError && (
@@ -791,15 +891,33 @@ export default function ProcedureDetail() {
                   <span className="text-slate-600">{capa.title}</span>
                   <CapaStatusBadge status={capa.status} />
                 </Link>
-                <button
-                  type="button"
-                  onClick={() => handleUnlinkCapa(capa.id)}
-                  disabled={unlinkingId === capa.id}
-                  aria-label="Retirer ce lien"
-                  className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600 disabled:opacity-50"
-                >
-                  <XCircle size={16} />
-                </button>
+                <div className="flex shrink-0 items-center gap-1">
+                  {!draftVersion && procedure.status !== 'obsolete' && (
+                    <button
+                      type="button"
+                      onClick={() => handleSuggestRevision(capa.id)}
+                      disabled={suggestingRevisionFor === capa.id}
+                      aria-label="Suggérer une révision depuis ce CAPA"
+                      title="Suggérer une révision depuis ce CAPA"
+                      className="rounded-md p-1.5 text-purple-500 hover:bg-purple-50 hover:text-purple-700 disabled:opacity-50"
+                    >
+                      {suggestingRevisionFor === capa.id ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={16} />
+                      )}
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleUnlinkCapa(capa.id)}
+                    disabled={unlinkingId === capa.id}
+                    aria-label="Retirer ce lien"
+                    className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600 disabled:opacity-50"
+                  >
+                    <XCircle size={16} />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -850,8 +968,9 @@ export default function ProcedureDetail() {
           procedureTitle={procedure.title}
           procedureProcess={procedure.process}
           template={template}
-          previousContent={lastRejectedVersion?.content ?? currentVersion?.content}
-          onClose={() => setIsNewVersionModalOpen(false)}
+          previousContent={suggestedRevisionContent ?? lastRejectedVersion?.content ?? currentVersion?.content}
+          rationale={suggestedRevisionRationale}
+          onClose={closeNewVersionModal}
           onCreated={handleVersionCreated}
         />
       )}
