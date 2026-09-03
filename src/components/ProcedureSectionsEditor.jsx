@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Plus, X } from 'lucide-react';
+import { AlertTriangle, Plus, X } from 'lucide-react';
 import AutoTextarea from './AutoTextarea.jsx';
 
 const FIELD_CLASS =
@@ -87,12 +87,26 @@ export default function ProcedureSectionsEditor({ template, content, onChange })
         />
       </div>
 
-      {(content.sections || []).map((section, index) => (
-        <div key={section.key}>
-          <label className="mb-1 block text-sm font-medium text-slate-700">{section.label}</label>
-          <AutoTextarea rows={4} value={section.content || ''} onChange={(e) => updateSectionContent(index, e.target.value)} className={FIELD_CLASS} />
-        </div>
-      ))}
+      {(content.sections || []).map((section, index) => {
+        // Sous-sections dont la génération IA a échoué (voir services/procedureFullDraftJob.js
+        // côté backend) : leur texte "à compléter manuellement" est déjà dans section.content,
+        // mais noyé dans le reste — ce badge le rend visible sans avoir à tout relire.
+        const failedCount = (section.subsections || []).filter((s) => s.generation_status === 'failed').length;
+        return (
+          <div key={section.key}>
+            <div className="mb-1 flex items-center gap-2">
+              <label className="block text-sm font-medium text-slate-700">{section.label}</label>
+              {failedCount > 0 && (
+                <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">
+                  <AlertTriangle size={12} />
+                  {failedCount > 1 ? `${failedCount} passages à compléter` : '1 passage à compléter'}
+                </span>
+              )}
+            </div>
+            <AutoTextarea rows={4} value={section.content || ''} onChange={(e) => updateSectionContent(index, e.target.value)} className={FIELD_CLASS} />
+          </div>
+        );
+      })}
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">Documents associés</label>

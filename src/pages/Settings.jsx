@@ -56,10 +56,14 @@ export default function Settings() {
   // Le callback OAuth Google Drive (backend) redirige vers /settings?drive=connected|error —
   // sans ce cas particulier, l'utilisateur atterrirait sur l'onglet "Entreprise" par défaut et
   // ne verrait jamais la confirmation d'activation ni l'erreur, puisque DriveStorageSettings
-  // ne serait pas monté.
-  const [activeTab, setActiveTab] = useState(() =>
-    new URLSearchParams(window.location.search).has('drive') ? 'documents' : 'company'
-  );
+  // ne serait pas monté. ?tab=<id> est le cas général (ex. lien "Changer" depuis
+  // NewProcedureFullDraftModal.jsx vers l'onglet Procédures) — le cas drive reste prioritaire
+  // puisqu'il pointe toujours vers "documents", jamais un autre onglet.
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('drive')) return 'documents';
+    return params.get('tab') || 'company';
+  });
 
   function loadCurrentUser() {
     api

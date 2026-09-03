@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertTriangle, Cloud, Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { AlertTriangle, Cloud, Download, FileText, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
@@ -10,6 +10,7 @@ import { useTenant } from '../lib/useTenant.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
 import AiFullProcedureDraft from '../components/AiFullProcedureDraft.jsx';
+import NewProcedureFullDraftModal from '../components/NewProcedureFullDraftModal.jsx';
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
@@ -28,13 +29,19 @@ function isReviewOverdue(procedure) {
   return procedure.next_review_date < new Date().toISOString().slice(0, 10);
 }
 
-function NewProcedureModal({ template, qqoqccpId, onClose, onCreated }) {
+// initialTitle/initialContent/initialAiGenerated : préremplissage venu du parcours de
+// génération complète (voir NewProcedureFullDraftModal.jsx) — la génération a déjà eu lieu
+// avant l'ouverture de cette modale, donc on se contente de seeder l'état local une fois, comme
+// pour n'importe quel autre point de départ (gabarit vide, ou déclenché depuis une analyse
+// QQOQCCP via qqoqccpId). Jamais republié automatiquement : reste un brouillon normal tant que
+// "Créer la procédure" n'a pas été soumis.
+function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, initialAiGenerated, onClose, onCreated }) {
   const [number, setNumber] = useState('');
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle || '');
   const [process, setProcess] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
-  const [content, setContent] = useState(EMPTY_CONTENT);
-  const [aiGenerated, setAiGenerated] = useState(false);
+  const [content, setContent] = useState(initialContent || EMPTY_CONTENT);
+  const [aiGenerated, setAiGenerated] = useState(Boolean(initialAiGenerated));
   const [generatingFromQqoqccp, setGeneratingFromQqoqccp] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -219,6 +226,8 @@ export default function Procedures() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(Boolean(qqoqccpId));
+  const [isFullDraftModalOpen, setIsFullDraftModalOpen] = useState(false);
+  const [fullDraftSeed, setFullDraftSeed] = useState(null);
   const [statusFilter, setStatusFilter] = useState('');
   const [processFilter, setProcessFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -270,7 +279,18 @@ export default function Procedures() {
   // procédure" ensuite ne doit pas redéclencher la génération informée par l'analyse.
   function closeModal() {
     setIsModalOpen(false);
+    setFullDraftSeed(null);
     if (qqoqccpId) setSearchParams((prev) => { prev.delete('fromQqoqccp'); return prev; });
+  }
+
+  // Relais entre les deux modales : la génération complète (voir NewProcedureFullDraftModal.jsx)
+  // se termine, on ferme cette modale et on ouvre directement l'éditeur manuel déjà existant,
+  // préempli — jamais de publication automatique, l'utilisateur relit/corrige puis soumet
+  // "Créer la procédure" comme n'importe quel autre brouillon.
+  function handleFullDraftGenerated(subject, content) {
+    setFullDraftSeed({ title: subject, content });
+    setIsFullDraftModalOpen(false);
+    setIsModalOpen(true);
   }
 
   // Colonnes communes aux 4 formats — même principe que Capas.jsx : le frontend envoie
@@ -418,6 +438,14 @@ export default function Procedures() {
             <Plus size={18} />
             Nouvelle procédure
           </button>
+          <button
+            type="button"
+            onClick={() => setIsFullDraftModalOpen(true)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-purple-300 px-4 py-2.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 sm:flex-none"
+          >
+            <FileText size={18} />
+            Nouvelle procédure — génération complète
+          </button>
         </div>
       </div>
 
@@ -543,7 +571,22 @@ export default function Procedures() {
       )}
 
       {isModalOpen && (
-        <NewProcedureModal template={template} qqoqccpId={qqoqccpId} onClose={closeModal} onCreated={handleCreated} />
+        <NewProcedureModal
+          template={template}
+          qqoqccpId={qqoqccpId}
+          initialTitle={fullDraftSeed?.title}
+          initialContent={fullDraftSeed?.content}
+          initialAiGenerated={Boolean(fullDraftSeed)}
+          onClose={closeModal}
+          onCreated={handleCreated}
+        />
+      )}
+      {isFullDraftModalOpen && (
+        <NewProcedureFullDraftModal
+          template={template}
+          onClose={() => setIsFullDraftModalOpen(false)}
+          onGenerated={handleFullDraftGenerated}
+        />
       )}
     </div>
   );
