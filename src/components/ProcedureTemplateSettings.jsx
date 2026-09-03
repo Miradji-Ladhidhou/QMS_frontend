@@ -102,7 +102,8 @@ export default function ProcedureTemplateSettings() {
       <p className="mt-1 text-sm text-slate-500">
         Les sections définies ici s'affichent, dans cet ordre, à la rédaction de chaque procédure. Les
         champs Objet, Domaine d'application et Responsabilités sont toujours présents et n'ont pas besoin
-        d'être ajoutés ici.
+        d'être ajoutés ici. Tant que rien n'a été enregistré, un point de départ minimal est proposé
+        ci-dessous — renommez, complétez ou supprimez-le librement avant de l'enregistrer.
       </p>
 
       {error && (
