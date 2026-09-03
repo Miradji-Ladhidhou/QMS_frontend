@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, X } from 'lucide-react';
+import { AlertTriangle, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -12,6 +12,15 @@ const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '',
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+// Pas de statut "overdue" dédié côté procédures (contrairement aux CAPA, où c'est une vraie
+// valeur de statut recalculée par un job) — juste une date dépassée, calculée ici à
+// l'affichage. Une procédure déjà obsolète n'a plus de revue "en retard" à signaler : elle est
+// retirée de la circulation, pas simplement en attente de révision.
+function isReviewOverdue(procedure) {
+  if (!procedure.next_review_date || procedure.status === 'obsolete') return false;
+  return procedure.next_review_date < new Date().toISOString().slice(0, 10);
 }
 
 function NewProcedureModal({ template, onClose, onCreated }) {
@@ -253,24 +262,32 @@ export default function Procedures() {
       ) : (
         <>
           <div className="mt-4 space-y-3 md:hidden">
-            {procedures.map((procedure) => (
-              <div
-                key={procedure.id}
-                onClick={() => navigate(`/procedures/${procedure.id}`)}
-                className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <p className="font-medium text-slate-900">{procedure.title}</p>
-                    <p className="text-sm text-slate-500">
-                      {procedure.number} · {procedure.process || 'Processus non précisé'}
-                    </p>
+            {procedures.map((procedure) => {
+              const overdue = isReviewOverdue(procedure);
+              return (
+                <div
+                  key={procedure.id}
+                  onClick={() => navigate(`/procedures/${procedure.id}`)}
+                  className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm ${
+                    overdue ? 'border-red-300' : 'border-slate-200'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="font-medium text-slate-900">{procedure.title}</p>
+                      <p className="text-sm text-slate-500">
+                        {procedure.number} · {procedure.process || 'Processus non précisé'}
+                      </p>
+                    </div>
+                    <StatusBadge status={procedure.status} />
                   </div>
-                  <StatusBadge status={procedure.status} />
+                  <p className={`mt-2 flex items-center gap-1 text-sm ${overdue ? 'font-medium text-red-600' : 'text-slate-500'}`}>
+                    {overdue && <AlertTriangle size={14} />}
+                    Prochaine révision : {formatDate(procedure.next_review_date)}
+                  </p>
                 </div>
-                <p className="mt-2 text-sm text-slate-500">Prochaine révision : {formatDate(procedure.next_review_date)}</p>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
@@ -286,22 +303,30 @@ export default function Procedures() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {procedures.map((procedure) => (
-                  <tr
-                    key={procedure.id}
-                    onClick={() => navigate(`/procedures/${procedure.id}`)}
-                    className="cursor-pointer hover:bg-slate-50"
-                  >
-                    <td className="px-4 py-3 font-medium text-slate-800">{procedure.number}</td>
-                    <td className="px-4 py-3 text-slate-700">{procedure.title}</td>
-                    <td className="px-4 py-3 text-slate-600">{procedure.process || '—'}</td>
-                    <td className="px-4 py-3 text-slate-600">{procedure.current_version?.version || '—'}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={procedure.status} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{formatDate(procedure.next_review_date)}</td>
-                  </tr>
-                ))}
+                {procedures.map((procedure) => {
+                  const overdue = isReviewOverdue(procedure);
+                  return (
+                    <tr
+                      key={procedure.id}
+                      onClick={() => navigate(`/procedures/${procedure.id}`)}
+                      className={`cursor-pointer hover:bg-slate-50 ${overdue ? 'bg-red-50/50' : ''}`}
+                    >
+                      <td className="px-4 py-3 font-medium text-slate-800">{procedure.number}</td>
+                      <td className="px-4 py-3 text-slate-700">{procedure.title}</td>
+                      <td className="px-4 py-3 text-slate-600">{procedure.process || '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{procedure.current_version?.version || '—'}</td>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={procedure.status} />
+                      </td>
+                      <td className={`px-4 py-3 ${overdue ? 'font-medium text-red-600' : 'text-slate-600'}`}>
+                        <span className="flex items-center gap-1">
+                          {overdue && <AlertTriangle size={14} />}
+                          {formatDate(procedure.next_review_date)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

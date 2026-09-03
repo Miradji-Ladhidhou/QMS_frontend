@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Check, Pencil, Plus, Send, X, XCircle } from 'lucide-react';
+import { Archive, ArrowLeft, Check, Pencil, Plus, Send, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -305,6 +305,8 @@ export default function ProcedureDetail() {
   const [acknowledgeError, setAcknowledgeError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actingVersionId, setActingVersionId] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
 
   async function loadProcedure() {
     setLoading(true);
@@ -389,6 +391,20 @@ export default function ProcedureDetail() {
     await loadProcedure();
   }
 
+  async function handleDelete() {
+    if (!window.confirm(`Supprimer définitivement la procédure "${procedure.title}" ? Cette action est irréversible.`)) return;
+
+    setDeleteError('');
+    setDeleting(true);
+    try {
+      await api.delete(`/procedures/${id}`);
+      navigate('/procedures');
+    } catch (err) {
+      setDeleteError(err.response?.data?.error || 'Impossible de supprimer cette procédure.');
+      setDeleting(false);
+    }
+  }
+
   async function handleLinkCapa(capa) {
     await api.post(`/procedures/${id}/link-capa`, { capa_id: capa.id });
     setIsLinkCapaModalOpen(false);
@@ -450,6 +466,14 @@ export default function ProcedureDetail() {
   // approuvée — pour que "Nouvelle version" reprenne le travail déjà fait, pas seulement le
   // motif du rejet déjà affiché dans l'historique.
   const lastRejectedVersion = versions.find((v) => v.status === 'rejected');
+  // Suppression réelle réservée aux procédures jamais soumises (voir DELETE /:id côté
+  // backend) — auteur ou admin uniquement, jamais manager : contrairement à
+  // valider/rejeter/obsolète, ce n'est pas une décision qualité mais une correction d'erreur
+  // de saisie.
+  const canDelete =
+    currentUser &&
+    (currentUser.role === 'admin' || procedure.created_by === currentUser.id) &&
+    versions.every((v) => v.status === 'draft');
   const canActOnDraft = draftVersion && currentUser && (canManage || draftVersion.author_id === currentUser.id);
 
   return (
@@ -497,6 +521,17 @@ export default function ProcedureDetail() {
                 Marquer comme obsolète
               </button>
             )}
+            {canDelete && (
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-2 rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {deleting ? 'Suppression...' : 'Supprimer'}
+              </button>
+            )}
           </div>
         </div>
 
@@ -535,6 +570,9 @@ export default function ProcedureDetail() {
         )}
         {acknowledgeError && (
           <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{acknowledgeError}</p>
+        )}
+        {deleteError && (
+          <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
         )}
         {actionError && (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{actionError}</p>
