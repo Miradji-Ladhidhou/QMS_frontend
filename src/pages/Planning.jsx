@@ -10,6 +10,7 @@ import {
   Circle,
   ClipboardCheck,
   ClipboardList,
+  Cloud,
   Download,
   Filter,
   FileText,
@@ -28,9 +29,10 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
@@ -602,6 +604,7 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
 
 export default function Planning() {
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const role = currentUser?.role;
   const canFilterByService = role === 'admin' || role === 'manager';
   const canManage = isManagerRole(role);
@@ -620,6 +623,8 @@ export default function Planning() {
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -865,6 +870,21 @@ export default function Planning() {
     }
   }
 
+  async function handleExportDrive(scopeIds) {
+    setExportingDrive(true);
+    setExportPdfError('');
+    setDriveSuccess('');
+    try {
+      const { columns, rows, subtitle } = buildTablePayload(scopeIds);
+      await exportToDrive('PLANNING', 'Planning', columns, rows, { subtitle, generatedBy: currentUser?.full_name });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -897,6 +917,17 @@ export default function Planning() {
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter Excel
           </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={() => handleExportDrive()}
+              disabled={exportingDrive || filteredItems.length === 0}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsNewModalOpen(true)}
@@ -916,6 +947,9 @@ export default function Planning() {
       )}
       {exportPdfError && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {canFilterByService && (
@@ -1058,6 +1092,8 @@ export default function Planning() {
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedTaskIds)}
           exportingXlsx={exportingXlsx}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedTaskIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDeleteTasks}
           onClear={() => setSelectedTaskIds([])}
         />

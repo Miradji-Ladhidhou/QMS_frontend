@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, Plus, X } from 'lucide-react';
+import { Cloud, Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SUPPLIER_STATUS_LABELS } from '../lib/supplierStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
@@ -218,6 +219,7 @@ function NewSupplierModal({ services, categories, onClose, onCreated }) {
 export default function Suppliers() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [suppliers, setSuppliers] = useState([]);
   const [services, setServices] = useState([]);
@@ -228,6 +230,8 @@ export default function Suppliers() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -377,6 +381,41 @@ export default function Suppliers() {
     }
   }
 
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
+    setExportingDrive(true);
+    setExportPdfError('');
+    setDriveSuccess('');
+    try {
+      const columns = [
+        { key: 'name', label: 'Nom' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'criticality', label: 'Criticité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'contact', label: 'Contact' },
+        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
+      ];
+      const rows = source.map((supplier) => ({
+        name: supplier.name,
+        category: supplier.category || '',
+        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
+        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
+        contact: supplier.contact_name || '',
+        next_evaluation_date: formatDate(supplier.next_evaluation_date),
+      }));
+      const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
+      await exportToDrive('FOURN', 'Évaluation fournisseurs', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -409,6 +448,17 @@ export default function Suppliers() {
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter Excel
           </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={() => handleExportDrive()}
+              disabled={exportingDrive || suppliers.length === 0}
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
           {canManage && (
             <button
               type="button"
@@ -462,6 +512,8 @@ export default function Suppliers() {
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
@@ -472,6 +524,9 @@ export default function Suppliers() {
       )}
       {exportPdfError && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {loading ? (

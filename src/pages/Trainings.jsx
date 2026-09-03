@@ -4,6 +4,7 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
+  Cloud,
   Download,
   FileSignature,
   Grid3x3,
@@ -17,9 +18,10 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SortSelect from '../components/SortSelect.jsx';
@@ -873,6 +875,7 @@ function ExcludePersonModal({ users, employees, onClose, onExcluded }) {
 
 export default function Trainings() {
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [trainings, setTrainings] = useState([]);
   const [users, setUsers] = useState([]);
@@ -888,6 +891,8 @@ export default function Trainings() {
   const [expandedId, setExpandedId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [isExcludeModalOpen, setIsExcludeModalOpen] = useState(false);
   const [certificateDownloadingId, setCertificateDownloadingId] = useState(null);
@@ -1133,6 +1138,40 @@ export default function Trainings() {
     }
   }
 
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
+    setExportingDrive(true);
+    setExportPdfError('');
+    setDriveSuccess('');
+    try {
+      const columns = [
+        { key: 'training', label: 'Formation' },
+        { key: 'type', label: 'Type' },
+        { key: 'person', label: 'Personne' },
+        { key: 'status', label: 'Statut' },
+        { key: 'completed_at', label: 'Réalisation' },
+      ];
+      const rows = source.flatMap((training) =>
+        training.records.map((record) => ({
+          training: training.title,
+          type: training.type || '',
+          person: personName(record),
+          status: record.employee_id ? 'Sans compte' : 'Compte',
+          completed_at: formatDate(record.completed_at),
+        }))
+      );
+      await exportToDrive('FORM', 'Formations', columns, rows, {
+        subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   const hasAnyRecord = trainings.some((training) => training.records.length > 0);
 
   const { sorted: sortedTrainings, sortKey, direction, setSortKey, toggleSort } = useSort(
@@ -1176,6 +1215,17 @@ export default function Trainings() {
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter Excel
           </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={() => handleExportDrive()}
+              disabled={exportingDrive || !hasAnyRecord}
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
           <Link
             to="/trainings/matrix"
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -1221,6 +1271,8 @@ export default function Trainings() {
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
@@ -1275,6 +1327,9 @@ export default function Trainings() {
       )}
       {exportPdfError && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {loading ? (

@@ -14,17 +14,25 @@ function triggerBlobDownload(blob, filename) {
   URL.revokeObjectURL(url);
 }
 
-// Miroir de exportToCsv (csvExport.js) mais le PDF est généré côté serveur (pdfkit, voir
-// backend/src/routes/reports.js) pour l'en-tête logo/entreprise, qu'un navigateur ne peut pas
-// produire seul sans dépendance supplémentaire. columns : [{ key, label, width? }], width en
-// fraction de la largeur de page (0-1), fournie pour toutes les colonnes ou aucune.
-export async function exportToPdf(filename, title, columns, rows, { subtitle, generatedBy } = {}) {
+// Génère le PDF (pdfkit côté serveur, voir backend/src/routes/reports.js) sans le télécharger —
+// factorisé entre exportToPdf (téléchargement) et exportToDrive (upload comme document) pour ne
+// jamais appeler /table-pdf deux fois pour le même export.
+async function fetchPdfBlob(title, columns, rows, { subtitle, generatedBy } = {}) {
   const response = await api.post(
     '/reports/table-pdf',
     { title, subtitle, generatedBy, columns, rows },
     { responseType: 'blob' }
   );
-  triggerBlobDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
+  return new Blob([response.data], { type: 'application/pdf' });
+}
+
+// Miroir de exportToCsv (csvExport.js) mais le PDF est généré côté serveur (pdfkit, voir
+// backend/src/routes/reports.js) pour l'en-tête logo/entreprise, qu'un navigateur ne peut pas
+// produire seul sans dépendance supplémentaire. columns : [{ key, label, width? }], width en
+// fraction de la largeur de page (0-1), fournie pour toutes les colonnes ou aucune.
+export async function exportToPdf(filename, title, columns, rows, options = {}) {
+  const blob = await fetchPdfBlob(title, columns, rows, options);
+  triggerBlobDownload(blob, filename);
 }
 
 // Même principe qu'exportToPdf, mais produit un vrai classeur Excel (en-têtes figés au
@@ -40,6 +48,33 @@ export async function exportToXlsx(filename, title, columns, rows, { subtitle, g
     new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
     filename
   );
+}
+
+// yyyyMMddHHmmss — évite toute collision avec la numérotation manuelle des documents existants
+// (ex. "QP-001") sans avoir besoin d'interroger la base pour un numéro "propre".
+function buildExportDocumentNumber(moduleCode) {
+  const stamp = new Date().toISOString().replace(/[-:TZ]/g, '').slice(0, 14);
+  return `EXPORT-${moduleCode}-${stamp}`;
+}
+
+// Enregistre l'export PDF comme un vrai document — même principe que la page Documents : POST
+// /api/documents route déjà tout seul vers Google Drive ou Supabase selon le réglage du tenant
+// (resolveTenantStorageProvider, backend/src/routes/documents.js), sans qu'aucun code ici n'ait
+// à connaître lequel. Pas de category_id fourni volontairement (voir le plan : forcer un choix
+// de catégorie casserait le geste "un seul bouton", et pré-provisionner une catégorie par module
+// se heurterait à POST /api/categories réservé aux admins) — le document atterrit à la racine,
+// reclassable ensuite comme n'importe quel document depuis sa propre page.
+export async function exportToDrive(moduleCode, title, columns, rows, { subtitle, generatedBy } = {}) {
+  const blob = await fetchPdfBlob(title, columns, rows, { subtitle, generatedBy });
+
+  const form = new FormData();
+  form.append('file', blob, `${title}.pdf`);
+  form.append('number', buildExportDocumentNumber(moduleCode));
+  form.append('title', title);
+  if (subtitle) form.append('description', subtitle);
+
+  const { data } = await api.post('/documents', form);
+  return data;
 }
 
 // POST générique pour les exports PDF non tabulaires (fiche de participation, certificat...) —

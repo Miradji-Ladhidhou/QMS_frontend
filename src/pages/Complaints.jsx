@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, Plus, X } from 'lucide-react';
+import { Cloud, Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
@@ -254,6 +255,7 @@ function NewComplaintModal({ users, services, categories, onClose, onCreated }) 
 export default function Complaints() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
@@ -265,6 +267,8 @@ export default function Complaints() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -417,6 +421,41 @@ export default function Complaints() {
     }
   }
 
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
+    setExportingDrive(true);
+    setExportPdfError('');
+    setDriveSuccess('');
+    try {
+      const columns = [
+        { key: 'customer_name', label: 'Client' },
+        { key: 'description', label: 'Description' },
+        { key: 'severity', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'due_date', label: 'Échéance' },
+        { key: 'assigned', label: 'Assigné' },
+      ];
+      const rows = source.map((complaint) => ({
+        customer_name: complaint.customer_name,
+        description: complaint.description || '',
+        severity: CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
+        status: COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
+        due_date: formatDate(complaint.due_date),
+        assigned: complaint.assigned?.full_name || '',
+      }));
+      const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
+      await exportToDrive('RECLAM', 'Réclamations clients', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -449,6 +488,17 @@ export default function Complaints() {
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter Excel
           </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={() => handleExportDrive()}
+              disabled={exportingDrive || complaints.length === 0}
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
@@ -500,6 +550,8 @@ export default function Complaints() {
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
@@ -510,6 +562,9 @@ export default function Complaints() {
       )}
       {exportPdfError && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {loading ? (

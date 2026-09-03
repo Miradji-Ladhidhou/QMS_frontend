@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardCheck, Download, Loader2, Plus, X } from 'lucide-react';
+import { ClipboardCheck, Cloud, Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { PLAN_STATUS_LABELS } from '../lib/haccpStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
@@ -180,6 +181,7 @@ function NewPlanModal({ services, categories, onClose, onCreated }) {
 export default function Haccp() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [plans, setPlans] = useState([]);
   const [services, setServices] = useState([]);
@@ -190,6 +192,8 @@ export default function Haccp() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [exportingAuditPdf, setExportingAuditPdf] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -331,6 +335,37 @@ export default function Haccp() {
     }
   }
 
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? plans.filter((plan) => scopeIds.includes(plan.id)) : plans;
+    setExportingDrive(true);
+    setExportPdfError('');
+    setDriveSuccess('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'status', label: 'Statut' },
+        { key: 'service', label: 'Service' },
+        { key: 'created_at', label: 'Créé le' },
+      ];
+      const rows = source.map((plan) => ({
+        title: plan.title,
+        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
+        service: plan.service?.name || '',
+        created_at: formatDate(plan.created_at),
+      }));
+      const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
+      await exportToDrive('HACCP', 'Plans HACCP', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   // Distinct de handleExportPdf ci-dessus (qui ne liste que titre/statut/service) : celui-ci
   // génère le rapport d'audit détaillé (étapes, dangers, CCP, synthèse de surveillance) via
   // POST /haccp/plans/pdf — la même route que le bouton "Exporter en PDF" de HaccpDetail.jsx
@@ -383,6 +418,17 @@ export default function Haccp() {
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter Excel
           </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={() => handleExportDrive()}
+              disabled={exportingDrive || plans.length === 0}
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleExportAuditPdf(selectedIds.length > 0 ? selectedIds : undefined)}
@@ -409,6 +455,9 @@ export default function Haccp() {
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       {exportPdfError && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -445,6 +494,8 @@ export default function Haccp() {
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

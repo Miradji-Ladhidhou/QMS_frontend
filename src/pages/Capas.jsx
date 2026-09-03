@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { ChevronRight, Cloud, Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
@@ -467,6 +468,7 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
 export default function Capas() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [capas, setCapas] = useState([]);
   const [users, setUsers] = useState([]);
@@ -481,6 +483,8 @@ export default function Capas() {
   const [updatingId, setUpdatingId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -662,6 +666,37 @@ export default function Capas() {
     }
   }
 
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
+    setExportingDrive(true);
+    setExportPdfError('');
+    setDriveSuccess('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro' },
+        { key: 'title', label: 'Objet' },
+        { key: 'priority', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'due_date', label: 'Échéance' },
+        { key: 'assigned', label: 'Responsable' },
+      ];
+      const rows = source.map((capa) => ({
+        number: capa.number,
+        title: capa.title,
+        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
+        due_date: formatDate(capa.due_date),
+        assigned: capa.assigned?.full_name || '',
+      }));
+      await exportToDrive('CAPA', 'CAPA', columns, rows, { subtitle: `${source.length} CAPA`, generatedBy: currentUser?.full_name });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   function handleCreated(newCapa) {
     setCapas((prev) => [newCapa, ...prev]);
     setIsModalOpen(false);
@@ -719,6 +754,17 @@ export default function Capas() {
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter Excel
           </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={() => handleExportDrive()}
+              disabled={exportingDrive || capas.length === 0}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setIsChoiceModalOpen(true)}
@@ -761,6 +807,8 @@ export default function Capas() {
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
@@ -771,6 +819,9 @@ export default function Capas() {
       )}
       {exportPdfError && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {loading ? (

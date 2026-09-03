@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { Cloud, Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import {
   RISK_TYPE_LABELS,
   RISK_STATUS_LABELS,
@@ -13,7 +14,7 @@ import {
   RISK_LEVEL_CELL_STYLES,
 } from '../lib/riskStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
@@ -377,6 +378,7 @@ function AnalyzeServiceModal({ services, onClose, onAdded }) {
 export default function Risks() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [risks, setRisks] = useState([]);
   const [users, setUsers] = useState([]);
@@ -390,6 +392,8 @@ export default function Risks() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -557,6 +561,45 @@ export default function Risks() {
     }
   }
 
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
+    setExportingDrive(true);
+    setExportPdfError('');
+    setDriveSuccess('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'type', label: 'Type' },
+        { key: 'status', label: 'Statut' },
+        { key: 'score', label: 'Score' },
+        { key: 'owner', label: 'Responsable' },
+        { key: 'review_date', label: 'Revue' },
+      ];
+      const rows = source.map((risk) => ({
+        title: risk.title,
+        type: RISK_TYPE_LABELS[risk.type] || risk.type,
+        status: RISK_STATUS_LABELS[risk.status] || risk.status,
+        score: risk.risk_score ?? '',
+        owner: risk.owner_user?.full_name || '',
+        review_date: formatDate(risk.review_date),
+      }));
+      const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
+      if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
+      await exportToDrive('RISQUE', 'Registre des risques', columns, rows, {
+        subtitle: [countLabel, ...filterParts].join(' · '),
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -589,6 +632,17 @@ export default function Risks() {
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter Excel
           </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={() => handleExportDrive()}
+              disabled={exportingDrive || risks.length === 0}
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
           {canManage && (
             <button
               type="button"
@@ -617,6 +671,9 @@ export default function Risks() {
       )}
       {exportPdfError && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {!loading && risks.length > 0 && (
@@ -685,6 +742,8 @@ export default function Risks() {
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

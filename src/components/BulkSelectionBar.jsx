@@ -1,4 +1,4 @@
-import { Download, FolderInput, Loader2, Trash2, X } from 'lucide-react';
+import { Cloud, Download, FolderInput, Loader2, Trash2, X } from 'lucide-react';
 
 // Barre partagée par toutes les listes qui supportent des actions en masse. N'apparaît que si
 // au moins un élément est coché. Chaque action (déplacer, exporter, supprimer) est optionnelle
@@ -12,6 +12,8 @@ export default function BulkSelectionBar({
   exportingPdf,
   onExportXlsx,
   exportingXlsx,
+  onExportDrive,
+  exportingDrive,
   onDelete,
   onClear,
 }) {
@@ -63,6 +65,17 @@ export default function BulkSelectionBar({
           >
             {exportingXlsx ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             Exporter Excel
+          </button>
+        )}
+        {onExportDrive && (
+          <button
+            type="button"
+            onClick={onExportDrive}
+            disabled={exportingDrive}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingDrive ? <Loader2 size={16} className="animate-spin" /> : <Cloud size={16} />}
+            Enregistrer sur Drive
           </button>
         )}
         {onDelete && (
