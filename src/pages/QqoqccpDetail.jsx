@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, Loader2, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, FileCheck, Loader2, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -490,6 +490,22 @@ export default function QqoqccpDetail() {
     );
   }
 
+  // Toujours proposé, indépendamment de la CAPA (les deux peuvent naître de la même analyse) —
+  // navigue vers la liste des procédures, qui ouvre automatiquement le formulaire de création
+  // avec un brouillon généré par l'IA à partir de cette analyse (voir Procedures.jsx).
+  function renderProcedureAction() {
+    return (
+      <button
+        type="button"
+        onClick={() => navigate(`/procedures?fromQqoqccp=${analysis.id}`)}
+        className="mt-2 flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+      >
+        <FileCheck size={18} />
+        Créer une procédure depuis cette analyse
+      </button>
+    );
+  }
+
   if (loading) {
     return <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
@@ -659,6 +675,7 @@ export default function QqoqccpDetail() {
       {/* Sous les 7 questions quand pas encore de proposition IA (voir l'autre occurrence
           sous le résultat IA plus bas). */}
       {!hasSuggestion && renderCapaAction()}
+      {!hasSuggestion && renderProcedureAction()}
 
       {hasSuggestion && (
         <div className="mt-6 rounded-xl border-2 border-dashed border-purple-300 bg-purple-50/40 p-5">
@@ -703,6 +720,7 @@ export default function QqoqccpDetail() {
       )}
 
       {hasSuggestion && renderCapaAction()}
+      {hasSuggestion && renderProcedureAction()}
 
       {showCapaForm && capaForm && (
         <CapaAdjustmentForm

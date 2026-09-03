@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Cloud, Download, Loader2, Plus, X } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { AlertTriangle, Cloud, Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
@@ -27,13 +27,14 @@ function isReviewOverdue(procedure) {
   return procedure.next_review_date < new Date().toISOString().slice(0, 10);
 }
 
-function NewProcedureModal({ template, onClose, onCreated }) {
+function NewProcedureModal({ template, qqoqccpId, onClose, onCreated }) {
   const [number, setNumber] = useState('');
   const [title, setTitle] = useState('');
   const [process, setProcess] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
   const [content, setContent] = useState(EMPTY_CONTENT);
   const [aiGenerated, setAiGenerated] = useState(false);
+  const [generatingFromQqoqccp, setGeneratingFromQqoqccp] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -52,6 +53,28 @@ function NewProcedureModal({ template, onClose, onCreated }) {
     }));
     setAiGenerated(true);
   }
+
+  // Déclenché automatiquement à l'ouverture quand la procédure naît d'une analyse QQOQCCP
+  // (voir QqoqccpDetail.jsx) : préremplit le titre depuis l'analyse elle-même (pas besoin que
+  // l'IA en invente un) et le contenu depuis un brouillon informé par le diagnostic complet.
+  async function generateFromQqoqccp() {
+    setError('');
+    setGeneratingFromQqoqccp(true);
+    try {
+      const { data } = await api.post('/procedures/generate-draft-from-qqoqccp', { qqoqccp_id: qqoqccpId });
+      if (data.title) setTitle(data.title);
+      handleAiGenerated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de générer un brouillon depuis cette analyse.');
+    } finally {
+      setGeneratingFromQqoqccp(false);
+    }
+  }
+
+  useEffect(() => {
+    if (qqoqccpId) generateFromQqoqccp();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [qqoqccpId]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -142,7 +165,29 @@ function NewProcedureModal({ template, onClose, onCreated }) {
             />
           </div>
 
-          <AiProcedureDraft title={title} process={process} onGenerated={handleAiGenerated} />
+          {qqoqccpId ? (
+            <div>
+              <button
+                type="button"
+                onClick={generateFromQqoqccp}
+                disabled={generatingFromQqoqccp}
+                className="flex items-center gap-2 rounded-md border border-purple-300 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
+              >
+                {generatingFromQqoqccp ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Sparkles size={16} />
+                )}
+                {generatingFromQqoqccp
+                  ? 'Génération depuis l\'analyse en cours...'
+                  : aiGenerated
+                    ? 'Régénérer depuis l\'analyse QQOQCCP'
+                    : 'Générer depuis l\'analyse QQOQCCP'}
+              </button>
+            </div>
+          ) : (
+            <AiProcedureDraft title={title} process={process} onGenerated={handleAiGenerated} />
+          )}
 
           <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
 
@@ -161,13 +206,15 @@ function NewProcedureModal({ template, onClose, onCreated }) {
 
 export default function Procedures() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const qqoqccpId = searchParams.get('fromQqoqccp');
   const currentUser = useCurrentUser();
   const tenant = useTenant();
   const [procedures, setProcedures] = useState([]);
   const [template, setTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(Boolean(qqoqccpId));
   const [statusFilter, setStatusFilter] = useState('');
   const [processFilter, setProcessFilter] = useState('');
   const [search, setSearch] = useState('');
@@ -213,6 +260,13 @@ export default function Procedures() {
   function handleCreated(procedure) {
     setIsModalOpen(false);
     navigate(`/procedures/${procedure.id}`);
+  }
+
+  // Efface fromQqoqccp de l'URL à la fermeture (annulée ou créée) : rouvrir "Nouvelle
+  // procédure" ensuite ne doit pas redéclencher la génération informée par l'analyse.
+  function closeModal() {
+    setIsModalOpen(false);
+    if (qqoqccpId) setSearchParams((prev) => { prev.delete('fromQqoqccp'); return prev; });
   }
 
   // Colonnes communes aux 4 formats — même principe que Capas.jsx : le frontend envoie
@@ -485,7 +539,7 @@ export default function Procedures() {
       )}
 
       {isModalOpen && (
-        <NewProcedureModal template={template} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewProcedureModal template={template} qqoqccpId={qqoqccpId} onClose={closeModal} onCreated={handleCreated} />
       )}
     </div>
   );
