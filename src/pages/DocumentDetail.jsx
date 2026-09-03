@@ -7,6 +7,7 @@ import {
   ChevronDown,
   ChevronUp,
   Download,
+  Eye,
   Lock,
   Pencil,
   Send,
@@ -23,6 +24,7 @@ import CategoryBadge from '../components/CategoryBadge.jsx';
 import ApprovalStatusBadge from '../components/ApprovalStatusBadge.jsx';
 import DecisionModal from '../components/DecisionModal.jsx';
 import SubmitForApprovalModal from '../components/SubmitForApprovalModal.jsx';
+import DocumentPreviewModal from '../components/DocumentPreviewModal.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
@@ -52,6 +54,14 @@ function formatDate(dateStr) {
 function formatDateTime(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleString('fr-FR');
+}
+
+// Décide seulement d'afficher ou non le bouton "Aperçu" — la vraie vérification (et l'URL) se
+// fait côté serveur via GET /:id/preview-url, seul juge final.
+const PREVIEWABLE_EXTENSIONS = new Set(['pdf', 'png', 'jpg', 'jpeg', 'gif', 'webp']);
+function isPreviewableFileName(fileName) {
+  const match = /\.([a-z0-9]+)$/i.exec(fileName || '');
+  return match ? PREVIEWABLE_EXTENSIONS.has(match[1].toLowerCase()) : false;
 }
 
 function NewVersionModal({ documentId, onClose, onUploaded }) {
@@ -331,6 +341,7 @@ export default function DocumentDetail() {
   const [deleteError, setDeleteError] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [downloadingKey, setDownloadingKey] = useState(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
   async function loadDocument() {
     setLoading(true);
@@ -540,6 +551,16 @@ export default function DocumentDetail() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            {doc.file_path && isPreviewableFileName(doc.file_name) && (
+              <button
+                type="button"
+                onClick={() => setIsPreviewOpen(true)}
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <Eye size={16} />
+                Aperçu
+              </button>
+            )}
             {doc.file_path && (
               <button
                 type="button"
@@ -803,6 +824,15 @@ export default function DocumentDetail() {
           decision={decisionModal}
           onClose={() => setDecisionModal(null)}
           onDecided={handleDecided}
+        />
+      )}
+
+      {isPreviewOpen && (
+        <DocumentPreviewModal
+          documentId={doc.id}
+          fileName={doc.file_name}
+          title={doc.title}
+          onClose={() => setIsPreviewOpen(false)}
         />
       )}
     </div>
