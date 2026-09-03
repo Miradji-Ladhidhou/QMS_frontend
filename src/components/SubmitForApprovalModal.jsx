@@ -2,7 +2,13 @@ import { useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../lib/api.js';
 
+const APPROVER_BASELINE_ROLES = ['admin', 'manager'];
+
 export default function SubmitForApprovalModal({ documentId, users, onClose, onSubmitted }) {
+  // Ne propose que les admins/managers : seuls ces rôles sont habilités par défaut à approuver
+  // (voir isQualifiedApprover côté backend, seul juge final — un member avec un accès can_approve
+  // explicite sur une catégorie restreinte reste choisissable, juste pas listé ici).
+  const eligibleUsers = users.filter((user) => APPROVER_BASELINE_ROLES.includes(user.role));
   const [selectedIds, setSelectedIds] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -53,11 +59,12 @@ export default function SubmitForApprovalModal({ documentId, users, onClose, onS
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <p className="mb-2 text-sm font-medium text-slate-700">Approbateurs requis</p>
-            {users.length === 0 ? (
-              <p className="text-sm text-slate-500">Aucun autre utilisateur dans l'entreprise.</p>
+            <p className="mb-2 text-xs text-slate-500">Seuls les admins/managers peuvent être désignés comme approbateurs.</p>
+            {eligibleUsers.length === 0 ? (
+              <p className="text-sm text-slate-500">Aucun admin/manager disponible.</p>
             ) : (
               <ul className="max-h-64 space-y-1 overflow-y-auto overflow-x-hidden rounded-md border border-slate-200 p-2">
-                {users.map((user) => (
+                {eligibleUsers.map((user) => (
                   <li key={user.id}>
                     <label className="flex items-center gap-2 rounded-md px-2 py-2 text-sm hover:bg-slate-50">
                       <input
