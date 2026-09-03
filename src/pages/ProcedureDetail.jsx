@@ -15,6 +15,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import LinkItemModal from '../components/LinkItemModal.jsx';
+import ProcedureAttachment from '../components/ProcedureAttachment.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
 
@@ -613,6 +614,11 @@ export default function ProcedureDetail() {
       {currentVersion && (
         <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
           <h2 className="text-sm font-semibold text-slate-900">Version en vigueur — v{currentVersion.version}</h2>
+          {currentVersion.attachment_file_name && (
+            <div className="mt-3">
+              <ProcedureAttachment procedureId={procedure.id} version={currentVersion} editable={false} />
+            </div>
+          )}
           <div className="mt-3 space-y-3 text-sm text-slate-700">
             {currentVersion.content?.objet && (
               <div>
@@ -661,6 +667,15 @@ export default function ProcedureDetail() {
 
           <div className="mt-3">
             <ProcedureComplianceCheck procedureId={procedure.id} versionId={draftVersion.id} />
+          </div>
+
+          <div className="mt-3">
+            <ProcedureAttachment
+              procedureId={procedure.id}
+              version={draftVersion}
+              editable={canActOnDraft}
+              onChanged={loadProcedure}
+            />
           </div>
 
           {canActOnDraft && (
