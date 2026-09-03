@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
+import { postForWordDownload } from '../lib/pdfExport.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ProcedureVersionStatusBadge from '../components/ProcedureVersionStatusBadge.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
@@ -329,6 +330,8 @@ export default function ProcedureDetail() {
   const [actionError, setActionError] = useState('');
   const [actingVersionId, setActingVersionId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportWordError, setExportWordError] = useState('');
   const [generatingSheet, setGeneratingSheet] = useState(false);
   const [sheetError, setSheetError] = useState('');
   const [suggestingRevisionFor, setSuggestingRevisionFor] = useState(null);
@@ -442,6 +445,28 @@ export default function ProcedureDetail() {
       setExportPdfError("Impossible d'exporter cette procédure en PDF.");
     } finally {
       setExportingPdf(false);
+    }
+  }
+
+  // Même repli que le backend pour choisir la version à exporter en l'absence de version
+  // courante (voir routes/procedures.js#/:id/pdf) : la plus récente, quel que soit son statut —
+  // contrairement à la fiche de diffusion, l'export Word est justement pensé pour un brouillon
+  // "presque prêt", pas seulement une version déjà approuvée.
+  async function handleExportWord() {
+    const versionToExport = currentVersion || versions[0];
+    if (!versionToExport) return;
+    setExportWordError('');
+    setExportingWord(true);
+    try {
+      await postForWordDownload(
+        `/procedures/${id}/versions/${versionToExport.id}/export-word`,
+        {},
+        `${procedure.number}.docx`
+      );
+    } catch {
+      setExportWordError('Impossible d\'exporter cette procédure en Word.');
+    } finally {
+      setExportingWord(false);
     }
   }
 
@@ -604,6 +629,15 @@ export default function ProcedureDetail() {
               {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               Exporter PDF
             </button>
+            <button
+              type="button"
+              onClick={handleExportWord}
+              disabled={exportingWord || !(currentVersion || versions[0])}
+              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {exportingWord ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Exporter Word
+            </button>
             {!draftVersion && procedure.status !== 'obsolete' && (
               <button
                 type="button"
@@ -709,6 +743,9 @@ export default function ProcedureDetail() {
         )}
         {exportPdfError && (
           <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
+        )}
+        {exportWordError && (
+          <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportWordError}</p>
         )}
         {deleteError && (
           <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>

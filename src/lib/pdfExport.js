@@ -90,3 +90,14 @@ export async function getPdfDownload(url, filename) {
   const response = await api.get(url, { responseType: 'blob' });
   triggerBlobDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
 }
+
+// POST pour un export Word (.docx) — même geste que postForPdfDownload, mais un .docx ne
+// s'affiche pas dans un onglet comme un PDF : toujours un téléchargement direct, jamais
+// openBlankTab (voir services/procedureWord.js côté backend pour le rendu lui-même).
+export async function postForWordDownload(url, body, filename) {
+  const response = await api.post(url, body, { responseType: 'blob' });
+  triggerBlobDownload(
+    new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
+    filename
+  );
+}
