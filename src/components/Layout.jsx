@@ -7,6 +7,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   Contact,
+  FileCheck,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -90,6 +91,7 @@ export const NAV_ITEMS = [
   { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer },
   { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
   { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
+  { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit

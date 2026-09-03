@@ -9,6 +9,7 @@ import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
 import DriveStorageSettings from '../components/DriveStorageSettings.jsx';
 import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
 import ModuleCategoriesSettings from '../components/ModuleCategoriesSettings.jsx';
+import ProcedureTemplateSettings from '../components/ProcedureTemplateSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import Groups from './Groups.jsx';
 
@@ -45,6 +46,7 @@ const TAB_GROUPS = [
     tabs: [
       { id: 'capa', label: 'CAPA', adminOnly: true },
       { id: 'documents', label: 'Documents', adminOnly: true },
+      { id: 'procedures', label: 'Procédures', adminOnly: true },
     ],
   },
 ];
@@ -118,6 +120,7 @@ export default function Settings() {
             <DriveStorageSettings />
           </div>
         )}
+        {activeTab === 'procedures' && isAdmin && <ProcedureTemplateSettings />}
         {activeTab === 'visibility' && isAdmin && <MenuVisibilitySettings />}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />
