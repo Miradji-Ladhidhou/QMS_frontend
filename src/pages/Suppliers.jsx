@@ -7,7 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SUPPLIER_STATUS_LABELS } from '../lib/supplierStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
@@ -227,6 +227,7 @@ export default function Suppliers() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -343,6 +344,39 @@ export default function Suppliers() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'name', label: 'Nom' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'criticality', label: 'Criticité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'contact', label: 'Contact' },
+        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
+      ];
+      const rows = source.map((supplier) => ({
+        name: supplier.name,
+        category: supplier.category || '',
+        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
+        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
+        contact: supplier.contact_name || '',
+        next_evaluation_date: formatDate(supplier.next_evaluation_date),
+      }));
+      const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
+      await exportToXlsx(`fournisseurs-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Évaluation fournisseurs', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -365,6 +399,15 @@ export default function Suppliers() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || suppliers.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           {canManage && (
             <button
@@ -417,6 +460,8 @@ export default function Suppliers() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
@@ -619,6 +619,7 @@ export default function Planning() {
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedTaskIds, setSelectedTaskIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -812,32 +813,55 @@ export default function Planning() {
     });
   }
 
-  async function handleExportPdf(scopeIds) {
+  // Partagé par l'export PDF et l'export Excel — mêmes colonnes/lignes, seul le format de
+  // sortie change (voir exportToPdf/exportToXlsx, pdfExport.js).
+  function buildTablePayload(scopeIds) {
     const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
+    const columns = [
+      { key: 'date', label: 'Date', width: 0.15 },
+      { key: 'type', label: 'Type', width: 0.2 },
+      { key: 'title', label: 'Titre', width: 0.5 },
+      { key: 'overdue', label: 'En retard', width: 0.15 },
+    ];
+    const rows = source.map((item) => ({
+      date: item.date,
+      type: TYPE_CONFIG[item.type].label,
+      title: item.title,
+      overdue: item.is_overdue ? 'Oui' : 'Non',
+    }));
+    const countLabel = `${source.length} élément${source.length > 1 ? 's' : ''}`;
+    return { columns, rows, subtitle: [countLabel, ...describeActiveFilters()].join(' · ') };
+  }
+
+  async function handleExportPdf(scopeIds) {
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'date', label: 'Date', width: 0.15 },
-        { key: 'type', label: 'Type', width: 0.2 },
-        { key: 'title', label: 'Titre', width: 0.5 },
-        { key: 'overdue', label: 'En retard', width: 0.15 },
-      ];
-      const rows = source.map((item) => ({
-        date: item.date,
-        type: TYPE_CONFIG[item.type].label,
-        title: item.title,
-        overdue: item.is_overdue ? 'Oui' : 'Non',
-      }));
-      const countLabel = `${source.length} élément${source.length > 1 ? 's' : ''}`;
+      const { columns, rows, subtitle } = buildTablePayload(scopeIds);
       await exportToPdf(`planning-${new Date().toISOString().slice(0, 10)}.pdf`, 'Planning', columns, rows, {
-        subtitle: [countLabel, ...describeActiveFilters()].join(' · '),
+        subtitle,
         generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
     } finally {
       setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx(scopeIds) {
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const { columns, rows, subtitle } = buildTablePayload(scopeIds);
+      await exportToXlsx(`planning-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Planning', columns, rows, {
+        subtitle,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le fichier Excel.');
+    } finally {
+      setExportingXlsx(false);
     }
   }
 
@@ -863,6 +887,15 @@ export default function Planning() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || filteredItems.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           <button
             type="button"
@@ -1023,6 +1056,8 @@ export default function Planning() {
           onExportCsv={() => handleExportCsv(selectedTaskIds)}
           onExportPdf={() => handleExportPdf(selectedTaskIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedTaskIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDeleteTasks}
           onClear={() => setSelectedTaskIds([])}
         />

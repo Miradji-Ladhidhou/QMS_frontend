@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -264,6 +264,7 @@ export default function Complaints() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -383,6 +384,39 @@ export default function Complaints() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'customer_name', label: 'Client' },
+        { key: 'description', label: 'Description' },
+        { key: 'severity', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'due_date', label: 'Échéance' },
+        { key: 'assigned', label: 'Assigné' },
+      ];
+      const rows = source.map((complaint) => ({
+        customer_name: complaint.customer_name,
+        description: complaint.description || '',
+        severity: CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
+        status: COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
+        due_date: formatDate(complaint.due_date),
+        assigned: complaint.assigned?.full_name || '',
+      }));
+      const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
+      await exportToXlsx(`reclamations-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Réclamations clients', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -405,6 +439,15 @@ export default function Complaints() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || complaints.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           <button
             type="button"
@@ -455,6 +498,8 @@ export default function Complaints() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

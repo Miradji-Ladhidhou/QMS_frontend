@@ -13,7 +13,7 @@ import {
   RISK_LEVEL_CELL_STYLES,
 } from '../lib/riskStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
@@ -389,6 +389,7 @@ export default function Risks() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -519,6 +520,43 @@ export default function Risks() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'type', label: 'Type' },
+        { key: 'status', label: 'Statut' },
+        { key: 'score', label: 'Score' },
+        { key: 'owner', label: 'Responsable' },
+        { key: 'review_date', label: 'Revue' },
+      ];
+      const rows = source.map((risk) => ({
+        title: risk.title,
+        type: RISK_TYPE_LABELS[risk.type] || risk.type,
+        status: RISK_STATUS_LABELS[risk.status] || risk.status,
+        score: risk.risk_score ?? '',
+        owner: risk.owner_user?.full_name || '',
+        review_date: formatDate(risk.review_date),
+      }));
+      const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
+      if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
+      await exportToXlsx(`risques-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Registre des risques', columns, rows, {
+        subtitle: [countLabel, ...filterParts].join(' · '),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -541,6 +579,15 @@ export default function Risks() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || risks.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           {canManage && (
             <button
@@ -636,6 +683,8 @@ export default function Risks() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

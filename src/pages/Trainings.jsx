@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
@@ -887,6 +887,7 @@ export default function Trainings() {
   const [editingRecord, setEditingRecord] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [isExcludeModalOpen, setIsExcludeModalOpen] = useState(false);
   const [certificateDownloadingId, setCertificateDownloadingId] = useState(null);
@@ -1100,6 +1101,38 @@ export default function Trainings() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'training', label: 'Formation' },
+        { key: 'type', label: 'Type' },
+        { key: 'person', label: 'Personne' },
+        { key: 'status', label: 'Statut' },
+        { key: 'completed_at', label: 'Réalisation' },
+      ];
+      const rows = source.flatMap((training) =>
+        training.records.map((record) => ({
+          training: training.title,
+          type: training.type || '',
+          person: personName(record),
+          status: record.employee_id ? 'Sans compte' : 'Compte',
+          completed_at: formatDate(record.completed_at),
+        }))
+      );
+      await exportToXlsx(`formations-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Formations', columns, rows, {
+        subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   const hasAnyRecord = trainings.some((training) => training.records.length > 0);
 
   const { sorted: sortedTrainings, sortKey, direction, setSortKey, toggleSort } = useSort(
@@ -1133,6 +1166,15 @@ export default function Trainings() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || !hasAnyRecord}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           <Link
             to="/trainings/matrix"
@@ -1177,6 +1219,8 @@ export default function Trainings() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

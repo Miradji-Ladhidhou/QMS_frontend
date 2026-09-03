@@ -6,7 +6,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
@@ -152,6 +152,7 @@ export default function ManagementReviews() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -252,6 +253,34 @@ export default function ManagementReviews() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? reviews.filter((review) => scopeIds.includes(review.id)) : reviews;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'review_date', label: 'Date de revue' },
+        { key: 'status', label: 'Statut' },
+        { key: 'participants', label: 'Participants' },
+      ];
+      const rows = source.map((review) => ({
+        title: review.title,
+        review_date: formatDate(review.review_date),
+        status: REVIEW_STATUS_LABELS[review.status] || review.status,
+        participants: review.participants || '',
+      }));
+      await exportToXlsx(`revues-direction-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Revues de direction', columns, rows, {
+        subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -274,6 +303,15 @@ export default function ManagementReviews() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || reviews.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           {canManage && (
             <button
@@ -309,6 +347,8 @@ export default function ManagementReviews() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

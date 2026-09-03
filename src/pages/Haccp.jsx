@@ -7,7 +7,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { PLAN_STATUS_LABELS } from '../lib/haccpStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
@@ -189,6 +189,7 @@ export default function Haccp() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [exportingAuditPdf, setExportingAuditPdf] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -301,6 +302,35 @@ export default function Haccp() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? plans.filter((plan) => scopeIds.includes(plan.id)) : plans;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'status', label: 'Statut' },
+        { key: 'service', label: 'Service' },
+        { key: 'created_at', label: 'Créé le' },
+      ];
+      const rows = source.map((plan) => ({
+        title: plan.title,
+        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
+        service: plan.service?.name || '',
+        created_at: formatDate(plan.created_at),
+      }));
+      const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
+      await exportToXlsx(`haccp-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Plans HACCP', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   // Distinct de handleExportPdf ci-dessus (qui ne liste que titre/statut/service) : celui-ci
   // génère le rapport d'audit détaillé (étapes, dangers, CCP, synthèse de surveillance) via
   // POST /haccp/plans/pdf — la même route que le bouton "Exporter en PDF" de HaccpDetail.jsx
@@ -343,6 +373,15 @@ export default function Haccp() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || plans.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           <button
             type="button"
@@ -404,6 +443,8 @@ export default function Haccp() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

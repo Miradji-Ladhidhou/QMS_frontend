@@ -1,9 +1,9 @@
 import { api } from './api.js';
 
-// Déclenche le téléchargement d'un blob PDF déjà reçu — factorisé car utilisé par tous les
-// exports PDF générés côté serveur (rapport générique ici, mais aussi fiche de participation
-// et certificat de réussite dans Trainings.jsx) qui partagent le même geste final.
-function triggerPdfDownload(blob, filename) {
+// Déclenche le téléchargement d'un blob déjà reçu — factorisé car utilisé par tous les exports
+// générés côté serveur (PDF ici, mais aussi le classeur Excel plus bas) qui partagent le même
+// geste final.
+function triggerBlobDownload(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = url;
@@ -24,7 +24,22 @@ export async function exportToPdf(filename, title, columns, rows, { subtitle, ge
     { title, subtitle, generatedBy, columns, rows },
     { responseType: 'blob' }
   );
-  triggerPdfDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
+  triggerBlobDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
+}
+
+// Même principe qu'exportToPdf, mais produit un vrai classeur Excel (en-têtes figés au
+// défilement, largeurs de colonnes, bordures — voir services/listReportXlsx.js) plutôt qu'un
+// CSV renommé. Réutilise les mêmes columns que l'export PDF de la page appelante.
+export async function exportToXlsx(filename, title, columns, rows, { subtitle, generatedBy } = {}) {
+  const response = await api.post(
+    '/reports/table-xlsx',
+    { title, subtitle, generatedBy, columns, rows },
+    { responseType: 'blob' }
+  );
+  triggerBlobDownload(
+    new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    filename
+  );
 }
 
 // POST générique pour les exports PDF non tabulaires (fiche de participation, certificat...) —
@@ -32,11 +47,11 @@ export async function exportToPdf(filename, title, columns, rows, { subtitle, ge
 // forcer une forme commune.
 export async function postForPdfDownload(url, body, filename) {
   const response = await api.post(url, body, { responseType: 'blob' });
-  triggerPdfDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
+  triggerBlobDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
 }
 
 // GET pour les PDF sans body (certificat d'une réalisation déjà identifiée par son id).
 export async function getPdfDownload(url, filename) {
   const response = await api.get(url, { responseType: 'blob' });
-  triggerPdfDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
+  triggerBlobDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
 }

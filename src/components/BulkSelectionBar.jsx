@@ -4,7 +4,17 @@ import { Download, FolderInput, Loader2, Trash2, X } from 'lucide-react';
 // au moins un élément est coché. Chaque action (déplacer, exporter, supprimer) est optionnelle
 // et n'est affichée que si la page appelante fournit le callback correspondant — une page qui
 // ne passe que onMove/onClear garde exactement le comportement d'avant.
-export default function BulkSelectionBar({ count, onMove, onExportCsv, onExportPdf, exportingPdf, onDelete, onClear }) {
+export default function BulkSelectionBar({
+  count,
+  onMove,
+  onExportCsv,
+  onExportPdf,
+  exportingPdf,
+  onExportXlsx,
+  exportingXlsx,
+  onDelete,
+  onClear,
+}) {
   if (count === 0) return null;
 
   return (
@@ -42,6 +52,17 @@ export default function BulkSelectionBar({ count, onMove, onExportCsv, onExportP
           >
             {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             Exporter PDF
+          </button>
+        )}
+        {onExportXlsx && (
+          <button
+            type="button"
+            onClick={onExportXlsx}
+            disabled={exportingXlsx}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Exporter Excel
           </button>
         )}
         {onDelete && (

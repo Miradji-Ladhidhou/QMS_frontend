@@ -4,7 +4,7 @@ import { ChevronRight, Download, Loader2, Plus, Sparkles, X } from 'lucide-react
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
@@ -480,6 +480,7 @@ export default function Capas() {
   const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -629,6 +630,38 @@ export default function Capas() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro' },
+        { key: 'title', label: 'Objet' },
+        { key: 'priority', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'due_date', label: 'Échéance' },
+        { key: 'assigned', label: 'Responsable' },
+      ];
+      const rows = source.map((capa) => ({
+        number: capa.number,
+        title: capa.title,
+        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
+        due_date: formatDate(capa.due_date),
+        assigned: capa.assigned?.full_name || '',
+      }));
+      await exportToXlsx(`capa-${new Date().toISOString().slice(0, 10)}.xlsx`, 'CAPA', columns, rows, {
+        subtitle: `${source.length} CAPA`,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   function handleCreated(newCapa) {
     setCapas((prev) => [newCapa, ...prev]);
     setIsModalOpen(false);
@@ -679,6 +712,15 @@ export default function Capas() {
           </button>
           <button
             type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || capas.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
+          </button>
+          <button
+            type="button"
             onClick={() => setIsChoiceModalOpen(true)}
             className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
           >
@@ -717,6 +759,8 @@ export default function Capas() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

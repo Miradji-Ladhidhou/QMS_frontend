@@ -6,7 +6,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
@@ -226,6 +226,7 @@ export default function Audits() {
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -343,6 +344,39 @@ export default function Audits() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? audits.filter((audit) => scopeIds.includes(audit.id)) : audits;
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'type', label: 'Type' },
+        { key: 'status', label: 'Statut' },
+        { key: 'service', label: 'Service' },
+        { key: 'auditor', label: 'Auditeur' },
+        { key: 'planned_date', label: 'Date' },
+      ];
+      const rows = source.map((audit) => ({
+        title: audit.title,
+        type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
+        status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
+        service: audit.service?.name || '',
+        auditor: audit.lead?.full_name || '',
+        planned_date: formatDate(audit.planned_date),
+      }));
+      const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
+      await exportToXlsx(`audits-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Audits internes', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -365,6 +399,15 @@ export default function Audits() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || audits.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           {canManage && (
             <button
@@ -413,6 +456,8 @@ export default function Audits() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

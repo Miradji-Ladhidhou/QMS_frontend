@@ -7,7 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { isManagerRole } from '../lib/roles.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
@@ -408,6 +408,7 @@ export default function Documents() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportPdfError, setExportPdfError] = useState('');
   const [downloadingId, setDownloadingId] = useState(null);
   const [downloadError, setDownloadError] = useState('');
@@ -659,6 +660,47 @@ export default function Documents() {
     }
   }
 
+  async function handleExportXlsx(scopeIds) {
+    const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
+    const source = sortByNumber(scoped);
+    setExportingXlsx(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro' },
+        { key: 'title', label: 'Titre' },
+        { key: 'description', label: 'Description' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'version', label: 'Version' },
+        { key: 'status', label: 'Statut' },
+        { key: 'review_date', label: 'Proch. révision' },
+        { key: 'latest_version_comment', label: 'Commentaire dernière version' },
+      ];
+      const rows = source.map((doc) => ({
+        number: doc.number,
+        title: doc.title,
+        description: doc.description || '',
+        category: doc.category?.name || '',
+        version: doc.version,
+        status: STATUS_LABELS[doc.status] || doc.status,
+        review_date: formatDate(doc.review_date),
+        latest_version_comment: doc.latest_version_comment || '',
+      }));
+      const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
+      await exportToXlsx(`documents-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Documents', columns, rows, {
+        subtitle: [countLabel, ...filterParts].join(' · '),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -681,6 +723,15 @@ export default function Documents() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => handleExportXlsx()}
+            disabled={exportingXlsx || filteredDocuments.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
           </button>
           <button
             type="button"
@@ -774,6 +825,8 @@ export default function Documents() {
           onExportCsv={() => handleExportCsv(selectedIds)}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
