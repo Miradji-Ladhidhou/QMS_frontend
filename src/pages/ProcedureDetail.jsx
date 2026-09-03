@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Check, Plus, Send, X, XCircle } from 'lucide-react';
+import { Archive, ArrowLeft, Check, Pencil, Plus, Send, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -89,6 +89,73 @@ function NewVersionModal({ procedureId, procedureTitle, procedureProcess, templa
             className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
           >
             {submitting ? 'Enregistrement...' : 'Enregistrer cette version'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// Modifier un brouillon existant : PUT /:id/versions/:versionId, refusé côté backend dès que
+// le statut n'est plus "draft" — contrairement à NewVersionModal, préremplit avec le contenu
+// PROPRE à cette version (jamais celui d'une autre), et ne crée rien de nouveau.
+function EditVersionModal({ procedureId, procedureTitle, procedureProcess, template, version, onClose, onUpdated }) {
+  const [content, setContent] = useState(version.content || EMPTY_CONTENT);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  function handleAiGenerated(draft) {
+    setContent((prev) => ({
+      ...prev,
+      objet: draft.objet || prev.objet,
+      domaine_application: draft.domaine_application || prev.domaine_application,
+      responsabilites: draft.responsabilites || prev.responsabilites,
+      sections: draft.sections?.length
+        ? prev.sections.map((section) => {
+            const generated = draft.sections.find((s) => s.key === section.key);
+            return generated ? { ...section, content: generated.content } : section;
+          })
+        : prev.sections,
+    }));
+  }
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data } = await api.put(`/procedures/${procedureId}/versions/${version.id}`, { content });
+      onUpdated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de modifier ce brouillon.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Modifier le brouillon — v{version.version}</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <AiProcedureDraft title={procedureTitle} process={procedureProcess} onGenerated={handleAiGenerated} />
+          <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Enregistrement...' : 'Enregistrer les modifications'}
           </button>
         </form>
       </div>
@@ -227,6 +294,7 @@ export default function ProcedureDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isNewVersionModalOpen, setIsNewVersionModalOpen] = useState(false);
+  const [isEditVersionModalOpen, setIsEditVersionModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isObsoleteModalOpen, setIsObsoleteModalOpen] = useState(false);
   const [isLinkCapaModalOpen, setIsLinkCapaModalOpen] = useState(false);
@@ -275,6 +343,11 @@ export default function ProcedureDetail() {
 
   function handleVersionCreated() {
     setIsNewVersionModalOpen(false);
+    loadProcedure();
+  }
+
+  function handleVersionUpdated() {
+    setIsEditVersionModalOpen(false);
     loadProcedure();
   }
 
@@ -372,6 +445,11 @@ export default function ProcedureDetail() {
   const draftVersion = versions.find((v) => v.status === 'draft');
   const pendingVersion = versions.find((v) => v.status === 'pending');
   const currentVersion = versions.find((v) => v.id === procedure.current_version_id);
+  // versions est trié plus récent d'abord (voir GET /:id) : le premier "rejected" trouvé est
+  // donc la dernière version rejetée. Repartir de son contenu — plutôt que de la version
+  // approuvée — pour que "Nouvelle version" reprenne le travail déjà fait, pas seulement le
+  // motif du rejet déjà affiché dans l'historique.
+  const lastRejectedVersion = versions.find((v) => v.status === 'rejected');
   const canActOnDraft = draftVersion && currentUser && (canManage || draftVersion.author_id === currentUser.id);
 
   return (
@@ -517,15 +595,25 @@ export default function ProcedureDetail() {
           </div>
 
           {canActOnDraft && (
-            <button
-              type="button"
-              onClick={() => handleSubmit(draftVersion.id)}
-              disabled={actingVersionId === draftVersion.id}
-              className="mt-4 flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
-            >
-              <Send size={16} />
-              {actingVersionId === draftVersion.id ? 'Envoi...' : 'Soumettre pour validation'}
-            </button>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => setIsEditVersionModalOpen(true)}
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <Pencil size={16} />
+                Modifier
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSubmit(draftVersion.id)}
+                disabled={actingVersionId === draftVersion.id}
+                className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+              >
+                <Send size={16} />
+                {actingVersionId === draftVersion.id ? 'Envoi...' : 'Soumettre pour validation'}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -678,9 +766,21 @@ export default function ProcedureDetail() {
           procedureTitle={procedure.title}
           procedureProcess={procedure.process}
           template={template}
-          previousContent={currentVersion?.content}
+          previousContent={lastRejectedVersion?.content ?? currentVersion?.content}
           onClose={() => setIsNewVersionModalOpen(false)}
           onCreated={handleVersionCreated}
+        />
+      )}
+
+      {isEditVersionModalOpen && draftVersion && (
+        <EditVersionModal
+          procedureId={procedure.id}
+          procedureTitle={procedure.title}
+          procedureProcess={procedure.process}
+          template={template}
+          version={draftVersion}
+          onClose={() => setIsEditVersionModalOpen(false)}
+          onUpdated={handleVersionUpdated}
         />
       )}
 
