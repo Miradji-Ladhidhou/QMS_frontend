@@ -7,6 +7,7 @@ const TOGGLE_LABELS = {
   email_training_renewal: 'Renouvellement de formation',
   email_approval_requests: "Demandes d'approbation",
   email_task_due: 'Tâches à échéance',
+  email_procedure_review: 'Procédures à réviser',
 };
 
 const FREQUENCY_LABELS = {
