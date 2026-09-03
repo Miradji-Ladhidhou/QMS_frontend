@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Check, XCircle } from 'lucide-react';
+import { Check, ChevronRight, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { isManagerRole } from '../lib/roles.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import DecisionModal from '../components/DecisionModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
@@ -16,10 +18,14 @@ function getApprovalSortValue(item, key) {
 }
 
 export default function MyApprovals() {
+  const currentUser = useCurrentUser();
+  const canValidateProcedures = isManagerRole(currentUser?.role);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [decisionTarget, setDecisionTarget] = useState(null);
+  const [pendingProcedures, setPendingProcedures] = useState([]);
+  const [proceduresError, setProceduresError] = useState('');
   const { sorted: sortedItems, sortKey, direction, setSortKey, toggleSort } = useSort(
     items,
     getApprovalSortValue,
@@ -40,9 +46,27 @@ export default function MyApprovals() {
     }
   }
 
+  // Pas d'approbateur désigné à l'avance sur les procédures (n'importe quel admin/manager peut
+  // valider, voir procedures.js#validate) : contrairement à /workflows/mine, cette liste n'est
+  // donc pas filtrée "assignée à moi" — juste réservée aux rôles qui peuvent effectivement agir.
+  async function loadPendingProcedures() {
+    setProceduresError('');
+    try {
+      const { data } = await api.get('/procedures/pending-validations');
+      setPendingProcedures(data);
+    } catch {
+      setProceduresError('Impossible de charger les procédures en attente de validation.');
+    }
+  }
+
   useEffect(() => {
     loadPending();
   }, []);
+
+  useEffect(() => {
+    if (canValidateProcedures) loadPendingProcedures();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canValidateProcedures]);
 
   function handleDecided() {
     setDecisionTarget(null);
@@ -112,6 +136,40 @@ export default function MyApprovals() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {canValidateProcedures && (
+        <div className="mt-8">
+          <h2 className="text-base font-semibold text-slate-900">Procédures</h2>
+
+          {proceduresError && (
+            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+              {proceduresError}
+            </p>
+          )}
+
+          {pendingProcedures.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">Aucune procédure en attente de validation.</p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {pendingProcedures.map((item) => (
+                <Link
+                  key={item.id}
+                  to={`/procedures/${item.procedure.id}`}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:bg-slate-50"
+                >
+                  <div>
+                    <p className="font-medium text-slate-900">{item.procedure.title}</p>
+                    <p className="text-sm text-slate-500">
+                      {item.procedure.number} · v{item.version}
+                    </p>
+                  </div>
+                  <ChevronRight size={18} className="shrink-0 text-slate-400" />
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
