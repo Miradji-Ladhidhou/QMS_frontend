@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BadgeCheck,
@@ -675,6 +675,21 @@ export default function DocumentDetail() {
                 <li key={approval.id} className="flex items-center justify-between text-sm">
                   <span className="text-slate-700">{approval.approver?.full_name || 'Utilisateur supprimé'}</span>
                   <ApprovalStatusBadge decision={approval.decision} />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {doc.linked_capas?.length > 0 && (
+          <div className="mt-4 border-t border-slate-100 pt-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Référencé par ces CAPA</p>
+            <ul className="space-y-1.5">
+              {doc.linked_capas.map((capa) => (
+                <li key={capa.id}>
+                  <Link to={`/capas/${capa.id}`} className="text-sm text-primary hover:underline">
+                    {capa.number} — {capa.title}
+                  </Link>
                 </li>
               ))}
             </ul>
