@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, Plus, X } from 'lucide-react';
+import { AlertTriangle, Cloud, Download, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
+import { exportToCsv } from '../lib/csvExport.js';
+import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
@@ -157,6 +161,8 @@ function NewProcedureModal({ template, onClose, onCreated }) {
 
 export default function Procedures() {
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const [procedures, setProcedures] = useState([]);
   const [template, setTemplate] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -165,6 +171,11 @@ export default function Procedures() {
   const [statusFilter, setStatusFilter] = useState('');
   const [processFilter, setProcessFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
+  const [exportError, setExportError] = useState('');
 
   async function loadProcedures() {
     setLoading(true);
@@ -204,18 +215,152 @@ export default function Procedures() {
     navigate(`/procedures/${procedure.id}`);
   }
 
+  // Colonnes communes aux 4 formats — même principe que Capas.jsx : le frontend envoie
+  // exactement ce qu'il affiche (donc respecte les filtres actifs de la page), le backend ne
+  // relit aucune table métier pour ces exports tabulaires (voir routes/reports.js).
+  function buildExportColumns() {
+    return [
+      { key: 'number', label: 'Numéro' },
+      { key: 'title', label: 'Titre' },
+      { key: 'status', label: 'Statut' },
+      { key: 'current_version', label: 'Version courante' },
+      { key: 'validated_at', label: 'Date de validation' },
+      { key: 'next_review_date', label: 'Date de prochaine révision' },
+      { key: 'author', label: 'Auteur' },
+      { key: 'validator', label: 'Validateur' },
+    ];
+  }
+
+  function buildExportRows() {
+    return procedures.map((procedure) => ({
+      number: procedure.number,
+      title: procedure.title,
+      status: STATUS_LABELS[procedure.status] || procedure.status,
+      current_version: procedure.current_version?.version || '',
+      validated_at: formatDate(procedure.current_version?.validated_at),
+      next_review_date: formatDate(procedure.next_review_date),
+      author: procedure.current_version?.author?.full_name || '',
+      validator: procedure.current_version?.validator?.full_name || '',
+    }));
+  }
+
+  function handleExportCsv() {
+    const columns = buildExportColumns();
+    const rows = buildExportRows().map((row) => columns.map((col) => row[col.key]));
+    exportToCsv(
+      `procedures-${new Date().toISOString().slice(0, 10)}.csv`,
+      'Procédures',
+      columns.map((col) => col.label),
+      rows,
+      { generatedBy: currentUser?.full_name, subtitle: `${procedures.length} procédures` }
+    );
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportError('');
+    try {
+      await exportToPdf(
+        `procedures-${new Date().toISOString().slice(0, 10)}.pdf`,
+        'Procédures',
+        buildExportColumns(),
+        buildExportRows(),
+        { subtitle: `${procedures.length} procédures`, generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx() {
+    setExportingXlsx(true);
+    setExportError('');
+    try {
+      await exportToXlsx(
+        `procedures-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        'Procédures',
+        buildExportColumns(),
+        buildExportRows(),
+        { subtitle: `${procedures.length} procédures`, generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportDrive() {
+    setExportingDrive(true);
+    setExportError('');
+    setDriveSuccess('');
+    try {
+      await exportToDrive('Procédures', 'Procédures', buildExportColumns(), buildExportRows(), {
+        subtitle: `${procedures.length} procédures`,
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Procédures</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouvelle procédure
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={procedures.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            <Download size={18} />
+            Exporter CSV
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf || procedures.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleExportXlsx}
+            disabled={exportingXlsx || procedures.length === 0}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+          >
+            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+            Exporter Excel
+          </button>
+          {tenant?.storage_provider === 'google_drive' && (
+            <button
+              type="button"
+              onClick={handleExportDrive}
+              disabled={exportingDrive || procedures.length === 0}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
+            >
+              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
+              Enregistrer sur Drive
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
+          >
+            <Plus size={18} />
+            Nouvelle procédure
+          </button>
+        </div>
       </div>
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -249,6 +394,12 @@ export default function Procedures() {
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {loading ? (

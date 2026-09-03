@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Check, Pencil, Plus, Send, Trash2, X, XCircle } from 'lucide-react';
+import { Archive, ArrowLeft, Check, Download, Loader2, Pencil, Plus, Send, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { openBlankTab } from '../lib/openInNewTab.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ProcedureVersionStatusBadge from '../components/ProcedureVersionStatusBadge.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
@@ -305,6 +306,8 @@ export default function ProcedureDetail() {
   const [acknowledgeError, setAcknowledgeError] = useState('');
   const [actionError, setActionError] = useState('');
   const [actingVersionId, setActingVersionId] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportPdfError, setExportPdfError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
 
@@ -389,6 +392,22 @@ export default function ProcedureDetail() {
     await api.post(`/procedures/${id}/obsolete`, { reason: reason || undefined });
     setIsObsoleteModalOpen(false);
     await loadProcedure();
+  }
+
+  async function handleExportPdf() {
+    const tab = openBlankTab();
+    setExportPdfError('');
+    setExportingPdf(true);
+    try {
+      const response = await api.get(`/procedures/${id}/pdf`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      if (tab) tab.location.href = url;
+    } catch {
+      tab?.close();
+      setExportPdfError("Impossible d'exporter cette procédure en PDF.");
+    } finally {
+      setExportingPdf(false);
+    }
   }
 
   async function handleDelete() {
@@ -501,6 +520,15 @@ export default function ProcedureDetail() {
           </div>
 
           <div className="flex shrink-0 flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              Exporter PDF
+            </button>
             {!draftVersion && procedure.status !== 'obsolete' && (
               <button
                 type="button"
@@ -570,6 +598,9 @@ export default function ProcedureDetail() {
         )}
         {acknowledgeError && (
           <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{acknowledgeError}</p>
+        )}
+        {exportPdfError && (
+          <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportPdfError}</p>
         )}
         {deleteError && (
           <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
