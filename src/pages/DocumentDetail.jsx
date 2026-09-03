@@ -215,6 +215,7 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
   const [createdAt, setCreatedAt] = useState(toDateInputValue(doc.created_at));
   const [reviewDate, setReviewDate] = useState(toDateInputValue(doc.review_date));
   const [reviewFrequencyMonths, setReviewFrequencyMonths] = useState(doc.review_frequency_months || '');
+  const [requiresAcknowledgment, setRequiresAcknowledgment] = useState(Boolean(doc.requires_acknowledgment));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -231,6 +232,7 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
         created_at: createdAt ? new Date(`${createdAt}T00:00:00`).toISOString() : undefined,
         review_date: reviewDate || null,
         review_frequency_months: reviewFrequencyMonths || null,
+        requires_acknowledgment: requiresAcknowledgment,
       }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier ces informations.');
@@ -305,6 +307,16 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
             à chaque nouvelle version.
           </p>
 
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={requiresAcknowledgment}
+              onChange={(e) => setRequiresAcknowledgment(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+            Nécessite un accusé de lecture
+          </label>
+
           <button
             type="submit"
             disabled={submitting}
@@ -314,6 +326,70 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
           </button>
         </form>
       </div>
+    </div>
+  );
+}
+
+// Panneau admin/manager "qui a lu / qui n'a pas encore" — chargement à part (pas dans
+// loadDocument) : n'a besoin d'être appelé que si requires_acknowledgment est actif, et jamais
+// pour un rôle qui n'y a pas accès (403 sinon).
+function AcknowledgmentPanel({ documentId }) {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get(`/documents/${documentId}/acknowledgments`)
+      .then(({ data: res }) => {
+        if (!cancelled) setData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Impossible de charger les accusés de lecture.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [documentId]);
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Accusés de lecture</p>
+      {error ? (
+        <p className="text-sm text-red-600">{error}</p>
+      ) : !data ? (
+        <p className="text-sm text-slate-500">Chargement...</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <p className="mb-1 text-xs font-medium text-emerald-700">Ont lu ({data.acknowledged.length})</p>
+            {data.acknowledged.length === 0 ? (
+              <p className="text-sm text-slate-500">Personne pour l'instant.</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-slate-700">
+                {data.acknowledged.map((entry) => (
+                  <li key={entry.user_id}>
+                    {entry.user?.full_name || 'Utilisateur supprimé'}
+                    <span className="text-slate-400"> · {formatDateTime(entry.acknowledged_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-medium text-amber-700">En attente ({data.pending.length})</p>
+            {data.pending.length === 0 ? (
+              <p className="text-sm text-slate-500">Tout le monde a lu.</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-slate-700">
+                {data.pending.map((user) => (
+                  <li key={user.id}>{user.full_name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -342,6 +418,8 @@ export default function DocumentDetail() {
   const [downloadError, setDownloadError] = useState('');
   const [downloadingKey, setDownloadingKey] = useState(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [acknowledging, setAcknowledging] = useState(false);
+  const [acknowledgeError, setAcknowledgeError] = useState('');
 
   async function loadDocument() {
     setLoading(true);
@@ -443,6 +521,19 @@ export default function DocumentDetail() {
     } catch {
       tab?.close();
       setCertificateError('Impossible de générer le certificat.');
+    }
+  }
+
+  async function handleAcknowledge() {
+    setAcknowledgeError('');
+    setAcknowledging(true);
+    try {
+      await api.post(`/documents/${doc.id}/acknowledge`);
+      await loadDocument();
+    } catch (err) {
+      setAcknowledgeError(err.response?.data?.error || "Impossible d'enregistrer l'accusé de lecture.");
+    } finally {
+      setAcknowledging(false);
     }
   }
 
@@ -662,6 +753,30 @@ export default function DocumentDetail() {
           </p>
         )}
 
+        {doc.requires_acknowledgment && (
+          <div className="mt-4 flex flex-col gap-2 rounded-md border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            {doc.my_acknowledgment ? (
+              <p className="text-sm text-sky-800">Lu et accusé réception le {formatDateTime(doc.my_acknowledgment.acknowledged_at)}.</p>
+            ) : (
+              <>
+                <p className="text-sm text-sky-800">Ce document nécessite un accusé de lecture.</p>
+                <button
+                  type="button"
+                  onClick={handleAcknowledge}
+                  disabled={acknowledging}
+                  className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+                >
+                  <Check size={16} />
+                  {acknowledging ? 'Enregistrement...' : "J'ai lu et compris"}
+                </button>
+              </>
+            )}
+          </div>
+        )}
+        {acknowledgeError && (
+          <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{acknowledgeError}</p>
+        )}
+
         {myPendingApproval && (
           <div className="mt-4 flex flex-col gap-2 rounded-md border border-amber-200 bg-amber-50 p-4 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-sm text-amber-800">Votre approbation est requise sur ce document.</p>
@@ -716,6 +831,8 @@ export default function DocumentDetail() {
             </ul>
           </div>
         )}
+
+        {canManage && doc.requires_acknowledgment && <AcknowledgmentPanel documentId={doc.id} />}
       </div>
 
       <div className="mt-4 flex gap-1 border-b border-slate-200">
