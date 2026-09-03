@@ -8,6 +8,7 @@ import { openBlankTab } from '../lib/openInNewTab.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ProcedureVersionStatusBadge from '../components/ProcedureVersionStatusBadge.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
+import AiFullProcedureDraft from '../components/AiFullProcedureDraft.jsx';
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 import ProcedureComplianceCheck from '../components/ProcedureComplianceCheck.jsx';
 import ProcedureVersionComparison from '../components/ProcedureVersionComparison.jsx';
@@ -56,7 +57,7 @@ function NewVersionModal({
       sections: draft.sections?.length
         ? prev.sections.map((section) => {
             const generated = draft.sections.find((s) => s.key === section.key);
-            return generated ? { ...section, content: generated.content } : section;
+            return generated ? { ...section, content: generated.content, subsections: generated.subsections } : section;
           })
         : prev.sections,
     }));
@@ -96,7 +97,10 @@ function NewVersionModal({
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <AiProcedureDraft title={procedureTitle} process={procedureProcess} onGenerated={handleAiGenerated} />
+          <div className="flex flex-wrap gap-2">
+            <AiProcedureDraft title={procedureTitle} process={procedureProcess} onGenerated={handleAiGenerated} />
+            <AiFullProcedureDraft title={procedureTitle} onGenerated={handleAiGenerated} />
+          </div>
           <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
 
           <button
@@ -129,7 +133,7 @@ function EditVersionModal({ procedureId, procedureTitle, procedureProcess, templ
       sections: draft.sections?.length
         ? prev.sections.map((section) => {
             const generated = draft.sections.find((s) => s.key === section.key);
-            return generated ? { ...section, content: generated.content } : section;
+            return generated ? { ...section, content: generated.content, subsections: generated.subsections } : section;
           })
         : prev.sections,
     }));
@@ -163,7 +167,10 @@ function EditVersionModal({ procedureId, procedureTitle, procedureProcess, templ
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <AiProcedureDraft title={procedureTitle} process={procedureProcess} onGenerated={handleAiGenerated} />
+          <div className="flex flex-wrap gap-2">
+            <AiProcedureDraft title={procedureTitle} process={procedureProcess} onGenerated={handleAiGenerated} />
+            <AiFullProcedureDraft title={procedureTitle} onGenerated={handleAiGenerated} />
+          </div>
           <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
 
           <button

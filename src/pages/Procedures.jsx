@@ -9,6 +9,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
+import AiFullProcedureDraft from '../components/AiFullProcedureDraft.jsx';
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
@@ -47,7 +48,7 @@ function NewProcedureModal({ template, qqoqccpId, onClose, onCreated }) {
       sections: draft.sections?.length
         ? prev.sections.map((section) => {
             const generated = draft.sections.find((s) => s.key === section.key);
-            return generated ? { ...section, content: generated.content } : section;
+            return generated ? { ...section, content: generated.content, subsections: generated.subsections } : section;
           })
         : prev.sections,
     }));
@@ -186,7 +187,10 @@ function NewProcedureModal({ template, qqoqccpId, onClose, onCreated }) {
               </button>
             </div>
           ) : (
-            <AiProcedureDraft title={title} process={process} onGenerated={handleAiGenerated} />
+            <div className="flex flex-wrap gap-2">
+              <AiProcedureDraft title={title} process={process} onGenerated={handleAiGenerated} />
+              <AiFullProcedureDraft title={title} onGenerated={handleAiGenerated} />
+            </div>
           )}
 
           <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
