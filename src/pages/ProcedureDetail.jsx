@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Check, Plus, Send, X } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Archive, ArrowLeft, Check, Plus, Send, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -11,6 +11,9 @@ import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 import ProcedureComplianceCheck from '../components/ProcedureComplianceCheck.jsx';
 import ProcedureVersionComparison from '../components/ProcedureVersionComparison.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
+import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
+import LinkItemModal from '../components/LinkItemModal.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
 
@@ -226,6 +229,10 @@ export default function ProcedureDetail() {
   const [isNewVersionModalOpen, setIsNewVersionModalOpen] = useState(false);
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
   const [isObsoleteModalOpen, setIsObsoleteModalOpen] = useState(false);
+  const [isLinkCapaModalOpen, setIsLinkCapaModalOpen] = useState(false);
+  const [isLinkAuditModalOpen, setIsLinkAuditModalOpen] = useState(false);
+  const [linksError, setLinksError] = useState('');
+  const [unlinkingId, setUnlinkingId] = useState(null);
   const [acknowledging, setAcknowledging] = useState(false);
   const [acknowledgeError, setAcknowledgeError] = useState('');
   const [actionError, setActionError] = useState('');
@@ -309,6 +316,44 @@ export default function ProcedureDetail() {
     await loadProcedure();
   }
 
+  async function handleLinkCapa(capa) {
+    await api.post(`/procedures/${id}/link-capa`, { capa_id: capa.id });
+    setIsLinkCapaModalOpen(false);
+    await loadProcedure();
+  }
+
+  async function handleUnlinkCapa(capaId) {
+    setLinksError('');
+    setUnlinkingId(capaId);
+    try {
+      await api.delete(`/procedures/${id}/link-capa/${capaId}`);
+      await loadProcedure();
+    } catch (err) {
+      setLinksError(err.response?.data?.error || 'Impossible de retirer ce lien.');
+    } finally {
+      setUnlinkingId(null);
+    }
+  }
+
+  async function handleLinkAudit(auditItem) {
+    await api.post(`/procedures/${id}/link-audit`, { audit_id: auditItem.id });
+    setIsLinkAuditModalOpen(false);
+    await loadProcedure();
+  }
+
+  async function handleUnlinkAudit(auditId) {
+    setLinksError('');
+    setUnlinkingId(auditId);
+    try {
+      await api.delete(`/procedures/${id}/link-audit/${auditId}`);
+      await loadProcedure();
+    } catch (err) {
+      setLinksError(err.response?.data?.error || 'Impossible de retirer ce lien.');
+    } finally {
+      setUnlinkingId(null);
+    }
+  }
+
   if (loading) {
     return <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
@@ -322,6 +367,8 @@ export default function ProcedureDetail() {
   }
 
   const versions = procedure.versions || [];
+  const linkedCapas = procedure.linked_capas || [];
+  const linkedAudits = procedure.linked_audits || [];
   const draftVersion = versions.find((v) => v.status === 'draft');
   const pendingVersion = versions.find((v) => v.status === 'pending');
   const currentVersion = versions.find((v) => v.id === procedure.current_version_id);
@@ -544,6 +591,87 @@ export default function ProcedureDetail() {
         )}
       </div>
 
+      {linksError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{linksError}</p>
+      )}
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-slate-900">CAPA liés</h2>
+          <button
+            type="button"
+            onClick={() => setIsLinkCapaModalOpen(true)}
+            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-700"
+          >
+            <Plus size={14} />
+            Rattacher un CAPA
+          </button>
+        </div>
+
+        {linkedCapas.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">Aucun CAPA rattaché pour l'instant.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-slate-100">
+            {linkedCapas.map((capa) => (
+              <li key={capa.id} className="flex items-center justify-between gap-2 py-2.5">
+                <Link to={`/capas/${capa.id}`} className="flex items-center gap-2 text-sm hover:text-primary">
+                  <span className="font-medium text-slate-800">{capa.number}</span>
+                  <span className="text-slate-600">{capa.title}</span>
+                  <CapaStatusBadge status={capa.status} />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleUnlinkCapa(capa.id)}
+                  disabled={unlinkingId === capa.id}
+                  aria-label="Retirer ce lien"
+                  className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600 disabled:opacity-50"
+                >
+                  <XCircle size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-slate-900">Audits liés</h2>
+          <button
+            type="button"
+            onClick={() => setIsLinkAuditModalOpen(true)}
+            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-700"
+          >
+            <Plus size={14} />
+            Rattacher un audit
+          </button>
+        </div>
+
+        {linkedAudits.length === 0 ? (
+          <p className="mt-2 text-sm text-slate-500">Aucun audit rattaché pour l'instant.</p>
+        ) : (
+          <ul className="mt-3 divide-y divide-slate-100">
+            {linkedAudits.map((auditItem) => (
+              <li key={auditItem.id} className="flex items-center justify-between gap-2 py-2.5">
+                <Link to={`/audits/${auditItem.id}`} className="flex items-center gap-2 text-sm hover:text-primary">
+                  <span className="font-medium text-slate-800">{auditItem.title}</span>
+                  <AuditStatusBadge status={auditItem.status} />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleUnlinkAudit(auditItem.id)}
+                  disabled={unlinkingId === auditItem.id}
+                  aria-label="Retirer ce lien"
+                  className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600 disabled:opacity-50"
+                >
+                  <XCircle size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {isNewVersionModalOpen && (
         <NewVersionModal
           procedureId={procedure.id}
@@ -565,6 +693,35 @@ export default function ProcedureDetail() {
 
       {isObsoleteModalOpen && (
         <ObsoleteProcedureModal onClose={() => setIsObsoleteModalOpen(false)} onConfirm={handleObsolete} />
+      )}
+
+      {isLinkCapaModalOpen && (
+        <LinkItemModal
+          title="Rattacher un CAPA"
+          fetchUrl="/capas"
+          excludeIds={linkedCapas.map((capa) => capa.id)}
+          getSearchText={(capa) => `${capa.number} ${capa.title}`}
+          renderItem={(capa) => (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0 font-medium text-slate-800">{capa.number}</span>
+              <span className="truncate text-slate-600">{capa.title}</span>
+            </span>
+          )}
+          onClose={() => setIsLinkCapaModalOpen(false)}
+          onSelect={handleLinkCapa}
+        />
+      )}
+
+      {isLinkAuditModalOpen && (
+        <LinkItemModal
+          title="Rattacher un audit"
+          fetchUrl="/audits"
+          excludeIds={linkedAudits.map((auditItem) => auditItem.id)}
+          getSearchText={(auditItem) => auditItem.title}
+          renderItem={(auditItem) => <span className="truncate text-slate-800">{auditItem.title}</span>}
+          onClose={() => setIsLinkAuditModalOpen(false)}
+          onSelect={handleLinkAudit}
+        />
       )}
     </div>
   );

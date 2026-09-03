@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Lock, Save, Send, Trash2 } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowLeft, Lock, Plus, Save, Send, Trash2, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -8,9 +8,11 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
+import StatusBadge from '../components/StatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
+import LinkItemModal from '../components/LinkItemModal.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
 // un <select>, seul moyen simple de distinguer "non vérifiée" d'un false explicite.
@@ -85,6 +87,10 @@ export default function CapaDetail() {
 
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+
+  const [isLinkProcedureModalOpen, setIsLinkProcedureModalOpen] = useState(false);
+  const [linksError, setLinksError] = useState('');
+  const [unlinkingId, setUnlinkingId] = useState(null);
 
   async function loadCapa() {
     setLoading(true);
@@ -183,6 +189,29 @@ export default function CapaDetail() {
       setCommentError(err.response?.data?.error || "Impossible d'ajouter le commentaire.");
     } finally {
       setSubmittingComment(false);
+    }
+  }
+
+  // Rattache une procédure existante à CETTE CAPA — même route que depuis ProcedureDetail.jsx
+  // (POST /api/procedures/:procedureId/link-capa), juste appelée dans l'autre sens : c'est le
+  // cas d'usage le plus fréquent en pratique (une CAPA qui débouche sur une révision de
+  // procédure, constatée ici au moment de la clôturer).
+  async function handleLinkProcedure(procedure) {
+    await api.post(`/procedures/${procedure.id}/link-capa`, { capa_id: id });
+    setIsLinkProcedureModalOpen(false);
+    await loadCapa();
+  }
+
+  async function handleUnlinkProcedure(procedureId) {
+    setLinksError('');
+    setUnlinkingId(procedureId);
+    try {
+      await api.delete(`/procedures/${procedureId}/link-capa/${id}`);
+      await loadCapa();
+    } catch (err) {
+      setLinksError(err.response?.data?.error || 'Impossible de retirer ce lien.');
+    } finally {
+      setUnlinkingId(null);
     }
   }
 
@@ -466,6 +495,52 @@ export default function CapaDetail() {
         </div>
       </form>
 
+      {linksError && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{linksError}</p>
+      )}
+
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Procédures liées</h2>
+          <button
+            type="button"
+            onClick={() => setIsLinkProcedureModalOpen(true)}
+            className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-700"
+          >
+            <Plus size={14} />
+            Rattacher une procédure
+          </button>
+        </div>
+
+        {(capa.linked_procedures || []).length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Aucune procédure rattachée pour l'instant — si cette CAPA a débouché sur une révision de procédure, c'est
+            ici qu'on le trace.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {capa.linked_procedures.map((procedure) => (
+              <li key={procedure.id} className="flex items-center justify-between gap-2 py-2.5">
+                <Link to={`/procedures/${procedure.id}`} className="flex items-center gap-2 text-sm hover:text-primary">
+                  <span className="font-medium text-slate-800">{procedure.number}</span>
+                  <span className="text-slate-600">{procedure.title}</span>
+                  <StatusBadge status={procedure.status} />
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => handleUnlinkProcedure(procedure.id)}
+                  disabled={unlinkingId === procedure.id}
+                  aria-label="Retirer ce lien"
+                  className="shrink-0 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600 disabled:opacity-50"
+                >
+                  <XCircle size={16} />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Commentaires de suivi</h2>
 
@@ -506,6 +581,23 @@ export default function CapaDetail() {
           </button>
         </form>
       </div>
+
+      {isLinkProcedureModalOpen && (
+        <LinkItemModal
+          title="Rattacher une procédure"
+          fetchUrl="/procedures"
+          excludeIds={(capa.linked_procedures || []).map((procedure) => procedure.id)}
+          getSearchText={(procedure) => `${procedure.number} ${procedure.title}`}
+          renderItem={(procedure) => (
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="shrink-0 font-medium text-slate-800">{procedure.number}</span>
+              <span className="truncate text-slate-600">{procedure.title}</span>
+            </span>
+          )}
+          onClose={() => setIsLinkProcedureModalOpen(false)}
+          onSelect={handleLinkProcedure}
+        />
+      )}
     </div>
   );
 }
