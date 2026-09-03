@@ -63,6 +63,7 @@ const RECURRENCE_LABELS = {
   daily: 'Quotidienne',
   weekly: 'Hebdomadaire',
   monthly: 'Mensuelle',
+  yearly: 'Annuelle',
 };
 
 function formatDateHeading(dateStr) {
@@ -637,7 +638,10 @@ export default function Planning() {
     return items.filter((item) => {
       if (typeFilter.length > 0 && !typeFilter.includes(item.type)) return false;
       if (overdueOnly && !item.is_overdue) return false;
-      if (assigneeFilter && !(item.type === 'task' && item.assigned_to === assigneeFilter)) return false;
+      // Ne s'applique qu'aux tâches (seul type portant assigned_to dans l'agrégat) — les autres
+      // types d'éléments restent visibles, ce filtre ne les concerne pas (bug corrigé : il les
+      // masquait tous dès que ce filtre était actif).
+      if (assigneeFilter && item.type === 'task' && item.assigned_to !== assigneeFilter) return false;
       if (searchText.trim() && !item.title.toLowerCase().includes(searchText.trim().toLowerCase())) return false;
       return true;
     });
