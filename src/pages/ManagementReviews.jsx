@@ -218,7 +218,10 @@ export default function ManagementReviews() {
       REVIEW_STATUS_LABELS[review.status] || review.status,
       review.participants || '',
     ]);
-    exportToCsv(`revues-direction-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    exportToCsv(`revues-direction-${new Date().toISOString().slice(0, 10)}.csv`, 'Revues de direction', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -240,6 +243,7 @@ export default function ManagementReviews() {
       }));
       await exportToPdf(`revues-direction-${new Date().toISOString().slice(0, 10)}.pdf`, 'Revues de direction', columns, rows, {
         subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

@@ -783,11 +783,33 @@ export default function Planning() {
   }, {});
   const dates = Object.keys(grouped).sort();
 
+  // Décrit les filtres réellement actifs pour le sous-titre de l'export — un auditeur qui reçoit
+  // ce document doit savoir sur quel périmètre il porte sans avoir à redemander.
+  function describeActiveFilters() {
+    const parts = [];
+    if (selectedServiceIds.length > 0) {
+      const names = allServices.filter((s) => selectedServiceIds.includes(s.id)).map((s) => s.name);
+      if (names.length > 0) parts.push(`Services : ${names.join(', ')}`);
+    }
+    if (typeFilter.length > 0) parts.push(`Types : ${typeFilter.map((t) => TYPE_CONFIG[t].label).join(', ')}`);
+    if (overdueOnly) parts.push('En retard uniquement');
+    if (assigneeFilter) {
+      const user = users.find((u) => u.id === assigneeFilter);
+      parts.push(`Assigné : ${user?.full_name || assigneeFilter}`);
+    }
+    if (searchText.trim()) parts.push(`Recherche : "${searchText.trim()}"`);
+    return parts;
+  }
+
   function handleExportCsv(scopeIds) {
     const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
     const headers = ['Date', 'Type', 'Titre', 'En retard'];
     const rows = source.map((item) => [item.date, TYPE_CONFIG[item.type].label, item.title, item.is_overdue ? 'Oui' : 'Non']);
-    exportToCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    const countLabel = `${source.length} élément${source.length > 1 ? 's' : ''}`;
+    exportToCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, 'Planning', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: [countLabel, ...describeActiveFilters()].join(' · '),
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -807,8 +829,10 @@ export default function Planning() {
         title: item.title,
         overdue: item.is_overdue ? 'Oui' : 'Non',
       }));
+      const countLabel = `${source.length} élément${source.length > 1 ? 's' : ''}`;
       await exportToPdf(`planning-${new Date().toISOString().slice(0, 10)}.pdf`, 'Planning', columns, rows, {
-        subtitle: `${source.length} élément${source.length > 1 ? 's' : ''}`,
+        subtitle: [countLabel, ...describeActiveFilters()].join(' · '),
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

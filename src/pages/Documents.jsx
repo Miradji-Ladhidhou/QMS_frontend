@@ -608,7 +608,14 @@ export default function Documents() {
       formatDate(doc.created_at),
       doc.latest_version_comment || '',
     ]);
-    exportToCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
+    const filterParts = [];
+    if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
+    if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
+    exportToCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, 'Documents', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: [countLabel, ...filterParts].join(' · '),
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -637,8 +644,13 @@ export default function Documents() {
         review_date: formatDate(doc.review_date),
         latest_version_comment: doc.latest_version_comment || '',
       }));
+      const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
       await exportToPdf(`documents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Documents', columns, rows, {
-        subtitle: `${source.length} document${source.length > 1 ? 's' : ''}`,
+        subtitle: [countLabel, ...filterParts].join(' · '),
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

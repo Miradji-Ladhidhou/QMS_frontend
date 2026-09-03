@@ -265,7 +265,11 @@ export default function Haccp() {
       plan.service?.name || '',
       formatDate(plan.created_at),
     ]);
-    exportToCsv(`haccp-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
+    exportToCsv(`haccp-${new Date().toISOString().slice(0, 10)}.csv`, 'Plans HACCP', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -285,8 +289,10 @@ export default function Haccp() {
         service: plan.service?.name || '',
         created_at: formatDate(plan.created_at),
       }));
+      const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
       await exportToPdf(`haccp-${new Date().toISOString().slice(0, 10)}.pdf`, 'Plans HACCP', columns, rows, {
-        subtitle: `${source.length} plan${source.length > 1 ? 's' : ''}`,
+        subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

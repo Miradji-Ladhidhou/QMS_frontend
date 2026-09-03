@@ -471,7 +471,15 @@ export default function Risks() {
       risk.owner_user?.full_name || '',
       formatDate(risk.review_date),
     ]);
-    exportToCsv(`risques-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
+    const filterParts = [];
+    if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
+    if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
+    if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
+    exportToCsv(`risques-${new Date().toISOString().slice(0, 10)}.csv`, 'Registre des risques', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: [countLabel, ...filterParts].join(' · '),
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -495,8 +503,14 @@ export default function Risks() {
         owner: risk.owner_user?.full_name || '',
         review_date: formatDate(risk.review_date),
       }));
+      const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
+      if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
       await exportToPdf(`risques-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des risques', columns, rows, {
-        subtitle: `${source.length} risque${source.length > 1 ? 's' : ''}`,
+        subtitle: [countLabel, ...filterParts].join(' · '),
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

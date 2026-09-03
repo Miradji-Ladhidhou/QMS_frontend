@@ -1062,7 +1062,10 @@ export default function Trainings() {
         formatDate(record.completed_at),
       ])
     );
-    exportToCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    exportToCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, 'Formations', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -1088,6 +1091,7 @@ export default function Trainings() {
       );
       await exportToPdf(`formations-${new Date().toISOString().slice(0, 10)}.pdf`, 'Formations', columns, rows, {
         subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

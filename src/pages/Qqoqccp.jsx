@@ -187,7 +187,10 @@ export default function Qqoqccp() {
       QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
       formatDate(analysis.created_at),
     ]);
-    exportToCsv(`qqoqccp-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    exportToCsv(`qqoqccp-${new Date().toISOString().slice(0, 10)}.csv`, 'QQOQCCP', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: `${source.length} analyse${source.length > 1 ? 's' : ''}`,
+    });
   }
 
   return (

@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
 import { useSort } from '../lib/useSort.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import SortableTh from '../components/SortableTh.jsx';
 
@@ -38,6 +39,7 @@ function cellDateLabel(cell) {
 
 export default function SkillMatrix() {
   const navigate = useNavigate();
+  const currentUser = useCurrentUser();
   const [matrix, setMatrix] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -86,7 +88,10 @@ export default function SkillMatrix() {
         return dateLabel ? `${TRAINING_STATUS_LABELS[status]} (${dateLabel})` : TRAINING_STATUS_LABELS[status];
       }),
     ]);
-    exportToCsv(`matrice-competences-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    exportToCsv(`matrice-competences-${new Date().toISOString().slice(0, 10)}.csv`, 'Matrice des compétences', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: `${people.length} personne${people.length > 1 ? 's' : ''}`,
+    });
   }
 
   async function handleExportPdf() {

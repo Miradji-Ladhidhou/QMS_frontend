@@ -343,7 +343,11 @@ export default function Complaints() {
       formatDate(complaint.due_date),
       complaint.assigned?.full_name || '',
     ]);
-    exportToCsv(`reclamations-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
+    exportToCsv(`reclamations-${new Date().toISOString().slice(0, 10)}.csv`, 'Réclamations clients', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -367,8 +371,10 @@ export default function Complaints() {
         due_date: formatDate(complaint.due_date),
         assigned: complaint.assigned?.full_name || '',
       }));
+      const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
       await exportToPdf(`reclamations-${new Date().toISOString().slice(0, 10)}.pdf`, 'Réclamations clients', columns, rows, {
-        subtitle: `${source.length} réclamation${source.length > 1 ? 's' : ''}`,
+        subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

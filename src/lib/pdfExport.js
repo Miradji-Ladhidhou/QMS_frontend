@@ -18,10 +18,10 @@ function triggerPdfDownload(blob, filename) {
 // backend/src/routes/reports.js) pour l'en-tête logo/entreprise, qu'un navigateur ne peut pas
 // produire seul sans dépendance supplémentaire. columns : [{ key, label, width? }], width en
 // fraction de la largeur de page (0-1), fournie pour toutes les colonnes ou aucune.
-export async function exportToPdf(filename, title, columns, rows, { subtitle } = {}) {
+export async function exportToPdf(filename, title, columns, rows, { subtitle, generatedBy } = {}) {
   const response = await api.post(
     '/reports/table-pdf',
-    { title, subtitle, columns, rows },
+    { title, subtitle, generatedBy, columns, rows },
     { responseType: 'blob' }
   );
   triggerPdfDownload(new Blob([response.data], { type: 'application/pdf' }), filename);

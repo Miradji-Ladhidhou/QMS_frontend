@@ -1187,7 +1187,9 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   }
 
   function handleDownloadTemplate() {
-    exportToCsv('modele-import-kpi.csv', TEMPLATE_HEADERS, buildTemplateRows());
+    // title volontairement null : ceci est un modèle vierge à réimporter tel quel, pas un
+    // export de données — voir csvExport.js.
+    exportToCsv('modele-import-kpi.csv', null, TEMPLATE_HEADERS, buildTemplateRows());
   }
 
   function loadRecentImports() {
@@ -2206,6 +2208,7 @@ function DistributionView({ kpi }) {
 // dynamiques (clés de row_data), paginées côté backend, export CSV complet (toutes les
 // pages, pas seulement celle affichée).
 function RecordProofModal({ kpi, record, onClose }) {
+  const currentUser = useCurrentUser();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
   const [page, setPage] = useState(1);
@@ -2239,10 +2242,12 @@ function RecordProofModal({ kpi, record, onClose }) {
       }
       exportToCsv(
         `${sanitizeFilename(kpi.name)}-preuve-${record.period_date}.csv`,
+        `Preuve — ${kpi.name}`,
         data.columns,
         allRows.map((row) =>
           data.columns.map((col) => (row.row_data[col] === null || row.row_data[col] === undefined ? '' : String(row.row_data[col])))
-        )
+        ),
+        { generatedBy: currentUser?.full_name, subtitle: `Période : ${record.period_date} · ${allRows.length} ligne${allRows.length > 1 ? 's' : ''}` }
       );
     } finally {
       setExporting(false);
@@ -2404,6 +2409,7 @@ function KpiCard({
   isSelected,
   onToggleSelect,
 }) {
+  const currentUser = useCurrentUser();
   const [showHistory, setShowHistory] = useState(false);
   const [showImports, setShowImports] = useState(false);
   const [imports, setImports] = useState(null);
@@ -2502,13 +2508,15 @@ function KpiCard({
     const sortedRecords = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
     exportToCsv(
       `${sanitizeFilename(kpi.name)}-valeurs.csv`,
+      kpi.name,
       ['Période', 'Valeur', 'Source', 'Commentaire'],
       sortedRecords.map((record) => [
         formatDate(record.period_date),
         record.value,
         SOURCE_LABELS[record.source] || record.source,
         record.comment || '',
-      ])
+      ]),
+      { generatedBy: currentUser?.full_name, subtitle: `${sortedRecords.length} valeur${sortedRecords.length > 1 ? 's' : ''}` }
     );
   }
 

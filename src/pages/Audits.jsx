@@ -303,7 +303,11 @@ export default function Audits() {
       formatDate(audit.planned_date),
       formatDate(audit.completed_date),
     ]);
-    exportToCsv(`audits-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
+    exportToCsv(`audits-${new Date().toISOString().slice(0, 10)}.csv`, 'Audits internes', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -327,8 +331,10 @@ export default function Audits() {
         auditor: audit.lead?.full_name || '',
         planned_date: formatDate(audit.planned_date),
       }));
+      const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
       await exportToPdf(`audits-${new Date().toISOString().slice(0, 10)}.pdf`, 'Audits internes', columns, rows, {
-        subtitle: `${source.length} audit${source.length > 1 ? 's' : ''}`,
+        subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

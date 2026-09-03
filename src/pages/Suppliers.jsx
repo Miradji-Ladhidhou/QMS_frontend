@@ -303,7 +303,11 @@ export default function Suppliers() {
       supplier.contact_name || '',
       formatDate(supplier.next_evaluation_date),
     ]);
-    exportToCsv(`fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
+    exportToCsv(`fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`, 'Évaluation fournisseurs', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -327,8 +331,10 @@ export default function Suppliers() {
         contact: supplier.contact_name || '',
         next_evaluation_date: formatDate(supplier.next_evaluation_date),
       }));
+      const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
       await exportToPdf(`fournisseurs-${new Date().toISOString().slice(0, 10)}.pdf`, 'Évaluation fournisseurs', columns, rows, {
-        subtitle: `${source.length} fournisseur${source.length > 1 ? 's' : ''}`,
+        subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');

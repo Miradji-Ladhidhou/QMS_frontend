@@ -591,7 +591,10 @@ export default function Capas() {
       capa.comment || '',
     ]);
 
-    exportToCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, headers, rows);
+    exportToCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, 'CAPA', headers, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle: `${source.length} CAPA`,
+    });
   }
 
   async function handleExportPdf(scopeIds) {
@@ -617,6 +620,7 @@ export default function Capas() {
       }));
       await exportToPdf(`capa-${new Date().toISOString().slice(0, 10)}.pdf`, 'CAPA', columns, rows, {
         subtitle: `${source.length} CAPA`,
+        generatedBy: currentUser?.full_name,
       });
     } catch {
       setExportPdfError('Impossible de générer le PDF.');
