@@ -186,43 +186,18 @@ function BigNumber({ value, suffix, trend }) {
   );
 }
 
-const SPARKLINE_WIDTH = 72;
-const SPARKLINE_HEIGHT = 24;
-
-// SVG à la main plutôt que recharts : ce widget n'a besoin que d'un tracé minimal (pas d'axes,
-// pas d'infobulle), et Dashboard.jsx ne charge sinon aucun morceau du gros chunk recharts —
-// pas de raison de l'y faire entrer pour trois points de données.
-function Sparkline({ values, stroke }) {
-  if (!values || values.length < 2) return null;
-
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const range = max - min || 1;
-  const step = SPARKLINE_WIDTH / (values.length - 1);
-  const points = values
-    .map((value, i) => `${i * step},${SPARKLINE_HEIGHT - ((value - min) / range) * SPARKLINE_HEIGHT}`)
-    .join(' ');
-  const lastX = (values.length - 1) * step;
-  const lastY = SPARKLINE_HEIGHT - ((values[values.length - 1] - min) / range) * SPARKLINE_HEIGHT;
-
-  return (
-    <svg width={SPARKLINE_WIDTH} height={SPARKLINE_HEIGHT} viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`} className="shrink-0">
-      <polyline points={points} fill="none" stroke={stroke} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx={lastX} cy={lastY} r="2" fill={stroke} />
-    </svg>
-  );
-}
-
+// Juste le nom + un badge "Sous l'objectif" — délibérément sans valeur ni graphique : afficher
+// une moyenne ou un pourcentage ici prêtait à confusion (le chiffre ne correspond à aucune
+// valeur affichée ailleurs dans l'app d'un simple coup d'œil). Pour voir le détail d'un KPI
+// précis (valeur, cible, historique), il faut ouvrir sa fiche — ce que fait déjà le clic sur
+// la carte entière (voir WidgetCard to="/kpis" plus bas).
 function KpiPreviewRow({ kpi }) {
   return (
     <div className="flex items-center justify-between gap-3 py-1.5">
-      <div className="min-w-0">
-        <p className="truncate text-sm text-slate-700">{kpi.name}</p>
-        <p className="text-xs text-slate-400">
-          {kpi.average} {kpi.unit || ''}
-        </p>
-      </div>
-      <Sparkline values={kpi.sparkline} stroke="#dc2626" />
+      <p className="min-w-0 truncate text-sm text-slate-700">{kpi.name}</p>
+      <span className="shrink-0 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
+        Sous l'objectif
+      </span>
     </div>
   );
 }
@@ -492,6 +467,14 @@ export default function Dashboard() {
                     <KpiPreviewRow key={kpi.id} kpi={kpi} />
                   ))}
                 </div>
+              )}
+              {/* Aperçu volontairement limité à 3 (voir dashboard.js#computeKpiSummary) même
+                  avec 60 KPI en tout : seul le total ci-dessus reflète le vrai nombre, cette
+                  ligne le rappelle plutôt que de laisser croire que la liste est complète. */}
+              {stats.kpis.off_target > (stats.kpis.preview?.length || 0) && (
+                <p className="mt-1 text-xs text-slate-400">
+                  + {stats.kpis.off_target - stats.kpis.preview.length} autre(s), voir la page KPI
+                </p>
               )}
             </WidgetCard>
           ))}
