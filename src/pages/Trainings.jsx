@@ -40,6 +40,23 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
 
+// next_due_date est calculé et stocké côté serveur à chaque réalisation (voir POST
+// /:id/records, addMonths(completed_at, frequency_months)) — même champ que celui utilisé par
+// la Matrice des compétences, pour ne jamais afficher une notion de "retard" différente de la
+// sienne sur cette page.
+function countOverdueRecords(training, today) {
+  return training.records.filter((record) => record.next_due_date && record.next_due_date < today).length;
+}
+
+function StatCard({ label, value, accent }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <p className={`text-2xl font-semibold ${accent}`}>{value}</p>
+      <p className="text-sm text-slate-500">{label}</p>
+    </div>
+  );
+}
+
 const PERSON_KIND_LABEL = { user: 'Compte', employee: 'Sans compte' };
 
 function personKey(kind, id) {
@@ -984,6 +1001,7 @@ export default function Trainings() {
   const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
   const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [search, setSearch] = useState('');
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -1293,8 +1311,20 @@ export default function Trainings() {
 
   const hasAnyRecord = trainings.some((training) => training.records.length > 0);
 
+  const today = new Date().toISOString().slice(0, 10);
+  const dormantCount = trainings.filter((training) => training.records.length === 0).length;
+  const overdueRecordsCount = trainings.reduce((sum, training) => sum + countOverdueRecords(training, today), 0);
+
+  const filteredTrainings = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return trainings;
+    return trainings.filter(
+      (training) => training.title.toLowerCase().includes(query) || training.type?.toLowerCase().includes(query)
+    );
+  }, [trainings, search]);
+
   const { sorted: sortedTrainings, sortKey, direction, setSortKey, toggleSort } = useSort(
-    trainings,
+    filteredTrainings,
     getTrainingSortValue,
     'title',
     'asc'
@@ -1384,7 +1414,29 @@ export default function Trainings() {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Formations" value={trainings.length} accent="text-slate-900" />
+        <StatCard label="Réalisations" value={trainings.reduce((sum, t) => sum + t.records.length, 0)} accent="text-slate-900" />
+        <StatCard
+          label="Jamais réalisées"
+          value={dormantCount}
+          accent={dormantCount > 0 ? 'text-amber-700' : 'text-slate-900'}
+        />
+        <StatCard
+          label="Personnes en retard de recyclage"
+          value={overdueRecordsCount}
+          accent={overdueRecordsCount > 0 ? 'text-red-700' : 'text-slate-900'}
+        />
+      </div>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <input
+          type="text"
+          placeholder="Rechercher par titre ou type..."
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:max-w-sm"
+        />
         <SortSelect
           options={TRAINING_SORT_OPTIONS}
           sortKey={sortKey}
@@ -1516,6 +1568,8 @@ export default function Trainings() {
         </div>
       ) : trainings.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune formation pour l'instant.</p>
+      ) : sortedTrainings.length === 0 ? (
+        <p className="mt-6 text-sm text-slate-500">Aucune formation ne correspond à cette recherche.</p>
       ) : (
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {trainingGroups.map((group) => (
@@ -1535,9 +1589,15 @@ export default function Trainings() {
               {(!isFolderView || expandedFolders.has(group.key)) &&
                 group.trainings.map((training) => {
                   const isExpanded = expandedId === training.id;
+                  const overdueCount = countOverdueRecords(training, today);
 
                   return (
-                    <div key={training.id} className="flex flex-col rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                    <div
+                      key={training.id}
+                      className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm sm:p-5 ${
+                        overdueCount > 0 ? 'border-red-300' : 'border-slate-200'
+                      }`}
+                    >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2">
                           {canManage && (
@@ -1587,6 +1647,16 @@ export default function Trainings() {
                       )}
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {overdueCount > 0 && (
+                          <span className="rounded-full bg-red-100 px-2 py-0.5 text-[11px] font-medium text-red-700">
+                            {overdueCount} en retard de recyclage
+                          </span>
+                        )}
+                        {overdueCount === 0 && training.records.length === 0 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+                            Aucune réalisation
+                          </span>
+                        )}
                         <CategoryBadge category={training.category} />
                         {canManage && (
                           <select
