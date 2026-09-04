@@ -925,7 +925,7 @@ export default function Planning() {
   const [searchText, setSearchText] = useState('');
   const [viewMode, setViewMode] = useState('calendar');
   const [groupBy, setGroupBy] = useState('type');
-  const [collapsedTypeFolders, setCollapsedTypeFolders] = useState(() => new Set());
+  const [expandedTypeFolders, setExpandedTypeFolders] = useState(() => new Set());
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => formatIsoDate(new Date()));
 
@@ -934,7 +934,7 @@ export default function Planning() {
   }
 
   function toggleTypeFolder(type) {
-    setCollapsedTypeFolders((prev) => {
+    setExpandedTypeFolders((prev) => {
       const next = new Set(prev);
       if (next.has(type)) next.delete(type);
       else next.add(type);
@@ -1533,7 +1533,7 @@ export default function Planning() {
           {groupedByType.map(({ type, items: typeItems, dates: typeDates, byDate }) => {
             const config = TYPE_CONFIG[type];
             const FolderIcon = config.icon;
-            const collapsed = collapsedTypeFolders.has(type);
+            const collapsed = !expandedTypeFolders.has(type);
             return (
               <div key={type} className="rounded-xl border border-slate-200 bg-white shadow-sm">
                 <button
