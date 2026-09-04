@@ -527,7 +527,7 @@ function getMonthCells(year, month) {
 // interaction directe visible depuis la liste). Le badge devient un bouton qui déplie le détail
 // de la checklist directement sur la carte, chaque étape cochable en un clic (PATCH
 // /tasks/:id { checklist } uniquement, pas besoin d'ouvrir le formulaire).
-function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSelect, onMarkDone, onToggleChecklistItem, onAddChecklistItem, onEdit, onDelete }) {
+function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkDone, onToggleChecklistItem, onAddChecklistItem, onEdit, onDelete }) {
   const config = TYPE_CONFIG[item.type];
   const Icon = config.icon;
   const isTask = item.type === 'task';
@@ -558,7 +558,7 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
       }`}
     >
       <div className="flex items-center gap-3 p-3 sm:p-4">
-      {isTask && canManage && (
+      {isTask && deletable && (
         <input
           type="checkbox"
           checked={selected}
@@ -1514,29 +1514,29 @@ export default function Planning() {
         </div>
       )}
 
-      {canManage && (
-        <SelectAllToggle
-          ids={filteredItems.filter((item) => item.type === 'task').map((item) => item.id)}
-          selectedIds={selectedTaskIds}
-          onChange={setSelectedTaskIds}
-        />
-      )}
+      {/* Sélectionnable dès qu'au moins une tâche est supprimable par l'utilisateur courant —
+          un manager voit toutes les tâches, un member uniquement celles qu'il a créées (même
+          règle que canDeleteTask/DELETE /tasks/bulk côté backend, qui autorise déjà un member à
+          supprimer ses propres tâches en masse sans que le frontend ne l'exposait jusqu'ici). */}
+      <SelectAllToggle
+        ids={filteredItems.filter((item) => item.type === 'task' && canDeleteTask(item, currentUser)).map((item) => item.id)}
+        selectedIds={selectedTaskIds}
+        onChange={setSelectedTaskIds}
+      />
 
-      {canManage && (
-        <BulkSelectionBar
-          count={selectedTaskIds.length}
-          onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedTaskIds)}
-          onExportPdf={() => handleExportPdf(selectedTaskIds)}
-          exportingPdf={exportingPdf}
-          onExportXlsx={() => handleExportXlsx(selectedTaskIds)}
-          exportingXlsx={exportingXlsx}
-          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedTaskIds) : undefined}
-          exportingDrive={exportingDrive}
-          onDelete={handleBulkDeleteTasks}
-          onClear={() => setSelectedTaskIds([])}
-        />
-      )}
+      <BulkSelectionBar
+        count={selectedTaskIds.length}
+        onMove={canManage ? () => setIsBulkMoveModalOpen(true) : undefined}
+        onExportCsv={() => handleExportCsv(selectedTaskIds)}
+        onExportPdf={() => handleExportPdf(selectedTaskIds)}
+        exportingPdf={exportingPdf}
+        onExportXlsx={() => handleExportXlsx(selectedTaskIds)}
+        exportingXlsx={exportingXlsx}
+        onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedTaskIds) : undefined}
+        exportingDrive={exportingDrive}
+        onDelete={handleBulkDeleteTasks}
+        onClear={() => setSelectedTaskIds([])}
+      />
 
       {loading ? (
         <div className="mt-4 space-y-3">
@@ -1577,7 +1577,6 @@ export default function Planning() {
                     key={`${item.type}-${item.id}`}
                     item={item}
                     currentUser={currentUser}
-                    canManage={canManage}
                     selected={selectedTaskIds.includes(item.id)}
                     onToggleSelect={() => toggleSelectTask(item.id)}
                     onMarkDone={handleMarkDone}
@@ -1630,8 +1629,7 @@ export default function Planning() {
                               key={`${item.type}-${item.id}`}
                               item={item}
                               currentUser={currentUser}
-                              canManage={canManage}
-                              selected={selectedTaskIds.includes(item.id)}
+                                        selected={selectedTaskIds.includes(item.id)}
                               onToggleSelect={() => toggleSelectTask(item.id)}
                               onMarkDone={handleMarkDone}
                               onToggleChecklistItem={handleToggleChecklistItem}
@@ -1660,7 +1658,6 @@ export default function Planning() {
                     key={`${item.type}-${item.id}`}
                     item={item}
                     currentUser={currentUser}
-                    canManage={canManage}
                     selected={selectedTaskIds.includes(item.id)}
                     onToggleSelect={() => toggleSelectTask(item.id)}
                     onMarkDone={handleMarkDone}
