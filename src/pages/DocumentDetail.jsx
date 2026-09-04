@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
   BadgeCheck,
+  CalendarCheck,
   Check,
   ChevronDown,
   ChevronUp,
@@ -39,6 +40,7 @@ const AUDIT_ACTION_LABELS = {
   certificate_generated: 'Certificat généré',
   metadata_edited_manually: 'Informations administratives modifiées manuellement',
   created_via_import: 'Créé par import en masse',
+  marked_reviewed: 'Marqué comme révisé',
 };
 
 // yyyy-mm-ddThh:mm:ss... -> yyyy-mm-dd, pour un <input type="date">.
@@ -330,6 +332,86 @@ function EditMetadataModal({ doc, onClose, onUpdated }) {
   );
 }
 
+// yyyy-mm-dd, aujourd'hui + N mois — même calcul que addMonthsIso côté backend
+// (routes/documents.js#computeReviewDateUpdate), pour préremplir une suggestion cohérente
+// avec ce que le serveur calculerait automatiquement s'il y avait une fréquence.
+function addMonthsToToday(months) {
+  const date = new Date();
+  date.setMonth(date.getMonth() + Number(months));
+  return date.toISOString().slice(0, 10);
+}
+
+// Sans fréquence de révision configurée (ni sur le document, ni par défaut sur le tenant, voir
+// Paramètres > Documents), uploader une nouvelle version ne fait JAMAIS avancer review_date —
+// un document déjà en retard le reste indéfiniment même après une vraie mise à jour de
+// contenu. Ce bouton comble ce trou en laissant confirmer/choisir la prochaine date à la main
+// (voir POST /documents/:id/mark-reviewed) — préremplie avec la fréquence effective si elle
+// existe, sinon +12 mois par défaut, toujours modifiable.
+function MarkReviewedModal({ doc, suggestedFrequencyMonths, onClose, onUpdated }) {
+  const [reviewDate, setReviewDate] = useState(addMonthsToToday(suggestedFrequencyMonths || 12));
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    let data;
+    try {
+      ({ data } = await api.post(`/documents/${doc.id}/mark-reviewed`, { review_date: reviewDate }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de marquer ce document comme révisé.');
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+    onUpdated(data);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Marquer comme révisé</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-slate-500">
+          Confirme que ce document a été relu aujourd'hui et choisis sa prochaine date de révision.
+        </p>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Prochaine révision</label>
+            <input
+              type="date"
+              required
+              value={reviewDate}
+              onChange={(e) => setReviewDate(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Enregistrement...' : 'Marquer comme révisé'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // Panneau admin/manager "qui a lu / qui n'a pas encore" — chargement à part (pas dans
 // loadDocument) : n'a besoin d'être appelé que si requires_acknowledgment est actif, et jamais
 // pour un rôle qui n'y a pas accès (403 sinon).
@@ -408,6 +490,7 @@ export default function DocumentDetail() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isBumpModalOpen, setIsBumpModalOpen] = useState(false);
   const [isEditMetadataModalOpen, setIsEditMetadataModalOpen] = useState(false);
+  const [isMarkReviewedModalOpen, setIsMarkReviewedModalOpen] = useState(false);
   const [isSubmitModalOpen, setIsSubmitModalOpen] = useState(false);
   const [decisionModal, setDecisionModal] = useState(null);
   const [certificateError, setCertificateError] = useState('');
@@ -478,6 +561,11 @@ export default function DocumentDetail() {
 
   function handleMetadataUpdated() {
     setIsEditMetadataModalOpen(false);
+    loadDocument();
+  }
+
+  function handleMarkReviewed() {
+    setIsMarkReviewedModalOpen(false);
     loadDocument();
   }
 
@@ -705,6 +793,17 @@ export default function DocumentDetail() {
                 Modifier
               </button>
             )}
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setIsMarkReviewedModalOpen(true)}
+                title="Confirmer la relecture et fixer la prochaine date de révision"
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                <CalendarCheck size={16} />
+                Marquer comme révisé
+              </button>
+            )}
             {canManage && <ShareRecordPanel resourceType="document" resourceId={doc.id} />}
           </div>
         </div>
@@ -924,6 +1023,15 @@ export default function DocumentDetail() {
 
       {isEditMetadataModalOpen && (
         <EditMetadataModal doc={doc} onClose={() => setIsEditMetadataModalOpen(false)} onUpdated={handleMetadataUpdated} />
+      )}
+
+      {isMarkReviewedModalOpen && (
+        <MarkReviewedModal
+          doc={doc}
+          suggestedFrequencyMonths={effectiveReviewFrequency}
+          onClose={() => setIsMarkReviewedModalOpen(false)}
+          onUpdated={handleMarkReviewed}
+        />
       )}
 
       {isSubmitModalOpen && (
