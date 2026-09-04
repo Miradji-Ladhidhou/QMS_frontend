@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
   Calendar,
+  CalendarDays,
   Check,
   CheckSquare,
   ChevronLeft,
@@ -581,7 +582,7 @@ function CalendarLegend({ types }) {
   );
 }
 
-function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selectedDate, onSelectDate }) {
+function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, onToday, onJumpToDate, selectedDate, onSelectDate }) {
   const cells = getMonthCells(year, month);
   const today = formatIsoDate(new Date());
   const monthLabel = new Date(year, month, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
@@ -614,6 +615,26 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
         >
           <ChevronRight size={18} />
         </button>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center justify-center gap-2">
+        <button
+          type="button"
+          onClick={onToday}
+          className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+        >
+          Aujourd'hui
+        </button>
+        <div className="relative">
+          <CalendarDays size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => onJumpToDate(e.target.value)}
+            aria-label="Aller à une date"
+            className="rounded-md border border-slate-300 py-1.5 pl-8 pr-2 text-xs text-slate-600 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-medium text-slate-400">
@@ -1226,6 +1247,17 @@ export default function Planning() {
             grouped={grouped}
             onPrevMonth={() => setCalendarDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
             onNextMonth={() => setCalendarDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            onToday={() => {
+              const now = new Date();
+              setCalendarDate(now);
+              setSelectedCalendarDate(formatIsoDate(now));
+            }}
+            onJumpToDate={(dateStr) => {
+              if (!dateStr) return;
+              const [y, m, d] = dateStr.split('-').map(Number);
+              setCalendarDate(new Date(y, m - 1, d));
+              setSelectedCalendarDate(dateStr);
+            }}
             selectedDate={selectedCalendarDate}
             onSelectDate={setSelectedCalendarDate}
           />
