@@ -14,15 +14,12 @@ import {
   Circle,
   ClipboardCheck,
   ClipboardList,
-  Cloud,
-  Download,
   Filter,
   FileCheck,
   FileText,
   Folder,
   GraduationCap,
   List,
-  Loader2,
   MessageSquareWarning,
   Pencil,
   Plus,
@@ -45,6 +42,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 
 const TYPE_CONFIG = {
   capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
@@ -1284,44 +1282,16 @@ export default function Planning() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Planning</h1>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleExportCsv()}
+          <ExportMenu
             disabled={filteredItems.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            <Download size={18} />
-            Exporter CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportPdf()}
-            disabled={exportingPdf || filteredItems.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportXlsx()}
-            disabled={exportingXlsx || filteredItems.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter Excel
-          </button>
-          {tenant?.storage_provider === 'google_drive' && (
-            <button
-              type="button"
-              onClick={() => handleExportDrive()}
-              disabled={exportingDrive || filteredItems.length === 0}
-              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-            >
-              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
-              Enregistrer sur Drive
-            </button>
-          )}
+            onExportCsv={() => handleExportCsv()}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+            exportingDrive={exportingDrive}
+          />
           <button
             type="button"
             onClick={() => setIsNewModalOpen(true)}
