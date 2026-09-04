@@ -6,8 +6,10 @@ import {
   CalendarDays,
   Check,
   CheckSquare,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   Circle,
   ClipboardCheck,
   ClipboardList,
@@ -305,7 +307,18 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
           )}
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Checklist</label>
+            <label className="mb-1 flex items-center gap-2 text-sm font-medium text-slate-700">
+              Checklist
+              {checklist.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                  {checklist.filter((entry) => entry.done).length}/{checklist.length}
+                </span>
+              )}
+            </label>
+            <p className="mb-2 text-xs text-slate-400">
+              Décomposez cette tâche en étapes que vous pourrez cocher une par une, directement depuis la liste — sans rouvrir ce
+              formulaire.
+            </p>
             {checklist.length > 0 && (
               <ul className="mb-2 space-y-1.5">
                 {checklist.map((entry, index) => (
@@ -464,23 +477,32 @@ function getMonthCells(year, month) {
   return cells;
 }
 
-function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSelect, onMarkDone, onEdit, onDelete }) {
+// La checklist n'était visible que comme un badge "2/5" figé sur la carte : la seule façon de
+// cocher une étape était d'ouvrir "Modifier" (formulaire complet) puis d'enregistrer — pour un
+// geste aussi fréquent que cocher une étape, c'est ce qui la rendait "incompréhensible" (aucune
+// interaction directe visible depuis la liste). Le badge devient un bouton qui déplie le détail
+// de la checklist directement sur la carte, chaque étape cochable en un clic (PATCH
+// /tasks/:id { checklist } uniquement, pas besoin d'ouvrir le formulaire).
+function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSelect, onMarkDone, onToggleChecklistItem, onEdit, onDelete }) {
   const config = TYPE_CONFIG[item.type];
   const Icon = config.icon;
   const isTask = item.type === 'task';
   const editable = isTask && canEditTask(item, currentUser);
   const deletable = isTask && canDeleteTask(item, currentUser);
+  const [checklistExpanded, setChecklistExpanded] = useState(false);
 
   const priorityBorder = isTask ? PRIORITY_CONFIG[item.priority]?.border : null;
-  const checklistDone = isTask ? (item.checklist || []).filter((entry) => entry.done).length : 0;
-  const checklistTotal = isTask ? (item.checklist || []).length : 0;
+  const checklist = isTask ? item.checklist || [] : [];
+  const checklistDone = checklist.filter((entry) => entry.done).length;
+  const checklistTotal = checklist.length;
 
   const content = (
     <div
-      className={`flex items-center gap-3 rounded-xl border bg-white p-3 shadow-sm sm:p-4 ${
-        item.is_overdue ? 'border-red-200' : 'border-slate-200'
-      } ${priorityBorder ? `border-l-4 ${priorityBorder}` : ''}`}
+      className={`rounded-xl border bg-white shadow-sm ${item.is_overdue ? 'border-red-200' : 'border-slate-200'} ${
+        priorityBorder ? `border-l-4 ${priorityBorder}` : ''
+      }`}
     >
+      <div className="flex items-center gap-3 p-3 sm:p-4">
       {isTask && canManage && (
         <input
           type="checkbox"
@@ -524,10 +546,18 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
             </span>
           )}
           {isTask && checklistTotal > 0 && (
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setChecklistExpanded((prev) => !prev);
+              }}
+              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600 hover:bg-slate-200"
+            >
               <CheckSquare size={11} />
               {checklistDone}/{checklistTotal}
-            </span>
+              {checklistExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            </button>
           )}
         </div>
       </div>
@@ -555,6 +585,31 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
             </button>
           )}
         </div>
+      )}
+      </div>
+
+      {isTask && checklistExpanded && checklistTotal > 0 && (
+        <ul className="space-y-1.5 border-t border-slate-100 px-3 pb-3 pt-2.5 sm:px-4">
+          {checklist.map((entry, index) => (
+            <li key={index} className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (editable) onToggleChecklistItem(item, index);
+                }}
+                disabled={!editable}
+                aria-label={entry.done ? 'Marquer comme à faire' : 'Marquer comme fait'}
+                className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${
+                  entry.done ? 'border-primary bg-primary text-white' : 'border-slate-300'
+                } ${editable ? '' : 'cursor-default opacity-70'}`}
+              >
+                {entry.done && <Check size={10} />}
+              </button>
+              <span className={`text-sm ${entry.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>{entry.text}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
@@ -885,6 +940,19 @@ export default function Planning() {
       await loadPlanning(selectedServiceIds);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de marquer cette tâche comme terminée.');
+    }
+  }
+
+  // Coche/décoche une seule étape directement depuis la carte (voir PlanningItemCard) — un
+  // simple PATCH ne portant que sur checklist, jamais besoin d'ouvrir le formulaire complet
+  // pour ce geste fréquent.
+  async function handleToggleChecklistItem(item, index) {
+    const updatedChecklist = (item.checklist || []).map((entry, i) => (i === index ? { ...entry, done: !entry.done } : entry));
+    try {
+      await api.patch(`/tasks/${item.id}`, { checklist: updatedChecklist });
+      await loadPlanning(selectedServiceIds);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de mettre à jour la checklist.');
     }
   }
 
@@ -1276,6 +1344,7 @@ export default function Planning() {
                     selected={selectedTaskIds.includes(item.id)}
                     onToggleSelect={() => toggleSelectTask(item.id)}
                     onMarkDone={handleMarkDone}
+                    onToggleChecklistItem={handleToggleChecklistItem}
                     onEdit={setEditingTaskId}
                     onDelete={handleDeleteTask}
                   />
@@ -1301,6 +1370,7 @@ export default function Planning() {
                     selected={selectedTaskIds.includes(item.id)}
                     onToggleSelect={() => toggleSelectTask(item.id)}
                     onMarkDone={handleMarkDone}
+                    onToggleChecklistItem={handleToggleChecklistItem}
                     onEdit={setEditingTaskId}
                     onDelete={handleDeleteTask}
                   />
