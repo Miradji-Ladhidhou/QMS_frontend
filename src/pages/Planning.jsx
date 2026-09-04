@@ -421,6 +421,38 @@ function formatIsoDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+// Aperçu chiffré calculé sur `items` (le périmètre chargé, scope service compris) plutôt que
+// sur `filteredItems` : un total qui bougerait avec les filtres de recherche/type juste
+// en-dessous serait déroutant (deux nombres qui se répondent l'un l'autre plutôt qu'un vrai
+// point de repère stable). Donne un vrai aperçu d'ensemble avant de plonger dans le détail —
+// la page ne se résumait jusqu'ici qu'à une longue liste filtrable, sans vision globale.
+function PlanningSummary({ items }) {
+  const today = formatIsoDate(new Date());
+  const weekEnd = formatIsoDate(new Date(Date.now() + 6 * 24 * 60 * 60 * 1000));
+
+  const overdue = items.filter((item) => item.is_overdue).length;
+  const dueToday = items.filter((item) => item.date === today).length;
+  const dueThisWeek = items.filter((item) => item.date >= today && item.date <= weekEnd).length;
+
+  const stats = [
+    { label: 'En retard', value: overdue, tone: overdue > 0 ? 'text-red-600' : 'text-slate-900' },
+    { label: "Aujourd'hui", value: dueToday, tone: 'text-slate-900' },
+    { label: 'Cette semaine', value: dueThisWeek, tone: 'text-slate-900' },
+    { label: 'Total', value: items.length, tone: 'text-slate-900' },
+  ];
+
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {stats.map((stat) => (
+        <div key={stat.label} className="rounded-xl border border-slate-200 bg-white p-3.5 shadow-sm sm:p-4">
+          <p className={`text-2xl font-semibold tabular-nums ${stat.tone}`}>{stat.value}</p>
+          <p className="mt-0.5 text-xs font-medium text-slate-500">{stat.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function getMonthCells(year, month) {
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // lundi = 0
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -571,6 +603,7 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
           const iso = formatIsoDate(date);
           const dayItems = grouped[iso] || [];
           const visibleTypes = [...new Set(dayItems.map((item) => item.type))];
+          const hasOverdue = dayItems.some((item) => item.is_overdue);
           const isSelected = selectedDate === iso;
           const isToday = iso === today;
 
@@ -587,15 +620,29 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
                     : 'border-transparent hover:bg-slate-50'
               }`}
             >
-              <span className={`font-medium ${isToday ? 'text-primary' : 'text-slate-700'}`}>{date.getDate()}</span>
-              {visibleTypes.length > 0 && (
-                <div className="flex flex-wrap items-center justify-center gap-0.5">
-                  {visibleTypes.slice(0, 3).map((type) => (
-                    <span key={type} className={`h-1.5 w-1.5 rounded-full ${TYPE_CONFIG[type].dot}`} />
-                  ))}
-                  {visibleTypes.length > 3 && <span className="text-[9px] text-slate-400">+{visibleTypes.length - 3}</span>}
-                </div>
-              )}
+              <span
+                className={`flex h-5 w-5 items-center justify-center rounded-full font-medium ${
+                  isToday ? 'bg-primary text-white' : 'text-slate-700'
+                }`}
+              >
+                {date.getDate()}
+              </span>
+              {dayItems.length > 0 &&
+                (dayItems.length <= 3 ? (
+                  <div className="flex flex-wrap items-center justify-center gap-0.5">
+                    {visibleTypes.slice(0, 3).map((type) => (
+                      <span key={type} className={`h-1.5 w-1.5 rounded-full ${TYPE_CONFIG[type].dot}`} />
+                    ))}
+                  </div>
+                ) : (
+                  <span
+                    className={`rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+                      hasOverdue ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                    }`}
+                  >
+                    {dayItems.length}
+                  </span>
+                ))}
             </button>
           );
         })}
@@ -954,49 +1001,18 @@ export default function Planning() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {canFilterByService && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <Filter size={16} />
-            Filtrer par service
-          </div>
+      {!loading && <PlanningSummary items={items} />}
 
-          {allServices.length === 0 ? (
-            <p className="text-sm text-slate-500">Aucun service configuré.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {allServices.map((service) => {
-                const checked = selectedServiceIds.includes(service.id);
-                return (
-                  <label
-                    key={service.id}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                      checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => handleToggleService(service.id)}
-                      className="sr-only"
-                    />
-                    {checked && <Check size={14} />}
-                    {service.name}
-                  </label>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
+      {/* Un seul panneau de filtres (recherche, service, type, retard, assigné) plutôt que deux
+          cartes empilées répétant chacune un en-tête "Filtre" — sous-sections labellisées pour
+          garder la même information sans la redondance visuelle. */}
       <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
         <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
           <Filter size={16} />
           Filtres
         </div>
 
-        <div className="relative mb-3">
+        <div className="relative">
           <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
@@ -1007,36 +1023,71 @@ export default function Planning() {
           />
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <label
-            className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-              overdueOnly ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <input type="checkbox" checked={overdueOnly} onChange={() => setOverdueOnly((prev) => !prev)} className="sr-only" />
-            {overdueOnly && <Check size={14} />}
-            En retard uniquement
-          </label>
+        {canFilterByService && (
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Service</p>
+            {allServices.length === 0 ? (
+              <p className="text-sm text-slate-500">Aucun service configuré.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {allServices.map((service) => {
+                  const checked = selectedServiceIds.includes(service.id);
+                  return (
+                    <label
+                      key={service.id}
+                      className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                        checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => handleToggleService(service.id)}
+                        className="sr-only"
+                      />
+                      {checked && <Check size={14} />}
+                      {service.name}
+                    </label>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
 
-          {Object.entries(TYPE_CONFIG).map(([type, config]) => {
-            const checked = typeFilter.includes(type);
-            return (
-              <label
-                key={type}
-                className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                  checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                }`}
-              >
-                <input type="checkbox" checked={checked} onChange={() => toggleTypeFilter(type)} className="sr-only" />
-                {checked && <Check size={14} />}
-                {config.label}
-              </label>
-            );
-          })}
+        <div className="mt-4">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Type</p>
+          <div className="flex flex-wrap gap-2">
+            <label
+              className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                overdueOnly ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <input type="checkbox" checked={overdueOnly} onChange={() => setOverdueOnly((prev) => !prev)} className="sr-only" />
+              {overdueOnly && <Check size={14} />}
+              En retard uniquement
+            </label>
+
+            {Object.entries(TYPE_CONFIG).map(([type, config]) => {
+              const checked = typeFilter.includes(type);
+              return (
+                <label
+                  key={type}
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <input type="checkbox" checked={checked} onChange={() => toggleTypeFilter(type)} className="sr-only" />
+                  {checked && <Check size={14} />}
+                  {config.label}
+                </label>
+              );
+            })}
+          </div>
         </div>
 
         {users.length > 0 && (
-          <div className="mt-3">
+          <div className="mt-4">
             <label className="mb-1 block text-sm font-medium text-slate-700">Assigné (tâches)</label>
             <select
               value={assigneeFilter}
@@ -1054,27 +1105,33 @@ export default function Planning() {
         )}
       </div>
 
-      <div className="mt-4 flex gap-2">
-        <button
-          type="button"
-          onClick={() => setViewMode('list')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
-            viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <List size={16} />
-          Liste
-        </button>
-        <button
-          type="button"
-          onClick={() => setViewMode('calendar')}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
-            viewMode === 'calendar' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-          }`}
-        >
-          <Calendar size={16} />
-          Calendrier
-        </button>
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-slate-500">
+          {filteredItems.length} élément{filteredItems.length > 1 ? 's' : ''}
+          {filteredItems.length !== items.length && ` sur ${items.length}`}
+        </p>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <List size={16} />
+            Liste
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('calendar')}
+            className={`flex flex-1 items-center justify-center gap-2 rounded-md border px-4 py-2 text-sm font-medium transition-colors sm:flex-none ${
+              viewMode === 'calendar' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Calendar size={16} />
+            Calendrier
+          </button>
+        </div>
       </div>
 
       {canManage && (
