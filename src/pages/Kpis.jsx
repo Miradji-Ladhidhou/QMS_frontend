@@ -2189,7 +2189,7 @@ function DistributionView({ kpi }) {
           ))}
         </select>
       )}
-      <div className="h-48">
+      <div className="h-48 lg:h-56 2xl:h-64">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
             <CartesianGrid stroke={GRID_COLOR} vertical={false} />
@@ -2742,7 +2742,7 @@ function KpiCard({
         {isCountGrouped ? (
           <DistributionView kpi={kpi} />
         ) : (
-          <div className="h-48">
+          <div className="h-48 lg:h-56 2xl:h-64">
             {hasEnoughForChart ? (
               <>
                 <ResponsiveContainer width="100%" height="100%">
@@ -3409,14 +3409,14 @@ export default function Kpis() {
       )}
 
       {loading || foldersLoading ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {[0, 1, 2].map((key) => (
+        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+          {[0, 1, 2, 3].map((key) => (
             <div key={key} className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
       ) : (
         <>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
             {folders.map((folder) => (
               <FolderTile
                 key={folder.id}
@@ -3471,7 +3471,7 @@ export default function Kpis() {
           ) : kpis.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">Aucun KPI directement dans ce dossier.</p>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
               {kpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
