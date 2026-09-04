@@ -564,10 +564,35 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
   return <div>{content}</div>;
 }
 
+// Légende des couleurs affichées sur le calendrier — seulement les types réellement présents
+// ce mois-ci (jamais les 9 d'un coup, la plupart n'auraient aucune puce visible), sinon une
+// puce colorée reste indéchiffrable sans deviner ou cliquer sur chaque jour.
+function CalendarLegend({ types }) {
+  if (types.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 border-t border-slate-100 pt-3">
+      {types.map((type) => (
+        <span key={type} className="flex items-center gap-1.5 text-xs text-slate-500">
+          <span className={`h-2 w-2 rounded-full ${TYPE_CONFIG[type].dot}`} />
+          {TYPE_CONFIG[type].label}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selectedDate, onSelectDate }) {
   const cells = getMonthCells(year, month);
   const today = formatIsoDate(new Date());
   const monthLabel = new Date(year, month, 1).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+  const monthTypesPresent = [
+    ...new Set(
+      cells
+        .filter(Boolean)
+        .flatMap((date) => grouped[formatIsoDate(date)] || [])
+        .map((item) => item.type)
+    ),
+  ];
 
   return (
     <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -607,11 +632,16 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
           const isSelected = selectedDate === iso;
           const isToday = iso === today;
 
+          // Infobulle native (survol) listant les titres du jour — sans elle, une puce ou un
+          // badge ne dit rien de CE qu'il y a ce jour-là avant de cliquer dessus.
+          const tooltip = dayItems.map((item) => `${TYPE_CONFIG[item.type].label} — ${item.title}`).join('\n');
+
           return (
             <button
               type="button"
               key={iso}
               onClick={() => onSelectDate(iso)}
+              title={tooltip || undefined}
               className={`flex min-h-14 flex-col items-center gap-1 rounded-lg border p-1.5 text-xs transition-colors sm:min-h-16 ${
                 isSelected
                   ? 'border-primary bg-primary/5'
@@ -647,6 +677,8 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
           );
         })}
       </div>
+
+      <CalendarLegend types={monthTypesPresent} />
     </div>
   );
 }
