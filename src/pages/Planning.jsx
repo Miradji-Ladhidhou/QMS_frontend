@@ -1057,24 +1057,32 @@ export default function Planning() {
     });
   }
 
+  // Optimiste : la tâche disparaît de la liste au clic, sans attendre l'aller-retour réseau —
+  // avant, le clic ne se traduisait à l'écran qu'après un rechargement complet (planning +
+  // tâches), ce qui donnait une impression de décalage entre le geste et son effet visible.
+  // En cas d'échec, on recharge pour resynchroniser avec le serveur.
   async function handleMarkDone(item) {
+    setItems((prev) => prev.filter((entry) => !(entry.id === item.id && entry.type === 'task')));
     try {
       await api.patch(`/tasks/${item.id}`, { status: 'done' });
-      await loadPlanning(selectedServiceIds);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de marquer cette tâche comme terminée.');
+      await loadPlanning(selectedServiceIds);
     }
   }
 
   // Coche/décoche une étape ou en ajoute une nouvelle directement depuis la carte (voir
   // PlanningItemCard) — un simple PATCH ne portant que sur checklist, jamais besoin d'ouvrir le
-  // formulaire complet pour ces gestes fréquents.
+  // formulaire complet pour ces gestes fréquents. Optimiste comme handleMarkDone : la carte
+  // reflète le changement immédiatement plutôt qu'après un rechargement complet du planning,
+  // ce qui donnait une impression de décalage entre le clic et l'effet visible.
   async function handleUpdateChecklist(item, updatedChecklist) {
+    setItems((prev) => prev.map((entry) => (entry.id === item.id && entry.type === 'task' ? { ...entry, checklist: updatedChecklist } : entry)));
     try {
       await api.patch(`/tasks/${item.id}`, { checklist: updatedChecklist });
-      await loadPlanning(selectedServiceIds);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour la checklist.');
+      await loadPlanning(selectedServiceIds);
     }
   }
 
