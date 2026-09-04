@@ -4,8 +4,6 @@ import {
   AlertTriangle,
   ChevronDown,
   ChevronUp,
-  Cloud,
-  Download,
   FileText,
   Folder,
   FolderPlus,
@@ -33,6 +31,7 @@ import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
 import AiFullProcedureDraft from '../components/AiFullProcedureDraft.jsx';
 import NewProcedureFullDraftModal from '../components/NewProcedureFullDraftModal.jsx';
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
 
@@ -598,44 +597,16 @@ export default function Procedures() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Procédures</h1>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleExportCsv}
+          <ExportMenu
             disabled={procedures.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            <Download size={18} />
-            Exporter CSV
-          </button>
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={exportingPdf || procedures.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleExportXlsx}
-            disabled={exportingXlsx || procedures.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter Excel
-          </button>
-          {tenant?.storage_provider === 'google_drive' && (
-            <button
-              type="button"
-              onClick={handleExportDrive}
-              disabled={exportingDrive || procedures.length === 0}
-              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-            >
-              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
-              Enregistrer sur Drive
-            </button>
-          )}
+            onExportCsv={handleExportCsv}
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
