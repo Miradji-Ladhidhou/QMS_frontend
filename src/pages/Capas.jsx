@@ -1,6 +1,20 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Cloud, Download, Loader2, Plus, Search, Sparkles, X } from 'lucide-react';
+import {
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  Cloud,
+  Download,
+  Folder,
+  FolderPlus,
+  List,
+  Loader2,
+  Plus,
+  Search,
+  Sparkles,
+  X,
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
@@ -13,6 +27,7 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
+import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
@@ -29,6 +44,7 @@ const CAPA_SORT_OPTIONS = [
   { key: 'number', label: 'numéro' },
   { key: 'title', label: 'objet' },
   { key: 'service', label: 'service' },
+  { key: 'category', label: 'dossier' },
   { key: 'priority', label: 'gravité' },
   { key: 'status', label: 'statut' },
 ];
@@ -37,6 +53,8 @@ function getCapaSortValue(capa, key) {
   switch (key) {
     case 'service':
       return capa.service?.name || '';
+    case 'category':
+      return capa.category?.name || '';
     case 'priority':
       return PRIORITY_RANK[capa.priority] ?? -1;
     case 'status':
@@ -465,6 +483,84 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
   );
 }
 
+// Raccourci de création de dossier directement depuis la page CAPA, sans passer par
+// Paramètres > Catégories — juste nom + couleur, même modale que Documents.jsx (voir
+// NewFolderModal là-bas), adaptée à POST /module-categories (resource_type: 'capa').
+function NewFolderModal({ onClose, onCreated }) {
+  const [name, setName] = useState('');
+  const [color, setColor] = useState('#1F3864');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+
+    let data;
+    try {
+      ({ data } = await api.post('/module-categories', { resource_type: 'capa', name, color }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer ce dossier.');
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+    onCreated(data);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-sm sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Nouveau dossier</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex items-end gap-3">
+            <div className="flex-1">
+              <label className="mb-1 block text-sm font-medium text-slate-700">Nom</label>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder="Ex : Production, Qualité fournisseurs..."
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Couleur</label>
+              <input
+                type="color"
+                value={color}
+                onChange={(e) => setColor(e.target.value)}
+                className="h-11 w-16 rounded-md border border-slate-300"
+              />
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Création...' : 'Créer le dossier'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Capas() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
@@ -493,6 +589,39 @@ export default function Capas() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [viewMode, setViewMode] = useState('folder');
+  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
+  const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
+  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+
+  function toggleFolder(key) {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  function handleFolderCreated(category) {
+    setCategories((prev) => [...prev, category].sort((a, b) => a.name.localeCompare(b.name)));
+    setIsNewFolderModalOpen(false);
+    setExpandedFolders((prev) => new Set(prev).add(category.id));
+  }
+
+  async function handleCategoryChange(event, capa) {
+    event.stopPropagation();
+    const categoryId = event.target.value || null;
+    setUpdatingCategoryId(capa.id);
+    try {
+      const { data } = await api.patch(`/capas/${capa.id}`, { category_id: categoryId });
+      setCapas((prev) => prev.map((item) => (item.id === capa.id ? data : item)));
+    } catch {
+      setError('Impossible de changer le dossier de cette CAPA.');
+    } finally {
+      setUpdatingCategoryId(null);
+    }
+  }
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -597,6 +726,27 @@ export default function Capas() {
     'due_date',
     'asc'
   );
+
+  // Un dossier par catégorie (module_categories, resource_type='capa'), plus un dossier "Sans
+  // dossier" en dernier pour les CAPA non classées — jamais affiché s'il est vide. Reprend
+  // sortedCapas (déjà filtré/trié) pour que le mode dossier reste cohérent avec le mode liste,
+  // même principe que Documents.jsx.
+  const groupedByFolder = useMemo(() => {
+    const byCategory = new Map(categories.map((category) => [category.id, []]));
+    const unfiled = [];
+    for (const capa of sortedCapas) {
+      if (capa.category_id && byCategory.has(capa.category_id)) byCategory.get(capa.category_id).push(capa);
+      else unfiled.push(capa);
+    }
+    const groups = categories
+      .map((category) => ({ key: category.id, category, capas: byCategory.get(category.id) || [] }))
+      .filter((group) => group.capas.length > 0);
+    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, capas: unfiled });
+    return groups;
+  }, [sortedCapas, categories]);
+
+  const isFolderView = viewMode === 'folder';
+  const capaGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, capas: sortedCapas }];
 
   function handleExportCsv(scopeIds) {
     const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
@@ -913,6 +1063,42 @@ export default function Capas() {
         )}
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('folder')}
+            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Folder size={16} />
+            Par dossier
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <List size={16} />
+            Liste
+          </button>
+        </div>
+
+        {currentUser?.role === 'admin' && (
+          <button
+            type="button"
+            onClick={() => setIsNewFolderModalOpen(true)}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            <FolderPlus size={16} />
+            Nouveau dossier
+          </button>
+        )}
+      </div>
+
       {canManage && (
         <SelectAllToggle ids={sortedCapas.map((capa) => capa.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
       )}
@@ -956,55 +1142,92 @@ export default function Capas() {
       ) : (
         <>
           <div className="mt-4 space-y-3 md:hidden">
-            {sortedCapas.map((capa) => (
-              <div
-                key={capa.id}
-                onClick={() => navigate(`/capas/${capa.id}`)}
-                className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm ${
-                  capa.status === 'overdue' ? 'border-red-300' : 'border-slate-200'
-                }`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2">
-                    {canManage && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(capa.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleSelect(capa.id)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
-                    )}
-                    <div>
-                      <p className="font-medium text-slate-900">{capa.title}</p>
-                      <p className="text-sm text-slate-500">
-                        {capa.number} · {capa.service?.name || 'Service non précisé'}
-                      </p>
-                    </div>
-                  </div>
-                  <CapaPriorityBadge priority={capa.priority} />
-                </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                  <CapaStatusBadge status={capa.status} />
-                  <span className="text-sm text-slate-500">Échéance : {formatDate(capa.due_date)}</span>
-                </div>
-                <p className="mt-1 text-xs text-slate-400">
-                  Délai de traitement : {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
-                </p>
-                {canManage && (
-                  <select
-                    value={capa.status}
-                    disabled={updatingId === capa.id}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => handleStatusChange(e, capa)}
-                    className="mt-3 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            {capaGroups.map((group) => (
+              <div key={group.key}>
+                {isFolderView && (
+                  <button
+                    type="button"
+                    onClick={() => toggleFolder(group.key)}
+                    className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm font-medium text-slate-700"
                   >
-                    {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
+                    {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
+                    {group.category ? group.category.name : 'Sans dossier'}
+                    <span className="font-normal text-slate-400">({group.capas.length})</span>
+                  </button>
+                )}
+                {(!isFolderView || expandedFolders.has(group.key)) && (
+                  <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
+                    {group.capas.map((capa) => (
+                      <div
+                        key={capa.id}
+                        onClick={() => navigate(`/capas/${capa.id}`)}
+                        className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm ${
+                          capa.status === 'overdue' ? 'border-red-300' : 'border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-start gap-2">
+                            {canManage && (
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(capa.id)}
+                                onClick={(e) => e.stopPropagation()}
+                                onChange={() => toggleSelect(capa.id)}
+                                className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                              />
+                            )}
+                            <div>
+                              <p className="font-medium text-slate-900">{capa.title}</p>
+                              <p className="text-sm text-slate-500">
+                                {capa.number} · {capa.service?.name || 'Service non précisé'}
+                              </p>
+                            </div>
+                          </div>
+                          <CapaPriorityBadge priority={capa.priority} />
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2">
+                          <CapaStatusBadge status={capa.status} />
+                          <CategoryBadge category={capa.category} />
+                        </div>
+                        <p className="mt-2 text-sm text-slate-500">Échéance : {formatDate(capa.due_date)}</p>
+                        <p className="mt-1 text-xs text-slate-400">
+                          Délai de traitement : {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
+                        </p>
+                        {canManage && (
+                          <div className="mt-3 grid grid-cols-2 gap-2">
+                            <select
+                              value={capa.status}
+                              disabled={updatingId === capa.id}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => handleStatusChange(e, capa)}
+                              className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                            >
+                              {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
+                                <option key={value} value={value}>
+                                  {label}
+                                </option>
+                              ))}
+                            </select>
+                            <select
+                              value={capa.category_id || ''}
+                              disabled={updatingCategoryId === capa.id}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={(e) => handleCategoryChange(e, capa)}
+                              className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                            >
+                              <option value="">Sans dossier</option>
+                              {categories.map((category) => (
+                                <option key={category.id} value={category.id}>
+                                  {category.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </div>
                     ))}
-                  </select>
+                  </div>
                 )}
               </div>
             ))}
@@ -1018,6 +1241,7 @@ export default function Capas() {
                   <SortableTh label="Numéro" sortKey="number" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Objet" sortKey="title" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Service" sortKey="service" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Dossier" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Gravité" sortKey="priority" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <th className="px-4 py-3">Délai de traitement</th>
                   <SortableTh label="Échéance" sortKey="due_date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -1025,53 +1249,91 @@ export default function Capas() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sortedCapas.map((capa) => (
-                  <tr
-                    key={capa.id}
-                    onClick={() => navigate(`/capas/${capa.id}`)}
-                    className={`cursor-pointer hover:bg-slate-50 ${capa.status === 'overdue' ? 'bg-red-50/50' : ''}`}
-                  >
-                    {canManage && (
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(capa.id)}
-                          onChange={() => toggleSelect(capa.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                      </td>
+                {capaGroups.map((group) => (
+                  <Fragment key={group.key}>
+                    {isFolderView && (
+                      <tr className="cursor-pointer bg-slate-50 hover:bg-slate-100" onClick={() => toggleFolder(group.key)}>
+                        <td colSpan={canManage ? 9 : 8} className="px-4 py-2.5">
+                          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+                            {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                            <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
+                            {group.category ? group.category.name : 'Sans dossier'}
+                            <span className="font-normal text-slate-400">({group.capas.length})</span>
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                    <td className="px-4 py-3 font-medium text-slate-800">{capa.number}</td>
-                    <td className="px-4 py-3 text-slate-700">{capa.title}</td>
-                    <td className="px-4 py-3 text-slate-600">{capa.service?.name || '—'}</td>
-                    <td className="px-4 py-3">
-                      <CapaPriorityBadge priority={capa.priority} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">
-                      {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{formatDate(capa.due_date)}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <CapaStatusBadge status={capa.status} />
-                        {canManage && (
-                          <select
-                            value={capa.status}
-                            disabled={updatingId === capa.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleStatusChange(e, capa)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
-                              <option key={value} value={value}>
-                                {label}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
+                    {(!isFolderView || expandedFolders.has(group.key)) &&
+                      group.capas.map((capa) => (
+                        <tr
+                          key={capa.id}
+                          onClick={() => navigate(`/capas/${capa.id}`)}
+                          className={`cursor-pointer hover:bg-slate-50 ${capa.status === 'overdue' ? 'bg-red-50/50' : ''}`}
+                        >
+                          {canManage && (
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(capa.id)}
+                                onChange={() => toggleSelect(capa.id)}
+                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                              />
+                            </td>
+                          )}
+                          <td className="px-4 py-3 font-medium text-slate-800">{capa.number}</td>
+                          <td className="px-4 py-3 text-slate-700">{capa.title}</td>
+                          <td className="px-4 py-3 text-slate-600">{capa.service?.name || '—'}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <CategoryBadge category={capa.category} />
+                              {canManage && (
+                                <select
+                                  value={capa.category_id || ''}
+                                  disabled={updatingCategoryId === capa.id}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => handleCategoryChange(e, capa)}
+                                  className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                >
+                                  <option value="">Sans dossier</option>
+                                  {categories.map((category) => (
+                                    <option key={category.id} value={category.id}>
+                                      {category.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">
+                            <CapaPriorityBadge priority={capa.priority} />
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">
+                            {getDelayDays(capa.priority, priorityDelays) ?? '—'} jours
+                          </td>
+                          <td className="px-4 py-3 text-slate-600">{formatDate(capa.due_date)}</td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <CapaStatusBadge status={capa.status} />
+                              {canManage && (
+                                <select
+                                  value={capa.status}
+                                  disabled={updatingId === capa.id}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={(e) => handleStatusChange(e, capa)}
+                                  className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                >
+                                  {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
+                                    <option key={value} value={value}>
+                                      {label}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -1117,6 +1379,10 @@ export default function Capas() {
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
         />
+      )}
+
+      {isNewFolderModalOpen && (
+        <NewFolderModal onClose={() => setIsNewFolderModalOpen(false)} onCreated={handleFolderCreated} />
       )}
     </div>
   );
