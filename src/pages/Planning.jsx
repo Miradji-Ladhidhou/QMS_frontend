@@ -613,17 +613,18 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
               {checklistExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
             </button>
           )}
-          {isTask && editable && checklistTotal === 0 && !addingChecklistItem && (
+          {isTask && editable && !addingChecklistItem && (
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 setAddingChecklistItem(true);
+                if (checklistTotal > 0) setChecklistExpanded(true);
               }}
               className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 hover:bg-slate-200"
             >
               <Plus size={11} />
-              Ajouter une checklist
+              {checklistTotal === 0 ? 'Ajouter une checklist' : 'Ajouter une étape'}
             </button>
           )}
         </div>
