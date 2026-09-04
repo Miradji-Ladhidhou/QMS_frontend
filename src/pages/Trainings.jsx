@@ -1561,7 +1561,7 @@ export default function Trainings() {
       )}
 
       {loading ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 flex flex-col gap-4">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
@@ -1571,14 +1571,14 @@ export default function Trainings() {
       ) : sortedTrainings.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune formation ne correspond à cette recherche.</p>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 flex flex-col gap-4">
           {trainingGroups.map((group) => (
             <Fragment key={group.key}>
               {isFolderView && (
                 <button
                   type="button"
                   onClick={() => toggleFolder(group.key)}
-                  className="col-span-full flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm font-medium text-slate-700"
+                  className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm font-medium text-slate-700"
                 >
                   {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />

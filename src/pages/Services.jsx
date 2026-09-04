@@ -384,7 +384,7 @@ export default function Services() {
       )}
 
       {loading ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 flex flex-col gap-4">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-48 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
@@ -392,7 +392,7 @@ export default function Services() {
       ) : services.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucun service pour l'instant.</p>
       ) : (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="mt-4 flex flex-col gap-4">
           {sortedServices.map((service) => (
             <ServiceCard
               key={service.id}
