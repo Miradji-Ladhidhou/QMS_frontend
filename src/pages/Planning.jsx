@@ -5,6 +5,7 @@ import {
   Calendar,
   CalendarDays,
   Check,
+  CheckCircle2,
   CheckSquare,
   ChevronDown,
   ChevronLeft,
@@ -567,7 +568,11 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
         />
       )}
 
-      {isTask && editable ? (
+      {isTask && item.done ? (
+        <span className="shrink-0 text-emerald-500" title="Terminée">
+          <CheckCircle2 size={20} />
+        </span>
+      ) : isTask && editable ? (
         <button
           type="button"
           onClick={() => onMarkDone(item)}
@@ -592,6 +597,12 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
               <AlertTriangle size={11} />
               En retard
+            </span>
+          )}
+          {isTask && item.done && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[11px] font-medium text-emerald-700">
+              <CheckCircle2 size={11} />
+              Terminée
             </span>
           )}
           {isTask && item.recurrence && item.recurrence !== 'none' && (
@@ -921,6 +932,7 @@ export default function Planning() {
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState([]);
   const [overdueOnly, setOverdueOnly] = useState(() => searchParams.get('overdue') === '1');
+  const [showDoneTasks, setShowDoneTasks] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [searchText, setSearchText] = useState('');
   const [viewMode, setViewMode] = useState('calendar');
@@ -942,8 +954,35 @@ export default function Planning() {
     });
   }
 
+  // /planning ne renvoie que les tâches status='todo' (voir fetchTaskItems) : une fois cochée,
+  // une tâche disparaissait du Planning sans qu'aucune vue ne permette de la retrouver. On
+  // reconstitue ici les tâches terminées à partir de `tasks` (GET /tasks, déjà chargé pour la
+  // modale d'édition, non filtré par statut), avec le même filtrage "mes tâches uniquement"
+  // qu'applique le backend pour un member sur /planning (fetchTaskItems personalUserId).
+  const doneTaskItems = useMemo(() => {
+    if (!showDoneTasks) return [];
+    return tasks
+      .filter((task) => task.status === 'done')
+      .filter((task) => role !== 'member' || task.created_by === currentUser?.id || task.assigned_to === currentUser?.id)
+      .map((task) => ({
+        type: 'task',
+        id: task.id,
+        title: task.title,
+        date: task.due_date,
+        link: '/planning',
+        created_by: task.created_by,
+        assigned_to: task.assigned_to,
+        priority: task.priority,
+        checklist: task.checklist,
+        recurrence: task.recurrence,
+        is_overdue: false,
+        done: true,
+      }));
+  }, [showDoneTasks, tasks, role, currentUser]);
+
   const filteredItems = useMemo(() => {
-    return items.filter((item) => {
+    const source = showDoneTasks ? [...items, ...doneTaskItems] : items;
+    return source.filter((item) => {
       if (typeFilter.length > 0 && !typeFilter.includes(item.type)) return false;
       if (overdueOnly && !item.is_overdue) return false;
       // Ne s'applique qu'aux tâches (seul type portant assigned_to dans l'agrégat) — les autres
@@ -953,7 +992,7 @@ export default function Planning() {
       if (searchText.trim() && !item.title.toLowerCase().includes(searchText.trim().toLowerCase())) return false;
       return true;
     });
-  }, [items, typeFilter, overdueOnly, assigneeFilter, searchText]);
+  }, [items, doneTaskItems, showDoneTasks, typeFilter, overdueOnly, assigneeFilter, searchText]);
 
   function toggleSelectTask(id) {
     setSelectedTaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -1063,6 +1102,7 @@ export default function Planning() {
   // En cas d'échec, on recharge pour resynchroniser avec le serveur.
   async function handleMarkDone(item) {
     setItems((prev) => prev.filter((entry) => !(entry.id === item.id && entry.type === 'task')));
+    setTasks((prev) => prev.map((task) => (task.id === item.id ? { ...task, status: 'done' } : task)));
     try {
       await api.patch(`/tasks/${item.id}`, { status: 'done' });
     } catch (err) {
@@ -1078,6 +1118,7 @@ export default function Planning() {
   // ce qui donnait une impression de décalage entre le clic et l'effet visible.
   async function handleUpdateChecklist(item, updatedChecklist) {
     setItems((prev) => prev.map((entry) => (entry.id === item.id && entry.type === 'task' ? { ...entry, checklist: updatedChecklist } : entry)));
+    setTasks((prev) => prev.map((task) => (task.id === item.id ? { ...task, checklist: updatedChecklist } : task)));
     try {
       await api.patch(`/tasks/${item.id}`, { checklist: updatedChecklist });
     } catch (err) {
@@ -1366,6 +1407,16 @@ export default function Planning() {
               En retard uniquement
             </label>
 
+            <label
+              className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                showDoneTasks ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <input type="checkbox" checked={showDoneTasks} onChange={() => setShowDoneTasks((prev) => !prev)} className="sr-only" />
+              {showDoneTasks && <Check size={14} />}
+              Tâches terminées
+            </label>
+
             {Object.entries(TYPE_CONFIG).map(([type, config]) => {
               const checked = typeFilter.includes(type);
               return (
@@ -1406,7 +1457,7 @@ export default function Planning() {
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-slate-500">
           {filteredItems.length} élément{filteredItems.length > 1 ? 's' : ''}
-          {filteredItems.length !== items.length && ` sur ${items.length}`}
+          {filteredItems.length !== items.length + doneTaskItems.length && ` sur ${items.length + doneTaskItems.length}`}
         </p>
         <div className="flex gap-2">
           <button
