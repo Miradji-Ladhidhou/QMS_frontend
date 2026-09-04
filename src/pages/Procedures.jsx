@@ -26,6 +26,9 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
+import SelectAllToggle from '../components/SelectAllToggle.jsx';
+import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
 import AiFullProcedureDraft from '../components/AiFullProcedureDraft.jsx';
 import NewProcedureFullDraftModal from '../components/NewProcedureFullDraftModal.jsx';
@@ -360,6 +363,33 @@ export default function Procedures() {
   const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
   const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState([]);
+  const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+
+  function toggleSelect(id) {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
+
+  function handleBulkMoved() {
+    setIsBulkMoveModalOpen(false);
+    setSelectedIds([]);
+    loadProcedures();
+  }
+
+  async function handleBulkDelete() {
+    if (
+      !window.confirm(`Supprimer définitivement ${selectedIds.length} procédure(s) sélectionnée(s) ? Cette action est irréversible.`)
+    ) {
+      return;
+    }
+    try {
+      await api.delete('/procedures/bulk', { data: { ids: selectedIds } });
+      setSelectedIds([]);
+      await loadProcedures();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer ces procédures.');
+    }
+  }
 
   function toggleFolder(key) {
     setExpandedFolders((prev) => {
@@ -690,6 +720,19 @@ export default function Procedures() {
         )}
       </div>
 
+      {canManage && (
+        <SelectAllToggle ids={procedures.map((procedure) => procedure.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+      )}
+
+      {canManage && (
+        <BulkSelectionBar
+          count={selectedIds.length}
+          onMove={() => setIsBulkMoveModalOpen(true)}
+          onDelete={handleBulkDelete}
+          onClear={() => setSelectedIds([])}
+        />
+      )}
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
@@ -738,11 +781,22 @@ export default function Procedures() {
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
-                            <div>
-                              <p className="font-medium text-slate-900">{procedure.title}</p>
-                              <p className="text-sm text-slate-500">
-                                {procedure.number} · {procedure.process || 'Processus non précisé'}
-                              </p>
+                            <div className="flex items-start gap-2">
+                              {canManage && (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.includes(procedure.id)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  onChange={() => toggleSelect(procedure.id)}
+                                  className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                />
+                              )}
+                              <div>
+                                <p className="font-medium text-slate-900">{procedure.title}</p>
+                                <p className="text-sm text-slate-500">
+                                  {procedure.number} · {procedure.process || 'Processus non précisé'}
+                                </p>
+                              </div>
                             </div>
                             <StatusBadge status={procedure.status} />
                           </div>
@@ -782,6 +836,7 @@ export default function Procedures() {
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
+                  {canManage && <th className="w-8 px-4 py-3" />}
                   <th className="px-4 py-3">Numéro</th>
                   <th className="px-4 py-3">Titre</th>
                   <th className="px-4 py-3">Processus</th>
@@ -796,7 +851,7 @@ export default function Procedures() {
                   <Fragment key={group.key}>
                     {isFolderView && (
                       <tr className="cursor-pointer bg-slate-50 hover:bg-slate-100" onClick={() => toggleFolder(group.key)}>
-                        <td colSpan={7} className="px-4 py-2.5">
+                        <td colSpan={canManage ? 8 : 7} className="px-4 py-2.5">
                           <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
                             {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                             <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
@@ -815,6 +870,16 @@ export default function Procedures() {
                             onClick={() => navigate(`/procedures/${procedure.id}`)}
                             className={`cursor-pointer hover:bg-slate-50 ${overdue ? 'bg-red-50/50' : ''}`}
                           >
+                            {canManage && (
+                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                <input
+                                  type="checkbox"
+                                  checked={selectedIds.includes(procedure.id)}
+                                  onChange={() => toggleSelect(procedure.id)}
+                                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                />
+                              </td>
+                            )}
                             <td className="px-4 py-3 font-medium text-slate-800">{procedure.number}</td>
                             <td className="px-4 py-3 text-slate-700">{procedure.title}</td>
                             <td className="px-4 py-3 text-slate-600">{procedure.process || '—'}</td>
@@ -882,6 +947,17 @@ export default function Procedures() {
 
       {isNewFolderModalOpen && (
         <NewFolderModal onClose={() => setIsNewFolderModalOpen(false)} onCreated={handleFolderCreated} />
+      )}
+
+      {isBulkMoveModalOpen && (
+        <BulkMoveCategoryModal
+          resourceType="procedure"
+          endpoint="/procedures/bulk-category"
+          categories={categories}
+          selectedIds={selectedIds}
+          onClose={() => setIsBulkMoveModalOpen(false)}
+          onMoved={handleBulkMoved}
+        />
       )}
     </div>
   );
