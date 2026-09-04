@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Cloud, Download, Folder, FolderPlus, List, Loader2, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Folder, FolderPlus, List, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
@@ -20,6 +20,7 @@ import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -596,44 +597,16 @@ export default function Complaints() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Réclamations clients</h1>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
-            onClick={() => handleExportCsv()}
+          <ExportMenu
             disabled={complaints.length === 0}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            <Download size={18} />
-            Exporter CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportPdf()}
-            disabled={exportingPdf || complaints.length === 0}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportXlsx()}
-            disabled={exportingXlsx || complaints.length === 0}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter Excel
-          </button>
-          {tenant?.storage_provider === 'google_drive' && (
-            <button
-              type="button"
-              onClick={() => handleExportDrive()}
-              disabled={exportingDrive || complaints.length === 0}
-              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-            >
-              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
-              Enregistrer sur Drive
-            </button>
-          )}
+            onExportCsv={() => handleExportCsv()}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+            exportingDrive={exportingDrive}
+          />
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}
