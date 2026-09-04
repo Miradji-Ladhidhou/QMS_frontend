@@ -642,7 +642,7 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
               key={iso}
               onClick={() => onSelectDate(iso)}
               title={tooltip || undefined}
-              className={`flex min-h-14 flex-col items-center gap-1 rounded-lg border p-1.5 text-xs transition-colors sm:min-h-16 ${
+              className={`flex min-h-14 flex-col items-center gap-1 rounded-lg border p-1.5 text-left text-xs transition-colors sm:min-h-28 sm:items-stretch ${
                 isSelected
                   ? 'border-primary bg-primary/5'
                   : isToday
@@ -651,28 +651,50 @@ function CalendarView({ year, month, grouped, onPrevMonth, onNextMonth, selected
               }`}
             >
               <span
-                className={`flex h-5 w-5 items-center justify-center rounded-full font-medium ${
+                className={`flex h-5 w-5 shrink-0 items-center justify-center self-center rounded-full font-medium sm:self-start ${
                   isToday ? 'bg-primary text-white' : 'text-slate-700'
                 }`}
               >
                 {date.getDate()}
               </span>
-              {dayItems.length > 0 &&
-                (dayItems.length <= 3 ? (
-                  <div className="flex flex-wrap items-center justify-center gap-0.5">
-                    {visibleTypes.slice(0, 3).map((type) => (
+
+              {/* Mobile : colonnes trop étroites (7 par ligne) pour du texte lisible — on
+                  garde les puces compactes, décodées par CalendarLegend ci-dessous. */}
+              {dayItems.length > 0 && (
+                <div className="flex flex-wrap items-center justify-center gap-0.5 sm:hidden">
+                  {dayItems.length <= 3 ? (
+                    visibleTypes.slice(0, 3).map((type) => (
                       <span key={type} className={`h-1.5 w-1.5 rounded-full ${TYPE_CONFIG[type].dot}`} />
-                    ))}
-                  </div>
-                ) : (
-                  <span
-                    className={`rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
-                      hasOverdue ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    {dayItems.length}
-                  </span>
-                ))}
+                    ))
+                  ) : (
+                    <span
+                      className={`rounded-full px-1.5 text-[10px] font-semibold tabular-nums ${
+                        hasOverdue ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+                      }`}
+                    >
+                      {dayItems.length}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* À partir de sm (colonnes plus larges) : le vrai titre de chaque élément,
+                  tronqué, plutôt qu'une puce à décoder. */}
+              {dayItems.length > 0 && (
+                <div className="hidden min-w-0 flex-1 flex-col gap-0.5 sm:flex">
+                  {dayItems.slice(0, 2).map((item) => (
+                    <span
+                      key={item.id}
+                      className={`truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight ${TYPE_CONFIG[item.type].className}`}
+                    >
+                      {item.title}
+                    </span>
+                  ))}
+                  {dayItems.length > 2 && (
+                    <span className="px-1 text-[10px] font-medium text-slate-400">+{dayItems.length - 2} autre(s)</span>
+                  )}
+                </div>
+              )}
             </button>
           );
         })}
