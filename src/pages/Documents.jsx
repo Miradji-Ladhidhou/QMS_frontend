@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Cloud, Download, Folder, FolderPlus, HardDrive, List, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Folder, FolderPlus, HardDrive, List, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -19,6 +19,7 @@ import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import DocumentBulkMoveModal from '../components/DocumentBulkMoveModal.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 
 const SEARCH_DEBOUNCE_MS = 300;
@@ -873,44 +874,16 @@ export default function Documents() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Documents</h1>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleExportCsv()}
+          <ExportMenu
             disabled={filteredDocuments.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            <Download size={18} />
-            Exporter CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportPdf()}
-            disabled={exportingPdf || filteredDocuments.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportXlsx()}
-            disabled={exportingXlsx || filteredDocuments.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter Excel
-          </button>
-          {tenant?.storage_provider === 'google_drive' && (
-            <button
-              type="button"
-              onClick={() => handleExportDrive()}
-              disabled={exportingDrive || filteredDocuments.length === 0}
-              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-            >
-              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
-              Enregistrer sur Drive
-            </button>
-          )}
+            onExportCsv={() => handleExportCsv()}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+            exportingDrive={exportingDrive}
+          />
           <button
             type="button"
             onClick={() => setIsImportModalOpen(true)}
