@@ -3409,7 +3409,7 @@ export default function Kpis() {
       )}
 
       {loading || foldersLoading ? (
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] gap-4">
           {[0, 1, 2, 3].map((key) => (
             <div key={key} className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
@@ -3471,7 +3471,7 @@ export default function Kpis() {
           ) : kpis.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">Aucun KPI directement dans ce dossier.</p>
           ) : (
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] gap-4">
               {kpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
