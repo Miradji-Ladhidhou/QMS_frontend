@@ -13,6 +13,7 @@ const RESOURCE_TABS = [
   { id: 'haccp_plan', label: 'HACCP' },
   { id: 'task', label: 'Planning' },
   { id: 'kpi', label: 'KPI' },
+  { id: 'procedure', label: 'Procédures' },
 ];
 
 export default function ModuleCategoriesSettings({ isAdmin }) {
