@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronRight, Cloud, Download, Loader2, Plus, Sparkles, X } from 'lucide-react';
+import { ChevronRight, Cloud, Download, Loader2, Plus, Search, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
@@ -488,6 +488,7 @@ export default function Capas() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const [searchText, setSearchText] = useState('');
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -552,15 +553,29 @@ export default function Capas() {
     [capas]
   );
 
+  // Recherche client (jamais un appel serveur) : les CAPA du tenant sont déjà toutes chargées
+  // par loadData, comme sur Planning.jsx — sur numéro, objet et description, les 3 champs qui
+  // identifient une CAPA au premier coup d'œil.
+  const filteredCapas = useMemo(() => {
+    const query = searchText.trim().toLowerCase();
+    if (!query) return capas;
+    return capas.filter(
+      (capa) =>
+        capa.number?.toLowerCase().includes(query) ||
+        capa.title?.toLowerCase().includes(query) ||
+        capa.description?.toLowerCase().includes(query)
+    );
+  }, [capas, searchText]);
+
   const { sorted: sortedCapas, sortKey, direction, setSortKey, toggleSort } = useSort(
-    capas,
+    filteredCapas,
     getCapaSortValue,
     'due_date',
     'asc'
   );
 
   function handleExportCsv(scopeIds) {
-    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
     const headers = [
       'Numéro',
       'Date',
@@ -603,7 +618,7 @@ export default function Capas() {
   }
 
   async function handleExportPdf(scopeIds) {
-    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
     setExportingPdf(true);
     setExportPdfError('');
     try {
@@ -635,7 +650,7 @@ export default function Capas() {
   }
 
   async function handleExportXlsx(scopeIds) {
-    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
     setExportingXlsx(true);
     setExportPdfError('');
     try {
@@ -667,7 +682,7 @@ export default function Capas() {
   }
 
   async function handleExportDrive(scopeIds) {
-    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : capas;
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
     setExportingDrive(true);
     setExportPdfError('');
     setDriveSuccess('');
@@ -730,7 +745,7 @@ export default function Capas() {
           <button
             type="button"
             onClick={() => handleExportCsv()}
-            disabled={capas.length === 0}
+            disabled={sortedCapas.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
             <Download size={18} />
@@ -739,7 +754,7 @@ export default function Capas() {
           <button
             type="button"
             onClick={() => handleExportPdf()}
-            disabled={exportingPdf || capas.length === 0}
+            disabled={exportingPdf || sortedCapas.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
@@ -748,7 +763,7 @@ export default function Capas() {
           <button
             type="button"
             onClick={() => handleExportXlsx()}
-            disabled={exportingXlsx || capas.length === 0}
+            disabled={exportingXlsx || sortedCapas.length === 0}
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
           >
             {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
@@ -758,7 +773,7 @@ export default function Capas() {
             <button
               type="button"
               onClick={() => handleExportDrive()}
-              disabled={exportingDrive || capas.length === 0}
+              disabled={exportingDrive || sortedCapas.length === 0}
               className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
             >
               {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
@@ -784,7 +799,18 @@ export default function Capas() {
         <CounterCard label="Clôturées" value={counters.closed} accent="text-emerald-700" />
       </div>
 
-      <div className="mt-4">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par numéro, objet ou description..."
+            value={searchText}
+            onChange={(e) => setSearchText(e.target.value)}
+            className="w-full rounded-md border border-slate-300 py-2.5 pl-9 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          />
+        </div>
+
         <SortSelect
           options={CAPA_SORT_OPTIONS}
           sortKey={sortKey}
@@ -832,6 +858,8 @@ export default function Capas() {
         </div>
       ) : capas.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune CAPA pour l'instant.</p>
+      ) : sortedCapas.length === 0 ? (
+        <p className="mt-6 text-sm text-slate-500">Aucune CAPA ne correspond à cette recherche.</p>
       ) : (
         <>
           <div className="mt-4 space-y-3 md:hidden">
