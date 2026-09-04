@@ -60,6 +60,13 @@ const MUTED_COLOR = '#94a3b8';
 // même graphique — la 1ère couleur reste LINE_COLOR pour ne rien changer au cas mono-série.
 const SERIES_COLORS = ['#1F3864', '#E69F00', '#009E73', '#CC79A7', '#0072B2', '#D55E00'];
 
+// Même fenêtre que dashboard.js#KPI_RECENT_WINDOW côté backend : le statut "hors objectif"
+// (et le nombre mis en avant sur la carte) reflète les relevés RÉCENTS, pas toute la vie du
+// KPI — une moyenne sur des années dilue une mauvaise tendance actuelle derrière de bonnes
+// valeurs anciennes, ce qui rendait le statut silencieux sur des KPI pourtant mauvais en ce
+// moment.
+const KPI_RECENT_WINDOW = 6;
+
 const FREQUENCY_LABELS = {
   daily: 'Quotidien',
   weekly: 'Hebdomadaire',
@@ -2460,10 +2467,13 @@ function KpiCard({
       average: values.length > 0 ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)) : null,
     };
   });
-  // La valeur mise en avant sur la carte est la moyenne de toutes les périodes enregistrées,
-  // pas la dernière valeur du graphique — plus représentative que le dernier point seul,
-  // qui peut être un pic isolé. Le graphique en dessous continue d'afficher chaque période.
-  const averageValue = records.length > 0 ? Number((records.reduce((sum, r) => sum + r.value, 0) / records.length).toFixed(2)) : null;
+  // La valeur mise en avant sur la carte est la moyenne des KPI_RECENT_WINDOW dernières
+  // périodes enregistrées (jamais la dernière valeur seule, qui peut être un pic isolé, ni
+  // toute la vie du KPI, qui dilue une mauvaise tendance récente derrière un vieil historique
+  // bon). Le graphique en dessous continue d'afficher chaque période, y compris les anciennes.
+  const recentRecords = [...records].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
+  const averageValue =
+    recentRecords.length > 0 ? Number((recentRecords.reduce((sum, r) => sum + r.value, 0) / recentRecords.length).toFixed(2)) : null;
   const targetDirection = kpi.target_direction || 'min';
   const status = getKpiStatus(averageValue, kpi.target, targetDirection);
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'bad' ? AlertCircle : null;
