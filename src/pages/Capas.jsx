@@ -489,6 +489,10 @@ export default function Capas() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [searchText, setSearchText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [priorityFilter, setPriorityFilter] = useState('');
+  const [serviceFilter, setServiceFilter] = useState('');
+  const [assigneeFilter, setAssigneeFilter] = useState('');
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -553,19 +557,39 @@ export default function Capas() {
     [capas]
   );
 
-  // Recherche client (jamais un appel serveur) : les CAPA du tenant sont déjà toutes chargées
-  // par loadData, comme sur Planning.jsx — sur numéro, objet et description, les 3 champs qui
-  // identifient une CAPA au premier coup d'œil.
+  // Recherche + filtres, tous côté client (jamais un appel serveur) : les CAPA du tenant sont
+  // déjà toutes chargées par loadData, comme sur Planning.jsx. Recherche sur numéro, objet et
+  // description, les 3 champs qui identifient une CAPA au premier coup d'œil.
   const filteredCapas = useMemo(() => {
     const query = searchText.trim().toLowerCase();
-    if (!query) return capas;
-    return capas.filter(
-      (capa) =>
-        capa.number?.toLowerCase().includes(query) ||
-        capa.title?.toLowerCase().includes(query) ||
-        capa.description?.toLowerCase().includes(query)
-    );
-  }, [capas, searchText]);
+    return capas.filter((capa) => {
+      if (statusFilter && capa.status !== statusFilter) return false;
+      if (priorityFilter && capa.priority !== priorityFilter) return false;
+      if (serviceFilter && capa.service_id !== serviceFilter) return false;
+      if (assigneeFilter && capa.assigned_to !== assigneeFilter) return false;
+      if (
+        query &&
+        !(
+          capa.number?.toLowerCase().includes(query) ||
+          capa.title?.toLowerCase().includes(query) ||
+          capa.description?.toLowerCase().includes(query)
+        )
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [capas, searchText, statusFilter, priorityFilter, serviceFilter, assigneeFilter]);
+
+  const hasActiveFilters = Boolean(searchText || statusFilter || priorityFilter || serviceFilter || assigneeFilter);
+
+  function clearFilters() {
+    setSearchText('');
+    setStatusFilter('');
+    setPriorityFilter('');
+    setServiceFilter('');
+    setAssigneeFilter('');
+  }
 
   const { sorted: sortedCapas, sortKey, direction, setSortKey, toggleSort } = useSort(
     filteredCapas,
@@ -820,6 +844,75 @@ export default function Capas() {
         />
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Tous les statuts</option>
+          {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={priorityFilter}
+          onChange={(e) => setPriorityFilter(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Toutes gravités</option>
+          {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+
+        {services.length > 0 && (
+          <select
+            value={serviceFilter}
+            onChange={(e) => setServiceFilter(e.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          >
+            <option value="">Tous les services</option>
+            {services.map((service) => (
+              <option key={service.id} value={service.id}>
+                {service.name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {users.length > 0 && (
+          <select
+            value={assigneeFilter}
+            onChange={(e) => setAssigneeFilter(e.target.value)}
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          >
+            <option value="">Tous les responsables</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.full_name}
+              </option>
+            ))}
+          </select>
+        )}
+
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            className="flex items-center gap-1 rounded-md px-2 py-2 text-sm font-medium text-slate-500 hover:text-slate-700"
+          >
+            <X size={14} />
+            Réinitialiser
+          </button>
+        )}
+      </div>
+
       {canManage && (
         <SelectAllToggle ids={sortedCapas.map((capa) => capa.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
       )}
@@ -859,7 +952,7 @@ export default function Capas() {
       ) : capas.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune CAPA pour l'instant.</p>
       ) : sortedCapas.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">Aucune CAPA ne correspond à cette recherche.</p>
+        <p className="mt-6 text-sm text-slate-500">Aucune CAPA ne correspond à cette recherche/ces filtres.</p>
       ) : (
         <>
           <div className="mt-4 space-y-3 md:hidden">
