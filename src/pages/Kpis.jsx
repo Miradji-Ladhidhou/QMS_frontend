@@ -44,6 +44,7 @@ import { exportToCsv } from '../lib/csvExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
+import SortSelect from '../components/SortSelect.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AutoTextarea from '../components/AutoTextarea.jsx';
@@ -66,6 +67,22 @@ const SERIES_COLORS = ['#1F3864', '#E69F00', '#009E73', '#CC79A7', '#0072B2', '#
 // valeurs anciennes, ce qui rendait le statut silencieux sur des KPI pourtant mauvais en ce
 // moment.
 const KPI_RECENT_WINDOW = 6;
+
+const KPI_SORT_OPTIONS = [
+  { key: 'latest_date', label: 'dernière valeur' },
+  { key: 'name', label: 'nom' },
+];
+
+// Date de la dernière valeur enregistrée, quelle que soit la série — sert de tri par défaut
+// (les KPI les plus récemment mis à jour en premier) sans dépendre d'un champ dédié côté API.
+function getKpiLatestDate(kpi) {
+  return kpi.records.reduce((latest, record) => (record.period_date > latest ? record.period_date : latest), '');
+}
+
+function getKpiSortValue(kpi, key) {
+  if (key === 'latest_date') return getKpiLatestDate(kpi);
+  return kpi.name?.toLowerCase() || '';
+}
 
 const FREQUENCY_LABELS = {
   daily: 'Quotidien',
@@ -3377,6 +3394,13 @@ export default function Kpis() {
     }
   }
 
+  const { sorted: sortedKpis, sortKey, direction, setSortKey, toggleSort } = useSort(
+    kpis,
+    getKpiSortValue,
+    'latest_date',
+    'desc'
+  );
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -3404,13 +3428,23 @@ export default function Kpis() {
 
       <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} />
 
+      <div className="mt-4">
+        <SortSelect
+          options={KPI_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
+      </div>
+
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
 
       {loading || foldersLoading ? (
-        <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] gap-4">
-          {[0, 1, 2, 3].map((key) => (
+        <div className="mt-4 flex flex-col gap-4">
+          {[0, 1, 2].map((key) => (
             <div key={key} className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
@@ -3438,7 +3472,7 @@ export default function Kpis() {
           </div>
 
           {canManage && (
-            <SelectAllToggle ids={kpis.map((kpi) => kpi.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+            <SelectAllToggle ids={sortedKpis.map((kpi) => kpi.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
           )}
 
           {canManage && (
@@ -3471,8 +3505,8 @@ export default function Kpis() {
           ) : kpis.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">Aucun KPI directement dans ce dossier.</p>
           ) : (
-            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(380px,1fr))] gap-4">
-              {kpis.map((kpi) => (
+            <div className="mt-4 flex flex-col gap-4">
+              {sortedKpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
                   kpi={kpi}
