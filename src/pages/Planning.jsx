@@ -18,6 +18,7 @@ import {
   Filter,
   FileCheck,
   FileText,
+  Folder,
   GraduationCap,
   List,
   Loader2,
@@ -812,11 +813,22 @@ export default function Planning() {
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [searchText, setSearchText] = useState('');
   const [viewMode, setViewMode] = useState('calendar');
+  const [groupBy, setGroupBy] = useState('type');
+  const [collapsedTypeFolders, setCollapsedTypeFolders] = useState(() => new Set());
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => formatIsoDate(new Date()));
 
   function toggleTypeFilter(type) {
     setTypeFilter((prev) => (prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]));
+  }
+
+  function toggleTypeFolder(type) {
+    setCollapsedTypeFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(type)) next.delete(type);
+      else next.add(type);
+      return next;
+    });
   }
 
   const filteredItems = useMemo(() => {
@@ -980,6 +992,13 @@ export default function Planning() {
     return acc;
   }, {});
   const dates = Object.keys(grouped).sort();
+
+  // Regroupement "par type" (voir groupBy) : tout mélangé sous une seule date rendait la liste
+  // difficile à parcourir dès qu'il y avait plusieurs sortes d'éléments le même jour — un dossier
+  // par module (même ordre que les puces de filtre ci-dessus), chacun trié par échéance.
+  const groupedByType = Object.keys(TYPE_CONFIG)
+    .map((type) => ({ type, items: filteredItems.filter((item) => item.type === type).sort((a, b) => (a.date > b.date ? 1 : -1)) }))
+    .filter((group) => group.items.length > 0);
 
   // Décrit les filtres réellement actifs pour le sous-titre de l'export — un auditeur qui reçoit
   // ce document doit savoir sur quel périmètre il porte sans avoir à redemander.
@@ -1277,6 +1296,31 @@ export default function Planning() {
         </div>
       </div>
 
+      {viewMode === 'list' && (
+        <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+          Grouper :
+          <button
+            type="button"
+            onClick={() => setGroupBy('date')}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              groupBy === 'date' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Par date
+          </button>
+          <button
+            type="button"
+            onClick={() => setGroupBy('type')}
+            className={`flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
+              groupBy === 'type' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Folder size={12} />
+            Par dossier
+          </button>
+        </div>
+      )}
+
       {canManage && (
         <SelectAllToggle
           ids={filteredItems.filter((item) => item.type === 'task').map((item) => item.id)}
@@ -1353,8 +1397,54 @@ export default function Planning() {
             )}
           </div>
         </>
-      ) : dates.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Rien à venir pour l'instant.</p>
+      ) : groupBy === 'type' ? (
+        <div className="mt-6 space-y-3">
+          {groupedByType.map(({ type, items: typeItems }) => {
+            const config = TYPE_CONFIG[type];
+            const FolderIcon = config.icon;
+            const collapsed = collapsedTypeFolders.has(type);
+            return (
+              <div key={type} className="rounded-xl border border-slate-200 bg-white shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => toggleTypeFolder(type)}
+                  className="flex w-full items-center justify-between gap-3 p-3 sm:p-4"
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${config.className}`}>
+                      <FolderIcon size={16} />
+                    </span>
+                    <span className="text-sm font-semibold text-slate-900">{config.label}</span>
+                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                      {typeItems.length}
+                    </span>
+                  </span>
+                  {collapsed ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronUp size={16} className="text-slate-400" />}
+                </button>
+                {!collapsed && (
+                  <div className="space-y-2 border-t border-slate-100 p-3 sm:p-4">
+                    {typeItems.map((item) => (
+                      <PlanningItemCard
+                        key={`${item.type}-${item.id}`}
+                        item={item}
+                        currentUser={currentUser}
+                        canManage={canManage}
+                        selected={selectedTaskIds.includes(item.id)}
+                        onToggleSelect={() => toggleSelectTask(item.id)}
+                        onMarkDone={handleMarkDone}
+                        onToggleChecklistItem={handleToggleChecklistItem}
+                        onEdit={setEditingTaskId}
+                        onDelete={handleDeleteTask}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
       ) : (
         <div className="mt-6 space-y-6">
           {dates.map((date) => (
