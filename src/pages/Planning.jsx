@@ -74,6 +74,16 @@ const RECURRENCE_LABELS = {
   yearly: 'Annuelle',
 };
 
+// Décrit l'intervalle en langage naturel ("Tous les 2 jours", "Toutes les 3 semaines") plutôt
+// qu'un simple nombre nu à côté du menu de fréquence, illisible sans contexte — accord de
+// genre correct ("semaine" est féminin, contrairement à jour/mois/an).
+const RECURRENCE_INTERVAL_TEXT = {
+  daily: (n) => ({ prefix: 'Tous les', suffix: n > 1 ? 'jours' : 'jour' }),
+  weekly: (n) => ({ prefix: 'Toutes les', suffix: n > 1 ? 'semaines' : 'semaine' }),
+  monthly: (n) => ({ prefix: 'Tous les', suffix: 'mois' }),
+  yearly: (n) => ({ prefix: 'Tous les', suffix: n > 1 ? 'ans' : 'an' }),
+};
+
 function formatDateHeading(dateStr) {
   const label = new Date(`${dateStr}T00:00:00`).toLocaleDateString('fr-FR', {
     weekday: 'long',
@@ -308,96 +318,113 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
           )}
 
           <div>
-            <label className="mb-1 flex items-center gap-2 text-sm font-medium text-slate-700">
-              Checklist
+            <div className="mb-1 flex items-center justify-between">
+              <label className="text-sm font-medium text-slate-700">Checklist</label>
               {checklist.length > 0 && (
-                <span className="rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
-                  {checklist.filter((entry) => entry.done).length}/{checklist.length}
+                <span className="text-xs font-medium text-slate-500">
+                  {checklist.filter((entry) => entry.done).length}/{checklist.length} terminée
+                  {checklist.length > 1 ? 's' : ''}
                 </span>
               )}
-            </label>
+            </div>
             <p className="mb-2 text-xs text-slate-400">
-              Décomposez cette tâche en étapes que vous pourrez cocher une par une, directement depuis la liste — sans rouvrir ce
-              formulaire.
+              Décomposez cette tâche en étapes à cocher une par une, directement depuis la liste — sans rouvrir ce formulaire.
             </p>
-            {checklist.length > 0 && (
-              <ul className="mb-2 space-y-1.5">
-                {checklist.map((entry, index) => (
-                  <li key={index} className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleChecklistItem(index)}
-                      aria-label={entry.done ? 'Marquer comme à faire' : 'Marquer comme fait'}
-                      className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border ${
-                        entry.done ? 'border-primary bg-primary text-white' : 'border-slate-300'
-                      }`}
-                    >
-                      {entry.done && <Check size={12} />}
-                    </button>
-                    <span className={`flex-1 text-sm ${entry.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
-                      {entry.text}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveChecklistItem(index)}
-                      aria-label="Supprimer cette ligne"
-                      className="p-1 text-slate-400 hover:text-red-600"
-                    >
-                      <X size={14} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={checklistDraft}
-                onChange={(e) => setChecklistDraft(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    handleAddChecklistItem();
-                  }
-                }}
-                placeholder="Ajouter une étape..."
-                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-              <button
-                type="button"
-                onClick={handleAddChecklistItem}
-                className="shrink-0 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                Ajouter
-              </button>
+
+            {/* Encadré distinct plutôt qu'une liste posée à plat dans le formulaire — pour que
+                la checklist se reconnaisse d'un coup d'œil comme un bloc à part entière, avec
+                sa propre barre de progression, plutôt qu'un champ de plus parmi d'autres. */}
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+              {checklist.length > 0 && (
+                <>
+                  <div className="mb-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: `${(checklist.filter((entry) => entry.done).length / checklist.length) * 100}%` }}
+                    />
+                  </div>
+                  <ul className="mb-2 space-y-0.5">
+                    {checklist.map((entry, index) => (
+                      <li key={index} className="group flex items-center gap-2 rounded-md px-1 py-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleChecklistItem(index)}
+                          aria-label={entry.done ? 'Marquer comme à faire' : 'Marquer comme fait'}
+                          className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border transition-colors ${
+                            entry.done ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white'
+                          }`}
+                        >
+                          {entry.done && <Check size={12} />}
+                        </button>
+                        <span className={`flex-1 text-sm ${entry.done ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                          {entry.text}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveChecklistItem(index)}
+                          aria-label="Supprimer cette ligne"
+                          className="p-1 text-slate-300 opacity-0 transition-opacity hover:text-red-600 group-hover:opacity-100"
+                        >
+                          <X size={14} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={checklistDraft}
+                  onChange={(e) => setChecklistDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddChecklistItem();
+                    }
+                  }}
+                  placeholder="Ajouter une étape, puis Entrée..."
+                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+                <button
+                  type="button"
+                  onClick={handleAddChecklistItem}
+                  aria-label="Ajouter cette étape"
+                  className="flex shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-600 hover:bg-slate-100"
+                >
+                  <Plus size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Récurrence</label>
-            <div className="flex gap-2">
-              <select
-                value={recurrence}
-                onChange={(e) => setRecurrence(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
-              >
-                {Object.entries(RECURRENCE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-              {recurrence !== 'none' && (
+            <select
+              value={recurrence}
+              onChange={(e) => setRecurrence(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
+            >
+              {Object.entries(RECURRENCE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            {recurrence !== 'none' && (
+              <div className="mt-2 flex items-center gap-2 text-sm text-slate-700">
+                <span>{RECURRENCE_INTERVAL_TEXT[recurrence](recurrenceInterval).prefix}</span>
                 <input
                   type="number"
                   min="1"
                   value={recurrenceInterval}
                   onChange={(e) => setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))}
                   aria-label="Intervalle de récurrence"
-                  className="w-20 shrink-0 rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-sm"
+                  className="w-16 shrink-0 rounded-md border border-slate-300 px-2 py-1.5 text-center text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 />
-              )}
-            </div>
+                <span>{RECURRENCE_INTERVAL_TEXT[recurrence](recurrenceInterval).suffix}</span>
+              </div>
+            )}
             {recurrence !== 'none' && (
               <p className="mt-1 text-xs text-slate-500">
                 À la clôture, une nouvelle tâche est recréée automatiquement à l'échéance suivante.
