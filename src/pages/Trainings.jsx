@@ -1561,7 +1561,7 @@ export default function Trainings() {
       )}
 
       {loading ? (
-        <div className="mt-4 flex flex-col gap-4">
+        <div className="mt-4 flex max-w-4xl flex-col gap-4">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
@@ -1571,7 +1571,7 @@ export default function Trainings() {
       ) : sortedTrainings.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune formation ne correspond à cette recherche.</p>
       ) : (
-        <div className="mt-4 flex flex-col gap-4">
+        <div className="mt-4 flex max-w-4xl flex-col gap-4">
           {trainingGroups.map((group) => (
             <Fragment key={group.key}>
               {isFolderView && (
