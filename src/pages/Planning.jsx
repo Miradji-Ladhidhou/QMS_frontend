@@ -117,6 +117,10 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
   const [isPrivate, setIsPrivate] = useState(Boolean(task?.is_private_to_me));
   const [priority, setPriority] = useState(task?.priority || 'normal');
   const [checklist, setChecklist] = useState(task?.checklist || []);
+  // Repliée par défaut pour une nouvelle tâche (un bouton "Ajouter une checklist" explicite à
+  // la place — un encadré vide toujours visible parmi tous les autres champs se perdait dans
+  // le formulaire) ; ouverte d'emblée si la tâche en a déjà une, jamais cachée sans prévenir.
+  const [checklistOpen, setChecklistOpen] = useState((task?.checklist || []).length > 0);
   const [checklistDraft, setChecklistDraft] = useState('');
   const [recurrence, setRecurrence] = useState(task?.recurrence || 'none');
   const [recurrenceInterval, setRecurrenceInterval] = useState(task?.recurrence_interval || 1);
@@ -317,6 +321,16 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
             </div>
           )}
 
+          {!checklistOpen ? (
+            <button
+              type="button"
+              onClick={() => setChecklistOpen(true)}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-700"
+            >
+              <Plus size={16} />
+              Ajouter une checklist
+            </button>
+          ) : (
           <div>
             <div className="mb-1 flex items-center justify-between">
               <label className="text-sm font-medium text-slate-700">Checklist</label>
@@ -397,6 +411,7 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
               </div>
             </div>
           </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Récurrence</label>
