@@ -18,6 +18,7 @@ import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import LinkItemModal from '../components/LinkItemModal.jsx';
 import ProcedureAttachment from '../components/ProcedureAttachment.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
 
@@ -658,6 +659,7 @@ export default function ProcedureDetail() {
                 Marquer comme obsolète
               </button>
             )}
+            {canManage && <ShareRecordPanel resourceType="procedure" resourceId={procedure.id} />}
             {canDelete && (
               <button
                 type="button"
