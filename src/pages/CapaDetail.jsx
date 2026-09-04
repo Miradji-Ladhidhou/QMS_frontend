@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Lock, Plus, Save, Send, Trash2, XCircle } from 'lucide-react';
+import { ArrowLeft, Cloud, Download, Loader2, Lock, Plus, Save, Send, Trash2, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
+import { getPdfDownload, getPdfAndSaveToDrive } from '../lib/pdfExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -62,8 +64,13 @@ export default function CapaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [capa, setCapa] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
+  const [exportError, setExportError] = useState('');
   const [services, setServices] = useState([]);
   const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
@@ -230,6 +237,32 @@ export default function CapaDetail() {
     }
   }
 
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportError('');
+    try {
+      await getPdfDownload(`/capas/${id}/pdf`, `${capa.number || capa.id}.pdf`);
+    } catch {
+      setExportError("Impossible d'exporter cette CAPA en PDF.");
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportDrive() {
+    setExportingDrive(true);
+    setExportError('');
+    setDriveSuccess('');
+    try {
+      await getPdfAndSaveToDrive(`/capas/${id}/pdf`, 'CAPA', `${capa.number ? `${capa.number} — ` : ''}${capa.title}`);
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   if (loading) {
     return <div className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
@@ -254,24 +287,52 @@ export default function CapaDetail() {
           Retour aux CAPA
         </button>
 
-        {canManage && (
-          <div className="flex flex-wrap items-center gap-2">
-            <ShareRecordPanel resourceType="capa" resourceId={capa.id} />
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={handleExportPdf}
+            disabled={exportingPdf}
+            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Exporter PDF
+          </button>
+          {tenant?.storage_provider === 'google_drive' && (
             <button
               type="button"
-              onClick={handleDelete}
-              disabled={deleting}
-              className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+              onClick={handleExportDrive}
+              disabled={exportingDrive}
+              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
             >
-              <Trash2 size={16} />
-              {deleting ? 'Suppression...' : 'Supprimer'}
+              {exportingDrive ? <Loader2 size={16} className="animate-spin" /> : <Cloud size={16} />}
+              Enregistrer sur Drive
             </button>
-          </div>
-        )}
+          )}
+          {canManage && (
+            <>
+              <ShareRecordPanel resourceType="capa" resourceId={capa.id} />
+              <button
+                type="button"
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex items-center gap-2 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-60"
+              >
+                <Trash2 size={16} />
+                {deleting ? 'Suppression...' : 'Supprimer'}
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {deleteError && (
         <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
+      )}
+      {exportError && (
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportError}</p>
+      )}
+      {driveSuccess && (
+        <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {currentUser?.role === 'member' && (

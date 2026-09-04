@@ -57,16 +57,17 @@ function buildExportDocumentNumber(moduleCode) {
   return `EXPORT-${moduleCode}-${stamp}`;
 }
 
-// Enregistre l'export PDF comme un vrai document — même principe que la page Documents : POST
-// /api/documents route déjà tout seul vers Google Drive ou Supabase selon le réglage du tenant
-// (resolveTenantStorageProvider, backend/src/routes/documents.js), sans qu'aucun code ici n'ait
-// à connaître lequel. Pas de category_id fourni volontairement (voir le plan : forcer un choix
-// de catégorie casserait le geste "un seul bouton", et pré-provisionner une catégorie par module
-// se heurterait à POST /api/categories réservé aux admins) — le document atterrit à la racine,
-// reclassable ensuite comme n'importe quel document depuis sa propre page.
-export async function exportToDrive(moduleCode, title, columns, rows, { subtitle, generatedBy } = {}) {
-  const blob = await fetchPdfBlob(title, columns, rows, { subtitle, generatedBy });
-
+// Enregistre un blob PDF déjà généré comme un vrai document — même principe que la page
+// Documents : POST /api/documents route déjà tout seul vers Google Drive ou Supabase selon le
+// réglage du tenant (resolveTenantStorageProvider, backend/src/routes/documents.js), sans
+// qu'aucun code ici n'ait à connaître lequel. Pas de category_id fourni volontairement (voir le
+// plan : forcer un choix de catégorie casserait le geste "un seul bouton", et pré-provisionner
+// une catégorie par module se heurterait à POST /api/categories réservé aux admins) — le
+// document atterrit à la racine, reclassable ensuite comme n'importe quel document depuis sa
+// propre page. Factorisé entre exportToDrive (export tabulaire) et getPdfAndSaveToDrive (PDF
+// déjà généré d'un seul enregistrement, ex. une fiche CAPA) — même geste final, seule la source
+// du blob change.
+async function uploadPdfAsDocument(moduleCode, title, blob, { subtitle } = {}) {
   const form = new FormData();
   form.append('file', blob, `${title}.pdf`);
   form.append('number', buildExportDocumentNumber(moduleCode));
@@ -75,6 +76,11 @@ export async function exportToDrive(moduleCode, title, columns, rows, { subtitle
 
   const { data } = await api.post('/documents', form);
   return data;
+}
+
+export async function exportToDrive(moduleCode, title, columns, rows, { subtitle, generatedBy } = {}) {
+  const blob = await fetchPdfBlob(title, columns, rows, { subtitle, generatedBy });
+  return uploadPdfAsDocument(moduleCode, title, blob, { subtitle });
 }
 
 // POST générique pour les exports PDF non tabulaires (fiche de participation, certificat...) —
@@ -89,6 +95,15 @@ export async function postForPdfDownload(url, body, filename) {
 export async function getPdfDownload(url, filename) {
   const response = await api.get(url, { responseType: 'blob' });
   triggerBlobDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
+}
+
+// Même PDF que getPdfDownload (un enregistrement déjà identifié par son id, ex. GET
+// /capas/:id/pdf), mais déposé sur le Drive du tenant comme un vrai document plutôt que
+// téléchargé — voir uploadPdfAsDocument ci-dessus.
+export async function getPdfAndSaveToDrive(url, moduleCode, title) {
+  const response = await api.get(url, { responseType: 'blob' });
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  return uploadPdfAsDocument(moduleCode, title, blob);
 }
 
 // POST pour un export Word (.docx) — même geste que postForPdfDownload, mais un .docx ne
