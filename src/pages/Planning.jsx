@@ -526,18 +526,29 @@ function getMonthCells(year, month) {
 // interaction directe visible depuis la liste). Le badge devient un bouton qui déplie le détail
 // de la checklist directement sur la carte, chaque étape cochable en un clic (PATCH
 // /tasks/:id { checklist } uniquement, pas besoin d'ouvrir le formulaire).
-function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSelect, onMarkDone, onToggleChecklistItem, onEdit, onDelete }) {
+function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSelect, onMarkDone, onToggleChecklistItem, onAddChecklistItem, onEdit, onDelete }) {
   const config = TYPE_CONFIG[item.type];
   const Icon = config.icon;
   const isTask = item.type === 'task';
   const editable = isTask && canEditTask(item, currentUser);
   const deletable = isTask && canDeleteTask(item, currentUser);
   const [checklistExpanded, setChecklistExpanded] = useState(false);
+  const [addingChecklistItem, setAddingChecklistItem] = useState(false);
+  const [newChecklistText, setNewChecklistText] = useState('');
 
   const priorityBorder = isTask ? PRIORITY_CONFIG[item.priority]?.border : null;
   const checklist = isTask ? item.checklist || [] : [];
   const checklistDone = checklist.filter((entry) => entry.done).length;
   const checklistTotal = checklist.length;
+
+  function submitNewChecklistItem() {
+    const text = newChecklistText.trim();
+    if (!text) return;
+    onAddChecklistItem(item, text);
+    setNewChecklistText('');
+    setAddingChecklistItem(false);
+    setChecklistExpanded(true);
+  }
 
   const content = (
     <div
@@ -602,6 +613,19 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
               {checklistExpanded ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
             </button>
           )}
+          {isTask && editable && checklistTotal === 0 && !addingChecklistItem && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAddingChecklistItem(true);
+              }}
+              className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500 hover:bg-slate-200"
+            >
+              <Plus size={11} />
+              Ajouter une checklist
+            </button>
+          )}
         </div>
       </div>
 
@@ -653,6 +677,45 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
             </li>
           ))}
         </ul>
+      )}
+
+      {isTask && addingChecklistItem && (
+        <div className="flex items-center gap-2 border-t border-slate-100 px-3 pb-3 pt-2.5 sm:px-4" onClick={(e) => e.stopPropagation()}>
+          <input
+            type="text"
+            autoFocus
+            value={newChecklistText}
+            onChange={(e) => setNewChecklistText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submitNewChecklistItem();
+              if (e.key === 'Escape') {
+                setAddingChecklistItem(false);
+                setNewChecklistText('');
+              }
+            }}
+            placeholder="Nouvelle étape…"
+            className="min-w-0 flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+          <button
+            type="button"
+            onClick={submitNewChecklistItem}
+            disabled={!newChecklistText.trim()}
+            className="shrink-0 rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-white disabled:opacity-40"
+          >
+            Ajouter
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setAddingChecklistItem(false);
+              setNewChecklistText('');
+            }}
+            aria-label="Annuler"
+            className="shrink-0 p-1.5 text-slate-400 hover:text-slate-600"
+          >
+            <X size={16} />
+          </button>
+        </div>
       )}
     </div>
   );
@@ -997,17 +1060,25 @@ export default function Planning() {
     }
   }
 
-  // Coche/décoche une seule étape directement depuis la carte (voir PlanningItemCard) — un
-  // simple PATCH ne portant que sur checklist, jamais besoin d'ouvrir le formulaire complet
-  // pour ce geste fréquent.
-  async function handleToggleChecklistItem(item, index) {
-    const updatedChecklist = (item.checklist || []).map((entry, i) => (i === index ? { ...entry, done: !entry.done } : entry));
+  // Coche/décoche une étape ou en ajoute une nouvelle directement depuis la carte (voir
+  // PlanningItemCard) — un simple PATCH ne portant que sur checklist, jamais besoin d'ouvrir le
+  // formulaire complet pour ces gestes fréquents.
+  async function handleUpdateChecklist(item, updatedChecklist) {
     try {
       await api.patch(`/tasks/${item.id}`, { checklist: updatedChecklist });
       await loadPlanning(selectedServiceIds);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour la checklist.');
     }
+  }
+
+  function handleToggleChecklistItem(item, index) {
+    const updatedChecklist = (item.checklist || []).map((entry, i) => (i === index ? { ...entry, done: !entry.done } : entry));
+    return handleUpdateChecklist(item, updatedChecklist);
+  }
+
+  function handleAddChecklistItem(item, text) {
+    return handleUpdateChecklist(item, [...(item.checklist || []), { text, done: false }]);
   }
 
   async function handleDeleteTask(item) {
@@ -1440,6 +1511,7 @@ export default function Planning() {
                     onToggleSelect={() => toggleSelectTask(item.id)}
                     onMarkDone={handleMarkDone}
                     onToggleChecklistItem={handleToggleChecklistItem}
+                    onAddChecklistItem={handleAddChecklistItem}
                     onEdit={setEditingTaskId}
                     onDelete={handleDeleteTask}
                   />
@@ -1492,6 +1564,7 @@ export default function Planning() {
                               onToggleSelect={() => toggleSelectTask(item.id)}
                               onMarkDone={handleMarkDone}
                               onToggleChecklistItem={handleToggleChecklistItem}
+                    onAddChecklistItem={handleAddChecklistItem}
                               onEdit={setEditingTaskId}
                               onDelete={handleDeleteTask}
                             />
@@ -1521,6 +1594,7 @@ export default function Planning() {
                     onToggleSelect={() => toggleSelectTask(item.id)}
                     onMarkDone={handleMarkDone}
                     onToggleChecklistItem={handleToggleChecklistItem}
+                    onAddChecklistItem={handleAddChecklistItem}
                     onEdit={setEditingTaskId}
                     onDelete={handleDeleteTask}
                   />
