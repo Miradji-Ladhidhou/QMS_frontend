@@ -1024,7 +1024,16 @@ export default function Planning() {
   // difficile à parcourir dès qu'il y avait plusieurs sortes d'éléments le même jour — un dossier
   // par module (même ordre que les puces de filtre ci-dessus), chacun trié par échéance.
   const groupedByType = Object.keys(TYPE_CONFIG)
-    .map((type) => ({ type, items: filteredItems.filter((item) => item.type === type).sort((a, b) => (a.date > b.date ? 1 : -1)) }))
+    .map((type) => {
+      const typeItems = filteredItems.filter((item) => item.type === type);
+      // Sous-groupé par date à l'intérieur de chaque dossier — un dossier "par type" sans les
+      // dates ne dit plus QUAND chaque élément est prévu, seulement quoi.
+      const byDate = typeItems.reduce((acc, item) => {
+        (acc[item.date] ||= []).push(item);
+        return acc;
+      }, {});
+      return { type, items: typeItems, dates: Object.keys(byDate).sort(), byDate };
+    })
     .filter((group) => group.items.length > 0);
 
   // Décrit les filtres réellement actifs pour le sous-titre de l'export — un auditeur qui reçoit
@@ -1428,7 +1437,7 @@ export default function Planning() {
         <p className="mt-6 text-sm text-slate-500">Rien à venir pour l'instant.</p>
       ) : groupBy === 'type' ? (
         <div className="mt-6 space-y-3">
-          {groupedByType.map(({ type, items: typeItems }) => {
+          {groupedByType.map(({ type, items: typeItems, dates: typeDates, byDate }) => {
             const config = TYPE_CONFIG[type];
             const FolderIcon = config.icon;
             const collapsed = collapsedTypeFolders.has(type);
@@ -1451,20 +1460,29 @@ export default function Planning() {
                   {collapsed ? <ChevronDown size={16} className="text-slate-400" /> : <ChevronUp size={16} className="text-slate-400" />}
                 </button>
                 {!collapsed && (
-                  <div className="space-y-2 border-t border-slate-100 p-3 sm:p-4">
-                    {typeItems.map((item) => (
-                      <PlanningItemCard
-                        key={`${item.type}-${item.id}`}
-                        item={item}
-                        currentUser={currentUser}
-                        canManage={canManage}
-                        selected={selectedTaskIds.includes(item.id)}
-                        onToggleSelect={() => toggleSelectTask(item.id)}
-                        onMarkDone={handleMarkDone}
-                        onToggleChecklistItem={handleToggleChecklistItem}
-                        onEdit={setEditingTaskId}
-                        onDelete={handleDeleteTask}
-                      />
+                  <div className="space-y-4 border-t border-slate-100 p-3 sm:p-4">
+                    {typeDates.map((date) => (
+                      <div key={date}>
+                        <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
+                          {formatDateHeading(date)}
+                        </h3>
+                        <div className="space-y-2">
+                          {byDate[date].map((item) => (
+                            <PlanningItemCard
+                              key={`${item.type}-${item.id}`}
+                              item={item}
+                              currentUser={currentUser}
+                              canManage={canManage}
+                              selected={selectedTaskIds.includes(item.id)}
+                              onToggleSelect={() => toggleSelectTask(item.id)}
+                              onMarkDone={handleMarkDone}
+                              onToggleChecklistItem={handleToggleChecklistItem}
+                              onEdit={setEditingTaskId}
+                              onDelete={handleDeleteTask}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
