@@ -4,7 +4,6 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
-  Cloud,
   Download,
   FileSignature,
   Folder,
@@ -34,6 +33,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -1358,44 +1358,16 @@ export default function Trainings() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Formations</h1>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <button
-            type="button"
-            onClick={() => handleExportCsv()}
+          <ExportMenu
             disabled={!hasAnyRecord}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            <Download size={18} />
-            Exporter CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportPdf()}
-            disabled={exportingPdf || !hasAnyRecord}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter PDF
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportXlsx()}
-            disabled={exportingXlsx || !hasAnyRecord}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingXlsx ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter Excel
-          </button>
-          {tenant?.storage_provider === 'google_drive' && (
-            <button
-              type="button"
-              onClick={() => handleExportDrive()}
-              disabled={exportingDrive || !hasAnyRecord}
-              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-            >
-              {exportingDrive ? <Loader2 size={18} className="animate-spin" /> : <Cloud size={18} />}
-              Enregistrer sur Drive
-            </button>
-          )}
+            onExportCsv={() => handleExportCsv()}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+            exportingDrive={exportingDrive}
+          />
           <Link
             to="/trainings/matrix"
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
