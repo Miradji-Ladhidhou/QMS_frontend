@@ -1099,12 +1099,18 @@ export default function Planning() {
   // Optimiste : la tâche disparaît de la liste au clic, sans attendre l'aller-retour réseau —
   // avant, le clic ne se traduisait à l'écran qu'après un rechargement complet (planning +
   // tâches), ce qui donnait une impression de décalage entre le geste et son effet visible.
-  // En cas d'échec, on recharge pour resynchroniser avec le serveur.
+  // En cas d'échec, on recharge pour resynchroniser avec le serveur. Pour une tâche récurrente,
+  // le backend recrée aussitôt la prochaine occurrence (voir isClosingRecurring dans
+  // routes/tasks.js) — invisible pour l'optimiste ci-dessus, qui ne connaît que la tâche
+  // clôturée. On recharge donc aussi en arrière-plan après un succès, sans bloquer le clic
+  // perçu (déjà résolu par la mise à jour optimiste), pour faire apparaître cette nouvelle
+  // occurrence sans attendre un rafraîchissement manuel de la page.
   async function handleMarkDone(item) {
     setItems((prev) => prev.filter((entry) => !(entry.id === item.id && entry.type === 'task')));
     setTasks((prev) => prev.map((task) => (task.id === item.id ? { ...task, status: 'done' } : task)));
     try {
       await api.patch(`/tasks/${item.id}`, { status: 'done' });
+      if (item.recurrence && item.recurrence !== 'none') await loadPlanning(selectedServiceIds);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de marquer cette tâche comme terminée.');
       await loadPlanning(selectedServiceIds);
