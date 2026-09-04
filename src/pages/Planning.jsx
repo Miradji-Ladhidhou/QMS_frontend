@@ -735,7 +735,7 @@ export default function Planning() {
   const [overdueOnly, setOverdueOnly] = useState(() => searchParams.get('overdue') === '1');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [searchText, setSearchText] = useState('');
-  const [viewMode, setViewMode] = useState('list');
+  const [viewMode, setViewMode] = useState('calendar');
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => formatIsoDate(new Date()));
 
