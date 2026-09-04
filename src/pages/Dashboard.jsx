@@ -109,6 +109,7 @@ const ACTIVITY_MODULE_LABELS = {
   complaints: 'Réclamation',
   risks: 'Risque',
   documents: 'Document',
+  procedures: 'Procédure',
   haccp: 'HACCP',
 };
 
@@ -449,6 +450,20 @@ export default function Dashboard() {
           ) : (
             <WidgetCard title="Documents à réviser" to="/documents">
               <BigNumber value={stats.documents.to_review} suffix="document(s) à réviser sous 30 jours" trend={stats.trends?.['documents.to_review']} />
+            </WidgetCard>
+          ))}
+
+        {!isMember &&
+          isModuleVisible('procedures') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title="Procédures à réviser" to="/procedures">
+              <BigNumber
+                value={stats.procedures.to_review}
+                suffix="procédure(s) à réviser sous 30 jours"
+                trend={stats.trends?.['procedures.to_review']}
+              />
             </WidgetCard>
           ))}
 

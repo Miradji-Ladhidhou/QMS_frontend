@@ -13,6 +13,7 @@ import {
   Cloud,
   Download,
   Filter,
+  FileCheck,
   FileText,
   GraduationCap,
   List,
@@ -43,6 +44,7 @@ import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 const TYPE_CONFIG = {
   capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
   document: { label: 'Document', icon: FileText, className: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
+  procedure: { label: 'Procédure', icon: FileCheck, className: 'bg-indigo-100 text-indigo-700', dot: 'bg-indigo-500' },
   training: { label: 'Formation', icon: GraduationCap, className: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
   task: { label: 'Tâche', icon: CheckSquare, className: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
   audit: { label: 'Audit', icon: ClipboardCheck, className: 'bg-sky-100 text-sky-700', dot: 'bg-sky-500' },
@@ -524,7 +526,7 @@ function PlanningItemCard({ item, currentUser, canManage, selected, onToggleSele
     </div>
   );
 
-  if (item.type === 'capa' || item.type === 'document') {
+  if (item.type === 'capa' || item.type === 'document' || item.type === 'procedure') {
     return <Link to={item.link}>{content}</Link>;
   }
   return <div>{content}</div>;
