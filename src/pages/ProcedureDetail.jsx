@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Archive, ArrowLeft, Check, Download, Loader2, Pencil, Plus, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
+import { Archive, ArrowLeft, Check, Download, FileText, FileType, Loader2, Pencil, Plus, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -333,6 +333,7 @@ export default function ProcedureDetail() {
   const [actingVersionId, setActingVersionId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
+  const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportWordError, setExportWordError] = useState('');
   const [generatingSheet, setGeneratingSheet] = useState(false);
   const [sheetError, setSheetError] = useState('');
@@ -621,25 +622,7 @@ export default function ProcedureDetail() {
             </div>
           </div>
 
-          <div className="flex shrink-0 flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleExportPdf}
-              disabled={exportingPdf}
-              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              Exporter PDF
-            </button>
-            <button
-              type="button"
-              onClick={handleExportWord}
-              disabled={exportingWord || !(currentVersion || versions[0])}
-              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {exportingWord ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-              Exporter Word
-            </button>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             {!draftVersion && procedure.status !== 'obsolete' && (
               <button
                 type="button"
@@ -650,26 +633,72 @@ export default function ProcedureDetail() {
                 Nouvelle version
               </button>
             )}
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setExportMenuOpen((prev) => !prev)}
+                disabled={exportingPdf || exportingWord}
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {exportingPdf || exportingWord ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                Exporter
+              </button>
+              {exportMenuOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setExportMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportMenuOpen(false);
+                        handleExportPdf();
+                      }}
+                      disabled={exportingPdf}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                      PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setExportMenuOpen(false);
+                        handleExportWord();
+                      }}
+                      disabled={exportingWord || !(currentVersion || versions[0])}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                    >
+                      {exportingWord ? <Loader2 size={14} className="animate-spin" /> : <FileType size={14} />}
+                      Word
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {canManage && <ShareRecordPanel resourceType="procedure" resourceId={procedure.id} compact />}
             {canManage && procedure.status !== 'obsolete' && (
               <button
                 type="button"
                 onClick={() => setIsObsoleteModalOpen(true)}
-                className="flex items-center gap-2 rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50"
+                aria-label="Marquer comme obsolète"
+                title="Marquer comme obsolète"
+                className="rounded-md p-2 text-slate-500 hover:bg-red-50 hover:text-red-600"
               >
                 <Archive size={16} />
-                Marquer comme obsolète
               </button>
             )}
-            {canManage && <ShareRecordPanel resourceType="procedure" resourceId={procedure.id} />}
             {canDelete && (
               <button
                 type="button"
                 onClick={handleDelete}
                 disabled={deleting}
-                className="flex items-center gap-2 rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                aria-label="Supprimer"
+                title="Supprimer"
+                className="rounded-md p-2 text-slate-500 hover:bg-red-50 hover:text-red-600 disabled:opacity-60"
               >
-                <Trash2 size={16} />
-                {deleting ? 'Suppression...' : 'Supprimer'}
+                {deleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
               </button>
             )}
           </div>
