@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Minus, Pencil, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
+import { RISK_LEVEL_LABELS, RISK_LEVEL_STYLES } from '../lib/riskStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
@@ -69,11 +70,132 @@ function SnapshotBlock({ snapshot }) {
   );
 }
 
+const AUDIT_FINDING_LABELS = {
+  major_nc: 'NC majeures',
+  minor_nc: 'NC mineures',
+  observation: 'Observations',
+  strength: 'Points forts',
+};
+
+function TrendIcon({ trend }) {
+  if (trend === 'up') return <TrendingUp size={14} className="text-emerald-600" />;
+  if (trend === 'down') return <TrendingDown size={14} className="text-red-600" />;
+  if (trend === 'stable') return <Minus size={14} className="text-slate-400" />;
+  return null;
+}
+
+// Panneau "données d'entrée" (§9.3.2) : figé à la création de la revue (ou lors d'une
+// actualisation explicite tant qu'elle est en brouillon), jamais recalculé après clôture — voir
+// input_snapshot dans schema.sql. Toujours rendu, avec un repli si aucune donnée n'est
+// disponible (revue ancienne, ou créée sans période).
+function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
+  if (!inputSnapshot) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 sm:p-5">
+        Aucune donnée d'entrée disponible (revue créée avant cette fonctionnalité, ou sans période définie).
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 shadow-sm sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Données d'entrée</h2>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Période du {formatDate(inputSnapshot.period.start)} au {formatDate(inputSnapshot.period.end)} — calculées le{' '}
+            {formatDateTime(inputSnapshot.generated_at)}
+          </p>
+        </div>
+        {canRefresh && (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Actualisation...' : "Actualiser les données d'entrée"}
+          </button>
+        )}
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">KPI suivis</p>
+          {inputSnapshot.kpi_trend.length === 0 ? (
+            <p className="mt-1 text-sm text-slate-400">Aucun KPI.</p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {inputSnapshot.kpi_trend.map((kpi) => (
+                <li key={kpi.id} className="flex items-center justify-between gap-2 text-sm text-slate-700">
+                  <span className="truncate">{kpi.name}</span>
+                  <span className="flex shrink-0 items-center gap-1 font-medium">
+                    {kpi.current_avg !== null ? `${kpi.current_avg.toFixed(1)}${kpi.unit ? ` ${kpi.unit}` : ''}` : '—'}
+                    <TrendIcon trend={kpi.trend} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Audits réalisés</p>
+          <p className="mt-1 text-lg font-semibold text-slate-900">{inputSnapshot.audits_period.count}</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {Object.entries(inputSnapshot.audits_period.findings_by_type).map(([type, count]) => (
+              <span key={type} className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                {AUDIT_FINDING_LABELS[type]} : {count}
+              </span>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Réclamations clients</p>
+          <p className="mt-1 text-sm text-slate-700">
+            <span className="text-lg font-semibold text-slate-900">{inputSnapshot.complaints_period.received}</span> reçue(s) —{' '}
+            <span className="font-medium">{inputSnapshot.complaints_period.still_open}</span> encore ouverte(s)
+          </p>
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">CAPA</p>
+          <p className="mt-1 text-sm text-slate-700">
+            <span className="text-lg font-semibold text-slate-900">{inputSnapshot.capas_period.in_progress}</span> en cours ·{' '}
+            <span className="font-medium">{inputSnapshot.capas_period.closed_in_period}</span> clôturée(s) sur la période
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            Taux de clôture dans les délais :{' '}
+            <span className="font-medium text-slate-700">
+              {inputSnapshot.capas_period.on_time_closure_rate === null ? '—' : `${inputSnapshot.capas_period.on_time_closure_rate}%`}
+            </span>
+          </p>
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-white px-3 py-2 sm:col-span-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Risques actuellement ouverts</p>
+          <div className="mt-1 flex flex-wrap gap-1.5">
+            {Object.entries(inputSnapshot.risks_open).map(([level, count]) => (
+              <span key={level} className={`rounded-full px-2 py-0.5 text-xs font-medium ${RISK_LEVEL_STYLES[level]}`}>
+                {RISK_LEVEL_LABELS[level]} : {count}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditReviewModal({ review, categories, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: review.title,
     review_date: review.review_date,
     participants: review.participants || '',
+    period_start: review.period_start || '',
+    period_end: review.period_end || '',
     category_id: review.category_id || '',
     previous_actions_status: review.previous_actions_status || '',
     context_changes: review.context_changes || '',
@@ -163,6 +285,31 @@ function EditReviewModal({ review, categories, onClose, onUpdated }) {
                 value={form.participants}
                 onChange={(e) => updateField('participants', e.target.value)}
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Période des données d'entrée
+              {review.status === 'completed' && (
+                <span className="ml-1 font-normal text-slate-400">(figée, la revue est clôturée)</span>
+              )}
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="date"
+                disabled={review.status === 'completed'}
+                value={form.period_start}
+                onChange={(e) => updateField('period_start', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-400"
+              />
+              <input
+                type="date"
+                disabled={review.status === 'completed'}
+                value={form.period_end}
+                onChange={(e) => updateField('period_end', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-400"
               />
             </div>
           </div>
@@ -441,6 +588,7 @@ export default function ManagementReviewDetail() {
   const [actionError, setActionError] = useState('');
   const [submittingAction, setSubmittingAction] = useState(false);
   const [capaModalAction, setCapaModalAction] = useState(null);
+  const [refreshingSnapshot, setRefreshingSnapshot] = useState(false);
 
   async function loadReview() {
     setLoading(true);
@@ -477,6 +625,19 @@ export default function ManagementReviewDetail() {
       setReview((prev) => ({ ...prev, ...data }));
     } catch {
       setError('Impossible de mettre à jour le statut.');
+    }
+  }
+
+  async function handleRefreshSnapshot() {
+    setRefreshingSnapshot(true);
+    setError('');
+    try {
+      const { data } = await api.post(`/management-reviews/${id}/refresh-snapshot`);
+      setReview((prev) => ({ ...prev, ...data }));
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'actualiser les données d'entrée.");
+    } finally {
+      setRefreshingSnapshot(false);
     }
   }
 
@@ -597,6 +758,15 @@ export default function ManagementReviewDetail() {
           <p className="text-xs text-slate-500">Participants</p>
           <p className="text-sm font-medium text-slate-800">{review.participants || '—'}</p>
         </div>
+      </div>
+
+      <div className="mt-4">
+        <InputDataBlock
+          inputSnapshot={review.input_snapshot}
+          canRefresh={canManage && review.status === 'draft' && Boolean(review.period_start && review.period_end)}
+          refreshing={refreshingSnapshot}
+          onRefresh={handleRefreshSnapshot}
+        />
       </div>
 
       {review.snapshot && (

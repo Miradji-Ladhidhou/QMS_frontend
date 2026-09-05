@@ -36,10 +36,20 @@ function getReviewSortValue(review, key) {
   return review[key];
 }
 
+// Défaut "trimestre écoulé" pour la période des données d'entrée — simple point de départ
+// suggéré, librement modifiable avant de créer la revue.
+function defaultPeriodStart() {
+  const date = new Date();
+  date.setMonth(date.getMonth() - 3);
+  return date.toISOString().slice(0, 10);
+}
+
 function NewReviewModal({ categories, onClose, onCreated }) {
   const [title, setTitle] = useState('');
   const [reviewDate, setReviewDate] = useState(new Date().toISOString().slice(0, 10));
   const [participants, setParticipants] = useState('');
+  const [periodStart, setPeriodStart] = useState(defaultPeriodStart());
+  const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
   const [categoryId, setCategoryId] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -69,6 +79,8 @@ function NewReviewModal({ categories, onClose, onCreated }) {
         title,
         review_date: reviewDate,
         participants: participants || undefined,
+        period_start: periodStart || undefined,
+        period_end: periodEnd || undefined,
         category_id: finalCategoryId,
       });
     } catch (err) {
@@ -128,6 +140,27 @@ function NewReviewModal({ categories, onClose, onCreated }) {
               onChange={(e) => setParticipants(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Période des données d'entrée
+              <span className="ml-1 font-normal text-slate-400">(KPI, audits, réclamations, CAPA, risques)</span>
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              <input
+                type="date"
+                value={periodStart}
+                onChange={(e) => setPeriodStart(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+              <input
+                type="date"
+                value={periodEnd}
+                onChange={(e) => setPeriodEnd(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
           </div>
 
           <CategoryVisibilityField
