@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Download, Loader2, Minus, RefreshCw, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Check, Download, FileType, Loader2, Minus, RefreshCw, X as XIcon } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { exportToCsv } from '../lib/csvExport.js';
+import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
 import { useSort } from '../lib/useSort.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -43,7 +43,9 @@ export default function SkillMatrix() {
   const [matrix, setMatrix] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportError, setExportError] = useState('');
 
   useEffect(() => {
@@ -76,22 +78,61 @@ export default function SkillMatrix() {
     return training.people.find((entry) => entry.person.id === personId);
   }
 
-  function handleExportCsv() {
-    const headers = ['Personnel', 'Statut personnel', ...matrix.map((entry) => entry.training.title)];
-    const rows = people.map((person) => [
-      person.full_name,
-      person.kind === 'employee' ? 'Sans compte' : 'Compte',
-      ...matrix.map((entry) => {
+  // Colonnes dynamiques (une par formation, en plus des 2 fixes) : columns/rows au même format
+  // que les autres pages malgré ce nombre variable — voir listReportPdf.js, dont la bascule
+  // automatique en paysage profite justement à ce genre de tableau large.
+  function buildMatrixExportPayload() {
+    const columns = [
+      { key: 'person', label: 'Personnel' },
+      { key: 'personStatus', label: 'Statut personnel' },
+      ...matrix.map((entry, i) => ({ key: `training_${i}`, label: entry.training.title })),
+    ];
+    const rows = people.map((person) => {
+      const row = {
+        person: person.full_name,
+        personStatus: person.kind === 'employee' ? 'Sans compte' : 'Compte',
+      };
+      matrix.forEach((entry, i) => {
         const cell = findEntry(entry, person.id);
         const status = cell?.status ?? 'never_done';
         const dateLabel = cellDateLabel(cell);
-        return dateLabel ? `${TRAINING_STATUS_LABELS[status]} (${dateLabel})` : TRAINING_STATUS_LABELS[status];
-      }),
-    ]);
-    exportToCsv(`matrice-competences-${new Date().toISOString().slice(0, 10)}.csv`, 'Matrice des compétences', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: `${people.length} personne${people.length > 1 ? 's' : ''}`,
+        row[`training_${i}`] = dateLabel ? `${TRAINING_STATUS_LABELS[status]} (${dateLabel})` : TRAINING_STATUS_LABELS[status];
+      });
+      return row;
     });
+    return { columns, rows, subtitle: `${people.length} personne${people.length > 1 ? 's' : ''}` };
+  }
+
+  async function handleExportCsv() {
+    setExportError('');
+    setExportingCsv(true);
+    try {
+      const { columns, rows, subtitle } = buildMatrixExportPayload();
+      await exportTableCsv(`matrice-competences-${new Date().toISOString().slice(0, 10)}.csv`, 'Matrice des compétences', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle,
+      });
+    } catch {
+      setExportError('Impossible d\'exporter la matrice en CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setExportError('');
+    setExportingWord(true);
+    try {
+      const { columns, rows, subtitle } = buildMatrixExportPayload();
+      await exportToWord(`matrice-competences-${new Date().toISOString().slice(0, 10)}.docx`, 'Matrice des compétences', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle,
+      });
+    } catch {
+      setExportError('Impossible d\'exporter la matrice en Word.');
+    } finally {
+      setExportingWord(false);
+    }
   }
 
   async function handleExportPdf() {
@@ -127,10 +168,10 @@ export default function SkillMatrix() {
           <button
             type="button"
             onClick={handleExportCsv}
-            disabled={people.length === 0}
+            disabled={exportingCsv || people.length === 0}
             className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
-            <Download size={18} />
+            {exportingCsv ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             CSV
           </button>
           <button
@@ -141,6 +182,15 @@ export default function SkillMatrix() {
           >
             {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleExportWord}
+            disabled={exportingWord || people.length === 0}
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingWord ? <Loader2 size={18} className="animate-spin" /> : <FileType size={18} />}
+            Word
           </button>
         </div>
       </div>

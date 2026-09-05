@@ -11,6 +11,7 @@ import {
   ChevronUp,
   Download,
   FileText,
+  FileType,
   Folder,
   FolderInput,
   FolderPlus,
@@ -41,6 +42,7 @@ import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
 import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
+import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
@@ -2264,13 +2266,17 @@ function RecordProofModal({ kpi, record, onClose }) {
         total = pageData.rows_total;
         currentPage += 1;
       }
-      exportToCsv(
+      const columns = data.columns.map((col) => ({ key: col, label: col }));
+      const rows = allRows.map((row) =>
+        Object.fromEntries(
+          data.columns.map((col) => [col, row.row_data[col] === null || row.row_data[col] === undefined ? '' : String(row.row_data[col])])
+        )
+      );
+      await exportTableCsv(
         `${sanitizeFilename(kpi.name)}-preuve-${record.period_date}.csv`,
         `Preuve — ${kpi.name}`,
-        data.columns,
-        allRows.map((row) =>
-          data.columns.map((col) => (row.row_data[col] === null || row.row_data[col] === undefined ? '' : String(row.row_data[col])))
-        ),
+        columns,
+        rows,
         { generatedBy: currentUser?.full_name, subtitle: `Période : ${record.period_date} · ${allRows.length} ligne${allRows.length > 1 ? 's' : ''}` }
       );
     } finally {
@@ -2530,21 +2536,39 @@ function KpiCard({
     }
   }
 
-  function handleExportDataCsv() {
-    setExportMenuOpen(false);
+  function buildDataExportPayload() {
     const sortedRecords = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
-    exportToCsv(
-      `${sanitizeFilename(kpi.name)}-valeurs.csv`,
-      kpi.name,
-      ['Période', 'Valeur', 'Source', 'Commentaire'],
-      sortedRecords.map((record) => [
-        formatDate(record.period_date),
-        record.value,
-        SOURCE_LABELS[record.source] || record.source,
-        record.comment || '',
-      ]),
-      { generatedBy: currentUser?.full_name, subtitle: `${sortedRecords.length} valeur${sortedRecords.length > 1 ? 's' : ''}` }
-    );
+    const columns = [
+      { key: 'period_date', label: 'Période' },
+      { key: 'value', label: 'Valeur' },
+      { key: 'source', label: 'Source' },
+      { key: 'comment', label: 'Commentaire' },
+    ];
+    const rows = sortedRecords.map((record) => ({
+      period_date: formatDate(record.period_date),
+      value: record.value,
+      source: SOURCE_LABELS[record.source] || record.source,
+      comment: record.comment || '',
+    }));
+    return { columns, rows, subtitle: `${sortedRecords.length} valeur${sortedRecords.length > 1 ? 's' : ''}` };
+  }
+
+  async function handleExportDataCsv() {
+    setExportMenuOpen(false);
+    const { columns, rows, subtitle } = buildDataExportPayload();
+    await exportTableCsv(`${sanitizeFilename(kpi.name)}-valeurs.csv`, kpi.name, columns, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle,
+    });
+  }
+
+  async function handleExportDataWord() {
+    setExportMenuOpen(false);
+    const { columns, rows, subtitle } = buildDataExportPayload();
+    await exportToWord(`${sanitizeFilename(kpi.name)}-valeurs.docx`, kpi.name, columns, rows, {
+      generatedBy: currentUser?.full_name,
+      subtitle,
+    });
   }
 
   return (
@@ -2605,6 +2629,14 @@ function KpiCard({
                   >
                     <FileText size={14} />
                     Exporter les données (CSV)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportDataWord}
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <FileType size={14} />
+                    Exporter les données (Word)
                   </button>
                 </div>
               </>
