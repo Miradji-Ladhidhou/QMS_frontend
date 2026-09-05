@@ -18,6 +18,7 @@ import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import LinkItemModal from '../components/LinkItemModal.jsx';
 import ProcedureAttachment from '../components/ProcedureAttachment.jsx';
+import ProcedureContentView from '../components/ProcedureContentView.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
@@ -765,41 +766,8 @@ export default function ProcedureDetail() {
               <ProcedureAttachment procedureId={procedure.id} version={currentVersion} editable={false} />
             </div>
           )}
-          <div className="mt-3 space-y-3 text-sm text-slate-700">
-            {currentVersion.content?.objet && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Objet</p>
-                <p className="mt-0.5 whitespace-pre-wrap">{currentVersion.content.objet}</p>
-              </div>
-            )}
-            {currentVersion.content?.domaine_application && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Domaine d'application</p>
-                <p className="mt-0.5 whitespace-pre-wrap">{currentVersion.content.domaine_application}</p>
-              </div>
-            )}
-            {currentVersion.content?.responsabilites && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Responsabilités</p>
-                <p className="mt-0.5 whitespace-pre-wrap">{currentVersion.content.responsabilites}</p>
-              </div>
-            )}
-            {(currentVersion.content?.sections || []).map((section) => (
-              <div key={section.key}>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{section.label}</p>
-                <p className="mt-0.5 whitespace-pre-wrap">{section.content}</p>
-              </div>
-            ))}
-            {currentVersion.content?.documents_associes?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Documents associés</p>
-                <ul className="mt-0.5 list-disc space-y-0.5 pl-5">
-                  {currentVersion.content.documents_associes.map((doc, i) => (
-                    <li key={i}>{doc}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+          <div className="mt-3">
+            <ProcedureContentView content={currentVersion.content} />
           </div>
         </div>
       )}
