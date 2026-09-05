@@ -39,6 +39,13 @@ function getPdcaSortValue(pdca, key) {
   return pdca[key];
 }
 
+// Miroir de DELETE /pdca/:id et DELETE /pdca/bulk côté backend : un manager qui n'a pas créé le
+// projet n'a pas plus de droit de suppression qu'un member (contrairement à PATCH/advance).
+function canDeletePdca(pdca, currentUser) {
+  if (!pdca || !currentUser) return false;
+  return currentUser.role === 'admin' || pdca.created_by === currentUser.id;
+}
+
 function NewPdcaModal({ users, services, categories, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
@@ -415,6 +422,7 @@ export default function Pdca() {
 
   const isFolderView = viewMode === 'folder';
   const pdcaGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, projects: sortedProjects }];
+  const deletableIds = sortedProjects.filter((pdca) => canDeletePdca(pdca, currentUser)).map((pdca) => pdca.id);
 
   function handleCreated(pdca) {
     setIsModalOpen(false);
@@ -513,12 +521,12 @@ export default function Pdca() {
         )}
       </div>
 
-      {canManage && <SelectAllToggle ids={sortedProjects.map((pdca) => pdca.id)} selectedIds={selectedIds} onChange={setSelectedIds} />}
+      {deletableIds.length > 0 && <SelectAllToggle ids={deletableIds} selectedIds={selectedIds} onChange={setSelectedIds} />}
 
-      {canManage && (
+      {(canManage || deletableIds.length > 0) && (
         <BulkSelectionBar
           count={selectedIds.length}
-          onMove={() => setIsBulkMoveModalOpen(true)}
+          onMove={canManage ? () => setIsBulkMoveModalOpen(true) : undefined}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />
@@ -571,7 +579,7 @@ export default function Pdca() {
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3">
-                          {canManage && (
+                          {canDeletePdca(pdca, currentUser) && (
                             <input
                               type="checkbox"
                               checked={selectedIds.includes(pdca.id)}
