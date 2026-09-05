@@ -361,6 +361,16 @@ export default function CapaDetail() {
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Origine</dt>
             <dd className="mt-1 text-sm text-slate-800">{capa.origin || '—'}</dd>
           </div>
+          {capa.qqoqccp_analysis && (
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Analyse QQOQCCP liée</dt>
+              <dd className="mt-1 text-sm">
+                <Link to={`/qqoqccp/${capa.qqoqccp_analysis.id}`} className="text-primary hover:underline">
+                  {capa.qqoqccp_analysis.title}
+                </Link>
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Responsable assigné</dt>
             <dd className="mt-1 text-sm text-slate-800">{capa.assigned?.full_name || 'Non assigné'}</dd>

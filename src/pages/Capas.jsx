@@ -1,13 +1,16 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  ClipboardList,
   Folder,
   FolderPlus,
   List,
+  Loader2,
   Plus,
+  RefreshCw,
   Search,
   Sparkles,
   X,
@@ -19,6 +22,7 @@ import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useMenuVisibility } from '../lib/useMenuVisibility.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
@@ -208,6 +212,164 @@ function GuidedDiagnosticModal({ onClose, onCreated }) {
   );
 }
 
+// Mêmes noms de champs/libellés que QUESTIONS dans QqoqccpDetail.jsx — dupliqués ici plutôt
+// qu'importés, ce panneau reste un composant local propre à Capas.jsx (même convention que le
+// reste du fichier : NewCapaChoiceModal/GuidedDiagnosticModal/NewCapaModal sont déjà tous
+// colocalisés ici).
+const QQOQCCP_QUESTIONS = [
+  { key: 'qui', label: 'Qui ?', placeholder: 'Qui est concerné ? Qui a détecté le problème ?' },
+  { key: 'quoi', label: 'Quoi ?', placeholder: "Que s'est-il passé exactement ?" },
+  { key: 'ou_', label: 'Où ?', placeholder: 'Où le problème a-t-il eu lieu ?' },
+  { key: 'quand_', label: 'Quand ?', placeholder: 'Quand le problème est-il survenu ? À quelle fréquence ?' },
+  { key: 'comment_', label: 'Comment ?', placeholder: "Comment le problème s'est-il produit ?" },
+  { key: 'combien', label: 'Combien ?', placeholder: "Quel est l'impact, le coût, la quantité concernée ?" },
+  { key: 'pourquoi', label: 'Pourquoi ?', placeholder: 'Pourquoi pense-t-on que cela s\'est produit ?' },
+];
+const QQOQCCP_MIN_FIELDS_FOR_GENERATE = 3;
+const QQOQCCP_SAVE_DEBOUNCE_MS = 1000;
+
+// Raccourci "Structurer la cause avec QQOQCCP" depuis NewCapaModal — contrairement à
+// GuidedDiagnosticModal (qui redirige vers /qqoqccp/:id, pensé pour qui n'a même pas encore de
+// titre de CAPA), ce panneau reste ouvert PAR-DESSUS le formulaire de CAPA déjà entamé : jamais
+// de perte de contexte. L'analyse est créée dès l'ouverture (comme QqoqccpDetail.jsx, sauvegarde
+// progressive par champ) — un panneau abandonné laisse un dossier orphelin mais valide, visible
+// dans la liste standalone du module comme n'importe quel autre, ce qui est le comportement
+// attendu ici, pas un bug à empêcher.
+function EmbeddedQqoqccpModal({ seedTitle, seedQuoi, onClose, onFinish }) {
+  const [analysisId, setAnalysisId] = useState(null);
+  const [form, setForm] = useState(() => Object.fromEntries(QQOQCCP_QUESTIONS.map(({ key }) => [key, ''])));
+  const [creating, setCreating] = useState(true);
+  const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState('');
+  const timers = useRef({});
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .post('/qqoqccp', { title: seedTitle?.trim() || 'Analyse QQOQCCP', quoi: seedQuoi || undefined })
+      .then(({ data }) => {
+        if (cancelled) return;
+        setAnalysisId(data.id);
+        setForm((prev) => ({ ...prev, quoi: data.quoi || prev.quoi }));
+      })
+      .catch(() => {
+        if (!cancelled) setError("Impossible de créer l'analyse QQOQCCP.");
+      })
+      .finally(() => {
+        if (!cancelled) setCreating(false);
+      });
+    return () => {
+      cancelled = true;
+      Object.values(timers.current).forEach(clearTimeout);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function handleFieldChange(field, value) {
+    setForm((prev) => ({ ...prev, [field]: value }));
+    if (!analysisId) return;
+    if (timers.current[field]) clearTimeout(timers.current[field]);
+    timers.current[field] = setTimeout(() => {
+      api.patch(`/qqoqccp/${analysisId}`, { [field]: value }).catch(() => {});
+    }, QQOQCCP_SAVE_DEBOUNCE_MS);
+  }
+
+  const filledCount = QQOQCCP_QUESTIONS.filter(({ key }) => form[key]?.trim()).length;
+  const canGenerate = filledCount >= QQOQCCP_MIN_FIELDS_FOR_GENERATE;
+
+  // Toujours disponible dès qu'au moins une question est renseignée : à la différence du bouton
+  // IA, ce résumé ne dépend jamais de GROQ_API_KEY — jamais bloqué si l'IA n'est pas configurée.
+  function buildManualSummary() {
+    return QQOQCCP_QUESTIONS.filter(({ key }) => form[key]?.trim())
+      .map(({ label, key }) => `${label} ${form[key].trim()}`)
+      .join('\n');
+  }
+
+  async function handleGenerate() {
+    setError('');
+    setGenerating(true);
+    try {
+      const { data } = await api.post(`/qqoqccp/${analysisId}/generate`);
+      onFinish(data.ai_synthesis, analysisId);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de générer une synthèse IA — utilisez le résumé simple.');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  function handleUseManualSummary() {
+    onFinish(buildManualSummary(), analysisId);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Structurer la cause avec QQOQCCP</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {creating ? (
+          <div className="flex items-center justify-center py-10 text-slate-400">
+            <Loader2 size={24} className="animate-spin" />
+          </div>
+        ) : !analysisId ? (
+          <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        ) : (
+          <>
+            <p className="mb-4 text-sm text-slate-500">
+              Répondez à ce qui est pertinent (3 questions minimum pour la synthèse IA) — le dossier créé reste consultable
+              indépendamment dans le module QQOQCCP.
+            </p>
+
+            {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+            <div className="space-y-3">
+              {QQOQCCP_QUESTIONS.map(({ key, label, placeholder }) => (
+                <div key={key}>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+                  <AutoTextarea
+                    rows={2}
+                    placeholder={placeholder}
+                    value={form[key]}
+                    onChange={(e) => handleFieldChange(key, e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={handleGenerate}
+                disabled={!canGenerate || generating}
+                title={!canGenerate ? `Remplissez au moins ${QQOQCCP_MIN_FIELDS_FOR_GENERATE} des 7 questions.` : undefined}
+                className="flex items-center gap-2 rounded-md border border-purple-300 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
+              >
+                {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                {generating ? 'Génération...' : 'Générer une synthèse IA'}
+              </button>
+              <button
+                type="button"
+                onClick={handleUseManualSummary}
+                disabled={filledCount === 0}
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+              >
+                <RefreshCw size={16} />
+                Utiliser un résumé simple
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function NewCapaModal({ users, services, categories, priorityDelays, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
@@ -221,14 +383,23 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
     root_cause: '',
     corrective_action: '',
     preventive_action: '',
+    qqoqccp_analysis_id: '',
   });
   const [dueDateTouched, setDueDateTouched] = useState(false);
   const [isPrivate, setIsPrivate] = useState(false);
+  const [isQqoqccpPanelOpen, setIsQqoqccpPanelOpen] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const visibleMenuKeys = useMenuVisibility();
+  const qqoqccpVisible = !visibleMenuKeys || visibleMenuKeys.includes('qqoqccp');
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function handleQqoqccpFinish(summaryText, analysisId) {
+    setForm((prev) => ({ ...prev, root_cause: summaryText || prev.root_cause, qqoqccp_analysis_id: analysisId }));
+    setIsQqoqccpPanelOpen(false);
   }
 
   // Le champ Échéance se met à jour tout seul en fonction de la gravité et du délai
@@ -290,6 +461,7 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
       root_cause: form.root_cause || undefined,
       corrective_action: form.corrective_action || undefined,
       preventive_action: form.preventive_action || undefined,
+      qqoqccp_analysis_id: form.qqoqccp_analysis_id || undefined,
     };
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence.
@@ -395,7 +567,19 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Cause identifiée</label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">Cause identifiée</label>
+              {qqoqccpVisible && (
+                <button
+                  type="button"
+                  onClick={() => setIsQqoqccpPanelOpen(true)}
+                  className="flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                >
+                  <ClipboardList size={13} />
+                  Structurer la cause avec QQOQCCP
+                </button>
+              )}
+            </div>
             <AutoTextarea
               rows={2}
               value={form.root_cause}
@@ -477,6 +661,15 @@ function NewCapaModal({ users, services, categories, priorityDelays, onClose, on
           </button>
         </form>
       </div>
+
+      {isQqoqccpPanelOpen && (
+        <EmbeddedQqoqccpModal
+          seedTitle={form.title}
+          seedQuoi={form.root_cause}
+          onClose={() => setIsQqoqccpPanelOpen(false)}
+          onFinish={handleQqoqccpFinish}
+        />
+      )}
     </div>
   );
 }
