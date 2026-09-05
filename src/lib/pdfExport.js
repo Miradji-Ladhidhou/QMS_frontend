@@ -116,3 +116,19 @@ export async function postForWordDownload(url, body, filename) {
     filename
   );
 }
+
+// Même principe qu'exportToXlsx, mais produit un tableau Word (voir services/listReportWord.js)
+// — réutilise les mêmes columns/rows que les exports PDF/Excel de la page appelante.
+export async function exportToWord(filename, title, columns, rows, options = {}) {
+  await postForWordDownload('/reports/table-word', { title, ...options, columns, rows }, filename);
+}
+
+// Équivalent backend de exportToCsv (csvExport.js), sous un nom différent pour ne jamais être
+// confondu avec elle : celle-ci reste réservée aux cas vraiment spécifiques au client (ex.
+// modèle d'import CSV vierge dans Kpis.jsx, sans données de tenant à envoyer). Ici, mêmes
+// columns/rows que les exports PDF/Excel/Word de la page appelante — voir
+// services/listReportCsv.js pour le format produit (BOM UTF-8, séparateur ';', bloc méta).
+export async function exportTableCsv(filename, title, columns, rows, options = {}) {
+  const response = await api.post('/reports/table-csv', { title, ...options, columns, rows }, { responseType: 'blob' });
+  triggerBlobDownload(new Blob([response.data], { type: 'text/csv;charset=utf-8' }), filename);
+}

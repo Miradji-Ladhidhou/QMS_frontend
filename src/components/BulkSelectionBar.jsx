@@ -1,4 +1,4 @@
-import { Cloud, Download, FolderInput, Loader2, Trash2, X } from 'lucide-react';
+import { Cloud, Download, FileType, FolderInput, Loader2, Trash2, X } from 'lucide-react';
 
 // Barre partagée par toutes les listes qui supportent des actions en masse. N'apparaît que si
 // au moins un élément est coché. Chaque action (déplacer, exporter, supprimer) est optionnelle
@@ -8,10 +8,13 @@ export default function BulkSelectionBar({
   count,
   onMove,
   onExportCsv,
+  exportingCsv,
   onExportPdf,
   exportingPdf,
   onExportXlsx,
   exportingXlsx,
+  onExportWord,
+  exportingWord,
   onExportDrive,
   exportingDrive,
   onDelete,
@@ -39,9 +42,10 @@ export default function BulkSelectionBar({
           <button
             type="button"
             onClick={onExportCsv}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            disabled={exportingCsv}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
           >
-            <Download size={16} />
+            {exportingCsv ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             Exporter CSV
           </button>
         )}
@@ -65,6 +69,17 @@ export default function BulkSelectionBar({
           >
             {exportingXlsx ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
             Exporter Excel
+          </button>
+        )}
+        {onExportWord && (
+          <button
+            type="button"
+            onClick={onExportWord}
+            disabled={exportingWord}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
+          >
+            {exportingWord ? <Loader2 size={16} className="animate-spin" /> : <FileType size={16} />}
+            Exporter Word
           </button>
         )}
         {onExportDrive && (
