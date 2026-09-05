@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, Check, Pencil, Trash2, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -180,7 +180,7 @@ function EditPdcaModal({ pdca, users, services, categories, onClose, onUpdated }
 // l'avance), passée/clôturée (contenu en lecture seule, modifiable via le crayon — correction
 // d'une coquille sans repasser par l'avancement séquentiel) et courante (zone de saisie ouverte
 // en permanence + bouton d'avancement).
-function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftChange, canEdit, isEditing, onStartEdit, onCancelEdit, onSave, saving, onAdvance, advancing, isLastPhase }) {
+function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftChange, canEdit, isEditing, onStartEdit, onCancelEdit, onSave, saving, onAdvance, advancing, isLastPhase, onGenerate, generating }) {
   if (state === 'future') {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 opacity-60 sm:p-5">
@@ -224,6 +224,17 @@ function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftCh
             className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
           />
           <div className="flex flex-wrap items-center gap-2">
+            {state === 'current' && onGenerate && (
+              <button
+                type="button"
+                onClick={onGenerate}
+                disabled={generating}
+                className="flex items-center gap-1.5 rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-100 disabled:opacity-60"
+              >
+                {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                {generating ? 'Génération...' : "Générer avec l'IA"}
+              </button>
+            )}
             <button
               type="button"
               onClick={onSave}
@@ -273,6 +284,7 @@ export default function PdcaDetail() {
   const [editingPhase, setEditingPhase] = useState(null);
   const [savingPhase, setSavingPhase] = useState(null);
   const [advancing, setAdvancing] = useState(false);
+  const [generating, setGenerating] = useState(false);
 
   async function loadPdca() {
     setLoading(true);
@@ -335,6 +347,19 @@ export default function PdcaDetail() {
       setError(err.response?.data?.error || "Impossible de faire avancer ce projet PDCA.");
     } finally {
       setAdvancing(false);
+    }
+  }
+
+  async function handleGeneratePhase() {
+    setError('');
+    setGenerating(true);
+    try {
+      const { data } = await api.post(`/pdca/${id}/generate`);
+      setDrafts((prev) => ({ ...prev, [pdca.status]: data.content }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de générer une suggestion IA.');
+    } finally {
+      setGenerating(false);
     }
   }
 
@@ -440,6 +465,8 @@ export default function PdcaDetail() {
               onAdvance={handleAdvance}
               advancing={advancing}
               isLastPhase={phase === 'act'}
+              onGenerate={canEdit ? handleGeneratePhase : undefined}
+              generating={generating}
             />
           );
         })}
