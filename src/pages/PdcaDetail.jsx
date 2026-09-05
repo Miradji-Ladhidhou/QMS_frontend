@@ -238,16 +238,20 @@ function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftCh
             <button
               type="button"
               onClick={onSave}
-              disabled={saving}
+              disabled={saving || (state === 'current' && generating)}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-60"
             >
               {saving ? 'Enregistrement...' : 'Enregistrer'}
             </button>
             {state === 'current' && (
+              // Avancer pendant qu'une génération IA est en cours pourrait faire arriver la
+              // suggestion APRÈS le changement de phase : elle serait alors écrite dans le
+              // brouillon de l'étape déjà quittée (drafts[pdca.status] capturé au clic, devenu
+              // obsolète) — désactivé le temps de la génération pour empêcher ce chevauchement.
               <button
                 type="button"
                 onClick={onAdvance}
-                disabled={advancing}
+                disabled={advancing || generating}
                 className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
               >
                 {advancing ? 'Avancement...' : isLastPhase ? 'Clôturer le projet' : "Passer à l'étape suivante"}
