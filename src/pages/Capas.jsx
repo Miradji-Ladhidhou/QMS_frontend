@@ -289,6 +289,14 @@ function EmbeddedQqoqccpModal({ seedTitle, seedQuoi, onClose, onFinish }) {
     setError('');
     setGenerating(true);
     try {
+      // Les PATCH par champ sont debouncés (QQOQCCP_SAVE_DEBOUNCE_MS) : si l'utilisateur tape
+      // puis clique tout de suite sur Générer, la dernière réponse pourrait ne pas encore être
+      // enregistrée en base au moment où /generate la lit (il lit la ligne, pas cette requête).
+      // On annule les PATCH en attente et on renvoie l'état actuel du formulaire en un seul
+      // appel avant de générer, pour ne jamais faire lire à l'IA une réponse en retard d'un cran.
+      Object.values(timers.current).forEach(clearTimeout);
+      timers.current = {};
+      await api.patch(`/qqoqccp/${analysisId}`, form);
       const { data } = await api.post(`/qqoqccp/${analysisId}/generate`);
       onFinish(data.ai_synthesis, analysisId);
     } catch (err) {
