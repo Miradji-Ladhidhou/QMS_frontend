@@ -17,8 +17,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -776,8 +775,10 @@ export default function Capas() {
   const [isChoiceModalOpen, setIsChoiceModalOpen] = useState(false);
   const [isGuidedModalOpen, setIsGuidedModalOpen] = useState(false);
   const [updatingId, setUpdatingId] = useState(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -947,47 +948,58 @@ export default function Capas() {
   const isFolderView = viewMode === 'folder';
   const capaGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, capas: sortedCapas }];
 
-  function handleExportCsv(scopeIds) {
+  // Volontairement plus détaillé que columns dans handleExportPdf/handleExportXlsx (15 champs
+  // contre 6) : le CSV/Excel se prête mieux à un export complet consultable dans un tableur,
+  // alors que le PDF reste un résumé pensé pour être lisible imprimé — divergence déjà présente
+  // avant le passage au backend, conservée telle quelle plutôt qu'unifiée sur le plus court.
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
-    const headers = [
-      'Numéro',
-      'Date',
-      'Service',
-      'Description de la non-conformité',
-      'Gravité',
-      'Délai de traitement (jours)',
-      'Échéance',
-      'Cause identifiée',
-      'Action corrective',
-      'Action préventive',
-      'Responsable',
-      'Statut',
-      'Vérification efficacité',
-      'Date clôture',
-      'Commentaire',
-    ];
-    const rows = source.map((capa) => [
-      capa.number,
-      formatDate(capa.created_at),
-      capa.service?.name || '',
-      capa.description || '',
-      CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
-      getDelayDays(capa.priority, priorityDelays) ?? '',
-      formatDate(capa.due_date),
-      capa.root_cause || '',
-      capa.corrective_action || '',
-      capa.preventive_action || '',
-      capa.assigned?.full_name || '',
-      CAPA_STATUS_LABELS[capa.status] || capa.status,
-      CAPA_EFFECTIVENESS_LABELS[capa.effectiveness_verified] || '',
-      formatDate(capa.closed_at),
-      capa.comment || '',
-    ]);
-
-    exportToCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, 'CAPA', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: `${source.length} CAPA`,
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro' },
+        { key: 'created_at', label: 'Date' },
+        { key: 'service', label: 'Service' },
+        { key: 'description', label: 'Description de la non-conformité' },
+        { key: 'priority', label: 'Gravité' },
+        { key: 'delay_days', label: 'Délai de traitement (jours)' },
+        { key: 'due_date', label: 'Échéance' },
+        { key: 'root_cause', label: 'Cause identifiée' },
+        { key: 'corrective_action', label: 'Action corrective' },
+        { key: 'preventive_action', label: 'Action préventive' },
+        { key: 'assigned', label: 'Responsable' },
+        { key: 'status', label: 'Statut' },
+        { key: 'effectiveness', label: 'Vérification efficacité' },
+        { key: 'closed_at', label: 'Date clôture' },
+        { key: 'comment', label: 'Commentaire' },
+      ];
+      const rows = source.map((capa) => ({
+        number: capa.number,
+        created_at: formatDate(capa.created_at),
+        service: capa.service?.name || '',
+        description: capa.description || '',
+        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+        delay_days: getDelayDays(capa.priority, priorityDelays) ?? '',
+        due_date: formatDate(capa.due_date),
+        root_cause: capa.root_cause || '',
+        corrective_action: capa.corrective_action || '',
+        preventive_action: capa.preventive_action || '',
+        assigned: capa.assigned?.full_name || '',
+        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
+        effectiveness: CAPA_EFFECTIVENESS_LABELS[capa.effectiveness_verified] || '',
+        closed_at: formatDate(capa.closed_at),
+        comment: capa.comment || '',
+      }));
+      await exportTableCsv(`capa-${new Date().toISOString().slice(0, 10)}.csv`, 'CAPA', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: `${source.length} CAPA`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -1051,6 +1063,38 @@ export default function Capas() {
       setExportPdfError("Impossible de générer le fichier Excel.");
     } finally {
       setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro' },
+        { key: 'title', label: 'Objet' },
+        { key: 'priority', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'due_date', label: 'Échéance' },
+        { key: 'assigned', label: 'Responsable' },
+      ];
+      const rows = source.map((capa) => ({
+        number: capa.number,
+        title: capa.title,
+        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
+        due_date: formatDate(capa.due_date),
+        assigned: capa.assigned?.full_name || '',
+      }));
+      await exportToWord(`capa-${new Date().toISOString().slice(0, 10)}.docx`, 'CAPA', columns, rows, {
+        subtitle: `${source.length} CAPA`,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
     }
   }
 
@@ -1118,10 +1162,13 @@ export default function Capas() {
           <ExportMenu
             disabled={sortedCapas.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -1279,10 +1326,13 @@ export default function Capas() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
