@@ -19,6 +19,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Siren,
   CalendarClock,
   Thermometer,
   Truck,
@@ -92,6 +93,8 @@ export const NAV_ITEMS = [
   { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
   { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
   { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck },
+  { key: 'accidents', to: '/accidents', label: 'Accidents du travail', icon: Siren },
+  { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit

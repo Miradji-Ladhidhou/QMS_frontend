@@ -37,6 +37,10 @@ const Complaints = lazy(() => import('./pages/Complaints.jsx'));
 const ComplaintDetail = lazy(() => import('./pages/ComplaintDetail.jsx'));
 const Risks = lazy(() => import('./pages/Risks.jsx'));
 const RiskDetail = lazy(() => import('./pages/RiskDetail.jsx'));
+const Accidents = lazy(() => import('./pages/Accidents.jsx'));
+const AccidentDetail = lazy(() => import('./pages/AccidentDetail.jsx'));
+const Pdca = lazy(() => import('./pages/Pdca.jsx'));
+const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
 const Haccp = lazy(() => import('./pages/Haccp.jsx'));
 const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
@@ -110,6 +114,10 @@ export default function App() {
               <Route path="audits/:id" element={<AuditDetail />} />
               <Route path="risks" element={<Risks />} />
               <Route path="risks/:id" element={<RiskDetail />} />
+              <Route path="accidents" element={<Accidents />} />
+              <Route path="accidents/:id" element={<AccidentDetail />} />
+              <Route path="pdca" element={<Pdca />} />
+              <Route path="pdca/:id" element={<PdcaDetail />} />
               <Route path="haccp" element={<Haccp />} />
               <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />
