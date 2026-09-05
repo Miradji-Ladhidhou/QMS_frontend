@@ -223,7 +223,7 @@ export default function CategoryManager({ isAdmin }) {
 
                 {category.is_restricted && expandedPermissionsId === category.id && (
                   <div className="mt-3">
-                    <CategoryPermissionsPanel categoryId={category.id} />
+                    <CategoryPermissionsPanel categoryId={category.id} isAdmin={isAdmin} />
                   </div>
                 )}
               </li>

@@ -229,7 +229,7 @@ export default function ModuleCategoryManager({ resourceType, isAdmin }) {
 
                 {category.is_restricted && expandedPermissionsId === category.id && (
                   <div className="mt-3">
-                    <CategoryPermissionsPanel categoryId={category.id} baseUrl="/module-categories" />
+                    <CategoryPermissionsPanel categoryId={category.id} baseUrl="/module-categories" isAdmin={isAdmin} />
                   </div>
                 )}
               </li>

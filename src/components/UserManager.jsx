@@ -340,7 +340,7 @@ export default function UserManager({ currentUser, isAdmin }) {
                     </button>
                   )}
 
-                  {isAdmin ? (
+                  {isAdmin && !isSelf ? (
                     <select
                       value={user.role}
                       disabled={isBusy}

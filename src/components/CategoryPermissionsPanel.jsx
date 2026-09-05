@@ -14,7 +14,16 @@ const DEFAULT_LEVELS = { can_view: true, can_edit: false, can_approve: false, ca
 // baseUrl : '/categories' pour les catégories de documents (défaut), '/module-categories'
 // pour les catégories génériques (CAPA, réclamations, QQOQCCP, fournisseurs, formations,
 // revues) — même composant réutilisé plutôt que dupliqué par module, voir ModuleCategoryManager.jsx.
-export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categories' }) {
+//
+// isAdmin : GET /:id/permissions est accessible à l'admin ET à quiconque a can_edit sur la
+// catégorie (voir le commentaire de cette route côté backend — categories.js/moduleCategories.js),
+// mais POST/DELETE sur ce même sous-chemin restent réservés admin. GET /groups (utile
+// uniquement pour la liste déroulante du formulaire d'octroi) l'est aussi entièrement —
+// l'appeler pour un non-admin ferait échouer tout le chargement du panneau (Promise.all) alors
+// que les noms des sujets déjà accordés sont de toute façon déjà résolus par le backend dans la
+// réponse de /permissions elle-même. Un can_edit non-admin obtient donc une vue en lecture
+// seule plutôt qu'un panneau cassé.
+export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categories', isAdmin = false }) {
   const [permissions, setPermissions] = useState([]);
   const [users, setUsers] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -32,7 +41,7 @@ export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categ
       const [permsRes, usersRes, groupsRes] = await Promise.all([
         api.get(`${baseUrl}/${categoryId}/permissions`),
         api.get('/users'),
-        api.get('/groups'),
+        isAdmin ? api.get('/groups') : Promise.resolve({ data: [] }),
       ]);
       setPermissions(permsRes.data);
       setUsers(usersRes.data);
@@ -133,14 +142,16 @@ export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categ
                     {permission.subject_type === 'user' ? 'Utilisateur' : 'Groupe'}
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => handleRevoke(permission)}
-                  aria-label="Révoquer l'accès"
-                  className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => handleRevoke(permission)}
+                    aria-label="Révoquer l'accès"
+                    className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-red-600"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
               <div className="mt-2 flex flex-wrap gap-3">
                 {LEVELS.map(({ field, label }) => (
@@ -148,8 +159,9 @@ export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categ
                     <input
                       type="checkbox"
                       checked={permission[field]}
+                      disabled={!isAdmin}
                       onChange={() => handleToggleLevel(permission, field)}
-                      className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary"
+                      className="h-3.5 w-3.5 rounded border-slate-300 text-primary focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60"
                     />
                     {label}
                   </label>
@@ -160,6 +172,13 @@ export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categ
         </ul>
       )}
 
+      {!isAdmin && (
+        <p className="mt-3 border-t border-slate-200 pt-3 text-xs text-slate-500">
+          Lecture seule — seul un administrateur peut accorder ou révoquer des accès.
+        </p>
+      )}
+
+      {isAdmin && (
       <form onSubmit={handleGrant} className="mt-3 space-y-2 border-t border-slate-200 pt-3">
         <div className="flex flex-col gap-2 sm:flex-row">
           <select
@@ -208,6 +227,7 @@ export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categ
           Accorder l'accès
         </button>
       </form>
+      )}
     </div>
   );
 }
