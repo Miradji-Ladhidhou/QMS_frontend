@@ -10,7 +10,9 @@ import {
   ClipboardList,
   Filter,
   MessageSquareWarning,
+  RefreshCw,
   ShieldAlert,
+  Siren,
   Thermometer,
   TrendingDown,
   Truck,
@@ -301,6 +303,10 @@ export default function Dashboard() {
   const auditsTitle = isMember ? 'Mes audits en cours' : 'Audits en cours';
   const complaintsTitle = isMember ? 'Mes réclamations ouvertes' : 'Réclamations ouvertes';
   const risksTitle = isMember ? 'Mes risques actifs' : 'Risques actifs';
+  // PDCA a un porteur individuel (owner, voir dashboard.js) comme les risques ci-dessus — même
+  // titre personnalisé. Accidents n'en a pas (injured_user_id désigne la personne blessée, pas
+  // un porteur de suivi) : reste sur un titre fixe, comme fournisseurs/revues de direction.
+  const pdcaTitle = isMember ? 'Mes projets PDCA actifs' : 'Projets PDCA actifs';
 
   const capaCards = [
     { id: 'open', label: 'Ouvertes', icon: ClipboardList, accent: 'bg-blue-100 text-blue-700' },
@@ -559,6 +565,32 @@ export default function Dashboard() {
                   trend={stats.trends?.['management_reviews.draft']}
                 />
               </div>
+            </WidgetCard>
+          ))}
+
+        {!isMember &&
+          isModuleVisible('accidents') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title="Accidents du travail" to="/accidents">
+              <div className="flex items-baseline gap-2">
+                <Siren size={20} className="text-slate-300" />
+                <BigNumber value={stats.accidents.open} suffix="accident(s) ouvert(s)" trend={stats.trends?.['accidents.open']} />
+              </div>
+            </WidgetCard>
+          ))}
+
+        {isModuleVisible('pdca') &&
+          (loading || !stats ? (
+            <WidgetSkeleton />
+          ) : (
+            <WidgetCard title={pdcaTitle} to="/pdca">
+              <div className="flex items-baseline gap-2">
+                <RefreshCw size={20} className="text-slate-300" />
+                <BigNumber value={stats.pdca.active} suffix="projet(s) actif(s)" trend={stats.trends?.['pdca.active']} />
+              </div>
+              <OverdueNote count={stats.pdca.overdue} />
             </WidgetCard>
           ))}
       </div>
