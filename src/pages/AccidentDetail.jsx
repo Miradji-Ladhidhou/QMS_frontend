@@ -11,6 +11,7 @@ import AccidentStatusBadge from '../components/AccidentStatusBadge.jsx';
 import AccidentSeverityBadge from '../components/AccidentSeverityBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -337,6 +338,25 @@ function CreateAccidentCapaModal({ accidentId, accident, users, services, priori
     }));
   }
 
+  // Même pattern que RiskDetail.jsx (handleAiGenerated/handleAiSelectAction) : ne remplace
+  // root_cause que si l'IA en propose (sinon on garde accident.root_cause déjà prérempli
+  // ci-dessus), corrective_action n'est jamais touché par onGenerated — uniquement par le choix
+  // d'une action suggérée.
+  function handleAiGenerated(suggestion) {
+    if (suggestion.overall_priority) handlePriorityChange(suggestion.overall_priority);
+    setForm((prev) => ({
+      ...prev,
+      root_cause: suggestion.root_causes?.length ? suggestion.root_causes.map((c) => `- ${c}`).join('\n') : prev.root_cause,
+      preventive_action: suggestion.preventive_actions?.length
+        ? suggestion.preventive_actions.map((a) => `- ${a}`).join('\n')
+        : prev.preventive_action,
+    }));
+  }
+
+  function handleAiSelectAction(action) {
+    updateField('corrective_action', action.description ? `${action.title}\n\n${action.description}` : action.title);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -393,6 +413,12 @@ function CreateAccidentCapaModal({ accidentId, accident, users, services, priori
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
+
+          <AiCapaSuggestion
+            context={`Accident du travail : ${accident.title}${accident.description ? `. ${accident.description}` : ''}${accident.immediate_cause ? ` Cause immédiate : ${accident.immediate_cause}` : ''}`}
+            onGenerated={handleAiGenerated}
+            onSelectAction={handleAiSelectAction}
+          />
 
           <div className="grid grid-cols-2 gap-3">
             <div>
