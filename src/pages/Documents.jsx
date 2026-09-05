@@ -6,8 +6,7 @@ import { useTenant } from '../lib/useTenant.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { isManagerRole } from '../lib/roles.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
@@ -487,8 +486,10 @@ export default function Documents() {
   const [categoryFilter, setCategoryFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -719,29 +720,47 @@ export default function Documents() {
     return [...docs].sort((a, b) => String(a.number ?? '').localeCompare(String(b.number ?? ''), 'fr', { numeric: true }));
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
     const source = sortByNumber(scoped);
-    const headers = ['Numéro', 'Titre', 'Description', 'Catégorie', 'Version', 'Statut', 'Prochaine révision', 'Créé le', 'Commentaire dernière version'];
-    const rows = source.map((doc) => [
-      doc.number,
-      doc.title,
-      doc.description || '',
-      doc.category?.name || '',
-      doc.version,
-      STATUS_LABELS[doc.status] || doc.status,
-      formatDate(doc.review_date),
-      formatDate(doc.created_at),
-      doc.latest_version_comment || '',
-    ]);
-    const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
-    const filterParts = [];
-    if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-    if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
-    exportToCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, 'Documents', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: [countLabel, ...filterParts].join(' · '),
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro' },
+        { key: 'title', label: 'Titre' },
+        { key: 'description', label: 'Description' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'version', label: 'Version' },
+        { key: 'status', label: 'Statut' },
+        { key: 'review_date', label: 'Prochaine révision' },
+        { key: 'created_at', label: 'Créé le' },
+        { key: 'latest_version_comment', label: 'Commentaire dernière version' },
+      ];
+      const rows = source.map((doc) => ({
+        number: doc.number,
+        title: doc.title,
+        description: doc.description || '',
+        category: doc.category?.name || '',
+        version: doc.version,
+        status: STATUS_LABELS[doc.status] || doc.status,
+        review_date: formatDate(doc.review_date),
+        created_at: formatDate(doc.created_at),
+        latest_version_comment: doc.latest_version_comment || '',
+      }));
+      const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
+      await exportTableCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, 'Documents', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: [countLabel, ...filterParts].join(' · '),
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -826,6 +845,47 @@ export default function Documents() {
     }
   }
 
+  async function handleExportWord(scopeIds) {
+    const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
+    const source = sortByNumber(scoped);
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'number', label: 'Numéro' },
+        { key: 'title', label: 'Titre' },
+        { key: 'description', label: 'Description' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'version', label: 'Version' },
+        { key: 'status', label: 'Statut' },
+        { key: 'review_date', label: 'Proch. révision' },
+        { key: 'latest_version_comment', label: 'Commentaire dernière version' },
+      ];
+      const rows = source.map((doc) => ({
+        number: doc.number,
+        title: doc.title,
+        description: doc.description || '',
+        category: doc.category?.name || '',
+        version: doc.version,
+        status: STATUS_LABELS[doc.status] || doc.status,
+        review_date: formatDate(doc.review_date),
+        latest_version_comment: doc.latest_version_comment || '',
+      }));
+      const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
+      await exportToWord(`documents-${new Date().toISOString().slice(0, 10)}.docx`, 'Documents', columns, rows, {
+        subtitle: [countLabel, ...filterParts].join(' · '),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le fichier Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive(scopeIds) {
     const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
     const source = sortByNumber(scoped);
@@ -877,10 +937,13 @@ export default function Documents() {
           <ExportMenu
             disabled={filteredDocuments.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -1015,10 +1078,13 @@ export default function Documents() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}

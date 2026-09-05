@@ -13,8 +13,7 @@ import {
   riskLevel,
   RISK_LEVEL_CELL_STYLES,
 } from '../lib/riskStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
@@ -470,8 +469,10 @@ export default function Risks() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -598,27 +599,43 @@ export default function Risks() {
     navigate(`/risks/${risk.id}`);
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
-    const headers = ['Titre', 'Type', 'Catégorie', 'Statut', 'Score', 'Responsable', 'Prochaine revue'];
-    const rows = source.map((risk) => [
-      risk.title,
-      RISK_TYPE_LABELS[risk.type] || risk.type,
-      risk.category || '',
-      RISK_STATUS_LABELS[risk.status] || risk.status,
-      risk.risk_score ?? '',
-      risk.owner_user?.full_name || '',
-      formatDate(risk.review_date),
-    ]);
-    const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
-    const filterParts = [];
-    if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
-    if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
-    if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
-    exportToCsv(`risques-${new Date().toISOString().slice(0, 10)}.csv`, 'Registre des risques', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: [countLabel, ...filterParts].join(' · '),
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'type', label: 'Type' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'status', label: 'Statut' },
+        { key: 'score', label: 'Score' },
+        { key: 'owner', label: 'Responsable' },
+        { key: 'review_date', label: 'Prochaine revue' },
+      ];
+      const rows = source.map((risk) => ({
+        title: risk.title,
+        type: RISK_TYPE_LABELS[risk.type] || risk.type,
+        category: risk.category || '',
+        status: RISK_STATUS_LABELS[risk.status] || risk.status,
+        score: risk.risk_score ?? '',
+        owner: risk.owner_user?.full_name || '',
+        review_date: formatDate(risk.review_date),
+      }));
+      const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
+      if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
+      await exportTableCsv(`risques-${new Date().toISOString().slice(0, 10)}.csv`, 'Registre des risques', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: [countLabel, ...filterParts].join(' · '),
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -695,6 +712,43 @@ export default function Risks() {
     }
   }
 
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'type', label: 'Type' },
+        { key: 'status', label: 'Statut' },
+        { key: 'score', label: 'Score' },
+        { key: 'owner', label: 'Responsable' },
+        { key: 'review_date', label: 'Revue' },
+      ];
+      const rows = source.map((risk) => ({
+        title: risk.title,
+        type: RISK_TYPE_LABELS[risk.type] || risk.type,
+        status: RISK_STATUS_LABELS[risk.status] || risk.status,
+        score: risk.risk_score ?? '',
+        owner: risk.owner_user?.full_name || '',
+        review_date: formatDate(risk.review_date),
+      }));
+      const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
+      const filterParts = [];
+      if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
+      if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
+      if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
+      await exportToWord(`risques-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre des risques', columns, rows, {
+        subtitle: [countLabel, ...filterParts].join(' · '),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive(scopeIds) {
     const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
     setExportingDrive(true);
@@ -742,10 +796,13 @@ export default function Risks() {
           <ExportMenu
             disabled={risks.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -880,10 +937,13 @@ export default function Risks() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}

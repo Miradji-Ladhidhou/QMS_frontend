@@ -15,8 +15,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -353,8 +352,10 @@ export default function Procedures() {
   const [statusFilter, setStatusFilter] = useState('');
   const [processFilter, setProcessFilter] = useState('');
   const [search, setSearch] = useState('');
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
@@ -527,16 +528,22 @@ export default function Procedures() {
     }));
   }
 
-  function handleExportCsv() {
-    const columns = buildExportColumns();
-    const rows = buildExportRows().map((row) => columns.map((col) => row[col.key]));
-    exportToCsv(
-      `procedures-${new Date().toISOString().slice(0, 10)}.csv`,
-      'Procédures',
-      columns.map((col) => col.label),
-      rows,
-      { generatedBy: currentUser?.full_name, subtitle: `${procedures.length} procédures` }
-    );
+  async function handleExportCsv() {
+    setExportingCsv(true);
+    setExportError('');
+    try {
+      await exportTableCsv(
+        `procedures-${new Date().toISOString().slice(0, 10)}.csv`,
+        'Procédures',
+        buildExportColumns(),
+        buildExportRows(),
+        { generatedBy: currentUser?.full_name, subtitle: `${procedures.length} procédures` }
+      );
+    } catch {
+      setExportError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf() {
@@ -575,6 +582,24 @@ export default function Procedures() {
     }
   }
 
+  async function handleExportWord() {
+    setExportingWord(true);
+    setExportError('');
+    try {
+      await exportToWord(
+        `procedures-${new Date().toISOString().slice(0, 10)}.docx`,
+        'Procédures',
+        buildExportColumns(),
+        buildExportRows(),
+        { subtitle: `${procedures.length} procédures`, generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive() {
     setExportingDrive(true);
     setExportError('');
@@ -600,10 +625,13 @@ export default function Procedures() {
           <ExportMenu
             disabled={procedures.length === 0}
             onExportCsv={handleExportCsv}
+            exportingCsv={exportingCsv}
             onExportPdf={handleExportPdf}
             exportingPdf={exportingPdf}
             onExportXlsx={handleExportXlsx}
             exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
             exportingDrive={exportingDrive}
           />

@@ -31,8 +31,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -921,8 +920,10 @@ export default function Planning() {
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -1199,19 +1200,24 @@ export default function Planning() {
     return parts;
   }
 
-  function handleExportCsv(scopeIds) {
-    const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
-    const headers = ['Date', 'Type', 'Titre', 'En retard'];
-    const rows = source.map((item) => [item.date, TYPE_CONFIG[item.type].label, item.title, item.is_overdue ? 'Oui' : 'Non']);
-    const countLabel = `${source.length} élément${source.length > 1 ? 's' : ''}`;
-    exportToCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, 'Planning', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: [countLabel, ...describeActiveFilters()].join(' · '),
-    });
+  async function handleExportCsv(scopeIds) {
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const { columns, rows, subtitle } = buildTablePayload(scopeIds);
+      await exportTableCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, 'Planning', columns, rows, {
+        subtitle,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
-  // Partagé par l'export PDF et l'export Excel — mêmes colonnes/lignes, seul le format de
-  // sortie change (voir exportToPdf/exportToXlsx, pdfExport.js).
+  // Partagé par l'export CSV, PDF, Excel et Word — mêmes colonnes/lignes, seul le format de
+  // sortie change (voir exportTableCsv/exportToPdf/exportToXlsx/exportToWord, pdfExport.js).
   function buildTablePayload(scopeIds) {
     const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
     const columns = [
@@ -1262,6 +1268,22 @@ export default function Planning() {
     }
   }
 
+  async function handleExportWord(scopeIds) {
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const { columns, rows, subtitle } = buildTablePayload(scopeIds);
+      await exportToWord(`planning-${new Date().toISOString().slice(0, 10)}.docx`, 'Planning', columns, rows, {
+        subtitle,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive(scopeIds) {
     setExportingDrive(true);
     setExportPdfError('');
@@ -1285,10 +1307,13 @@ export default function Planning() {
           <ExportMenu
             disabled={filteredItems.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -1498,10 +1523,13 @@ export default function Planning() {
         count={selectedTaskIds.length}
         onMove={canManage ? () => setIsBulkMoveModalOpen(true) : undefined}
         onExportCsv={() => handleExportCsv(selectedTaskIds)}
+        exportingCsv={exportingCsv}
         onExportPdf={() => handleExportPdf(selectedTaskIds)}
         exportingPdf={exportingPdf}
         onExportXlsx={() => handleExportXlsx(selectedTaskIds)}
         exportingXlsx={exportingXlsx}
+        onExportWord={() => handleExportWord(selectedTaskIds)}
+        exportingWord={exportingWord}
         onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedTaskIds) : undefined}
         exportingDrive={exportingDrive}
         onDelete={handleBulkDeleteTasks}

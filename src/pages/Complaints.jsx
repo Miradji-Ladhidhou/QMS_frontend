@@ -4,8 +4,7 @@ import { ChevronDown, ChevronUp, Folder, FolderPlus, List, Plus, X } from 'lucid
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -347,8 +346,10 @@ export default function Complaints() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -472,23 +473,39 @@ export default function Complaints() {
     navigate(`/complaints/${complaint.id}`);
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
-    const headers = ['Client', 'Description', 'Gravité', 'Statut', 'Date de réception', 'Échéance de réponse', 'Assigné'];
-    const rows = source.map((complaint) => [
-      complaint.customer_name,
-      complaint.description || '',
-      CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
-      COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
-      formatDate(complaint.received_date),
-      formatDate(complaint.due_date),
-      complaint.assigned?.full_name || '',
-    ]);
-    const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
-    exportToCsv(`reclamations-${new Date().toISOString().slice(0, 10)}.csv`, 'Réclamations clients', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'customer_name', label: 'Client' },
+        { key: 'description', label: 'Description' },
+        { key: 'severity', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'received_date', label: 'Date de réception' },
+        { key: 'due_date', label: 'Échéance de réponse' },
+        { key: 'assigned', label: 'Assigné' },
+      ];
+      const rows = source.map((complaint) => ({
+        customer_name: complaint.customer_name,
+        description: complaint.description || '',
+        severity: CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
+        status: COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
+        received_date: formatDate(complaint.received_date),
+        due_date: formatDate(complaint.due_date),
+        assigned: complaint.assigned?.full_name || '',
+      }));
+      const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
+      await exportTableCsv(`reclamations-${new Date().toISOString().slice(0, 10)}.csv`, 'Réclamations clients', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -557,6 +574,39 @@ export default function Complaints() {
     }
   }
 
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'customer_name', label: 'Client' },
+        { key: 'description', label: 'Description' },
+        { key: 'severity', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'due_date', label: 'Échéance' },
+        { key: 'assigned', label: 'Assigné' },
+      ];
+      const rows = source.map((complaint) => ({
+        customer_name: complaint.customer_name,
+        description: complaint.description || '',
+        severity: CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
+        status: COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
+        due_date: formatDate(complaint.due_date),
+        assigned: complaint.assigned?.full_name || '',
+      }));
+      const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
+      await exportToWord(`reclamations-${new Date().toISOString().slice(0, 10)}.docx`, 'Réclamations clients', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive(scopeIds) {
     const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
     setExportingDrive(true);
@@ -600,10 +650,13 @@ export default function Complaints() {
           <ExportMenu
             disabled={complaints.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -690,10 +743,13 @@ export default function Complaints() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}

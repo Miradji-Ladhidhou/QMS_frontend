@@ -17,8 +17,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { PLAN_STATUS_LABELS } from '../lib/haccpStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
@@ -280,8 +279,10 @@ export default function Haccp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -404,21 +405,35 @@ export default function Haccp() {
     return new Date(dateStr).toLocaleDateString('fr-FR');
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? plans.filter((plan) => scopeIds.includes(plan.id)) : plans;
-    const headers = ['Titre', 'Produit', 'Statut', 'Service', 'Créé le'];
-    const rows = source.map((plan) => [
-      plan.title,
-      plan.product_description || '',
-      PLAN_STATUS_LABELS[plan.status] || plan.status,
-      plan.service?.name || '',
-      formatDate(plan.created_at),
-    ]);
-    const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
-    exportToCsv(`haccp-${new Date().toISOString().slice(0, 10)}.csv`, 'Plans HACCP', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'product_description', label: 'Produit' },
+        { key: 'status', label: 'Statut' },
+        { key: 'service', label: 'Service' },
+        { key: 'created_at', label: 'Créé le' },
+      ];
+      const rows = source.map((plan) => ({
+        title: plan.title,
+        product_description: plan.product_description || '',
+        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
+        service: plan.service?.name || '',
+        created_at: formatDate(plan.created_at),
+      }));
+      const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
+      await exportTableCsv(`haccp-${new Date().toISOString().slice(0, 10)}.csv`, 'Plans HACCP', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -476,6 +491,35 @@ export default function Haccp() {
       setExportPdfError("Impossible de générer le fichier Excel.");
     } finally {
       setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? plans.filter((plan) => scopeIds.includes(plan.id)) : plans;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'status', label: 'Statut' },
+        { key: 'service', label: 'Service' },
+        { key: 'created_at', label: 'Créé le' },
+      ];
+      const rows = source.map((plan) => ({
+        title: plan.title,
+        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
+        service: plan.service?.name || '',
+        created_at: formatDate(plan.created_at),
+      }));
+      const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
+      await exportToWord(`haccp-${new Date().toISOString().slice(0, 10)}.docx`, 'Plans HACCP', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
     }
   }
 
@@ -538,10 +582,13 @@ export default function Haccp() {
           <ExportMenu
             disabled={plans.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -642,10 +689,13 @@ export default function Haccp() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}

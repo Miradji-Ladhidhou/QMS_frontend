@@ -6,8 +6,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
@@ -272,8 +271,10 @@ export default function ManagementReviews() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -387,19 +388,32 @@ export default function ManagementReviews() {
     navigate(`/management-reviews/${review.id}`);
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? reviews.filter((review) => scopeIds.includes(review.id)) : reviews;
-    const headers = ['Titre', 'Date de revue', 'Statut', 'Participants'];
-    const rows = source.map((review) => [
-      review.title,
-      formatDate(review.review_date),
-      REVIEW_STATUS_LABELS[review.status] || review.status,
-      review.participants || '',
-    ]);
-    exportToCsv(`revues-direction-${new Date().toISOString().slice(0, 10)}.csv`, 'Revues de direction', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'review_date', label: 'Date de revue' },
+        { key: 'status', label: 'Statut' },
+        { key: 'participants', label: 'Participants' },
+      ];
+      const rows = source.map((review) => ({
+        title: review.title,
+        review_date: formatDate(review.review_date),
+        status: REVIEW_STATUS_LABELS[review.status] || review.status,
+        participants: review.participants || '',
+      }));
+      await exportTableCsv(`revues-direction-${new Date().toISOString().slice(0, 10)}.csv`, 'Revues de direction', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -458,6 +472,34 @@ export default function ManagementReviews() {
     }
   }
 
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? reviews.filter((review) => scopeIds.includes(review.id)) : reviews;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'review_date', label: 'Date de revue' },
+        { key: 'status', label: 'Statut' },
+        { key: 'participants', label: 'Participants' },
+      ];
+      const rows = source.map((review) => ({
+        title: review.title,
+        review_date: formatDate(review.review_date),
+        status: REVIEW_STATUS_LABELS[review.status] || review.status,
+        participants: review.participants || '',
+      }));
+      await exportToWord(`revues-direction-${new Date().toISOString().slice(0, 10)}.docx`, 'Revues de direction', columns, rows, {
+        subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive(scopeIds) {
     const source = scopeIds ? reviews.filter((review) => scopeIds.includes(review.id)) : reviews;
     setExportingDrive(true);
@@ -496,10 +538,13 @@ export default function ManagementReviews() {
           <ExportMenu
             disabled={reviews.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -571,10 +616,13 @@ export default function ManagementReviews() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}

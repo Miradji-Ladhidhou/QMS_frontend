@@ -6,8 +6,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { ACCIDENT_STATUS_LABELS, ACCIDENT_SEVERITY_LABELS } from '../lib/accidentStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AccidentStatusBadge from '../components/AccidentStatusBadge.jsx';
@@ -412,8 +411,10 @@ export default function Accidents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -571,23 +572,30 @@ export default function Accidents() {
     return parts;
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? accidents.filter((accident) => scopeIds.includes(accident.id)) : accidents;
-    const headers = ['Titre', "Date de l'accident", 'Gravité', 'Statut', 'Personne concernée', 'Service', 'Arrêt de travail'];
-    const rows = buildExportRows(source).map((row) => [
-      row.title,
-      row.occurred_at,
-      row.severity,
-      row.status,
-      row.person,
-      row.service,
-      row.with_lost_time,
-    ]);
-    const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-    exportToCsv(`accidents-${new Date().toISOString().slice(0, 10)}.csv`, 'Registre des accidents du travail', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: [countLabel, ...filterSummary()].join(' · '),
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'occurred_at', label: "Date de l'accident" },
+        { key: 'severity', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'person', label: 'Personne concernée' },
+        { key: 'service', label: 'Service' },
+        { key: 'with_lost_time', label: 'Arrêt de travail' },
+      ];
+      const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
+      await exportTableCsv(`accidents-${new Date().toISOString().slice(0, 10)}.csv`, 'Registre des accidents du travail', columns, buildExportRows(source), {
+        generatedBy: currentUser?.full_name,
+        subtitle: [countLabel, ...filterSummary()].join(' · '),
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -640,6 +648,31 @@ export default function Accidents() {
     }
   }
 
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? accidents.filter((accident) => scopeIds.includes(accident.id)) : accidents;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'title', label: 'Titre' },
+        { key: 'occurred_at', label: 'Date' },
+        { key: 'severity', label: 'Gravité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'person', label: 'Personne' },
+        { key: 'service', label: 'Service' },
+      ];
+      const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
+      await exportToWord(`accidents-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre des accidents du travail', columns, buildExportRows(source), {
+        subtitle: [countLabel, ...filterSummary()].join(' · '),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive(scopeIds) {
     const source = scopeIds ? accidents.filter((accident) => scopeIds.includes(accident.id)) : accidents;
     setExportingDrive(true);
@@ -675,10 +708,13 @@ export default function Accidents() {
           <ExportMenu
             disabled={accidents.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -805,10 +841,13 @@ export default function Accidents() {
         count={selectedIds.length}
         onMove={canManage ? () => setIsBulkMoveModalOpen(true) : undefined}
         onExportCsv={() => handleExportCsv(selectedIds)}
+        exportingCsv={exportingCsv}
         onExportPdf={() => handleExportPdf(selectedIds)}
         exportingPdf={exportingPdf}
         onExportXlsx={() => handleExportXlsx(selectedIds)}
         exportingXlsx={exportingXlsx}
+        onExportWord={() => handleExportWord(selectedIds)}
+        exportingWord={exportingWord}
         onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
         exportingDrive={exportingDrive}
         onDelete={handleBulkDelete}

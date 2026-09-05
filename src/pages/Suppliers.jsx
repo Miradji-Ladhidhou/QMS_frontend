@@ -7,8 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SUPPLIER_STATUS_LABELS } from '../lib/supplierStatus.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
@@ -317,8 +316,10 @@ export default function Suppliers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -440,22 +441,37 @@ export default function Suppliers() {
     navigate(`/suppliers/${supplier.id}`);
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
-    const headers = ['Nom', 'Catégorie', 'Criticité', 'Statut', 'Contact', 'Prochaine évaluation'];
-    const rows = source.map((supplier) => [
-      supplier.name,
-      supplier.category || '',
-      CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
-      SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
-      supplier.contact_name || '',
-      formatDate(supplier.next_evaluation_date),
-    ]);
-    const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
-    exportToCsv(`fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`, 'Évaluation fournisseurs', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'name', label: 'Nom' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'criticality', label: 'Criticité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'contact', label: 'Contact' },
+        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
+      ];
+      const rows = source.map((supplier) => ({
+        name: supplier.name,
+        category: supplier.category || '',
+        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
+        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
+        contact: supplier.contact_name || '',
+        next_evaluation_date: formatDate(supplier.next_evaluation_date),
+      }));
+      const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
+      await exportTableCsv(`fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`, 'Évaluation fournisseurs', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -524,6 +540,39 @@ export default function Suppliers() {
     }
   }
 
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'name', label: 'Nom' },
+        { key: 'category', label: 'Catégorie' },
+        { key: 'criticality', label: 'Criticité' },
+        { key: 'status', label: 'Statut' },
+        { key: 'contact', label: 'Contact' },
+        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
+      ];
+      const rows = source.map((supplier) => ({
+        name: supplier.name,
+        category: supplier.category || '',
+        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
+        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
+        contact: supplier.contact_name || '',
+        next_evaluation_date: formatDate(supplier.next_evaluation_date),
+      }));
+      const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
+      await exportToWord(`fournisseurs-${new Date().toISOString().slice(0, 10)}.docx`, 'Évaluation fournisseurs', columns, rows, {
+        subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le fichier Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive(scopeIds) {
     const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
     setExportingDrive(true);
@@ -567,10 +616,13 @@ export default function Suppliers() {
           <ExportMenu
             disabled={suppliers.length === 0}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -659,10 +711,13 @@ export default function Suppliers() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}

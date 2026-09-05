@@ -19,8 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { exportToCsv } from '../lib/csvExport.js';
-import { exportToPdf, exportToXlsx, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -988,8 +987,10 @@ export default function Trainings() {
   const [editingTraining, setEditingTraining] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportPdfError, setExportPdfError] = useState('');
@@ -1193,22 +1194,36 @@ export default function Trainings() {
     }
   }
 
-  function handleExportCsv(scopeIds) {
+  async function handleExportCsv(scopeIds) {
     const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
-    const headers = ['Formation', 'Type', 'Personne', 'Statut personnel', 'Date de réalisation'];
-    const rows = source.flatMap((training) =>
-      training.records.map((record) => [
-        training.title,
-        training.type || '',
-        personName(record),
-        record.employee_id ? 'Sans compte' : 'Compte',
-        formatDate(record.completed_at),
-      ])
-    );
-    exportToCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, 'Formations', headers, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
-    });
+    setExportingCsv(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'training', label: 'Formation' },
+        { key: 'type', label: 'Type' },
+        { key: 'person', label: 'Personne' },
+        { key: 'status', label: 'Statut personnel' },
+        { key: 'completed_at', label: 'Date de réalisation' },
+      ];
+      const rows = source.flatMap((training) =>
+        training.records.map((record) => ({
+          training: training.title,
+          type: training.type || '',
+          person: personName(record),
+          status: record.employee_id ? 'Sans compte' : 'Compte',
+          completed_at: formatDate(record.completed_at),
+        }))
+      );
+      await exportTableCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, 'Formations', columns, rows, {
+        generatedBy: currentUser?.full_name,
+        subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -1272,6 +1287,38 @@ export default function Trainings() {
       setExportPdfError("Impossible de générer le fichier Excel.");
     } finally {
       setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
+    setExportingWord(true);
+    setExportPdfError('');
+    try {
+      const columns = [
+        { key: 'training', label: 'Formation' },
+        { key: 'type', label: 'Type' },
+        { key: 'person', label: 'Personne' },
+        { key: 'status', label: 'Statut' },
+        { key: 'completed_at', label: 'Réalisation' },
+      ];
+      const rows = source.flatMap((training) =>
+        training.records.map((record) => ({
+          training: training.title,
+          type: training.type || '',
+          person: personName(record),
+          status: record.employee_id ? 'Sans compte' : 'Compte',
+          completed_at: formatDate(record.completed_at),
+        }))
+      );
+      await exportToWord(`formations-${new Date().toISOString().slice(0, 10)}.docx`, 'Formations', columns, rows, {
+        subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportPdfError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
     }
   }
 
@@ -1361,10 +1408,13 @@ export default function Trainings() {
           <ExportMenu
             disabled={!hasAnyRecord}
             onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
             exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
             exportingDrive={exportingDrive}
           />
@@ -1467,10 +1517,13 @@ export default function Trainings() {
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
           onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}
           exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
           onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
           exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
