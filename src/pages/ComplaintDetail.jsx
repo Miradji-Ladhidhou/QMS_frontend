@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -531,8 +531,11 @@ export default function ComplaintDetail() {
     try {
       const { data } = await api.patch(`/complaints/${id}`, { status });
       setComplaint((prev) => ({ ...prev, ...data }));
-    } catch {
-      setError('Impossible de mettre à jour le statut.');
+    } catch (err) {
+      // Le backend refuse désormais "Résolue"/"Clôturée" sans résolution renseignée (et
+      // "Clôturée" sans satisfaction client renseignée) — message générique remplacé par celui
+      // du serveur pour que l'utilisateur comprenne pourquoi.
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
   }
 
@@ -665,6 +668,16 @@ export default function ComplaintDetail() {
               <p className="text-sm text-slate-700">{complaint.customer_satisfied ? 'Oui' : 'Non'}</p>
             </div>
           )}
+        </div>
+      )}
+
+      {complaint.customer_satisfied === false && !complaint.linked_capa && (
+        <div className="mt-4 flex items-start gap-2.5 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <p>
+            Le client s'est dit insatisfait de la résolution — envisagez d'ouvrir une CAPA pour traiter la cause plus
+            en profondeur.
+          </p>
         </div>
       )}
 
