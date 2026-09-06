@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Cloud, Download, Loader2, Lock, Plus, Save, Send, Trash2, XCircle } from 'lucide-react';
+import { ArrowLeft, Cloud, Download, Loader2, Lock, Plus, Save, Send, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -60,6 +60,139 @@ function formatDateTime(dateStr) {
   return new Date(dateStr).toLocaleString('fr-FR');
 }
 
+// Volontairement minimal (titre + échéance) : l'édition complète (assigné, priorité,
+// checklist, récurrence) reste dans Planning.jsx une fois la tâche créée, pas ici.
+function CreateTaskModal({ capaId, onClose, onCreated }) {
+  const [title, setTitle] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data } = await api.post(`/capas/${capaId}/create-task`, { title, due_date: dueDate });
+      onCreated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer cette tâche.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-md rounded-t-xl bg-white p-5 sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Créer une tâche de suivi</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Échéance</label>
+            <input
+              type="date"
+              required
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Création...' : 'Créer la tâche'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// service_id/plan_content par défaut résolus côté serveur depuis la CAPA (voir
+// routes/capas.js#create-pdca) — pas besoin de les redemander ici.
+function CreatePdcaModal({ capaId, defaultTitle, onClose, onCreated }) {
+  const [title, setTitle] = useState(defaultTitle);
+  const [targetDate, setTargetDate] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data } = await api.post(`/capas/${capaId}/create-pdca`, { title, target_date: targetDate || undefined });
+      onCreated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer ce projet PDCA.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-md rounded-t-xl bg-white p-5 sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Lancer un cycle PDCA</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Échéance cible (optionnel)</label>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Création...' : 'Lancer le cycle PDCA'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function CapaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -98,6 +231,12 @@ export default function CapaDetail() {
   const [isLinkProcedureModalOpen, setIsLinkProcedureModalOpen] = useState(false);
   const [linksError, setLinksError] = useState('');
   const [unlinkingId, setUnlinkingId] = useState(null);
+
+  const [isCreateTaskModalOpen, setIsCreateTaskModalOpen] = useState(false);
+  const [tasksError, setTasksError] = useState('');
+  const [togglingTaskId, setTogglingTaskId] = useState(null);
+
+  const [isCreatePdcaModalOpen, setIsCreatePdcaModalOpen] = useState(false);
 
   async function loadCapa() {
     setLoading(true);
@@ -165,6 +304,15 @@ export default function CapaDetail() {
     event.preventDefault();
     setEffectivenessError('');
     setEffectivenessSaved(false);
+
+    // Même règle que côté serveur (routes/capas.js) : un verdict d'efficacité sans commentaire
+    // ne tient pas en audit — vérifié ici aussi pour éviter l'aller-retour réseau qui échouerait
+    // de toute façon.
+    if (effectivenessVerified !== '' && !effectivenessNotes.trim()) {
+      setEffectivenessError("Merci de justifier le résultat de la vérification d'efficacité par un commentaire.");
+      return;
+    }
+
     setSavingEffectiveness(true);
 
     try {
@@ -220,6 +368,35 @@ export default function CapaDetail() {
     } finally {
       setUnlinkingId(null);
     }
+  }
+
+  function handleTaskCreated(task) {
+    setCapa((prev) => ({ ...prev, linked_tasks: [...(prev.linked_tasks || []), task] }));
+    setIsCreateTaskModalOpen(false);
+  }
+
+  // PATCH /tasks/:id est déjà utilisé par Planning.jsx pour basculer todo/done — même route,
+  // juste appelée ici pour ne pas devoir quitter la fiche CAPA pour cocher une tâche de suivi.
+  async function handleToggleTask(task) {
+    setTasksError('');
+    setTogglingTaskId(task.id);
+    try {
+      const nextStatus = task.status === 'done' ? 'todo' : 'done';
+      const { data } = await api.patch(`/tasks/${task.id}`, { status: nextStatus });
+      setCapa((prev) => ({
+        ...prev,
+        linked_tasks: prev.linked_tasks.map((t) => (t.id === task.id ? { ...t, status: data.status } : t)),
+      }));
+    } catch (err) {
+      setTasksError(err.response?.data?.error || 'Impossible de mettre à jour cette tâche.');
+    } finally {
+      setTogglingTaskId(null);
+    }
+  }
+
+  function handlePdcaCreated(pdcaProject) {
+    setCapa((prev) => ({ ...prev, pdca_project: pdcaProject }));
+    setIsCreatePdcaModalOpen(false);
   }
 
   async function handleDelete() {
@@ -371,6 +548,22 @@ export default function CapaDetail() {
               </dd>
             </div>
           )}
+          <div>
+            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Projet PDCA</dt>
+            <dd className="mt-1 text-sm">
+              {capa.pdca_project ? (
+                <Link to={`/pdca/${capa.pdca_project.id}`} className="text-primary hover:underline">
+                  {capa.pdca_project.title}
+                </Link>
+              ) : canManage ? (
+                <button type="button" onClick={() => setIsCreatePdcaModalOpen(true)} className="text-primary hover:underline">
+                  Lancer un cycle PDCA
+                </button>
+              ) : (
+                <span className="text-slate-500">—</span>
+              )}
+            </dd>
+          </div>
           <div>
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Responsable assigné</dt>
             <dd className="mt-1 text-sm text-slate-800">{capa.assigned?.full_name || 'Non assigné'}</dd>
@@ -543,7 +736,9 @@ export default function CapaDetail() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Notes de vérification</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Notes de vérification{effectivenessVerified !== '' && ' *'}
+            </label>
             <AutoTextarea
               rows={2}
               value={effectivenessNotes}
@@ -613,6 +808,51 @@ export default function CapaDetail() {
       </div>
 
       <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Tâches de suivi</h2>
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setIsCreateTaskModalOpen(true)}
+              className="flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-700"
+            >
+              <Plus size={14} />
+              Créer une tâche
+            </button>
+          )}
+        </div>
+
+        {tasksError && (
+          <p className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{tasksError}</p>
+        )}
+
+        {(capa.linked_tasks || []).length === 0 ? (
+          <p className="text-sm text-slate-500">
+            Aucune tâche de suivi pour l'instant — utile pour décomposer cette CAPA en actions concrètes, chacune avec
+            sa propre échéance.
+          </p>
+        ) : (
+          <ul className="divide-y divide-slate-100">
+            {capa.linked_tasks.map((task) => (
+              <li key={task.id} className="flex items-center gap-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={task.status === 'done'}
+                  disabled={!canManage || togglingTaskId === task.id}
+                  onChange={() => handleToggleTask(task)}
+                  className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50"
+                />
+                <span className={`flex-1 text-sm ${task.status === 'done' ? 'text-slate-400 line-through' : 'text-slate-700'}`}>
+                  {task.title}
+                </span>
+                <span className="shrink-0 text-xs text-slate-500">{formatDate(task.due_date)}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      <div className="mt-6 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="mb-4 text-sm font-semibold text-slate-900 sm:text-base">Commentaires de suivi</h2>
 
         {capa.comments.length === 0 ? (
@@ -667,6 +907,19 @@ export default function CapaDetail() {
           )}
           onClose={() => setIsLinkProcedureModalOpen(false)}
           onSelect={handleLinkProcedure}
+        />
+      )}
+
+      {isCreateTaskModalOpen && (
+        <CreateTaskModal capaId={id} onClose={() => setIsCreateTaskModalOpen(false)} onCreated={handleTaskCreated} />
+      )}
+
+      {isCreatePdcaModalOpen && (
+        <CreatePdcaModal
+          capaId={id}
+          defaultTitle={`Suivi — ${capa.title}`}
+          onClose={() => setIsCreatePdcaModalOpen(false)}
+          onCreated={handlePdcaCreated}
         />
       )}
     </div>

@@ -602,6 +602,15 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
               Terminée
             </span>
           )}
+          {isTask && item.capa && (
+            <Link
+              to={`/capas/${item.capa.id}`}
+              onClick={(e) => e.stopPropagation()}
+              className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-200"
+            >
+              CAPA {item.capa.number}
+            </Link>
+          )}
           {isTask && item.recurrence && item.recurrence !== 'none' && (
             <span className="inline-flex items-center text-slate-400" title={`Récurrence : ${RECURRENCE_LABELS[item.recurrence]}`}>
               <Repeat size={12} />
@@ -974,6 +983,7 @@ export default function Planning() {
         priority: task.priority,
         checklist: task.checklist,
         recurrence: task.recurrence,
+        capa: task.capa || null,
         is_overdue: false,
         done: true,
       }));
