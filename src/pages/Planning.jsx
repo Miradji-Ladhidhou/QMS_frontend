@@ -606,7 +606,7 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
             <Link
               to={`/capas/${item.capa.id}`}
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 rounded-full bg-indigo-100 px-1.5 py-0.5 text-[11px] font-medium text-indigo-700 hover:bg-indigo-200"
+              className="inline-flex items-center gap-1 rounded-full bg-blue-100 px-1.5 py-0.5 text-[11px] font-medium text-blue-700 hover:bg-blue-200"
             >
               CAPA {item.capa.number}
             </Link>
