@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Download, FileType, Loader2, Minus, RefreshCw, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Check, Download, EyeOff, FileType, Loader2, Minus, RefreshCw, X as XIcon } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
@@ -14,6 +14,7 @@ const CELL_STYLES = {
   due_soon: 'bg-amber-100 text-amber-700',
   expired: 'bg-red-100 text-red-700',
   never_done: 'bg-slate-100 text-slate-400',
+  not_applicable: 'bg-slate-50 text-slate-300',
 };
 
 const CELL_ICONS = {
@@ -21,6 +22,7 @@ const CELL_ICONS = {
   due_soon: RefreshCw,
   expired: XIcon,
   never_done: Minus,
+  not_applicable: EyeOff,
 };
 
 function formatDate(dateStr) {

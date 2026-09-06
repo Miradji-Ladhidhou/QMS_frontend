@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
+import { CAPA_EFFECTIVENESS_LABELS, CAPA_EFFECTIVENESS_STYLES } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -37,6 +38,38 @@ import ExportMenu from '../components/ExportMenu.jsx';
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+// Postes déjà utilisés par au moins une personne du tenant (users/employees, déjà chargés pour
+// RecordModal) — sert de suggestions de cases à cocher pour "Postes concernés" sans avoir
+// besoin d'un référentiel de postes dédié ni d'un nouvel appel réseau.
+function distinctJobTitles(users, employees) {
+  const seen = new Set();
+  const result = [];
+  for (const person of [...users, ...employees]) {
+    const title = person.job_title?.trim();
+    if (!title) continue;
+    const key = title.toLowerCase();
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(title);
+    }
+  }
+  return result.sort((a, b) => a.localeCompare(b, 'fr'));
+}
+
+// Représente le tri-état evaluation_result (null/true/false) comme une chaîne pour un
+// <select> — même conversion que CapaDetail.jsx#effectivenessToSelectValue.
+function effectivenessToSelectValue(value) {
+  if (value === true) return 'true';
+  if (value === false) return 'false';
+  return '';
+}
+
+function selectValueToEffectiveness(value) {
+  if (value === 'true') return true;
+  if (value === 'false') return false;
+  return null;
 }
 
 // next_due_date est calculé et stocké côté serveur à chaque réalisation (voir POST
@@ -147,7 +180,85 @@ function getTrainingSortValue(training, key) {
   return training[key];
 }
 
-function NewTrainingModal({ categories, onClose, onCreated }) {
+// Cases à cocher construites à partir des postes déjà utilisés (distinctJobTitles), plus un
+// champ libre pour un poste pas encore associé à personne. Aucune case cochée = la formation
+// s'applique à tout le monde (comportement historique, préservé par défaut).
+function JobTitleRequirementsField({ availableJobTitles, selected, onChange }) {
+  const [newTitle, setNewTitle] = useState('');
+
+  function isSelected(title) {
+    return selected.some((t) => t.toLowerCase() === title.toLowerCase());
+  }
+
+  function toggle(title) {
+    onChange(isSelected(title) ? selected.filter((t) => t.toLowerCase() !== title.toLowerCase()) : [...selected, title]);
+  }
+
+  function addCustom() {
+    const trimmed = newTitle.trim();
+    if (!trimmed || isSelected(trimmed)) return;
+    onChange([...selected, trimmed]);
+    setNewTitle('');
+  }
+
+  const customTitles = selected.filter((t) => !availableJobTitles.some((a) => a.toLowerCase() === t.toLowerCase()));
+
+  return (
+    <div>
+      <label className="mb-1 block text-sm font-medium text-slate-700">Postes concernés</label>
+      <p className="mb-2 text-xs text-slate-500">Aucun poste coché : la formation s'applique à tout le monde.</p>
+
+      {(availableJobTitles.length > 0 || customTitles.length > 0) && (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {availableJobTitles.map((title) => (
+            <label
+              key={title}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm text-slate-700"
+            >
+              <input
+                type="checkbox"
+                checked={isSelected(title)}
+                onChange={() => toggle(title)}
+                className="h-4 w-4 rounded border-slate-300 text-primary focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              {title}
+            </label>
+          ))}
+          {customTitles.map((title) => (
+            <span
+              key={title}
+              className="flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-1 text-sm text-primary-700"
+            >
+              {title}
+              <button type="button" onClick={() => toggle(title)} aria-label={`Retirer ${title}`}>
+                <X size={12} />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={newTitle}
+          onChange={(e) => setNewTitle(e.target.value)}
+          placeholder="Ajouter un autre intitulé de poste"
+          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        />
+        <button
+          type="button"
+          onClick={addCustom}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Ajouter
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NewTrainingModal({ categories, users, employees, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     type: '',
@@ -158,9 +269,12 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
     description: '',
     category_id: '',
   });
+  const [requiredJobTitles, setRequiredJobTitles] = useState([]);
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const availableJobTitles = useMemo(() => distinctJobTitles(users, employees), [users, employees]);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -191,6 +305,7 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
       duration: form.duration || undefined,
       description: form.description || undefined,
       category_id: categoryId,
+      required_job_titles: requiredJobTitles,
     };
 
     // onCreated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
@@ -299,6 +414,12 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
             />
           </div>
 
+          <JobTitleRequirementsField
+            availableJobTitles={availableJobTitles}
+            selected={requiredJobTitles}
+            onChange={setRequiredJobTitles}
+          />
+
           <CategoryVisibilityField
             categories={categories}
             categoryId={form.category_id}
@@ -320,7 +441,7 @@ function NewTrainingModal({ categories, onClose, onCreated }) {
   );
 }
 
-function EditTrainingModal({ training, categories, onClose, onUpdated }) {
+function EditTrainingModal({ training, categories, users, employees, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: training.title,
     type: training.type || '',
@@ -331,9 +452,12 @@ function EditTrainingModal({ training, categories, onClose, onUpdated }) {
     description: training.description || '',
     category_id: training.category_id || '',
   });
+  const [requiredJobTitles, setRequiredJobTitles] = useState(training.required_job_titles || []);
   const [isPrivate, setIsPrivate] = useState(Boolean(training.is_private_to_me));
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  const availableJobTitles = useMemo(() => distinctJobTitles(users, employees), [users, employees]);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -368,6 +492,7 @@ function EditTrainingModal({ training, categories, onClose, onUpdated }) {
         duration: form.duration || null,
         description: form.description || null,
         category_id: categoryId,
+        required_job_titles: requiredJobTitles,
       }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier la formation.');
@@ -470,6 +595,12 @@ function EditTrainingModal({ training, categories, onClose, onUpdated }) {
             />
           </div>
 
+          <JobTitleRequirementsField
+            availableJobTitles={availableJobTitles}
+            selected={requiredJobTitles}
+            onChange={setRequiredJobTitles}
+          />
+
           <CategoryVisibilityField
             categories={categories}
             categoryId={form.category_id}
@@ -497,12 +628,22 @@ function personName(record) {
 
 function EditRecordModal({ training, record, onClose, onUpdated }) {
   const [completedAt, setCompletedAt] = useState(record.completed_at);
+  const [evaluationResult, setEvaluationResult] = useState(effectivenessToSelectValue(record.evaluation_result));
+  const [evaluationNotes, setEvaluationNotes] = useState(record.evaluation_notes || '');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
+
+    // Même règle que côté serveur (routes/trainings.js) : un verdict d'évaluation sans
+    // commentaire ne tient pas en audit — vérifié ici aussi pour éviter l'aller-retour réseau.
+    if (evaluationResult !== '' && !evaluationNotes.trim()) {
+      setError("Merci de justifier le résultat de l'évaluation par un commentaire.");
+      return;
+    }
+
     setSubmitting(true);
 
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence.
@@ -510,6 +651,8 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
     try {
       ({ data } = await api.patch(`/trainings/${training.id}/records/${record.id}`, {
         completed_at: completedAt,
+        evaluation_result: selectValueToEffectiveness(evaluationResult),
+        evaluation_notes: evaluationNotes || null,
       }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier cette réalisation.');
@@ -522,7 +665,7 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Modifier la réalisation</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -546,6 +689,31 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
               required
               value={completedAt}
               onChange={(e) => setCompletedAt(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Évaluation d'efficacité</label>
+            <select
+              value={evaluationResult}
+              onChange={(e) => setEvaluationResult(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">{CAPA_EFFECTIVENESS_LABELS[null]}</option>
+              <option value="true">{CAPA_EFFECTIVENESS_LABELS[true]}</option>
+              <option value="false">{CAPA_EFFECTIVENESS_LABELS[false]}</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">
+              Notes d'évaluation{evaluationResult !== '' && ' *'}
+            </label>
+            <AutoTextarea
+              rows={2}
+              value={evaluationNotes}
+              onChange={(e) => setEvaluationNotes(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
@@ -1729,6 +1897,13 @@ export default function Trainings() {
                                 )}
                                 {' — '}
                                 {formatDate(record.completed_at)}
+                                {record.evaluation_result !== null && (
+                                  <span
+                                    className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${CAPA_EFFECTIVENESS_STYLES[record.evaluation_result]}`}
+                                  >
+                                    {CAPA_EFFECTIVENESS_LABELS[record.evaluation_result]}
+                                  </span>
+                                )}
                               </span>
                               <div className="flex shrink-0 items-center gap-2">
                                 <button
@@ -1797,7 +1972,13 @@ export default function Trainings() {
       )}
 
       {isNewModalOpen && (
-        <NewTrainingModal categories={categories} onClose={() => setIsNewModalOpen(false)} onCreated={handleTrainingCreated} />
+        <NewTrainingModal
+          categories={categories}
+          users={users}
+          employees={employees}
+          onClose={() => setIsNewModalOpen(false)}
+          onCreated={handleTrainingCreated}
+        />
       )}
 
       {recordingTraining && (
@@ -1832,6 +2013,8 @@ export default function Trainings() {
         <EditTrainingModal
           training={editingTraining}
           categories={categories}
+          users={users}
+          employees={employees}
           onClose={() => setEditingTraining(null)}
           onUpdated={handleTrainingUpdated}
         />

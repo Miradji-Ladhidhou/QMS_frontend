@@ -3,6 +3,9 @@ export const TRAINING_STATUS_LABELS = {
   due_soon: 'À renouveler bientôt',
   expired: 'Expiré',
   never_done: 'Jamais fait',
+  // Poste non concerné par cette formation (required_job_titles) — distinct de "Jamais fait",
+  // qui doit rester réservé à un vrai manque pour un poste qui en a besoin.
+  not_applicable: 'Non concerné',
 };
 
 export const TRAINING_STATUS_STYLES = {
@@ -10,4 +13,5 @@ export const TRAINING_STATUS_STYLES = {
   due_soon: 'bg-amber-100 text-amber-700',
   expired: 'bg-red-100 text-red-700',
   never_done: 'bg-slate-100 text-slate-500',
+  not_applicable: 'bg-slate-50 text-slate-300',
 };
