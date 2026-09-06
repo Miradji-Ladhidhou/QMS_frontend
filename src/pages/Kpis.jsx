@@ -2829,7 +2829,6 @@ function KpiCard({
               </>
             )}
           </div>
-          )}
         </div>
       </div>
 
