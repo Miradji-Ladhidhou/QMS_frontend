@@ -1147,8 +1147,11 @@ export default function Capas() {
     try {
       const { data } = await api.patch(`/capas/${capa.id}`, { status });
       setCapas((prev) => prev.map((item) => (item.id === capa.id ? data : item)));
-    } catch {
-      setError('Impossible de mettre à jour le statut.');
+    } catch (err) {
+      // Le backend refuse désormais une clôture sans action corrective renseignée ni efficacité
+      // vérifiée (voir routes/capas.js) — message générique remplacé par celui du serveur pour
+      // que l'utilisateur comprenne pourquoi, plutôt qu'un "impossible" sans explication.
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     } finally {
       setUpdatingId(null);
     }
