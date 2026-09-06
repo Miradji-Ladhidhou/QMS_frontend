@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -9,6 +10,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  ClipboardCheck,
   Download,
   FileText,
   FileType,
@@ -328,7 +330,7 @@ function fieldErrorsFromResponse(err) {
   return Object.fromEntries(details.map((detail) => [detail.path, detail.msg]));
 }
 
-function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
+function KpiFormModal({ kpi, folderId, categories, users, onClose, onSaved }) {
   const isEditing = Boolean(kpi);
   const [form, setForm] = useState({
     name: kpi?.name || '',
@@ -338,6 +340,7 @@ function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
     frequency: kpi?.frequency || '',
     calculation_type: kpi?.calculation_type || 'manual',
     category_id: kpi?.category_id || '',
+    owner: kpi?.owner || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(kpi?.is_private_to_me));
   const [error, setError] = useState('');
@@ -383,6 +386,7 @@ function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
       frequency: form.frequency || null,
       calculation_type: form.calculation_type,
       category_id: categoryId,
+      owner: form.owner || null,
     };
     // Le déplacement d'un KPI existant passe par l'action dédiée "Déplacer" (menu de la
     // carte), pas par ce formulaire — seule la création place le KPI dans le dossier
@@ -516,6 +520,19 @@ function KpiFormModal({ kpi, folderId, categories, onClose, onSaved }) {
               ))}
             </select>
             {fieldErrors.frequency && <p className="mt-1 text-xs text-red-600">{fieldErrors.frequency}</p>}
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Responsable</label>
+            <select value={form.owner} onChange={(e) => updateField('owner', e.target.value)} className={inputClassName('owner')}>
+              <option value="">Non désigné</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+            {fieldErrors.owner && <p className="mt-1 text-xs text-red-600">{fieldErrors.owner}</p>}
           </div>
 
           <CategoryVisibilityField
@@ -2422,6 +2439,87 @@ function SeriesDot({ cx, cy, payload, seriesLabel, color, clickable, onSelect })
   );
 }
 
+// Volontairement minimal (titre + priorité/échéance) : la cause racine et les actions se
+// rédigent ensuite sur la fiche CAPA elle-même, comme pour les autres flux "créer une CAPA
+// depuis X" de l'application.
+function CreateCapaFromKpiModal({ kpi, onClose, onCreated }) {
+  const [title, setTitle] = useState(`KPI hors objectif — ${kpi.name}`);
+  const [priority, setPriority] = useState('medium');
+  const [dueDate, setDueDate] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data } = await api.post(`/kpis/${kpi.id}/create-capa`, { title, priority, due_date: dueDate || undefined });
+      onCreated(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer cette CAPA.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-md rounded-t-xl bg-white p-5 sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Créer une CAPA</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <input
+              type="text"
+              required
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
+            <select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="low">Basse</option>
+              <option value="medium">Modérée</option>
+              <option value="high">Majeure</option>
+              <option value="critical">Critique</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Échéance (optionnel)</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Création...' : 'Créer la CAPA'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function KpiCard({
   kpi,
   canManage,
@@ -2436,6 +2534,7 @@ function KpiCard({
   onOpenConfigModal,
   onOpenManualSeriesModal,
   onViewProof,
+  onOpenCapaModal,
   isSelected,
   onToggleSelect,
 }) {
@@ -2763,6 +2862,28 @@ function KpiCard({
                 <StatusIcon size={14} />
                 {KPI_STATUS_LABELS[status]}
               </span>
+            )}
+            {status === 'bad' && (
+              kpi.linked_capa ? (
+                <Link
+                  to={`/capas/${kpi.linked_capa.id}`}
+                  className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-emerald-300 bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+                >
+                  <ClipboardCheck size={13} />
+                  Voir la CAPA liée — {kpi.linked_capa.number}
+                </Link>
+              ) : (
+                canManage && (
+                  <button
+                    type="button"
+                    onClick={() => onOpenCapaModal(kpi)}
+                    className="flex items-center gap-1.5 whitespace-nowrap rounded-md border border-primary px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                  >
+                    <ClipboardCheck size={13} />
+                    Créer une CAPA
+                  </button>
+                )
+              )
             )}
           </div>
         )}
@@ -3210,8 +3331,10 @@ export default function Kpis() {
   const [folderModal, setFolderModal] = useState(null); // null fermé, 'new' création, objet dossier édition
   const [moveModal, setMoveModal] = useState(null); // le kpi en cours de déplacement, ou null
   const [categories, setCategories] = useState([]);
+  const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const [capaModal, setCapaModal] = useState(null); // le kpi pour lequel on crée une CAPA, ou null
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -3288,6 +3411,10 @@ export default function Kpis() {
     api
       .get('/module-categories', { params: { resource_type: 'kpi' } })
       .then(({ data }) => setCategories(data))
+      .catch(() => {});
+    api
+      .get('/users')
+      .then(({ data }) => setUsers(data))
       .catch(() => {});
   }, []);
 
@@ -3554,6 +3681,7 @@ export default function Kpis() {
                   onOpenConfigModal={setConfigModal}
                   onOpenManualSeriesModal={setManualSeriesModal}
                   onViewProof={(kpiArg, record) => setProofModal({ kpi: kpiArg, record })}
+                  onOpenCapaModal={setCapaModal}
                   isSelected={selectedIds.includes(kpi.id)}
                   onToggleSelect={() => toggleSelect(kpi.id)}
                 />
@@ -3577,8 +3705,20 @@ export default function Kpis() {
           kpi={formModal === 'new' ? null : formModal}
           folderId={currentFolderId}
           categories={categories}
+          users={users}
           onClose={() => setFormModal(null)}
           onSaved={handleSaved}
+        />
+      )}
+
+      {capaModal && (
+        <CreateCapaFromKpiModal
+          kpi={capaModal}
+          onClose={() => setCapaModal(null)}
+          onCreated={(capa) => {
+            setKpis((prev) => prev.map((k) => (k.id === capaModal.id ? { ...k, linked_capa: capa } : k)));
+            setCapaModal(null);
+          }}
         />
       )}
 
