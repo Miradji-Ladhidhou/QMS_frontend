@@ -279,8 +279,8 @@ export default function AuditDetail() {
     try {
       const { data } = await api.patch(`/audits/${id}`, { status });
       setAudit((prev) => ({ ...prev, ...data }));
-    } catch {
-      setError('Impossible de mettre à jour le statut.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
   }
 
