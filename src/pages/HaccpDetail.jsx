@@ -742,7 +742,7 @@ function SurveillanceTab({ plan, users, services, priorityDelays, onCapaCreated 
           {!withinLimits && (
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective immédiate</label>
-              <AutoTextarea rows={2} value={correctiveActionTaken} onChange={(e) => setCorrectiveActionTaken(e.target.value)} className={FIELD_CLASS} />
+              <AutoTextarea required rows={2} value={correctiveActionTaken} onChange={(e) => setCorrectiveActionTaken(e.target.value)} className={FIELD_CLASS} />
             </div>
           )}
           <button type="submit" disabled={submitting} className="w-full rounded-md bg-primary py-2.5 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60 sm:w-auto sm:px-6">
@@ -866,8 +866,8 @@ export default function HaccpDetail() {
     try {
       const { data } = await api.patch(`/haccp/plans/${id}`, { status });
       setPlan((prev) => ({ ...prev, ...data }));
-    } catch {
-      setError('Impossible de mettre à jour le statut.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
   }
 
