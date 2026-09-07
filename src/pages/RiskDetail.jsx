@@ -601,8 +601,8 @@ export default function RiskDetail() {
     try {
       const { data } = await api.patch(`/risks/${id}`, { status });
       setRisk((prev) => ({ ...prev, ...data }));
-    } catch {
-      setError('Impossible de mettre à jour le statut.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
   }
 
