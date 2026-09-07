@@ -26,8 +26,11 @@ export default function QualityPolicySettings({ isAdmin }) {
   const [acknowledging, setAcknowledging] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
 
-  async function load() {
-    setLoading(true);
+  // silent: true pour un rechargement après une action déjà en cours (publier/accuser
+  // réception) — sans ça, le skeleton de chargement remplaçait tout le panneau, y compris le
+  // message de succès qu'on venait juste d'afficher (voir handlePublish/handleAcknowledge).
+  async function load({ silent = false } = {}) {
+    if (!silent) setLoading(true);
     setError('');
     try {
       const { data } = await api.get('/quality-policy');
@@ -35,7 +38,7 @@ export default function QualityPolicySettings({ isAdmin }) {
     } catch {
       setError('Impossible de charger la politique qualité.');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }
 
@@ -59,7 +62,7 @@ export default function QualityPolicySettings({ isAdmin }) {
       await api.post('/quality-policy', { content: draft });
       setIsEditing(false);
       setSuccess('Politique qualité publiée.');
-      await load();
+      await load({ silent: true });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de publier la politique qualité.');
     } finally {
@@ -72,7 +75,7 @@ export default function QualityPolicySettings({ isAdmin }) {
     setAcknowledging(true);
     try {
       await api.post('/quality-policy/acknowledge');
-      await load();
+      await load({ silent: true });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer votre lecture.");
     } finally {
