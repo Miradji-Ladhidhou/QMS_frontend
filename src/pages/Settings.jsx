@@ -11,6 +11,7 @@ import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
 import ModuleCategoriesSettings from '../components/ModuleCategoriesSettings.jsx';
 import ProcedureTemplateSettings from '../components/ProcedureTemplateSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
+import QualityPolicySettings from '../components/QualityPolicySettings.jsx';
 import Groups from './Groups.jsx';
 
 // Groupé par intention plutôt qu'en une seule rangée d'onglets à défiler (10 onglets à plat,
@@ -29,6 +30,10 @@ const TAB_GROUPS = [
     label: 'Entreprise',
     tabs: [
       { id: 'company', label: 'Entreprise' },
+      // Pas adminOnly : la politique qualité doit rester visible/consultable par tout le
+      // monde (§5.2, "communiquée, comprise") — seule sa révision est réservée admin, gérée
+      // à l'intérieur du composant lui-même (voir QualityPolicySettings.jsx).
+      { id: 'quality-policy', label: 'Politique qualité' },
       { id: 'users', label: 'Utilisateurs' },
       { id: 'groups', label: 'Groupes', adminOnly: true },
       { id: 'visibility', label: 'Visibilité', adminOnly: true },
@@ -113,6 +118,7 @@ export default function Settings() {
 
       <div className="mt-4">
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
+        {activeTab === 'quality-policy' && <QualityPolicySettings isAdmin={isAdmin} />}
         {activeTab === 'categories' && <CategoryManager isAdmin={isAdmin} />}
         {activeTab === 'module-categories' && <ModuleCategoriesSettings isAdmin={isAdmin} />}
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
