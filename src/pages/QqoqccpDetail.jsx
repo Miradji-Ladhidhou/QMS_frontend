@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, FileCheck, Loader2, RefreshCw, Sparkles, Trash2 } from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, FileCheck, Loader2, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -255,6 +255,66 @@ function CapaAdjustmentForm({
   );
 }
 
+// Conclure qu'aucune CAPA n'est nécessaire est une conclusion légitime d'une analyse de cause
+// (clause 10.2 de l'ISO 9001) — jusqu'ici seul "créer une CAPA" menait à un état final
+// ("validated"), laissant une analyse honnêtement conclue "rien à faire" bloquée en brouillon
+// indéfiniment. Commentaire obligatoire : même discipline que la vérification d'efficacité
+// d'une CAPA (CapaDetail.jsx) — un jugement sans justification écrite ne tient pas en audit.
+function CloseAnalysisModal({ analysisId, onClose, onClosed }) {
+  const [reason, setReason] = useState('');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data } = await api.post(`/qqoqccp/${analysisId}/close`, { closure_reason: reason });
+      onClosed(data);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de clôturer cette analyse.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full max-w-md rounded-t-xl bg-white p-5 sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Clôturer sans action</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Justification</label>
+            <AutoTextarea
+              rows={3}
+              required
+              placeholder="Pourquoi aucune action corrective n'est nécessaire..."
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={submitting || !reason.trim()}
+            className="flex w-full items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+          >
+            {submitting ? 'Clôture...' : 'Clôturer'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function QqoqccpDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -276,6 +336,7 @@ export default function QqoqccpDetail() {
   // pas seulement celles démarrées depuis "Diagnostic guidé" (Capas.jsx).
   const [showCapaForm, setShowCapaForm] = useState(false);
   const [capaForm, setCapaForm] = useState(null);
+  const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
   const [priorityTouched, setPriorityTouched] = useState(false);
   const [dueDateTouched, setDueDateTouched] = useState(false);
   const [selectedActionIndex, setSelectedActionIndex] = useState(null);
@@ -490,6 +551,37 @@ export default function QqoqccpDetail() {
     );
   }
 
+  // Conclure qu'aucune CAPA n'est nécessaire est une conclusion légitime — mutuellement
+  // exclusive avec analysis.capa (une analyse déjà "validated" ne se clôture pas sans action).
+  // Réservé admin/manager, même rigueur que la vérification d'efficacité d'une CAPA.
+  function renderCloseAction() {
+    if (showCapaForm || analysis.capa) return null;
+
+    if (analysis.status === 'closed') {
+      return (
+        <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Clôturée sans action</p>
+          <p className="mt-1 text-sm text-slate-700">{analysis.closure_reason}</p>
+        </div>
+      );
+    }
+
+    if (!isManagerRole(currentUser?.role)) return null;
+
+    return (
+      <button
+        type="button"
+        onClick={() => setIsCloseModalOpen(true)}
+        disabled={!canGenerate}
+        title={!canGenerate ? `Remplissez au moins ${MIN_FIELDS_FOR_GENERATE} des 7 questions avant de clôturer cette analyse.` : undefined}
+        className="mt-2 flex items-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <Check size={18} />
+        Clôturer sans action
+      </button>
+    );
+  }
+
   // Toujours proposé, indépendamment de la CAPA (les deux peuvent naître de la même analyse) —
   // navigue vers la liste des procédures, qui ouvre automatiquement le formulaire de création
   // avec un brouillon généré par l'IA à partir de cette analyse (voir Procedures.jsx).
@@ -675,6 +767,7 @@ export default function QqoqccpDetail() {
       {/* Sous les 7 questions quand pas encore de proposition IA (voir l'autre occurrence
           sous le résultat IA plus bas). */}
       {!hasSuggestion && renderCapaAction()}
+      {!hasSuggestion && renderCloseAction()}
       {!hasSuggestion && renderProcedureAction()}
 
       {hasSuggestion && (
@@ -720,6 +813,7 @@ export default function QqoqccpDetail() {
       )}
 
       {hasSuggestion && renderCapaAction()}
+      {hasSuggestion && renderCloseAction()}
       {hasSuggestion && renderProcedureAction()}
 
       {showCapaForm && capaForm && (
@@ -740,6 +834,17 @@ export default function QqoqccpDetail() {
           onSubmit={handleCreateCapa}
           submitting={creatingCapa}
           error={capaError}
+        />
+      )}
+
+      {isCloseModalOpen && (
+        <CloseAnalysisModal
+          analysisId={id}
+          onClose={() => setIsCloseModalOpen(false)}
+          onClosed={(data) => {
+            setAnalysis(data);
+            setIsCloseModalOpen(false);
+          }}
         />
       )}
     </div>
