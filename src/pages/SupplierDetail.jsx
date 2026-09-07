@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -622,6 +622,13 @@ export default function SupplierDetail() {
         </div>
       </div>
 
+      {supplier.evaluations[0]?.decision === 'to_replace' && !supplier.evaluations[0]?.linked_capa && (
+        <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <p>La dernière évaluation recommande de remplacer ce fournisseur — envisagez d'ouvrir une CAPA.</p>
+        </div>
+      )}
+
       <div className="mt-6 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Évaluations ({supplier.evaluations.length})</h2>
         {canManage && (
@@ -780,9 +787,12 @@ export default function SupplierDetail() {
               </div>
 
               <div>
-                <label className="mb-1 block text-sm font-medium text-slate-700">Commentaire</label>
+                <label className="mb-1 block text-sm font-medium text-slate-700">
+                  Commentaire{evaluationForm.decision !== 'maintained' && ' (justifiez cette décision)'}
+                </label>
                 <AutoTextarea
                   rows={2}
+                  required={evaluationForm.decision !== 'maintained'}
                   value={evaluationForm.comment}
                   onChange={(e) => setEvaluationForm((prev) => ({ ...prev, comment: e.target.value }))}
                   className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
