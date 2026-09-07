@@ -589,8 +589,8 @@ export default function AccidentDetail() {
     try {
       const { data } = await api.patch(`/accidents/${id}`, { status });
       setAccident((prev) => ({ ...prev, ...data }));
-    } catch {
-      setError('Impossible de mettre à jour le statut.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
   }
 
