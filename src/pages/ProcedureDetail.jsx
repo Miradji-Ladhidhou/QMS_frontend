@@ -286,9 +286,10 @@ function ObsoleteProcedureModal({ onClose, onConfirm }) {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Motif (optionnel)</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Motif</label>
             <AutoTextarea
               rows={3}
+              required
               placeholder="Remplacée par la version 2.0, processus supprimé..."
               value={reason}
               onChange={(e) => setReason(e.target.value)}
@@ -860,7 +861,8 @@ export default function ProcedureDetail() {
             <button
               type="button"
               onClick={() => handleValidate(pendingVersion.id)}
-              disabled={actingVersionId === pendingVersion.id}
+              disabled={actingVersionId === pendingVersion.id || pendingVersion.author_id === currentUser?.id}
+              title={pendingVersion.author_id === currentUser?.id ? 'Vous ne pouvez pas valider une version que vous avez rédigée vous-même.' : undefined}
               className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
             >
               <Check size={16} />
