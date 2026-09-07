@@ -1,14 +1,18 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 
 const APPROVER_BASELINE_ROLES = ['admin', 'manager'];
 
 export default function SubmitForApprovalModal({ documentId, users, onClose, onSubmitted }) {
+  const currentUser = useCurrentUser();
   // Ne propose que les admins/managers : seuls ces rôles sont habilités par défaut à approuver
   // (voir isQualifiedApprover côté backend, seul juge final — un member avec un accès can_approve
-  // explicite sur une catégorie restreinte reste choisissable, juste pas listé ici).
-  const eligibleUsers = users.filter((user) => APPROVER_BASELINE_ROLES.includes(user.role));
+  // explicite sur une catégorie restreinte reste choisissable, juste pas listé ici). Le
+  // soumetteur lui-même n'est jamais proposé : la revue doit être indépendante (§7.5.2 b), le
+  // backend le refuserait de toute façon (voir POST .../submit-for-approval).
+  const eligibleUsers = users.filter((user) => APPROVER_BASELINE_ROLES.includes(user.role) && user.id !== currentUser?.id);
   const [selectedIds, setSelectedIds] = useState([]);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
