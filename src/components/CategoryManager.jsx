@@ -73,8 +73,8 @@ export default function CategoryManager({ isAdmin }) {
     try {
       await api.delete(`/categories/${category.id}`);
       setCategories((prev) => prev.filter((item) => item.id !== category.id));
-    } catch {
-      setError('Impossible de supprimer cette catégorie.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de supprimer cette catégorie.');
     }
   }
 
