@@ -623,8 +623,8 @@ export default function ManagementReviewDetail() {
     try {
       const { data } = await api.patch(`/management-reviews/${id}`, { status });
       setReview((prev) => ({ ...prev, ...data }));
-    } catch {
-      setError('Impossible de mettre à jour le statut.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
   }
 
