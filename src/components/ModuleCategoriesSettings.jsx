@@ -14,6 +14,7 @@ const RESOURCE_TABS = [
   { id: 'task', label: 'Planning' },
   { id: 'kpi', label: 'KPI' },
   { id: 'procedure', label: 'Procédures' },
+  { id: 'quality_objective', label: 'Objectifs qualité' },
 ];
 
 export default function ModuleCategoriesSettings({ isAdmin }) {
