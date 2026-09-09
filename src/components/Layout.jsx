@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Contact,
   FileCheck,
+  FileSignature,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -105,6 +106,12 @@ export const NAV_ITEMS = [
     to: '/nonconforming-outputs',
     label: 'Non-conformités produit/service',
     icon: PackageX,
+  },
+  {
+    key: 'order-reviews',
+    to: '/order-reviews',
+    label: 'Revue des exigences avant engagement',
+    icon: FileSignature,
   },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
