@@ -21,6 +21,7 @@ import {
   ShieldCheck,
   Siren,
   CalendarClock,
+  Gauge,
   Target,
   Thermometer,
   Truck,
@@ -97,6 +98,7 @@ export const NAV_ITEMS = [
   { key: 'accidents', to: '/accidents', label: 'Accidents du travail', icon: Siren },
   { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw },
   { key: 'quality-objectives', to: '/quality-objectives', label: 'Objectifs qualité', icon: Target },
+  { key: 'measuring-equipment', to: '/measuring-equipment', label: 'Étalonnage', icon: Gauge },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit

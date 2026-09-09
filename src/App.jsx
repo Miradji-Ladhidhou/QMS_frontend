@@ -43,6 +43,8 @@ const Pdca = lazy(() => import('./pages/Pdca.jsx'));
 const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
 const QualityObjectives = lazy(() => import('./pages/QualityObjectives.jsx'));
 const QualityObjectiveDetail = lazy(() => import('./pages/QualityObjectiveDetail.jsx'));
+const MeasuringEquipment = lazy(() => import('./pages/MeasuringEquipment.jsx'));
+const MeasuringEquipmentDetail = lazy(() => import('./pages/MeasuringEquipmentDetail.jsx'));
 const Haccp = lazy(() => import('./pages/Haccp.jsx'));
 const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
@@ -122,6 +124,8 @@ export default function App() {
               <Route path="pdca/:id" element={<PdcaDetail />} />
               <Route path="quality-objectives" element={<QualityObjectives />} />
               <Route path="quality-objectives/:id" element={<QualityObjectiveDetail />} />
+              <Route path="measuring-equipment" element={<MeasuringEquipment />} />
+              <Route path="measuring-equipment/:id" element={<MeasuringEquipmentDetail />} />
               <Route path="haccp" element={<Haccp />} />
               <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />
