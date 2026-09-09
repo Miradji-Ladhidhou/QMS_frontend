@@ -45,6 +45,8 @@ const QualityObjectives = lazy(() => import('./pages/QualityObjectives.jsx'));
 const QualityObjectiveDetail = lazy(() => import('./pages/QualityObjectiveDetail.jsx'));
 const MeasuringEquipment = lazy(() => import('./pages/MeasuringEquipment.jsx'));
 const MeasuringEquipmentDetail = lazy(() => import('./pages/MeasuringEquipmentDetail.jsx'));
+const NonconformingOutputs = lazy(() => import('./pages/NonconformingOutputs.jsx'));
+const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutputDetail.jsx'));
 const Haccp = lazy(() => import('./pages/Haccp.jsx'));
 const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
@@ -126,6 +128,8 @@ export default function App() {
               <Route path="quality-objectives/:id" element={<QualityObjectiveDetail />} />
               <Route path="measuring-equipment" element={<MeasuringEquipment />} />
               <Route path="measuring-equipment/:id" element={<MeasuringEquipmentDetail />} />
+              <Route path="nonconforming-outputs" element={<NonconformingOutputs />} />
+              <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
               <Route path="haccp" element={<Haccp />} />
               <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />

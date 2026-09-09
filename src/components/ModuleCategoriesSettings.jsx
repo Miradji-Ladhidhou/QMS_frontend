@@ -16,6 +16,7 @@ const RESOURCE_TABS = [
   { id: 'procedure', label: 'Procédures' },
   { id: 'quality_objective', label: 'Objectifs qualité' },
   { id: 'measuring_equipment', label: 'Étalonnage' },
+  { id: 'nonconforming_output', label: 'Non-conformités produit/service' },
 ];
 
 export default function ModuleCategoriesSettings({ isAdmin }) {

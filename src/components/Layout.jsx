@@ -15,6 +15,7 @@ import {
   LogOut,
   Menu,
   MessageSquareWarning,
+  PackageX,
   RefreshCw,
   Settings,
   ShieldAlert,
@@ -99,6 +100,12 @@ export const NAV_ITEMS = [
   { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw },
   { key: 'quality-objectives', to: '/quality-objectives', label: 'Objectifs qualité', icon: Target },
   { key: 'measuring-equipment', to: '/measuring-equipment', label: 'Étalonnage', icon: Gauge },
+  {
+    key: 'nonconforming-outputs',
+    to: '/nonconforming-outputs',
+    label: 'Non-conformités produit/service',
+    icon: PackageX,
+  },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
