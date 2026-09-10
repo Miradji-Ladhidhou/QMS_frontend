@@ -56,6 +56,12 @@ export default function PageGuide({ id }) {
       <div className="min-w-0 flex-1 [&_strong]:font-medium [&_strong]:text-slate-800">
         {guide.title && <p className="font-medium text-slate-800">{guide.title}</p>}
         <div className="mt-0.5 space-y-1">{guide.body}</div>
+        {guide.example && (
+          <p className="mt-1.5 border-l-2 border-slate-300 pl-2 text-xs text-slate-500">
+            <span className="font-medium text-slate-600">Exemple — </span>
+            {guide.example}
+          </p>
+        )}
       </div>
       <button
         type="button"
