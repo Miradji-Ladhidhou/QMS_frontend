@@ -13,7 +13,7 @@ const DEFAULT_LEVELS = { can_view: true, can_edit: false, can_approve: false, ca
 
 // baseUrl : '/categories' pour les catégories de documents (défaut), '/module-categories'
 // pour les catégories génériques (CAPA, réclamations, QQOQCCP, fournisseurs, formations,
-// revues) — même composant réutilisé plutôt que dupliqué par module, voir ModuleCategoryManager.jsx.
+// revues) — même composant réutilisé plutôt que dupliqué par module, voir CategoryManagerPanel.jsx.
 //
 // isAdmin : GET /:id/permissions est accessible à l'admin ET à quiconque a can_edit sur la
 // catégorie (voir le commentaire de cette route côté backend — categories.js/moduleCategories.js),

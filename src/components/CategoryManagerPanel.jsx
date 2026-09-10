@@ -6,7 +6,12 @@ import CategoryPermissionsPanel from './CategoryPermissionsPanel.jsx';
 const DEFAULT_COLOR = '#1F3864';
 const DEFAULT_FORM = { name: '', color: DEFAULT_COLOR, is_restricted: false };
 
-export default function CategoryManager({ isAdmin }) {
+// Gestion complète des dossiers (catégories) d'un module, affichée directement dans la page
+// concernée via ManageCategoriesModal — remplace les anciens onglets Paramètres > Catégories.
+// Un seul composant paramétré : `baseUrl` = '/module-categories' (générique, avec
+// `resourceType`) ou '/categories' (Documents). Les deux back-ends partagent exactement les
+// mêmes verbes (POST / PUT / DELETE + /:id/permissions).
+export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, onChanged }) {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -15,14 +20,16 @@ export default function CategoryManager({ isAdmin }) {
   const [saving, setSaving] = useState(false);
   const [expandedPermissionsId, setExpandedPermissionsId] = useState(null);
 
+  const listParams = resourceType ? { params: { resource_type: resourceType } } : undefined;
+
   async function loadCategories() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get('/categories');
+      const { data } = await api.get(baseUrl, listParams);
       setCategories(data);
     } catch {
-      setError('Impossible de charger les catégories.');
+      setError('Impossible de charger les dossiers.');
     } finally {
       setLoading(false);
     }
@@ -30,7 +37,10 @@ export default function CategoryManager({ isAdmin }) {
 
   useEffect(() => {
     loadCategories();
-  }, []);
+    setEditingId(null);
+    setExpandedPermissionsId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseUrl, resourceType]);
 
   function startCreate() {
     setEditingId('new');
@@ -53,28 +63,31 @@ export default function CategoryManager({ isAdmin }) {
 
     try {
       if (editingId === 'new') {
-        const { data } = await api.post('/categories', form);
+        const payload = resourceType ? { ...form, resource_type: resourceType } : form;
+        const { data } = await api.post(baseUrl, payload);
         setCategories((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
       } else {
-        const { data } = await api.put(`/categories/${editingId}`, form);
+        const { data } = await api.put(`${baseUrl}/${editingId}`, form);
         setCategories((prev) => prev.map((category) => (category.id === editingId ? data : category)));
       }
       setEditingId(null);
+      onChanged?.();
     } catch (err) {
-      setError(err.response?.data?.error || "Impossible d'enregistrer la catégorie.");
+      setError(err.response?.data?.error || "Impossible d'enregistrer le dossier.");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(category) {
-    if (!window.confirm(`Supprimer la catégorie "${category.name}" ?`)) return;
+    if (!window.confirm(`Supprimer le dossier "${category.name}" ?`)) return;
 
     try {
-      await api.delete(`/categories/${category.id}`);
+      await api.delete(`${baseUrl}/${category.id}`);
       setCategories((prev) => prev.filter((item) => item.id !== category.id));
+      onChanged?.();
     } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de supprimer cette catégorie.');
+      setError(err.response?.data?.error || 'Impossible de supprimer ce dossier.');
     }
   }
 
@@ -110,7 +123,7 @@ export default function CategoryManager({ isAdmin }) {
             onChange={(e) => setForm((prev) => ({ ...prev, is_restricted: e.target.checked }))}
             className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
           />
-          Catégorie restreinte (accès limité aux utilisateurs/groupes autorisés)
+          Dossier restreint (accès limité aux utilisateurs/groupes autorisés)
         </label>
 
         <div className="flex gap-2">
@@ -134,28 +147,21 @@ export default function CategoryManager({ isAdmin }) {
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Catégories de documents</h2>
-        {isAdmin && editingId === null && (
-          <button
-            type="button"
-            onClick={startCreate}
-            className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
-          >
-            <Plus size={16} />
-            Nouvelle catégorie
-          </button>
-        )}
-      </div>
-
-      {error && (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+    <div>
+      {isAdmin && editingId === null && (
+        <button
+          type="button"
+          onClick={startCreate}
+          className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
+        >
+          <Plus size={16} />
+          Nouveau dossier
+        </button>
       )}
 
-      {editingId === 'new' && (
-        <div className="mt-4 rounded-md border border-slate-200 p-4">{renderForm(handleSubmit)}</div>
-      )}
+      {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+      {editingId === 'new' && <div className="mt-4 rounded-md border border-slate-200 p-4">{renderForm(handleSubmit)}</div>}
 
       {loading ? (
         <div className="mt-4 space-y-2">
@@ -164,7 +170,7 @@ export default function CategoryManager({ isAdmin }) {
           ))}
         </div>
       ) : categories.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">Aucune catégorie pour l'instant.</p>
+        <p className="mt-4 text-sm text-slate-500">Aucun dossier pour l'instant.</p>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100">
           {categories.map((category) =>
@@ -181,15 +187,12 @@ export default function CategoryManager({ isAdmin }) {
                     onClick={() => setExpandedPermissionsId(expandedPermissionsId === category.id ? null : category.id)}
                     className="flex flex-1 items-center gap-3 text-left disabled:cursor-default"
                   >
-                    <span
-                      className="h-4 w-4 shrink-0 rounded-full"
-                      style={{ backgroundColor: category.color || '#94A3B8' }}
-                    />
+                    <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: category.color || '#94A3B8' }} />
                     <span className="text-sm font-medium text-slate-800">{category.name}</span>
                     {category.is_restricted && (
                       <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                         <Lock size={12} />
-                        Restreinte
+                        Restreint
                       </span>
                     )}
                     {category.is_restricted &&
@@ -223,7 +226,7 @@ export default function CategoryManager({ isAdmin }) {
 
                 {category.is_restricted && expandedPermissionsId === category.id && (
                   <div className="mt-3">
-                    <CategoryPermissionsPanel categoryId={category.id} isAdmin={isAdmin} />
+                    <CategoryPermissionsPanel categoryId={category.id} baseUrl={baseUrl} isAdmin={isAdmin} />
                   </div>
                 )}
               </li>

@@ -15,6 +15,7 @@ import {
   FileText,
   FileType,
   Folder,
+  FolderCog,
   FolderInput,
   FolderPlus,
   History,
@@ -56,6 +57,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
+import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 
 const LINE_COLOR = '#1F3864';
@@ -3333,6 +3335,7 @@ export default function Kpis() {
   const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [capaModal, setCapaModal] = useState(null); // le kpi pour lequel on crée une CAPA, ou null
 
   function toggleSelect(id) {
@@ -3406,11 +3409,15 @@ export default function Kpis() {
     loadBreadcrumb(currentFolderId);
   }, [currentFolderId]);
 
-  useEffect(() => {
+  function loadKpiCategories() {
     api
       .get('/module-categories', { params: { resource_type: 'kpi' } })
       .then(({ data }) => setCategories(data))
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadKpiCategories();
     api
       .get('/users')
       .then(({ data }) => setUsers(data))
@@ -3573,6 +3580,16 @@ export default function Kpis() {
             <FileText size={18} />
             {generatingReport ? 'Génération...' : 'Générer rapport PDF'}
           </button>
+          {currentUser?.role === 'admin' && (
+            <button
+              type="button"
+              onClick={() => setIsManageCategoriesOpen(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
+            >
+              <FolderCog size={18} />
+              Gérer les catégories
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setFormModal('new')}
@@ -3771,6 +3788,16 @@ export default function Kpis() {
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
+        />
+      )}
+
+      {isManageCategoriesOpen && (
+        <ManageCategoriesModal
+          baseUrl="/module-categories"
+          resourceType="kpi"
+          isAdmin
+          onClose={() => setIsManageCategoriesOpen(false)}
+          onChanged={loadKpiCategories}
         />
       )}
     </div>

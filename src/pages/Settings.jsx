@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
 import CompanySettings from '../components/CompanySettings.jsx';
-import CategoryManager from '../components/CategoryManager.jsx';
 import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
 import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
 import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
 import DriveStorageSettings from '../components/DriveStorageSettings.jsx';
 import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
-import ModuleCategoriesSettings from '../components/ModuleCategoriesSettings.jsx';
 import ProcedureTemplateSettings from '../components/ProcedureTemplateSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import QualityPolicySettings from '../components/QualityPolicySettings.jsx';
@@ -42,13 +40,6 @@ const TAB_GROUPS = [
     ],
   },
   {
-    label: 'Catégories',
-    tabs: [
-      { id: 'categories', label: 'Catégories documents' },
-      { id: 'module-categories', label: 'Catégories modules' },
-    ],
-  },
-  {
     label: 'Modules',
     tabs: [
       { id: 'capa', label: 'CAPA', adminOnly: true },
@@ -69,7 +60,11 @@ export default function Settings() {
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('drive')) return 'documents';
-    return params.get('tab') || 'company';
+    const requested = params.get('tab');
+    // Un ?tab=<id> inconnu (ex. anciens liens vers 'categories' / 'module-categories', onglets
+    // supprimés depuis) retombe sur "Entreprise" plutôt que d'afficher une zone vide.
+    const known = TAB_GROUPS.some((group) => group.tabs.some((tab) => tab.id === requested));
+    return known ? requested : 'company';
   });
 
   function loadCurrentUser() {
@@ -122,8 +117,6 @@ export default function Settings() {
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
         {activeTab === 'quality-policy' && <QualityPolicySettings isAdmin={isAdmin} />}
         {activeTab === 'qms-context' && <QmsContextSettings isAdmin={isAdmin} />}
-        {activeTab === 'categories' && <CategoryManager isAdmin={isAdmin} />}
-        {activeTab === 'module-categories' && <ModuleCategoriesSettings isAdmin={isAdmin} />}
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}

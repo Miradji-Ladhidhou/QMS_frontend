@@ -53,8 +53,9 @@ const SECTIONS = [
       <>
         <p>Vos procédures, modes opératoires, enregistrements... avec un historique de versions et une piste d'audit complète.</p>
         <p className="mt-2">
-          Chaque document appartient à une <strong>catégorie</strong> (Paramètres &gt; Catégories documents) : une catégorie
-          peut être laissée ouverte à tout le monde, ou <strong>restreinte</strong> à des personnes/groupes précis.
+          Chaque document appartient à un <strong>dossier</strong> (bouton <strong>Gérer les dossiers</strong> en haut de la
+          page Documents) : un dossier peut être laissé ouvert à tout le monde, ou <strong>restreint</strong> à des
+          personnes/groupes précis.
         </p>
       </>
     ),
@@ -141,8 +142,8 @@ const SECTIONS = [
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>Par défaut, tout le monde dans l'entreprise voit tout.</li>
           <li>
-            Un admin peut créer une <strong>catégorie restreinte</strong> (Paramètres &gt; Catégories) et choisir qui y a
-            accès — utilisateur par utilisateur ou par groupe.
+            Un admin peut créer un <strong>dossier restreint</strong> (bouton <strong>Gérer les dossiers</strong> en haut de
+            chaque page) et choisir qui y a accès — utilisateur par utilisateur ou par groupe.
           </li>
           <li>
             À la création (ou l'édition) d'un élément, vous pouvez aussi choisir <strong>"Uniquement moi"</strong> — personne

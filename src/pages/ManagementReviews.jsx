@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderPlus, List, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -15,6 +15,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
+import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 
@@ -182,85 +183,6 @@ function NewReviewModal({ categories, onClose, onCreated }) {
     </div>
   );
 }
-
-// Raccourci de création de dossier directement depuis la page, sans passer par Paramètres >
-// Catégories — juste nom + couleur, même modale que Capas.jsx, adaptée à POST
-// /module-categories (resource_type: 'management_review').
-function NewFolderModal({ onClose, onCreated }) {
-  const [name, setName] = useState('');
-  const [color, setColor] = useState('#1F3864');
-  const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-    setError('');
-    setSubmitting(true);
-
-    let data;
-    try {
-      ({ data } = await api.post('/module-categories', { resource_type: 'management_review', name, color }));
-    } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de créer ce dossier.');
-      setSubmitting(false);
-      return;
-    }
-    setSubmitting(false);
-    onCreated(data);
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-sm sm:rounded-xl sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Nouveau dossier</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        {error && (
-          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
-        )}
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="flex items-end gap-3">
-            <div className="flex-1">
-              <label className="mb-1 block text-sm font-medium text-slate-700">Nom</label>
-              <input
-                type="text"
-                required
-                autoFocus
-                placeholder="Ex : Revues annuelles, Revues site X..."
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Couleur</label>
-              <input
-                type="color"
-                value={color}
-                onChange={(e) => setColor(e.target.value)}
-                className="h-11 w-16 rounded-md border border-slate-300"
-              />
-            </div>
-          </div>
-
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-          >
-            {submitting ? 'Création...' : 'Créer le dossier'}
-          </button>
-        </form>
-      </div>
-    </div>
-  );
-}
-
 export default function ManagementReviews() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
@@ -282,7 +204,7 @@ export default function ManagementReviews() {
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState('folder');
   const [expandedFolders, setExpandedFolders] = useState(() => new Set());
-  const [isNewFolderModalOpen, setIsNewFolderModalOpen] = useState(false);
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
 
   function toggleFolder(key) {
@@ -293,13 +215,6 @@ export default function ManagementReviews() {
       return next;
     });
   }
-
-  function handleFolderCreated(category) {
-    setCategories((prev) => [...prev, category].sort((a, b) => a.name.localeCompare(b.name)));
-    setIsNewFolderModalOpen(false);
-    setExpandedFolders((prev) => new Set(prev).add(category.id));
-  }
-
   async function handleCategoryChange(event, review) {
     event.stopPropagation();
     const categoryId = event.target.value || null;
@@ -323,12 +238,16 @@ export default function ManagementReviews() {
       .finally(() => setLoading(false));
   }
 
-  useEffect(() => {
-    loadReviews();
+  function loadCategories() {
     api
       .get('/module-categories', { params: { resource_type: 'management_review' } })
       .then(({ data }) => setCategories(data))
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadReviews();
+    loadCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -598,11 +517,11 @@ export default function ManagementReviews() {
         {currentUser?.role === 'admin' && (
           <button
             type="button"
-            onClick={() => setIsNewFolderModalOpen(true)}
+            onClick={() => setIsManageCategoriesOpen(true)}
             className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
-            <FolderPlus size={16} />
-            Nouveau dossier
+            <FolderCog size={16} />
+            Gérer les dossiers
           </button>
         )}
       </div>
@@ -741,8 +660,14 @@ export default function ManagementReviews() {
         />
       )}
 
-      {isNewFolderModalOpen && (
-        <NewFolderModal onClose={() => setIsNewFolderModalOpen(false)} onCreated={handleFolderCreated} />
+      {isManageCategoriesOpen && (
+        <ManageCategoriesModal
+          baseUrl="/module-categories"
+          resourceType="management_review"
+          isAdmin
+          onClose={() => setIsManageCategoriesOpen(false)}
+          onChanged={loadCategories}
+        />
       )}
     </div>
   );
