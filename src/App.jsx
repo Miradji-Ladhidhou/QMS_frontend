@@ -51,6 +51,8 @@ const OrderReviews = lazy(() => import('./pages/OrderReviews.jsx'));
 const OrderReviewDetail = lazy(() => import('./pages/OrderReviewDetail.jsx'));
 const QmsChanges = lazy(() => import('./pages/QmsChanges.jsx'));
 const QmsChangeDetail = lazy(() => import('./pages/QmsChangeDetail.jsx'));
+const CustomerSatisfaction = lazy(() => import('./pages/CustomerSatisfaction.jsx'));
+const CustomerSatisfactionDetail = lazy(() => import('./pages/CustomerSatisfactionDetail.jsx'));
 const Haccp = lazy(() => import('./pages/Haccp.jsx'));
 const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
@@ -138,6 +140,8 @@ export default function App() {
               <Route path="order-reviews/:id" element={<OrderReviewDetail />} />
               <Route path="qms-changes" element={<QmsChanges />} />
               <Route path="qms-changes/:id" element={<QmsChangeDetail />} />
+              <Route path="customer-satisfaction" element={<CustomerSatisfaction />} />
+              <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />
               <Route path="haccp" element={<Haccp />} />
               <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />
