@@ -23,6 +23,7 @@ import {
   MoreVertical,
   Pencil,
   Plus,
+  RefreshCw,
   Settings,
   Trash2,
   Upload,
@@ -2522,6 +2523,19 @@ function CreateCapaFromKpiModal({ kpi, onClose, onCreated }) {
   );
 }
 
+// Libellés des modules alimentant un KPI automatique (miroir de MODULE_KPI_SOURCES côté
+// backend — deux repos séparés).
+const MODULE_KPI_LABELS = {
+  capa: 'CAPA',
+  nonconforming_output: 'Non-conformités',
+  complaint: 'Réclamations',
+  accident: 'Accidents',
+  customer_satisfaction: 'Satisfaction client',
+  audit: 'Audits',
+  audit_finding: 'Constats d’audit',
+  training_record: 'Formations',
+};
+
 function KpiCard({
   kpi,
   canManage,
@@ -2537,6 +2551,8 @@ function KpiCard({
   onOpenManualSeriesModal,
   onViewProof,
   onOpenCapaModal,
+  onRecompute,
+  recomputing,
   isSelected,
   onToggleSelect,
 }) {
@@ -2604,6 +2620,7 @@ function KpiCard({
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
   const hasEnoughForChart = chartData.length >= 2;
   const isImportBased = kpi.calculation_type === 'import';
+  const isModuleBased = kpi.calculation_type === 'module';
   const isCountGrouped = seriesConfigs.length === 1 && seriesConfigs[0].calc_type === 'count_grouped';
   const canExportChart = isCountGrouped || hasEnoughForChart;
 
@@ -2691,11 +2708,19 @@ function KpiCard({
                 Objectif : {targetDirection === 'max' ? '≤' : '≥'} {kpi.target} {kpi.unit || ''}
               </p>
             )}
-            {kpi.frequency && (
-              <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                {FREQUENCY_LABELS[kpi.frequency] || kpi.frequency}
-              </span>
-            )}
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {kpi.frequency && (
+                <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                  {FREQUENCY_LABELS[kpi.frequency] || kpi.frequency}
+                </span>
+              )}
+              {isModuleBased && (
+                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                  <RefreshCw size={11} />
+                  Auto — {MODULE_KPI_LABELS[kpi.source_module] || kpi.source_module}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -2788,7 +2813,7 @@ function KpiCard({
                       Séries de calcul
                     </button>
                   )}
-                  {!isImportBased && (
+                  {!isImportBased && !isModuleBased && (
                     <button
                       type="button"
                       onClick={() => {
@@ -2888,7 +2913,19 @@ function KpiCard({
             )}
           </div>
         )}
-        {isImportBased ? (
+        {isModuleBased ? (
+          canManage && (
+            <button
+              type="button"
+              onClick={() => onRecompute(kpi)}
+              disabled={recomputing}
+              className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <RefreshCw size={14} className={recomputing ? 'animate-spin' : ''} />
+              {recomputing ? 'Calcul...' : 'Actualiser'}
+            </button>
+          )
+        ) : isImportBased ? (
           <button
             type="button"
             onClick={() => onOpenImportModal(kpi)}
@@ -3311,6 +3348,98 @@ function MoveKpiModal({ kpi, onClose, onMoved }) {
   );
 }
 
+// Catalogue des métriques de module prêtes à l'emploi (§9.1) — une par ligne, groupées par
+// module. « Créer » crée le KPI + sa recette + un premier calcul côté backend.
+function ModulePresetModal({ folderId, onClose, onCreated }) {
+  const [presets, setPresets] = useState(null);
+  const [error, setError] = useState('');
+  const [creatingId, setCreatingId] = useState(null);
+
+  useEffect(() => {
+    api
+      .get('/kpis/module-presets')
+      .then(({ data }) => setPresets(data))
+      .catch(() => setError('Impossible de charger le catalogue.'));
+  }, []);
+
+  async function handleCreate(preset) {
+    setCreatingId(preset.id);
+    setError('');
+    try {
+      await api.post('/kpis/from-module-preset', { preset_id: preset.id, folder_id: folderId || undefined });
+      onCreated();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer ce KPI.');
+      setCreatingId(null);
+    }
+  }
+
+  const grouped = (presets || []).reduce((acc, p) => {
+    (acc[p.module_label] ||= []).push(p);
+    return acc;
+  }, {});
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">KPI depuis un module</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="mb-4 text-sm text-slate-500">
+          Suivi automatique de l'efficacité, calculé depuis les données du module choisi (ISO 9001 §9.1). Recalculé chaque
+          nuit et via le bouton « Actualiser ».
+        </p>
+
+        {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        {presets === null ? (
+          <div className="space-y-2">
+            {[0, 1, 2].map((k) => (
+              <div key={k} className="h-16 animate-pulse rounded-md bg-slate-100" />
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-5">
+            {Object.entries(grouped).map(([moduleLabel, items]) => (
+              <div key={moduleLabel}>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{moduleLabel}</p>
+                <div className="space-y-2">
+                  {items.map((preset) => (
+                    <div
+                      key={preset.id}
+                      className="flex items-start justify-between gap-3 rounded-md border border-slate-200 p-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-slate-800">
+                          {preset.label}
+                          {preset.unit ? <span className="ml-1 font-normal text-slate-400">({preset.unit})</span> : null}
+                        </p>
+                        <p className="mt-0.5 text-xs text-slate-500">{preset.description}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => handleCreate(preset)}
+                        disabled={creatingId !== null}
+                        className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+                      >
+                        {creatingId === preset.id ? 'Création...' : 'Créer'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Kpis() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
@@ -3337,6 +3466,27 @@ export default function Kpis() {
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [capaModal, setCapaModal] = useState(null); // le kpi pour lequel on crée une CAPA, ou null
+  const [modulePresetOpen, setModulePresetOpen] = useState(false);
+  const [recomputingId, setRecomputingId] = useState(null);
+
+  async function handleRecompute(kpi) {
+    setRecomputingId(kpi.id);
+    setError('');
+    try {
+      await api.post(`/kpis/${kpi.id}/recompute`);
+      const { data } = await api.get(`/kpis/${kpi.id}`);
+      setKpis((prev) => prev.map((k) => (k.id === kpi.id ? data : k)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de recalculer ce KPI.');
+    } finally {
+      setRecomputingId(null);
+    }
+  }
+
+  function handlePresetCreated() {
+    setModulePresetOpen(false);
+    loadKpis(currentFolderId);
+  }
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -3590,6 +3740,16 @@ export default function Kpis() {
               Gérer les catégories
             </button>
           )}
+          {canManage && (
+            <button
+              type="button"
+              onClick={() => setModulePresetOpen(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
+            >
+              <RefreshCw size={18} />
+              Depuis un module
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setFormModal('new')}
@@ -3698,6 +3858,8 @@ export default function Kpis() {
                   onOpenManualSeriesModal={setManualSeriesModal}
                   onViewProof={(kpiArg, record) => setProofModal({ kpi: kpiArg, record })}
                   onOpenCapaModal={setCapaModal}
+                  onRecompute={handleRecompute}
+                  recomputing={recomputingId === kpi.id}
                   isSelected={selectedIds.includes(kpi.id)}
                   onToggleSelect={() => toggleSelect(kpi.id)}
                 />
@@ -3799,6 +3961,10 @@ export default function Kpis() {
           onClose={() => setIsManageCategoriesOpen(false)}
           onChanged={loadKpiCategories}
         />
+      )}
+
+      {modulePresetOpen && (
+        <ModulePresetModal folderId={currentFolderId} onClose={() => setModulePresetOpen(false)} onCreated={handlePresetCreated} />
       )}
     </div>
   );
