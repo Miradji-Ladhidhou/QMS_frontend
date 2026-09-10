@@ -356,71 +356,72 @@ export default function CommunicationPlan() {
             </button>
           )}
         </div>
+      ) : sorted.length === 0 ? (
+        <p className="mt-6 text-sm text-slate-500">Aucune ligne ne correspond aux filtres.</p>
       ) : (
-        <div className="mt-4 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm">
-          <table className="min-w-full divide-y divide-slate-200 text-sm">
-            <thead className="bg-slate-50 text-left text-xs font-medium uppercase tracking-wide text-slate-500">
-              <tr>
-                <th className="px-4 py-3">Objet</th>
-                <th className="px-4 py-3">Public</th>
-                <th className="px-4 py-3">Portée</th>
-                <th className="px-4 py-3">Fréquence</th>
-                <th className="px-4 py-3">Canal</th>
-                <th className="px-4 py-3">Responsable</th>
-                {isAdmin && <th className="px-4 py-3 text-right">Actions</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {sorted.map((item) => (
-                <tr key={item.id} className={item.is_active ? '' : 'bg-slate-50 text-slate-400'}>
-                  <td className="px-4 py-3 font-medium text-slate-900">
-                    {item.subject}
-                    {!item.is_active && <span className="ml-2 text-xs font-normal text-slate-400">(inactive)</span>}
-                    {item.notes && <p className="mt-0.5 text-xs font-normal text-slate-500">{item.notes}</p>}
-                  </td>
-                  <td className="px-4 py-3">{item.audience}</td>
-                  <td className="px-4 py-3">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+          {sorted.map((item) => (
+            <div
+              key={item.id}
+              className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${item.is_active ? '' : 'opacity-60'}`}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="font-medium text-slate-900">{item.subject}</p>
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
                     <CommunicationScopeBadge scope={item.scope} />
-                  </td>
-                  <td className="px-4 py-3">{item.timing}</td>
-                  <td className="px-4 py-3">{item.channel}</td>
-                  <td className="px-4 py-3">{item.responsible?.full_name || '—'}</td>
-                  {isAdmin && (
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-1">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setModalItem(item);
-                            setModalOpen(true);
-                          }}
-                          aria-label="Modifier"
-                          className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
-                        >
-                          <Pencil size={15} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => handleDelete(item)}
-                          aria-label="Supprimer"
-                          className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
-              {sorted.length === 0 && (
-                <tr>
-                  <td colSpan={isAdmin ? 7 : 6} className="px-4 py-8 text-center text-slate-500">
-                    Aucune ligne ne correspond aux filtres.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                    {!item.is_active && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Inactive</span>
+                    )}
+                  </div>
+                </div>
+                {isAdmin && (
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setModalItem(item);
+                        setModalOpen(true);
+                      }}
+                      aria-label="Modifier"
+                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(item)}
+                      aria-label="Supprimer"
+                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+                <div>
+                  <dt className="text-xs text-slate-500">Public</dt>
+                  <dd className="text-slate-800">{item.audience}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Fréquence</dt>
+                  <dd className="text-slate-800">{item.timing}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Canal</dt>
+                  <dd className="text-slate-800">{item.channel}</dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-slate-500">Responsable</dt>
+                  <dd className="text-slate-800">{item.responsible?.full_name || '—'}</dd>
+                </div>
+              </dl>
+
+              {item.notes && <p className="mt-2 text-xs text-slate-500">{item.notes}</p>}
+            </div>
+          ))}
         </div>
       )}
 

@@ -243,9 +243,14 @@ export default function Employees() {
       ) : employees.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune personne enregistrée pour l'instant.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2">
           {sortedEmployees.map((employee) => (
-            <li key={employee.id} className="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div
+              key={employee.id}
+              className={`flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between ${
+                employee.is_active ? '' : 'opacity-60'
+              }`}
+            >
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-medium text-slate-900">{employee.full_name}</span>
@@ -293,9 +298,9 @@ export default function Employees() {
                   <Trash2 size={16} />
                 </button>
               </div>
-            </li>
+            </div>
           ))}
-        </ul>
+        </div>
       )}
 
       {isCreating && <EmployeeModal onClose={() => setIsCreating(false)} onSaved={handleCreated} />}
