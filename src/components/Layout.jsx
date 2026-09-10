@@ -17,6 +17,7 @@ import {
   Menu,
   MessageSquareWarning,
   PackageX,
+  Repeat,
   RefreshCw,
   Settings,
   ShieldAlert,
@@ -112,6 +113,12 @@ export const NAV_ITEMS = [
     to: '/order-reviews',
     label: 'Revue des exigences avant engagement',
     icon: FileSignature,
+  },
+  {
+    key: 'qms-changes',
+    to: '/qms-changes',
+    label: 'Planification des modifications',
+    icon: Repeat,
   },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas

@@ -18,6 +18,7 @@ const RESOURCE_TABS = [
   { id: 'measuring_equipment', label: 'Étalonnage' },
   { id: 'nonconforming_output', label: 'Non-conformités produit/service' },
   { id: 'order_review', label: 'Revue des exigences avant engagement' },
+  { id: 'qms_change', label: 'Planification des modifications' },
 ];
 
 export default function ModuleCategoriesSettings({ isAdmin }) {
