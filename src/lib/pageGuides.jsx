@@ -19,7 +19,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Procédures, formulaires, enregistrements — avec <strong>gestion des versions</strong> et piste d'audit. Chaque
-        document vit dans un <strong>dossier</strong> laissé ouvert à tous ou restreint à certaines personnes. <em>ISO 9001 §7.5.</em>
+        document vit dans un <strong>dossier</strong> laissé ouvert à tous ou restreint à certaines personnes.
       </p>
     ),
   },
@@ -28,7 +28,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Une CAPA sert à identifier la <strong>cause racine</strong> d'un problème, décider une <strong>action corrective</strong>,
-        puis <strong>vérifier son efficacité</strong> avant de clôturer. <em>ISO 9001 §10.2.</em>
+        puis <strong>vérifier son efficacité</strong> avant de clôturer.
       </p>
     ),
   },
@@ -37,7 +37,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         De la réception à la résolution, en gardant la trace de la <strong>satisfaction du client</strong> une fois la
-        réclamation traitée. Une réclamation grave peut déclencher une CAPA. <em>ISO 9001 §9.1.2.</em>
+        réclamation traitée. Une réclamation grave peut déclencher une CAPA.
       </p>
     ),
   },
@@ -46,7 +46,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Le catalogue des formations et qui les a suivies. La <strong>matrice</strong> croise le personnel et les formations
-        obligatoires par poste pour repérer les <strong>manques</strong> et les <strong>recyclages en retard</strong>. <em>ISO 9001 §7.2.</em>
+        obligatoires par poste pour repérer les <strong>manques</strong> et les <strong>recyclages en retard</strong>.
       </p>
     ),
   },
@@ -55,7 +55,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Un KPI est une valeur suivie dans le temps, comparée à un <strong>objectif</strong>. Alimentation au choix : saisie
-        manuelle, import Excel, ou <strong>calcul automatique</strong> depuis un autre module. <em>ISO 9001 §9.1.</em>
+        manuelle, import Excel, ou <strong>calcul automatique</strong> depuis un autre module.
       </p>
     ),
   },
@@ -74,7 +74,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Planifier les audits, les conduire, consigner les <strong>constats</strong> (points forts, écarts,
-        non-conformités) et les transformer en actions. <em>ISO 9001 §9.2.</em>
+        non-conformités) et les transformer en actions.
       </p>
     ),
   },
@@ -83,7 +83,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Identifier un risque, le <strong>coter</strong> (gravité × probabilité), décider un traitement — accepter,
-        réduire, éviter ou transférer — puis suivre le plan d'action. <em>ISO 9001 §6.1.</em>
+        réduire, éviter ou transférer — puis suivre le plan d'action.
       </p>
     ),
   },
@@ -101,7 +101,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Notation périodique des fournisseurs (qualité, délais, réactivité) et trace des décisions de{' '}
-        <strong>(re)qualification</strong>. <em>ISO 9001 §8.4.</em>
+        <strong>(re)qualification</strong>.
       </p>
     ),
   },
@@ -110,7 +110,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Rassembler les <strong>entrées</strong> (indicateurs, audits, réclamations, actions en cours…) et enregistrer les{' '}
-        <strong>décisions et actions</strong> qui en sortent. <em>ISO 9001 §9.3.</em>
+        <strong>décisions et actions</strong> qui en sortent.
       </p>
     ),
   },
@@ -146,7 +146,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Un objectif <strong>mesurable</strong>, avec une échéance, un responsable et un suivi d'avancement. Peut être
-        relié à un KPI pour se mettre à jour tout seul. <em>ISO 9001 §6.2.</em>
+        relié à un KPI pour se mettre à jour tout seul.
       </p>
     ),
   },
@@ -155,7 +155,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Inventaire des équipements de mesure et de contrôle, échéances de <strong>vérification / étalonnage</strong> et
-        certificats associés. <em>ISO 9001 §7.1.5.</em>
+        certificats associés.
       </p>
     ),
   },
@@ -164,7 +164,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Enregistrer une non-conformité détectée sur un produit ou service et la <strong>décision</strong> prise : rebut,
-        retouche, dérogation, tri… <em>ISO 9001 §8.7.</em>
+        retouche, dérogation, tri…
       </p>
     ),
   },
@@ -173,7 +173,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Avant d'accepter une commande ou un devis : s'assurer que les exigences sont <strong>comprises</strong>, qu'on a
-        la <strong>capacité de livrer</strong> et que les écarts éventuels sont traités. <em>ISO 9001 §8.2.3.</em>
+        la <strong>capacité de livrer</strong> et que les écarts éventuels sont traités.
       </p>
     ),
   },
@@ -182,7 +182,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Planifier une modification du système de management : objet, <strong>impact</strong>, ressources nécessaires,
-        approbation. <em>ISO 9001 §6.3.</em>
+        approbation.
       </p>
     ),
   },
@@ -191,7 +191,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Recueillir enquêtes et notes de satisfaction <strong>en dehors des réclamations</strong>, pour suivre la
-        tendance. <em>ISO 9001 §9.1.2.</em>
+        tendance.
       </p>
     ),
   },
@@ -200,7 +200,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Les communications <strong>internes et externes</strong> du système de management : sujet, cible, fréquence,
-        canal, responsable. <em>ISO 9001 §7.4.</em>
+        canal, responsable.
       </p>
     ),
   },
@@ -238,7 +238,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         <strong>Ouverte → En cours → En vérification → Clôturée.</strong> La clôture exige une action corrective
-        renseignée <strong>et</strong> une vérification d'efficacité positive (§10.2.1 f).
+        renseignée <strong>et</strong> une vérification d'efficacité positive.
       </p>
     ),
   },
@@ -283,7 +283,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Enregistrez la <strong>disposition</strong> décidée (rebut, retouche, dérogation, tri…) et qui l'a décidée. La
-        clôture n'est possible qu'une fois la disposition traitée. <em>ISO 9001 §8.7.2.</em>
+        clôture n'est possible qu'une fois la disposition traitée.
       </p>
     ),
   },
@@ -301,7 +301,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         <strong>Planifiée → Approuvée → Mise en œuvre</strong> (ou Annulée). Chaque passage d'étape est daté ; on ne
-        saute pas d'étape. <em>ISO 9001 §6.3.</em>
+        saute pas d'étape.
       </p>
     ),
   },
@@ -319,7 +319,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Fixez la <strong>cible</strong> et l'échéance, mettez à jour l'avancement (ou reliez un <strong>KPI</strong> pour
-        qu'il se mette à jour seul). <em>ISO 9001 §6.2.</em>
+        qu'il se mette à jour seul).
       </p>
     ),
   },
@@ -328,7 +328,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Notez le fournisseur sur les critères retenus ; la <strong>note globale</strong> et le statut de qualification en
-        découlent. Ré-évaluez à la fréquence définie. <em>ISO 9001 §8.4.</em>
+        découlent. Ré-évaluez à la fréquence définie.
       </p>
     ),
   },
@@ -337,7 +337,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Passez en revue les <strong>entrées</strong> requises, puis enregistrez les <strong>décisions</strong> et les{' '}
-        <strong>actions</strong> avec leurs responsables. <em>ISO 9001 §9.3.</em>
+        <strong>actions</strong> avec leurs responsables.
       </p>
     ),
   },
@@ -382,7 +382,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Renseignez la <strong>périodicité</strong> d'étalonnage/vérification : la prochaine échéance et le statut (à jour
-        / bientôt / dépassé) en découlent. Joignez les certificats. <em>ISO 9001 §7.1.5.</em>
+        / bientôt / dépassé) en découlent. Joignez les certificats.
       </p>
     ),
   },
