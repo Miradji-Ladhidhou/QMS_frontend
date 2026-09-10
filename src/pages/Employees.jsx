@@ -1,21 +1,24 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Ban, CheckCircle2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Ban, CheckCircle2, ChevronDown, ChevronUp, Folder, FolderCog, List, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
+import CategoryBadge from '../components/CategoryBadge.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 
 const EMPLOYEE_SORT_OPTIONS = [
   { key: 'full_name', label: 'nom' },
   { key: 'is_active', label: 'statut' },
 ];
 
-function EmployeeModal({ employee, onClose, onSaved }) {
+function EmployeeModal({ employee, categories, onClose, onSaved }) {
   const isNew = !employee;
   const [fullName, setFullName] = useState(employee?.full_name || '');
   const [email, setEmail] = useState(employee?.email || '');
   const [jobTitle, setJobTitle] = useState(employee?.job_title || '');
+  const [categoryId, setCategoryId] = useState(employee?.category_id || '');
   const [isActive, setIsActive] = useState(employee?.is_active ?? true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -34,11 +37,13 @@ function EmployeeModal({ employee, onClose, onSaved }) {
             full_name: fullName,
             email: email || undefined,
             job_title: jobTitle || undefined,
+            category_id: categoryId || undefined,
           })
         : await api.patch(`/employees/${employee.id}`, {
             full_name: fullName,
             email: email || null,
             job_title: jobTitle || null,
+            category_id: categoryId || null,
             is_active: isActive,
           });
     } catch (err) {
@@ -97,6 +102,22 @@ function EmployeeModal({ employee, onClose, onSaved }) {
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Dossier</label>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Sans dossier</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {!isNew && (
             <label className="flex items-center gap-2 text-sm text-slate-700">
               <input
@@ -122,15 +143,97 @@ function EmployeeModal({ employee, onClose, onSaved }) {
   );
 }
 
+function EmployeeCard({ employee, categories, updatingCategoryId, togglingId, deletingId, onToggleActive, onEdit, onDelete, onCategoryChange }) {
+  return (
+    <div
+      className={`flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
+        employee.is_active ? '' : 'opacity-60'
+      }`}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-slate-900">{employee.full_name}</span>
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                employee.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
+              }`}
+            >
+              {employee.is_active ? <CheckCircle2 size={12} /> : <Ban size={12} />}
+              {employee.is_active ? 'Actif' : 'Inactif'}
+            </span>
+          </div>
+          {employee.email && <p className="mt-0.5 text-sm text-slate-500">{employee.email}</p>}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleActive(employee)}
+            disabled={togglingId === employee.id}
+            className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
+              employee.is_active
+                ? 'border border-slate-300 text-slate-700 hover:bg-slate-50'
+                : 'bg-primary text-white hover:bg-primary-700'
+            }`}
+          >
+            <Ban size={14} />
+            {employee.is_active ? 'Désactiver' : 'Réactiver'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onEdit(employee)}
+            aria-label="Modifier"
+            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+          >
+            <Pencil size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onDelete(employee)}
+            disabled={deletingId === employee.id}
+            aria-label="Supprimer"
+            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
+          >
+            <Trash2 size={16} />
+          </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <CategoryBadge category={employee.category} />
+        <select
+          value={employee.category_id || ''}
+          disabled={updatingCategoryId === employee.id}
+          onChange={(e) => onCategoryChange(e, employee)}
+          className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Sans dossier</option>
+          {categories.map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+      </div>
+    </div>
+  );
+}
+
 export default function Employees() {
   const currentUser = useCurrentUser();
   const [employees, setEmployees] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [viewMode, setViewMode] = useState('folder');
+  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [editing, setEditing] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
   const { sorted: sortedEmployees, sortKey, direction, setSortKey, toggleSort } = useSort(
     employees,
     (employee, key) => employee[key],
@@ -142,8 +245,12 @@ export default function Employees() {
     setLoading(true);
     setError('');
     try {
-      const { data } = await api.get('/employees');
-      setEmployees(data);
+      const [employeesRes, categoriesRes] = await Promise.all([
+        api.get('/employees'),
+        api.get('/module-categories', { params: { resource_type: 'employee' } }),
+      ]);
+      setEmployees(employeesRes.data);
+      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger le personnel.');
     } finally {
@@ -159,6 +266,15 @@ export default function Employees() {
 
   if (currentUser && currentUser.role !== 'admin') {
     return <Navigate to="/" replace />;
+  }
+
+  function toggleFolder(key) {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
   }
 
   function handleCreated(employee) {
@@ -184,6 +300,19 @@ export default function Employees() {
     }
   }
 
+  async function handleCategoryChange(event, employee) {
+    const categoryId = event.target.value || null;
+    setUpdatingCategoryId(employee.id);
+    try {
+      const { data } = await api.patch(`/employees/${employee.id}`, { category_id: categoryId });
+      setEmployees((prev) => prev.map((e) => (e.id === employee.id ? data : e)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de changer le dossier de cette personne.');
+    } finally {
+      setUpdatingCategoryId(null);
+    }
+  }
+
   async function handleDelete(employee) {
     if (!window.confirm(`Supprimer définitivement "${employee.full_name}" du personnel suivi ?`)) return;
 
@@ -198,6 +327,23 @@ export default function Employees() {
       setDeletingId(null);
     }
   }
+
+  const groupedByFolder = useMemo(() => {
+    const byCategory = new Map(categories.map((category) => [category.id, []]));
+    const unfiled = [];
+    for (const employee of sortedEmployees) {
+      if (employee.category_id && byCategory.has(employee.category_id)) byCategory.get(employee.category_id).push(employee);
+      else unfiled.push(employee);
+    }
+    const groups = categories
+      .map((category) => ({ key: category.id, category, employees: byCategory.get(category.id) || [] }))
+      .filter((group) => group.employees.length > 0);
+    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, employees: unfiled });
+    return groups;
+  }, [sortedEmployees, categories]);
+
+  const isFolderView = viewMode === 'folder';
+  const employeeGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, employees: sortedEmployees }];
 
   return (
     <div>
@@ -218,8 +364,43 @@ export default function Employees() {
         </button>
       </div>
 
+      {error && (
+        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+
       {employees.length > 0 && (
-        <div className="mt-4">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setViewMode('folder')}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Folder size={16} />
+              Par dossier
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('list')}
+              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <List size={16} />
+              Liste
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsManageCategoriesOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <FolderCog size={16} />
+              Gérer les dossiers
+            </button>
+          </div>
+
           <SortSelect
             options={EMPLOYEE_SORT_OPTIONS}
             sortKey={sortKey}
@@ -228,10 +409,6 @@ export default function Employees() {
             onToggleDirection={() => toggleSort(sortKey)}
           />
         </div>
-      )}
-
-      {error && (
-        <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
 
       {loading ? (
@@ -243,68 +420,58 @@ export default function Employees() {
       ) : employees.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune personne enregistrée pour l'instant.</p>
       ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {sortedEmployees.map((employee) => (
-            <div
-              key={employee.id}
-              className={`flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between ${
-                employee.is_active ? '' : 'opacity-60'
-              }`}
-            >
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-medium text-slate-900">{employee.full_name}</span>
-                  <span
-                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                      employee.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
-                    }`}
-                  >
-                    {employee.is_active ? <CheckCircle2 size={12} /> : <Ban size={12} />}
-                    {employee.is_active ? 'Actif' : 'Inactif'}
-                  </span>
+        <div className="mt-4 space-y-3">
+          {employeeGroups.map((group) => (
+            <div key={group.key}>
+              {isFolderView && (
+                <button
+                  type="button"
+                  onClick={() => toggleFolder(group.key)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm font-medium text-slate-700"
+                >
+                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
+                  {group.category ? group.category.name : 'Sans dossier'}
+                  <span className="font-normal text-slate-400">({group.employees.length})</span>
+                </button>
+              )}
+              {(!isFolderView || expandedFolders.has(group.key)) && (
+                <div className={`grid gap-3 sm:grid-cols-2 ${isFolderView ? 'mt-2' : ''}`}>
+                  {group.employees.map((employee) => (
+                    <EmployeeCard
+                      key={employee.id}
+                      employee={employee}
+                      categories={categories}
+                      updatingCategoryId={updatingCategoryId}
+                      togglingId={togglingId}
+                      deletingId={deletingId}
+                      onToggleActive={handleToggleActive}
+                      onEdit={setEditing}
+                      onDelete={handleDelete}
+                      onCategoryChange={handleCategoryChange}
+                    />
+                  ))}
                 </div>
-                {employee.email && <p className="mt-0.5 text-sm text-slate-500">{employee.email}</p>}
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleToggleActive(employee)}
-                  disabled={togglingId === employee.id}
-                  className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60 ${
-                    employee.is_active
-                      ? 'border border-slate-300 text-slate-700 hover:bg-slate-50'
-                      : 'bg-primary text-white hover:bg-primary-700'
-                  }`}
-                >
-                  <Ban size={14} />
-                  {employee.is_active ? 'Désactiver' : 'Réactiver'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditing(employee)}
-                  aria-label="Modifier"
-                  className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(employee)}
-                  disabled={deletingId === employee.id}
-                  aria-label="Supprimer"
-                  className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
-                >
-                  <Trash2 size={16} />
-                </button>
-              </div>
+              )}
             </div>
           ))}
         </div>
       )}
 
-      {isCreating && <EmployeeModal onClose={() => setIsCreating(false)} onSaved={handleCreated} />}
-      {editing && <EmployeeModal employee={editing} onClose={() => setEditing(null)} onSaved={handleUpdated} />}
+      {isCreating && <EmployeeModal categories={categories} onClose={() => setIsCreating(false)} onSaved={handleCreated} />}
+      {editing && (
+        <EmployeeModal employee={editing} categories={categories} onClose={() => setEditing(null)} onSaved={handleUpdated} />
+      )}
+
+      {isManageCategoriesOpen && (
+        <ManageCategoriesModal
+          baseUrl="/module-categories"
+          resourceType="employee"
+          isAdmin
+          onClose={() => setIsManageCategoriesOpen(false)}
+          onChanged={loadEmployees}
+        />
+      )}
     </div>
   );
 }

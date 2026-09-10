@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Folder, FolderCog, List, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import { COMMUNICATION_SCOPE_LABELS } from '../lib/communicationPlanLabels.js';
 import CommunicationScopeBadge from '../components/CommunicationScopeBadge.jsx';
+import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 
 const PLAN_SORT_OPTIONS = [
   { key: 'subject', label: 'objet' },
@@ -18,7 +20,7 @@ function getPlanSortValue(item, key) {
   return item[key];
 }
 
-function ItemModal({ item, users, onClose, onSaved }) {
+function ItemModal({ item, users, categories, onClose, onSaved }) {
   const isNew = !item;
   const [form, setForm] = useState({
     subject: item?.subject || '',
@@ -28,6 +30,7 @@ function ItemModal({ item, users, onClose, onSaved }) {
     channel: item?.channel || '',
     responsible_user_id: item?.responsible_user_id || '',
     notes: item?.notes || '',
+    category_id: item?.category_id || '',
     is_active: item?.is_active ?? true,
   });
   const [error, setError] = useState('');
@@ -50,6 +53,7 @@ function ItemModal({ item, users, onClose, onSaved }) {
       channel: form.channel,
       responsible_user_id: form.responsible_user_id || (isNew ? undefined : null),
       notes: form.notes || (isNew ? undefined : null),
+      category_id: form.category_id || (isNew ? undefined : null),
     };
     if (!isNew) payload.is_active = form.is_active;
 
@@ -164,6 +168,22 @@ function ItemModal({ item, users, onClose, onSaved }) {
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Dossier</label>
+            <select
+              value={form.category_id}
+              onChange={(e) => updateField('category_id', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Sans dossier</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Précisions (optionnel)</label>
             <AutoTextarea
               rows={2}
@@ -198,26 +218,114 @@ function ItemModal({ item, users, onClose, onSaved }) {
   );
 }
 
+function ItemCard({ item, isAdmin, categories, updatingCategoryId, onEdit, onDelete, onCategoryChange }) {
+  return (
+    <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${item.is_active ? '' : 'opacity-60'}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="font-medium text-slate-900">{item.subject}</p>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <CommunicationScopeBadge scope={item.scope} />
+            {!item.is_active && (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Inactive</span>
+            )}
+          </div>
+        </div>
+        {isAdmin && (
+          <div className="flex shrink-0 items-center gap-1">
+            <button
+              type="button"
+              onClick={() => onEdit(item)}
+              aria-label="Modifier"
+              className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+            >
+              <Pencil size={15} />
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(item)}
+              aria-label="Supprimer"
+              className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
+        <div>
+          <dt className="text-xs text-slate-500">Public</dt>
+          <dd className="text-slate-800">{item.audience}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-500">Fréquence</dt>
+          <dd className="text-slate-800">{item.timing}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-500">Canal</dt>
+          <dd className="text-slate-800">{item.channel}</dd>
+        </div>
+        <div>
+          <dt className="text-xs text-slate-500">Responsable</dt>
+          <dd className="text-slate-800">{item.responsible?.full_name || '—'}</dd>
+        </div>
+      </dl>
+
+      {item.notes && <p className="mt-2 text-xs text-slate-500">{item.notes}</p>}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <CategoryBadge category={item.category} />
+        {isAdmin && (
+          <select
+            value={item.category_id || ''}
+            disabled={updatingCategoryId === item.id}
+            onChange={(e) => onCategoryChange(e, item)}
+            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          >
+            <option value="">Sans dossier</option>
+            {categories.map((category) => (
+              <option key={category.id} value={category.id}>
+                {category.name}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function CommunicationPlan() {
   const currentUser = useCurrentUser();
   const isAdmin = currentUser?.role === 'admin';
   const [items, setItems] = useState([]);
   const [users, setUsers] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [scopeFilter, setScopeFilter] = useState('');
   const [showInactive, setShowInactive] = useState(true);
+  const [viewMode, setViewMode] = useState('folder');
+  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [modalItem, setModalItem] = useState(null); // { } for new, item object for edit
+  const [modalItem, setModalItem] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
 
   async function loadData() {
     setLoading(true);
     setError('');
     try {
-      const [itemsRes, usersRes] = await Promise.all([api.get('/communication-plan'), api.get('/users')]);
+      const [itemsRes, usersRes, categoriesRes] = await Promise.all([
+        api.get('/communication-plan'),
+        api.get('/users'),
+        api.get('/module-categories', { params: { resource_type: 'communication_plan' } }),
+      ]);
       setItems(itemsRes.data);
       setUsers(usersRes.data);
+      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger le plan de communication.');
     } finally {
@@ -229,6 +337,15 @@ export default function CommunicationPlan() {
     loadData();
   }, []);
 
+  function toggleFolder(key) {
+    setExpandedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
   async function handleDelete(item) {
     if (!window.confirm(`Supprimer définitivement la ligne "${item.subject}" ?`)) return;
     try {
@@ -239,12 +356,35 @@ export default function CommunicationPlan() {
     }
   }
 
+  async function handleCategoryChange(event, item) {
+    const categoryId = event.target.value || null;
+    setUpdatingCategoryId(item.id);
+    try {
+      const { data } = await api.patch(`/communication-plan/${item.id}`, { category_id: categoryId });
+      setItems((prev) => prev.map((i) => (i.id === item.id ? data : i)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de changer le dossier de cette ligne.');
+    } finally {
+      setUpdatingCategoryId(null);
+    }
+  }
+
   function handleSaved(saved) {
     setItems((prev) => {
       const exists = prev.some((i) => i.id === saved.id);
       return exists ? prev.map((i) => (i.id === saved.id ? saved : i)) : [...prev, saved];
     });
     setModalOpen(false);
+  }
+
+  function openNew() {
+    setModalItem(null);
+    setModalOpen(true);
+  }
+
+  function openEdit(item) {
+    setModalItem(item);
+    setModalOpen(true);
   }
 
   const filteredItems = useMemo(() => {
@@ -263,6 +403,23 @@ export default function CommunicationPlan() {
 
   const { sorted, sortKey, direction, setSortKey, toggleSort } = useSort(filteredItems, getPlanSortValue, 'scope', 'asc');
 
+  const groupedByFolder = useMemo(() => {
+    const byCategory = new Map(categories.map((category) => [category.id, []]));
+    const unfiled = [];
+    for (const item of sorted) {
+      if (item.category_id && byCategory.has(item.category_id)) byCategory.get(item.category_id).push(item);
+      else unfiled.push(item);
+    }
+    const groups = categories
+      .map((category) => ({ key: category.id, category, items: byCategory.get(category.id) || [] }))
+      .filter((group) => group.items.length > 0);
+    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, items: unfiled });
+    return groups;
+  }, [sorted, categories]);
+
+  const isFolderView = viewMode === 'folder';
+  const itemGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, items: sorted }];
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -270,10 +427,7 @@ export default function CommunicationPlan() {
         {isAdmin && (
           <button
             type="button"
-            onClick={() => {
-              setModalItem(null);
-              setModalOpen(true);
-            }}
+            onClick={openNew}
             className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
           >
             <Plus size={18} />
@@ -333,6 +487,42 @@ export default function CommunicationPlan() {
         />
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setViewMode('folder')}
+            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <Folder size={16} />
+            Par dossier
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode('list')}
+            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            <List size={16} />
+            Liste
+          </button>
+        </div>
+
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => setIsManageCategoriesOpen(true)}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+          >
+            <FolderCog size={16} />
+            Gérer les dossiers
+          </button>
+        )}
+      </div>
+
       {loading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
@@ -345,10 +535,7 @@ export default function CommunicationPlan() {
           {isAdmin && (
             <button
               type="button"
-              onClick={() => {
-                setModalItem(null);
-                setModalOpen(true);
-              }}
+              onClick={openNew}
               className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
             >
               <Plus size={18} />
@@ -359,74 +546,60 @@ export default function CommunicationPlan() {
       ) : sorted.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucune ligne ne correspond aux filtres.</p>
       ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          {sorted.map((item) => (
-            <div
-              key={item.id}
-              className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${item.is_active ? '' : 'opacity-60'}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="font-medium text-slate-900">{item.subject}</p>
-                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                    <CommunicationScopeBadge scope={item.scope} />
-                    {!item.is_active && (
-                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Inactive</span>
-                    )}
-                  </div>
+        <div className="mt-4 space-y-3">
+          {itemGroups.map((group) => (
+            <div key={group.key}>
+              {isFolderView && (
+                <button
+                  type="button"
+                  onClick={() => toggleFolder(group.key)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm font-medium text-slate-700"
+                >
+                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
+                  {group.category ? group.category.name : 'Sans dossier'}
+                  <span className="font-normal text-slate-400">({group.items.length})</span>
+                </button>
+              )}
+              {(!isFolderView || expandedFolders.has(group.key)) && (
+                <div className={`grid gap-3 sm:grid-cols-2 ${isFolderView ? 'mt-2' : ''}`}>
+                  {group.items.map((item) => (
+                    <ItemCard
+                      key={item.id}
+                      item={item}
+                      isAdmin={isAdmin}
+                      categories={categories}
+                      updatingCategoryId={updatingCategoryId}
+                      onEdit={openEdit}
+                      onDelete={handleDelete}
+                      onCategoryChange={handleCategoryChange}
+                    />
+                  ))}
                 </div>
-                {isAdmin && (
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setModalItem(item);
-                        setModalOpen(true);
-                      }}
-                      aria-label="Modifier"
-                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleDelete(item)}
-                      aria-label="Supprimer"
-                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
-                    >
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <dl className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 text-sm">
-                <div>
-                  <dt className="text-xs text-slate-500">Public</dt>
-                  <dd className="text-slate-800">{item.audience}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Fréquence</dt>
-                  <dd className="text-slate-800">{item.timing}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Canal</dt>
-                  <dd className="text-slate-800">{item.channel}</dd>
-                </div>
-                <div>
-                  <dt className="text-xs text-slate-500">Responsable</dt>
-                  <dd className="text-slate-800">{item.responsible?.full_name || '—'}</dd>
-                </div>
-              </dl>
-
-              {item.notes && <p className="mt-2 text-xs text-slate-500">{item.notes}</p>}
+              )}
             </div>
           ))}
         </div>
       )}
 
       {modalOpen && (
-        <ItemModal item={modalItem} users={users} onClose={() => setModalOpen(false)} onSaved={handleSaved} />
+        <ItemModal
+          item={modalItem}
+          users={users}
+          categories={categories}
+          onClose={() => setModalOpen(false)}
+          onSaved={handleSaved}
+        />
+      )}
+
+      {isManageCategoriesOpen && (
+        <ManageCategoriesModal
+          baseUrl="/module-categories"
+          resourceType="communication_plan"
+          isAdmin
+          onClose={() => setIsManageCategoriesOpen(false)}
+          onChanged={loadData}
+        />
       )}
     </div>
   );
