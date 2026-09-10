@@ -3502,7 +3502,7 @@ function ModulePresetModal({ folderId, onClose, onCreated, onCompareCreated }) {
                             <p className="mt-0.5 text-xs text-slate-500">{preset.description}</p>
                             {preset.target != null ? (
                               <p className="mt-0.5 text-xs text-slate-400">
-                                Objectif : {preset.target_direction === 'min' ? '≤' : '≥'} {preset.target}
+                                Objectif : {preset.target_direction === 'max' ? '≤' : '≥'} {preset.target}
                                 {preset.unit ? ` ${preset.unit}` : ''}
                               </p>
                             ) : null}
