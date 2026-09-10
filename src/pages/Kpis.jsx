@@ -2621,6 +2621,7 @@ function KpiCard({
   const hasEnoughForChart = chartData.length >= 2;
   const isImportBased = kpi.calculation_type === 'import';
   const isModuleBased = kpi.calculation_type === 'module';
+  const isSnapshot = isModuleBased && seriesConfigs[0]?.period_column === '__snapshot__';
   const isCountGrouped = seriesConfigs.length === 1 && seriesConfigs[0].calc_type === 'count_grouped';
   const canExportChart = isCountGrouped || hasEnoughForChart;
 
@@ -2718,6 +2719,11 @@ function KpiCard({
                 <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
                   <RefreshCw size={11} />
                   Auto — {MODULE_KPI_LABELS[kpi.source_module] || kpi.source_module}
+                </span>
+              )}
+              {isSnapshot && (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                  photo à date
                 </span>
               )}
             </div>
@@ -3417,8 +3423,19 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
                         <p className="text-sm font-medium text-slate-800">
                           {preset.label}
                           {preset.unit ? <span className="ml-1 font-normal text-slate-400">({preset.unit})</span> : null}
+                          {preset.snapshot ? (
+                            <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                              photo à date
+                            </span>
+                          ) : null}
                         </p>
                         <p className="mt-0.5 text-xs text-slate-500">{preset.description}</p>
+                        {preset.target != null ? (
+                          <p className="mt-0.5 text-xs text-slate-400">
+                            Objectif : {preset.target_direction === 'min' ? '≤' : '≥'} {preset.target}
+                            {preset.unit ? ` ${preset.unit}` : ''}
+                          </p>
+                        ) : null}
                       </div>
                       <button
                         type="button"
