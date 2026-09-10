@@ -2534,6 +2534,8 @@ const MODULE_KPI_LABELS = {
   audit: 'Audits',
   audit_finding: 'Constats d’audit',
   training_record: 'Formations',
+  competence: 'Formations',
+  competence_person: 'Formations',
 };
 
 function KpiCard({
