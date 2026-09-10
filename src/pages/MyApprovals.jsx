@@ -7,6 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import DecisionModal from '../components/DecisionModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const APPROVAL_SORT_OPTIONS = [
   { key: 'title', label: 'titre du document' },
@@ -76,6 +77,7 @@ export default function MyApprovals() {
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Mes approbations</h1>
+      <PageGuide id="my-approvals" />
 
       {items.length > 0 && (
         <div className="mt-4">

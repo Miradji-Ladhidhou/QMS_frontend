@@ -9,6 +9,7 @@ import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const PLAN_SORT_OPTIONS = [
   { key: 'subject', label: 'objet' },
@@ -436,10 +437,7 @@ export default function CommunicationPlan() {
         )}
       </div>
 
-      <p className="mt-2 text-sm text-slate-500">
-        Qui communique quoi, à qui, quand et par quel canal — communications internes et externes du système de management
-        (ISO 9001 §7.4).
-      </p>
+      <PageGuide id="communication-plan" />
 
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 

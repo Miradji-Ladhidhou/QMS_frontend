@@ -12,6 +12,7 @@ import FindingTypeBadge from '../components/FindingTypeBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -389,6 +390,7 @@ export default function AuditDetail() {
           )}
         </div>
       </div>
+      <PageGuide id="auditDetail" />
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 

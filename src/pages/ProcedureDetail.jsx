@@ -20,6 +20,7 @@ import LinkItemModal from '../components/LinkItemModal.jsx';
 import ProcedureAttachment from '../components/ProcedureAttachment.jsx';
 import ProcedureContentView from '../components/ProcedureContentView.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
 
@@ -614,6 +615,7 @@ export default function ProcedureDetail() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{procedure.title}</h1>
+            <PageGuide id="procedureDetail" />
             <p className="mt-1 text-sm text-slate-500">
               {procedure.number} · {procedure.process || 'Processus non précisé'}
             </p>

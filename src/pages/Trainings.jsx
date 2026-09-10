@@ -35,6 +35,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -1518,6 +1519,7 @@ export default function Trainings() {
           </button>
         </div>
       </div>
+      <PageGuide id="trainings" />
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Formations" value={trainings.length} accent="text-slate-900" />

@@ -15,6 +15,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import LinkItemModal from '../components/LinkItemModal.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
 // un <select>, seul moyen simple de distinguer "non vérifiée" d'un false explicite.
@@ -522,6 +523,7 @@ export default function CapaDetail() {
       <div className={`rounded-xl border bg-white p-5 sm:p-6 ${capa.status === 'overdue' ? 'border-red-300' : 'border-slate-200'}`}>
         <div>
           <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{capa.title}</h1>
+          <PageGuide id="capaDetail" />
           <p className="mt-1 text-sm text-slate-500">{capa.number}</p>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <CapaPriorityBadge priority={capa.priority} />

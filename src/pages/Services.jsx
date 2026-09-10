@@ -5,6 +5,7 @@ import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import SortSelect from '../components/SortSelect.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const SERVICE_SORT_OPTIONS = [
   { key: 'name', label: 'nom' },
@@ -366,6 +367,7 @@ export default function Services() {
           Nouveau service
         </button>
       </div>
+      <PageGuide id="services" />
 
       {services.length > 0 && (
         <div className="mt-4">

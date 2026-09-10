@@ -29,6 +29,7 @@ import DocumentPreviewModal from '../components/DocumentPreviewModal.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 
 const AUDIT_ACTION_LABELS = {
@@ -704,6 +705,7 @@ export default function DocumentDetail() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{doc.title}</h1>
+            <PageGuide id="documentDetail" />
             <p className="mt-1 text-sm text-slate-500">
               {doc.number} · v{doc.version}
             </p>

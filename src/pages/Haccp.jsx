@@ -30,6 +30,7 @@ import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const PLAN_SORT_OPTIONS = [
   { key: 'title', label: 'titre' },
@@ -529,6 +530,7 @@ export default function Haccp() {
           )}
         </div>
       </div>
+      <PageGuide id="haccp" />
 
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       {exportPdfError && (

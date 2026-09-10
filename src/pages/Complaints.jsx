@@ -21,6 +21,7 @@ import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -585,6 +586,7 @@ export default function Complaints() {
           </button>
         </div>
       </div>
+      <PageGuide id="complaints" />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <select

@@ -10,6 +10,7 @@ import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
+import PageGuide from '../components/PageGuide.jsx';
 
 // Mêmes noms de champs que qqoqccp_analyses (schema.sql) et que le corps attendu par
 // PATCH /api/qqoqccp/:id — voir backend/src/routes/qqoqccp.js.
@@ -691,6 +692,7 @@ export default function QqoqccpDetail() {
           )}
         </div>
       </div>
+      <PageGuide id="qqoqccpDetail" />
       {exportError && <p className="mt-2 text-sm text-red-600">{exportError}</p>}
       {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
 

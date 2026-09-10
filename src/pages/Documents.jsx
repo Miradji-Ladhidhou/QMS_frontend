@@ -21,6 +21,7 @@ import DocumentBulkMoveModal from '../components/DocumentBulkMoveModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
+import PageGuide from '../components/PageGuide.jsx';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -882,6 +883,7 @@ export default function Documents() {
           </button>
         </div>
       </div>
+      <PageGuide id="documents" />
       {tenant?.storage_provider === 'google_drive' && (
         <p className="mt-2 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
           <HardDrive size={16} className="shrink-0" />

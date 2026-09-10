@@ -32,6 +32,7 @@ import AiFullProcedureDraft from '../components/AiFullProcedureDraft.jsx';
 import NewProcedureFullDraftModal from '../components/NewProcedureFullDraftModal.jsx';
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
 
@@ -568,6 +569,7 @@ export default function Procedures() {
           </button>
         </div>
       </div>
+      <PageGuide id="procedures" />
 
       <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <input

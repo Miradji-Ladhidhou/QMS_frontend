@@ -28,6 +28,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import AiRiskSuggestion from '../components/AiRiskSuggestion.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -743,6 +744,7 @@ export default function Risks() {
           )}
         </div>
       </div>
+      <PageGuide id="risks" />
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>

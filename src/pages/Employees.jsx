@@ -7,6 +7,7 @@ import { useSort } from '../lib/useSort.js';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const EMPLOYEE_SORT_OPTIONS = [
   { key: 'full_name', label: 'nom' },
@@ -348,12 +349,7 @@ export default function Employees() {
   return (
     <div>
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Personnel</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Salariés suivis pour les formations sans avoir de compte QMS SaaS.
-          </p>
-        </div>
+        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Personnel</h1>
         <button
           type="button"
           onClick={() => setIsCreating(true)}
@@ -363,6 +359,7 @@ export default function Employees() {
           Nouvelle personne
         </button>
       </div>
+      <PageGuide id="employees" />
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>

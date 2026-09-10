@@ -37,6 +37,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const PRIORITY_RANK = Object.fromEntries(Object.keys(CAPA_PRIORITY_LABELS).map((key, i) => [key, i]));
 const STATUS_RANK = Object.fromEntries(Object.keys(CAPA_STATUS_LABELS).map((key, i) => [key, i]));
@@ -1100,6 +1101,7 @@ export default function Capas() {
           </button>
         </div>
       </div>
+      <PageGuide id="capas" />
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <CounterCard label="Ouvertes" value={counters.open} accent="text-blue-700" />

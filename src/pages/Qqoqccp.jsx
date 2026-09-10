@@ -16,6 +16,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -323,6 +324,7 @@ export default function Qqoqccp() {
           </button>
         </div>
       </div>
+      <PageGuide id="qqoqccp" />
 
       <div className="mt-4">
         <SortSelect

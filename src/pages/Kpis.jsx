@@ -60,6 +60,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
@@ -4026,6 +4027,7 @@ export default function Kpis() {
           </button>
         </div>
       </div>
+      <PageGuide id="kpis" />
 
       <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} />
 

@@ -14,6 +14,7 @@ import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AiHazardSuggestion from '../components/AiHazardSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 const FIELD_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -977,6 +978,7 @@ export default function HaccpDetail() {
           )}
         </div>
       </div>
+      <PageGuide id="haccpDetail" />
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
