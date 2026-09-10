@@ -3354,13 +3354,16 @@ function MoveKpiModal({ kpi, onClose, onMoved }) {
   );
 }
 
-// Catalogue des métriques de module prêtes à l'emploi (§9.1) — une par ligne, groupées par
-// module. « Créer » crée le KPI + sa recette + un premier calcul côté backend.
-function ModulePresetModal({ folderId, onClose, onCreated }) {
+// Catalogue des métriques de module prêtes à l'emploi (§9.1), groupées par module dans des
+// sections pliantes. « Créer » crée un KPI ; cocher plusieurs métriques puis « Créer et
+// comparer » les crée toutes et ouvre le graphique combiné (une courbe / couleur chacune).
+function ModulePresetModal({ folderId, onClose, onCreated, onCompareCreated }) {
   const [presets, setPresets] = useState(null);
   const [error, setError] = useState('');
   const [creatingId, setCreatingId] = useState(null);
   const [openModule, setOpenModule] = useState(null); // un seul module déplié à la fois
+  const [selected, setSelected] = useState([]); // ids de presets cochés
+  const [bulkCreating, setBulkCreating] = useState(false);
 
   useEffect(() => {
     api
@@ -3368,6 +3371,10 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
       .then(({ data }) => setPresets(data))
       .catch(() => setError('Impossible de charger le catalogue.'));
   }, []);
+
+  function toggle(id) {
+    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  }
 
   async function handleCreate(preset) {
     setCreatingId(preset.id);
@@ -3381,6 +3388,35 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
     }
   }
 
+  async function handleBulkCreateAndCompare() {
+    setBulkCreating(true);
+    setError('');
+    const createdKpis = [];
+    let failures = 0;
+    for (const presetId of selected) {
+      try {
+        const { data } = await api.post('/kpis/from-module-preset', {
+          preset_id: presetId,
+          folder_id: folderId || undefined,
+        });
+        createdKpis.push(data);
+      } catch {
+        failures += 1;
+      }
+    }
+    setBulkCreating(false);
+    if (createdKpis.length >= 2) {
+      onCompareCreated(createdKpis);
+    } else if (createdKpis.length === 1) {
+      onCreated();
+    } else {
+      setError('Aucun indicateur n’a pu être créé.');
+    }
+    if (failures > 0 && createdKpis.length > 0) {
+      setError(`${failures} indicateur(s) n’ont pas pu être créés — les autres sont prêts.`);
+    }
+  }
+
   const grouped = (presets || []).reduce((acc, p) => {
     (acc[p.module_label] ||= []).push(p);
     return acc;
@@ -3388,7 +3424,8 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+      <div className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-xl bg-white sm:max-w-2xl sm:rounded-xl">
+        <div className="overflow-y-auto overflow-x-hidden p-5 sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">KPI depuis un module</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -3398,7 +3435,7 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
 
         <p className="mb-4 text-sm text-slate-500">
           Suivi automatique de l'efficacité, calculé depuis les données du module choisi (ISO 9001 §9.1). Recalculé chaque
-          nuit et via le bouton « Actualiser ».
+          nuit et via le bouton « Actualiser ». Coche plusieurs métriques pour les tracer sur un graphique commun.
         </p>
 
         {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
@@ -3439,9 +3476,16 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
                       {items.map((preset) => (
                         <div
                           key={preset.id}
-                          className="flex items-start justify-between gap-3 rounded-md border border-slate-200 p-3"
+                          className="flex items-start gap-3 rounded-md border border-slate-200 p-3"
                         >
-                          <div className="min-w-0">
+                          <input
+                            type="checkbox"
+                            checked={selected.includes(preset.id)}
+                            onChange={() => toggle(preset.id)}
+                            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                            aria-label={`Sélectionner ${preset.label}`}
+                          />
+                          <div className="min-w-0 flex-1">
                             <p className="text-sm font-medium text-slate-800">
                               {preset.label}
                               {preset.unit ? (
@@ -3476,6 +3520,31 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
                 </div>
               );
             })}
+          </div>
+        )}
+        </div>
+
+        {selected.length > 0 && (
+          <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
+            <button
+              type="button"
+              onClick={() => setSelected([])}
+              className="text-xs font-medium text-slate-500 hover:text-slate-700"
+            >
+              {selected.length} sélectionné{selected.length > 1 ? 's' : ''} — effacer
+            </button>
+            <button
+              type="button"
+              onClick={handleBulkCreateAndCompare}
+              disabled={bulkCreating || selected.length < 2}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+            >
+              {bulkCreating
+                ? 'Création...'
+                : selected.length < 2
+                  ? 'Coche au moins 2 métriques'
+                  : `Créer et comparer (${selected.length})`}
+            </button>
           </div>
         )}
       </div>
@@ -3652,6 +3721,7 @@ export default function Kpis() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [directCompareKpis, setDirectCompareKpis] = useState(null); // KPI fraîchement créés à comparer
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [capaModal, setCapaModal] = useState(null); // le kpi pour lequel on crée une CAPA, ou null
   const [modulePresetOpen, setModulePresetOpen] = useState(false);
@@ -3673,6 +3743,12 @@ export default function Kpis() {
 
   function handlePresetCreated() {
     setModulePresetOpen(false);
+    loadKpis(currentFolderId);
+  }
+
+  function handlePresetCompareCreated(createdKpis) {
+    setModulePresetOpen(false);
+    setDirectCompareKpis(createdKpis);
     loadKpis(currentFolderId);
   }
 
@@ -4153,7 +4229,12 @@ export default function Kpis() {
       )}
 
       {modulePresetOpen && (
-        <ModulePresetModal folderId={currentFolderId} onClose={() => setModulePresetOpen(false)} onCreated={handlePresetCreated} />
+        <ModulePresetModal
+          folderId={currentFolderId}
+          onClose={() => setModulePresetOpen(false)}
+          onCreated={handlePresetCreated}
+          onCompareCreated={handlePresetCompareCreated}
+        />
       )}
 
       {compareOpen && selectedIds.length >= 2 && (
@@ -4161,6 +4242,10 @@ export default function Kpis() {
           kpis={kpis.filter((kpi) => selectedIds.includes(kpi.id))}
           onClose={() => setCompareOpen(false)}
         />
+      )}
+
+      {directCompareKpis && directCompareKpis.length >= 2 && (
+        <CompareChartModal kpis={directCompareKpis} onClose={() => setDirectCompareKpis(null)} />
       )}
     </div>
   );
