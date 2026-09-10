@@ -3033,7 +3033,7 @@ function KpiCard({
             <div className="mt-2">
               <RecordHistoryTable
                 kpi={kpi}
-                canManage={canManage}
+                canManage={canManage && !isModuleBased}
                 onEditRecord={(record) => onOpenRecordModal(kpi, record)}
                 onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
               />
