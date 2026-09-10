@@ -2537,6 +2537,11 @@ const MODULE_KPI_LABELS = {
   training_record: 'Formations',
   competence: 'Formations',
   competence_person: 'Formations',
+  risk: 'Risques',
+  supplier: 'Fournisseurs',
+  supplier_evaluation: 'Fournisseurs',
+  equipment: 'Étalonnage',
+  equipment_calibration: 'Étalonnage',
 };
 
 function KpiCard({
