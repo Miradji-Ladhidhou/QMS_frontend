@@ -1,4 +1,4 @@
-import { Cloud, Download, FileType, FolderInput, Loader2, Trash2, X } from 'lucide-react';
+import { Cloud, Download, FileType, FolderInput, GitCompare, Loader2, Trash2, X } from 'lucide-react';
 
 // Barre partagée par toutes les listes qui supportent des actions en masse. N'apparaît que si
 // au moins un élément est coché. Chaque action (déplacer, exporter, supprimer) est optionnelle
@@ -7,6 +7,7 @@ import { Cloud, Download, FileType, FolderInput, Loader2, Trash2, X } from 'luci
 export default function BulkSelectionBar({
   count,
   onMove,
+  onCompare,
   onExportCsv,
   exportingCsv,
   onExportPdf,
@@ -36,6 +37,16 @@ export default function BulkSelectionBar({
           >
             <FolderInput size={16} />
             Déplacer vers...
+          </button>
+        )}
+        {onCompare && (
+          <button
+            type="button"
+            onClick={onCompare}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <GitCompare size={16} />
+            Comparer sur un graphique
           </button>
         )}
         {onExportCsv && (

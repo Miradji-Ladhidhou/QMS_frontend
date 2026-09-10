@@ -3483,6 +3483,150 @@ function ModulePresetModal({ folderId, onClose, onCreated }) {
   );
 }
 
+// Superpose plusieurs KPI sélectionnés sur un même graphique. Unités identiques → valeurs
+// réelles sur un axe commun ; unités hétérogènes → « Base 100 » (chaque courbe indexée à 100
+// sur son premier point) pour rester lisible sans double axe. Vue éphémère : rien n'est
+// enregistré.
+function CompareChartModal({ kpis, onClose }) {
+  const series = kpis.slice(0, SERIES_COLORS.length).map((kpi, i) => {
+    const byPeriod = new Map();
+    (kpi.records || [])
+      .filter((r) => r.value !== null && r.value !== undefined)
+      .forEach((r) => {
+        const cur = byPeriod.get(r.period_date) || { sum: 0, n: 0 };
+        cur.sum += Number(r.value);
+        cur.n += 1;
+        byPeriod.set(r.period_date, cur);
+      });
+    const values = [...byPeriod.entries()]
+      .map(([period_date, { sum, n }]) => ({ period_date, value: sum / n }))
+      .sort((a, b) => (a.period_date > b.period_date ? 1 : -1));
+    return {
+      id: kpi.id,
+      name: kpi.name,
+      unit: kpi.unit || '',
+      color: SERIES_COLORS[i % SERIES_COLORS.length],
+      values,
+    };
+  });
+
+  const units = [...new Set(series.map((s) => s.unit))];
+  const sameUnit = units.length === 1;
+  const [indexed, setIndexed] = useState(!sameUnit);
+
+  const periods = [...new Set(series.flatMap((s) => s.values.map((v) => v.period_date)))].sort();
+  const data = periods.map((period_date) => {
+    const row = { period_date };
+    series.forEach((s) => {
+      const pt = s.values.find((v) => v.period_date === period_date);
+      if (!pt) return;
+      if (indexed) {
+        const base = s.values.find((v) => v.value !== 0)?.value;
+        row[s.id] = base ? Number(((pt.value / base) * 100).toFixed(1)) : null;
+      } else {
+        row[s.id] = pt.value;
+      }
+    });
+    return row;
+  });
+
+  const enoughData = data.length >= 2 && series.some((s) => s.values.length >= 2);
+  const frequency = kpis[0]?.frequency;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-3xl sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">
+            Comparer {series.length} indicateur{series.length > 1 ? 's' : ''}
+          </h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {kpis.length > SERIES_COLORS.length && (
+          <p className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            {kpis.length} sélectionnés — seuls les {SERIES_COLORS.length} premiers sont tracés.
+          </p>
+        )}
+
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIndexed(false)}
+            disabled={!sameUnit}
+            title={sameUnit ? '' : 'Unités différentes : indisponible'}
+            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+              !indexed ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Valeurs réelles
+          </button>
+          <button
+            type="button"
+            onClick={() => setIndexed(true)}
+            className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-colors ${
+              indexed ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            Base 100
+          </button>
+        </div>
+
+        {!sameUnit && (
+          <p className="mb-3 text-xs text-slate-400">
+            Unités différentes ({units.filter(Boolean).join(', ') || '—'}) : comparaison en base 100 (1ᵉʳ point = 100).
+          </p>
+        )}
+
+        {enoughData ? (
+          <div className="h-72 lg:h-80">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={data} margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
+                <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                <XAxis
+                  dataKey="period_date"
+                  tickFormatter={(d) => formatPeriodShort(d, frequency)}
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fill: MUTED_COLOR, fontSize: 11 }}
+                />
+                <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={44} />
+                <Tooltip
+                  labelFormatter={(l) => formatDate(l)}
+                  formatter={(val, id) => {
+                    const s = series.find((x) => x.id === id);
+                    return [indexed ? `${val} (base 100)` : `${val} ${s?.unit || ''}`.trim(), s?.name || id];
+                  }}
+                  contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+                />
+                <Legend wrapperStyle={{ fontSize: 11 }} formatter={(id) => series.find((x) => x.id === id)?.name || id} />
+                {series.map((s) => (
+                  <Line
+                    key={s.id}
+                    type="monotone"
+                    dataKey={s.id}
+                    stroke={s.color}
+                    strokeWidth={2}
+                    connectNulls
+                    dot={{ r: 3 }}
+                    activeDot={{ r: 6 }}
+                  />
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+        ) : (
+          <p className="py-12 text-center text-sm text-slate-500">
+            Pas assez de valeurs pour tracer une comparaison — il faut au moins 2 périodes.
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Kpis() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
@@ -3507,6 +3651,7 @@ export default function Kpis() {
   const [users, setUsers] = useState([]);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const [compareOpen, setCompareOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [capaModal, setCapaModal] = useState(null); // le kpi pour lequel on crée une CAPA, ou null
   const [modulePresetOpen, setModulePresetOpen] = useState(false);
@@ -3857,6 +4002,7 @@ export default function Kpis() {
             <BulkSelectionBar
               count={selectedIds.length}
               onMove={() => setIsBulkMoveModalOpen(true)}
+              onCompare={selectedIds.length >= 2 ? () => setCompareOpen(true) : undefined}
               onDelete={handleBulkDelete}
               onClear={() => setSelectedIds([])}
             />
@@ -4008,6 +4154,13 @@ export default function Kpis() {
 
       {modulePresetOpen && (
         <ModulePresetModal folderId={currentFolderId} onClose={() => setModulePresetOpen(false)} onCreated={handlePresetCreated} />
+      )}
+
+      {compareOpen && selectedIds.length >= 2 && (
+        <CompareChartModal
+          kpis={kpis.filter((kpi) => selectedIds.includes(kpi.id))}
+          onClose={() => setCompareOpen(false)}
+        />
       )}
     </div>
   );
