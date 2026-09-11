@@ -21,6 +21,7 @@ import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useTenant } from '../lib/useTenant.js';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { STATUS_LABELS as DOCUMENT_STATUS_LABELS } from '../lib/documentStatus.js';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import ApprovalStatusBadge from '../components/ApprovalStatusBadge.jsx';
 import DecisionModal from '../components/DecisionModal.jsx';
@@ -504,6 +505,7 @@ export default function DocumentDetail() {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
   const [acknowledgeError, setAcknowledgeError] = useState('');
+  const [statusError, setStatusError] = useState('');
 
   async function loadDocument() {
     setLoading(true);
@@ -613,6 +615,17 @@ export default function DocumentDetail() {
     }
   }
 
+  async function handleStatusChange(event) {
+    const status = event.target.value;
+    setStatusError('');
+    try {
+      const { data } = await api.patch(`/documents/${doc.id}/status`, { status });
+      setDoc((prev) => ({ ...prev, ...data }));
+    } catch (err) {
+      setStatusError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
+    }
+  }
+
   async function handleAcknowledge() {
     setAcknowledgeError('');
     setAcknowledging(true);
@@ -697,6 +710,9 @@ export default function DocumentDetail() {
       {deleteError && (
         <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{deleteError}</p>
       )}
+      {statusError && (
+        <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{statusError}</p>
+      )}
       {downloadError && (
         <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{downloadError}</p>
       )}
@@ -711,7 +727,21 @@ export default function DocumentDetail() {
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <CategoryBadge category={doc.category} />
-              <StatusBadge status={doc.status} />
+              {canManage ? (
+                <select
+                  value={doc.status}
+                  onChange={handleStatusChange}
+                  className="rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  {Object.entries(DOCUMENT_STATUS_LABELS).map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <StatusBadge status={doc.status} />
+              )}
               {doc.category?.is_restricted && (
                 <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                   <Lock size={12} />
