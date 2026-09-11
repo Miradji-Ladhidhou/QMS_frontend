@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SUPPLIER_STATUS_LABELS } from '../lib/supplierStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
@@ -12,8 +13,11 @@ import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -21,6 +25,9 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const SUPPLIER_RESOURCE_TYPE = 'supplier';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -44,7 +51,7 @@ function getSupplierSortValue(supplier, key) {
   }
 }
 
-function NewSupplierModal({ services, categories, onClose, onCreated }) {
+function NewSupplierModal({ services, onClose, onCreated }) {
   const [form, setForm] = useState({
     name: '',
     category: '',
@@ -54,6 +61,7 @@ function NewSupplierModal({ services, categories, onClose, onCreated }) {
     criticality: 'medium',
     service_id: '',
     category_id: '',
+    category_name: '',
     next_evaluation_date: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
@@ -198,9 +206,12 @@ function NewSupplierModal({ services, categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={SUPPLIER_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -234,7 +245,6 @@ export default function Suppliers() {
   const canManage = isManagerRole(currentUser?.role);
   const [suppliers, setSuppliers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -248,30 +258,26 @@ export default function Suppliers() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingSupplier, setMovingSupplier] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: SUPPLIER_RESOURCE_TYPE });
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, supplier) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(supplier.id);
+  async function handleMoveSupplier(folderId) {
+    const supplier = movingSupplier;
+    setMovingSupplier(null);
     try {
-      const { data } = await api.patch(`/suppliers/${supplier.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/suppliers/${supplier.id}`, { category_id: folderId || null });
       setSuppliers((prev) => prev.map((item) => (item.id === supplier.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de ce fournisseur.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -279,14 +285,12 @@ export default function Suppliers() {
     setLoading(true);
     setError('');
     try {
-      const [suppliersRes, servicesRes, categoriesRes] = await Promise.all([
+      const [suppliersRes, servicesRes] = await Promise.all([
         api.get('/suppliers', { params: statusFilter ? { status: statusFilter } : {} }),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'supplier' } }),
       ]);
       setSuppliers(suppliersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les fournisseurs.');
     } finally {
@@ -331,26 +335,14 @@ export default function Suppliers() {
     'asc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='supplier'), plus un dossier
-  // "Sans dossier" en dernier pour les fournisseurs non classés — jamais affiché s'il est vide.
-  // Reprend sortedSuppliers (déjà trié) pour que le mode dossier reste cohérent avec le mode
-  // liste, même principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const supplier of sortedSuppliers) {
-      if (supplier.category_id && byCategory.has(supplier.category_id)) byCategory.get(supplier.category_id).push(supplier);
-      else unfiled.push(supplier);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, suppliers: byCategory.get(category.id) || [] }))
-      .filter((group) => group.suppliers.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, suppliers: unfiled });
-    return groups;
-  }, [sortedSuppliers, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const supplierGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, suppliers: sortedSuppliers }];
+  // sortedSuppliers reste la liste COMPLÈTE (filtrée seulement par statut) : naviguer dans un
+  // dossier ne fait que choisir, côté affichage, quel sous-ensemble montrer — filtrage client
+  // de la liste déjà chargée, même principe que Risks.jsx. "Sans dossier" (racine) =
+  // category_id null.
+  const currentFolderSuppliers = useMemo(
+    () => sortedSuppliers.filter((supplier) => (supplier.category_id || null) === currentFolderId),
+    [sortedSuppliers, currentFolderId]
+  );
 
   function handleCreated(supplier) {
     setIsModalOpen(false);
@@ -580,28 +572,7 @@ export default function Suppliers() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les fournisseurs" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -617,7 +588,7 @@ export default function Suppliers() {
 
       {canManage && (
         <SelectAllToggle
-          ids={sortedSuppliers.map((supplier) => supplier.id)}
+          ids={currentFolderSuppliers.map((supplier) => supplier.id)}
           selectedIds={selectedIds}
           onChange={setSelectedIds}
         />
@@ -652,107 +623,108 @@ export default function Suppliers() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : suppliers.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucun fournisseur pour l'instant</p>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
-              <Plus size={18} />
-              Créer le premier fournisseur
-            </button>
-          )}
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {supplierGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.suppliers.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.suppliers.map((supplier) => (
-                    <div
-                      key={supplier.id}
-                      onClick={() => navigate(`/suppliers/${supplier.id}`)}
-                      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex min-w-0 items-center gap-3">
-                          {canManage && (
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(supplier.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={() => toggleSelect(supplier.id)}
-                              className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                            />
-                          )}
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-900">{supplier.name}</p>
-                            <p className="truncate text-sm text-slate-500">
-                              {supplier.next_evaluation_date
-                                ? `Prochaine évaluation le ${formatDate(supplier.next_evaluation_date)}`
-                                : 'Aucune évaluation planifiée'}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <CapaPriorityBadge priority={supplier.criticality} />
-                          <SupplierStatusBadge status={supplier.status} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CategoryBadge category={supplier.folder} />
-                        {canManage && (
-                          <select
-                            value={supplier.category_id || ''}
-                            disabled={updatingCategoryId === supplier.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, supplier)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            </div>
+          )}
+
+          {suppliers.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucun fournisseur pour l'instant</p>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                >
+                  <Plus size={18} />
+                  Créer le premier fournisseur
+                </button>
               )}
             </div>
-          ))}
-        </div>
+          ) : currentFolderSuppliers.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucun fournisseur directement dans ce dossier.' : 'Aucun fournisseur sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderSuppliers.map((supplier) => (
+                <div
+                  key={supplier.id}
+                  onClick={() => navigate(`/suppliers/${supplier.id}`)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      {canManage && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(supplier.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelect(supplier.id)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900">{supplier.name}</p>
+                        <p className="truncate text-sm text-slate-500">
+                          {supplier.next_evaluation_date
+                            ? `Prochaine évaluation le ${formatDate(supplier.next_evaluation_date)}`
+                            : 'Aucune évaluation planifiée'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <CapaPriorityBadge priority={supplier.criticality} />
+                      <SupplierStatusBadge status={supplier.status} />
+                    </div>
+                  </div>
+                  {canManage && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingSupplier(supplier);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
         <NewSupplierModal
           services={services}
-          categories={categories}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />
@@ -760,9 +732,9 @@ export default function Suppliers() {
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="supplier"
+          resourceType={SUPPLIER_RESOURCE_TYPE}
           endpoint="/suppliers/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -771,11 +743,37 @@ export default function Suppliers() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="supplier"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={SUPPLIER_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={SUPPLIER_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingSupplier && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={SUPPLIER_RESOURCE_TYPE}
+          initialFolderId={movingSupplier.category_id || null}
+          title="Déplacer"
+          subtitle={movingSupplier.name}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingSupplier(null)}
+          onSelect={handleMoveSupplier}
         />
       )}
     </div>

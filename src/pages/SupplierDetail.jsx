@@ -39,7 +39,7 @@ const SCORE_FIELDS = [
   { key: 'responsiveness_score', label: 'Réactivité' },
 ];
 
-function EditSupplierModal({ supplier, services, categories, onClose, onUpdated }) {
+function EditSupplierModal({ supplier, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     name: supplier.name,
     category: supplier.category || '',
@@ -50,6 +50,7 @@ function EditSupplierModal({ supplier, services, categories, onClose, onUpdated 
     status: supplier.status,
     service_id: supplier.service_id || '',
     category_id: supplier.category_id || '',
+    category_name: supplier.folder?.name || '',
     next_evaluation_date: supplier.next_evaluation_date || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(supplier.is_private_to_me));
@@ -76,11 +77,14 @@ function EditSupplierModal({ supplier, services, categories, onClose, onUpdated 
       }
     }
 
+    // eslint-disable-next-line no-unused-vars
+    const { category_name, ...formForApi } = form;
+
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence —
     // un bug dans le parent ne doit jamais se faire passer pour un échec de la modification.
     let data;
     try {
-      ({ data } = await api.patch(`/suppliers/${supplier.id}`, { ...form, category_id: categoryId }));
+      ({ data } = await api.patch(`/suppliers/${supplier.id}`, { ...formForApi, category_id: categoryId }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier ce fournisseur.');
       setSubmitting(false);
@@ -207,9 +211,12 @@ function EditSupplierModal({ supplier, services, categories, onClose, onUpdated 
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="supplier"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -456,7 +463,6 @@ export default function SupplierDetail() {
   const [supplier, setSupplier] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -494,10 +500,6 @@ export default function SupplierDetail() {
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
-      .catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'supplier' } })
-      .then(({ data }) => setCategories(data))
       .catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -714,7 +716,6 @@ export default function SupplierDetail() {
         <EditSupplierModal
           supplier={supplier}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setSupplier((prev) => ({ ...prev, ...data }));
