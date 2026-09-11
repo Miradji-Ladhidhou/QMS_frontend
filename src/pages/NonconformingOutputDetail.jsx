@@ -21,7 +21,7 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
 
-function EditOutputModal({ output, users, services, categories, onClose, onUpdated }) {
+function EditOutputModal({ output, users, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: output.title,
     description: output.description || '',
@@ -33,6 +33,7 @@ function EditOutputModal({ output, users, services, categories, onClose, onUpdat
     customer_informed: output.customer_informed,
     decided_by: output.decided_by || '',
     category_id: output.category_id || '',
+    category_name: output.category?.name || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(output.is_private_to_me));
   const [error, setError] = useState('');
@@ -220,9 +221,12 @@ function EditOutputModal({ output, users, services, categories, onClose, onUpdat
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="nonconforming_output"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -423,7 +427,6 @@ export default function NonconformingOutputDetail() {
   const [output, setOutput] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -447,10 +450,6 @@ export default function NonconformingOutputDetail() {
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
-      .catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'nonconforming_output' } })
-      .then(({ data }) => setCategories(data))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -610,7 +609,6 @@ export default function NonconformingOutputDetail() {
           output={output}
           users={users}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setOutput((prev) => ({ ...prev, ...data }));

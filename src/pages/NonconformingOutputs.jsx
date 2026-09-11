@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, Search, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { NONCONFORMING_OUTPUT_STATUS_LABELS, NONCONFORMING_OUTPUT_DISPOSITION_LABELS } from '../lib/nonconformingOutputStatus.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import NonconformingOutputStatusBadge from '../components/NonconformingOutputStatusBadge.jsx';
 import NonconformingOutputDispositionBadge from '../components/NonconformingOutputDispositionBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const OUTPUT_RESOURCE_TYPE = 'nonconforming_output';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -37,7 +44,7 @@ function getOutputSortValue(output, key) {
 // Modale de création — ouverte à tous les rôles côté backend (POST /nonconforming-outputs) :
 // n'importe qui doit pouvoir signaler une non-conformité produit/service constatée, même
 // principe que Accidents.jsx.
-function NewOutputModal({ services, categories, onClose, onCreated }) {
+function NewOutputModal({ services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -46,6 +53,7 @@ function NewOutputModal({ services, categories, onClose, onCreated }) {
     disposition: 'correction',
     customer_informed: false,
     category_id: '',
+    category_name: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -186,9 +194,12 @@ function NewOutputModal({ services, categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={OUTPUT_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -212,7 +223,6 @@ export default function NonconformingOutputs() {
   const canManage = isManagerRole(currentUser?.role);
   const [outputs, setOutputs] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -220,35 +230,30 @@ export default function NonconformingOutputs() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingOutput, setMovingOutput] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: OUTPUT_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
-  async function handleCategoryChange(event, output) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(output.id);
+  async function handleMoveOutput(folderId) {
+    const output = movingOutput;
+    setMovingOutput(null);
     try {
-      const { data } = await api.patch(`/nonconforming-outputs/${output.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/nonconforming-outputs/${output.id}`, { category_id: folderId || null });
       setOutputs((prev) => prev.map((item) => (item.id === output.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cette non-conformité.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -277,14 +282,12 @@ export default function NonconformingOutputs() {
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
-      const [outputsRes, servicesRes, categoriesRes] = await Promise.all([
+      const [outputsRes, servicesRes] = await Promise.all([
         api.get('/nonconforming-outputs', { params }),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'nonconforming_output' } }),
       ]);
       setOutputs(outputsRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger le registre des non-conformités produit/service.');
     } finally {
@@ -312,27 +315,17 @@ export default function NonconformingOutputs() {
     'desc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='nonconforming_output'), plus un
-  // dossier "Sans dossier" en dernier — même principe que Accidents.jsx/Risks.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const output of sortedOutputs) {
-      if (output.category_id && byCategory.has(output.category_id)) byCategory.get(output.category_id).push(output);
-      else unfiled.push(output);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, outputs: byCategory.get(category.id) || [] }))
-      .filter((group) => group.outputs.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, outputs: unfiled });
-    return groups;
-  }, [sortedOutputs, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const outputGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, outputs: sortedOutputs }];
+  // sortedOutputs reste la liste COMPLÈTE (recherche + tri) : naviguer dans un dossier ne fait
+  // que choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderOutputs = useMemo(
+    () => sortedOutputs.filter((output) => (output.category_id || null) === currentFolderId),
+    [sortedOutputs, currentFolderId]
+  );
   // Miroir de DELETE /nonconforming-outputs/:id côté backend : admin/manager uniquement, sans
   // restriction créateur (contrairement à accidents.js) — voir le plan approuvé.
-  const deletableIds = canManage ? sortedOutputs.map((output) => output.id) : [];
+  const deletableIds = canManage ? currentFolderOutputs.map((output) => output.id) : [];
 
   function handleCreated(output) {
     setIsModalOpen(false);
@@ -391,28 +384,7 @@ export default function NonconformingOutputs() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les non-conformités" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -437,110 +409,112 @@ export default function NonconformingOutputs() {
         />
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : outputs.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucune non-conformité produit/service enregistrée pour l'instant</p>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          >
-            <Plus size={18} />
-            Signaler la première non-conformité
-          </button>
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {outputGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.outputs.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.outputs.map((output) => (
-                    <div
-                      key={output.id}
-                      onClick={() => navigate(`/nonconforming-outputs/${output.id}`)}
-                      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        {canManage && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(output.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleSelect(output.id)}
-                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-900">{output.title}</p>
-                          <p className="truncate text-sm text-slate-500">
-                            {formatDate(output.detected_at)}
-                            {output.service?.name ? ` · ${output.service.name}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <NonconformingOutputDispositionBadge disposition={output.disposition} />
-                          <NonconformingOutputStatusBadge status={output.status} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CategoryBadge category={output.category} />
-                        {output.customer_informed && (
-                          <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Client informé</span>
-                        )}
-                        {canManage && (
-                          <select
-                            value={output.category_id || ''}
-                            disabled={updatingCategoryId === output.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, output)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
+          )}
+
+          {outputs.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucune non-conformité produit/service enregistrée pour l'instant</p>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Plus size={18} />
+                Signaler la première non-conformité
+              </button>
+            </div>
+          ) : currentFolderOutputs.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune non-conformité directement dans ce dossier.' : 'Aucune non-conformité sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderOutputs.map((output) => (
+                <div
+                  key={output.id}
+                  onClick={() => navigate(`/nonconforming-outputs/${output.id}`)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(output.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(output.id)}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{output.title}</p>
+                      <p className="truncate text-sm text-slate-500">
+                        {formatDate(output.detected_at)}
+                        {output.service?.name ? ` · ${output.service.name}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <NonconformingOutputDispositionBadge disposition={output.disposition} />
+                      <NonconformingOutputStatusBadge status={output.status} />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {output.customer_informed && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Client informé</span>
+                    )}
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingOutput(output);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
-        <NewOutputModal services={services} categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewOutputModal services={services} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
       )}
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="nonconforming_output"
+          resourceType={OUTPUT_RESOURCE_TYPE}
           endpoint="/nonconforming-outputs/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -549,11 +523,37 @@ export default function NonconformingOutputs() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="nonconforming_output"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={OUTPUT_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={OUTPUT_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingOutput && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={OUTPUT_RESOURCE_TYPE}
+          initialFolderId={movingOutput.category_id || null}
+          title="Déplacer"
+          subtitle={movingOutput.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingOutput(null)}
+          onSelect={handleMoveOutput}
         />
       )}
     </div>
