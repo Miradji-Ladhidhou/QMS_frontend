@@ -23,7 +23,7 @@ const DEFAULT_FORM = { name: '', color: DEFAULT_COLOR, is_restricted: false };
 // créé/assigné/partagé. Le choix "ouvert" n'a donc plus aucun effet distinct de "restreint
 // sans permission accordée" : on retire la bascule et chaque dossier de ces deux modules est
 // systématiquement un groupe de permission, jamais un simple rangement sans conséquence.
-const ALWAYS_RESTRICTED_RESOURCE_TYPES = ['capa', 'complaint'];
+export const ALWAYS_RESTRICTED_RESOURCE_TYPES = ['capa', 'complaint'];
 
 export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, onChanged }) {
   const alwaysRestricted = ALWAYS_RESTRICTED_RESOURCE_TYPES.includes(resourceType);

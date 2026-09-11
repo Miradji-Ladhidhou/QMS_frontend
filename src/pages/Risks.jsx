@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderCog, FolderInput, Plus, Sparkles, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -22,6 +22,7 @@ import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import FolderTile from '../components/FolderTile.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
 import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
@@ -412,6 +413,7 @@ export default function Risks() {
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isAnalyzeModalOpen, setIsAnalyzeModalOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingRisk, setMovingRisk] = useState(null);
   const {
     currentFolderId,
@@ -848,11 +850,21 @@ export default function Risks() {
         </div>
       ) : (
         <>
-          {folders.length > 0 && (
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
               {folders.map((folder) => (
                 <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
               ))}
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -958,6 +970,19 @@ export default function Risks() {
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
           onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={RISK_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
         />
       )}
 
