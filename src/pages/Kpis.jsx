@@ -2533,7 +2533,7 @@ const MODULE_KPI_LABELS = {
   accident: 'Accidents',
   customer_satisfaction: 'Satisfaction client',
   audit: 'Audits',
-  audit_finding: 'Constats d’audit',
+  audit_finding: 'Audits internes',
   training_record: 'Formations',
   competence: 'Formations',
   competence_person: 'Formations',
