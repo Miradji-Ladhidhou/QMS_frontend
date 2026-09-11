@@ -8,7 +8,6 @@ import {
   ClipboardList,
   Contact,
   FileCheck,
-  FileSignature,
   FileText,
   GraduationCap,
   HelpCircle,
@@ -105,12 +104,6 @@ export const NAV_ITEMS = [
     to: '/nonconforming-outputs',
     label: 'Non-conformités produit/service',
     icon: PackageX,
-  },
-  {
-    key: 'order-reviews',
-    to: '/order-reviews',
-    label: 'Revue des exigences avant engagement',
-    icon: FileSignature,
   },
   {
     key: 'qms-changes',

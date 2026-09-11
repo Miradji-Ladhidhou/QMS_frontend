@@ -35,7 +35,7 @@ function getChangeSortValue(change, key) {
 
 // Modale de création — ouverte à tous les rôles côté backend (POST /qms-changes) :
 // identifier le besoin d'une modification du SMQ n'est pas réservé au management, même
-// principe que OrderReviews.jsx/Accidents.jsx.
+// principe qu'Accidents.jsx.
 function NewChangeModal({ services, categories, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
@@ -291,7 +291,7 @@ export default function QmsChanges() {
   );
 
   // Un dossier par catégorie (module_categories, resource_type='qms_change'), plus un dossier
-  // "Sans dossier" en dernier — même principe que OrderReviews.jsx/Accidents.jsx.
+  // "Sans dossier" en dernier — même principe qu'Accidents.jsx.
   const groupedByFolder = useMemo(() => {
     const byCategory = new Map(categories.map((category) => [category.id, []]));
     const unfiled = [];
@@ -309,7 +309,7 @@ export default function QmsChanges() {
   const isFolderView = viewMode === 'folder';
   const changeGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, changes: sortedChanges }];
   // Miroir de DELETE /qms-changes/:id côté backend : admin/manager uniquement, sans
-  // restriction créateur (même choix que order_reviews.js/nonconforming_outputs.js).
+  // restriction créateur (même choix que nonconforming_outputs.js).
   const deletableIds = canManage ? sortedChanges.map((change) => change.id) : [];
 
   function handleCreated(change) {

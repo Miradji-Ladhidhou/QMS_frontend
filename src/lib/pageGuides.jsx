@@ -186,17 +186,6 @@ export const PAGE_GUIDES = {
     example:
       "50 pièces usinées hors tolérance détectées au contrôle final → décision : tri à 100 % → 12 rebutées, 38 reprises.",
   },
-  'order-reviews': {
-    title: "Vérifier avant de s'engager",
-    body: (
-      <p>
-        Avant d'accepter une commande ou un devis : s'assurer que les exigences sont <strong>comprises</strong>, qu'on a
-        la <strong>capacité de livrer</strong> et que les écarts éventuels sont traités.
-      </p>
-    ),
-    example:
-      "devis pour 10 000 pièces en 3 semaines → capacité machine ? matière disponible ? tolérances tenables ? → on valide avant de signer.",
-  },
   'qms-changes': {
     title: 'Modifier le système de façon maîtrisée',
     body: (
@@ -325,16 +314,6 @@ export const PAGE_GUIDES = {
       </p>
     ),
     example: "lot de 200 pièces avec un défaut d'aspect → disposition « dérogation acceptée par le client » → clôture.",
-  },
-  orderReviewDetail: {
-    title: 'Revue avant engagement',
-    body: (
-      <p>
-        Statuez <strong>Accepté</strong> ou <strong>Rejeté</strong> une fois les exigences vérifiées. Si vous changez
-        d'avis, la date de décision se met à jour.
-      </p>
-    ),
-    example: "commande vérifiée (délai, capacité, tolérances) → « Accepté » → la date d'acceptation est enregistrée.",
   },
   qmsChangeDetail: {
     title: "Cycle d'une modification",
