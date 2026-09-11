@@ -10,7 +10,6 @@ import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
 import ProcedureTemplateSettings from '../components/ProcedureTemplateSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import QualityPolicySettings from '../components/QualityPolicySettings.jsx';
-import QmsContextSettings from '../components/QmsContextSettings.jsx';
 import Groups from './Groups.jsx';
 
 // Groupé par intention plutôt qu'en une seule rangée d'onglets à défiler (10 onglets à plat,
@@ -33,7 +32,6 @@ const TAB_GROUPS = [
       // monde (§5.2, "communiquée, comprise") — seule sa révision est réservée admin, gérée
       // à l'intérieur du composant lui-même (voir QualityPolicySettings.jsx).
       { id: 'quality-policy', label: 'Politique qualité' },
-      { id: 'qms-context', label: 'Contexte du SMQ' },
       { id: 'users', label: 'Utilisateurs' },
       { id: 'groups', label: 'Groupes', adminOnly: true },
       { id: 'visibility', label: 'Visibilité', adminOnly: true },
@@ -116,7 +114,6 @@ export default function Settings() {
       <div className="mt-4">
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
         {activeTab === 'quality-policy' && <QualityPolicySettings isAdmin={isAdmin} />}
-        {activeTab === 'qms-context' && <QmsContextSettings isAdmin={isAdmin} />}
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
         {activeTab === 'capa' && isAdmin && <CapaDelaysSettings />}
