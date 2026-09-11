@@ -175,17 +175,6 @@ export const PAGE_GUIDES = {
     example:
       "projet « réduire les rebuts de 30 % » : Plan (analyse + objectif) → Do (nouveau réglage) → Check (mesure sur 1 mois) → Act (on standardise ou on ajuste).",
   },
-  'measuring-equipment': {
-    title: "Suivi d'étalonnage des équipements de mesure",
-    body: (
-      <p>
-        Inventaire des équipements de mesure et de contrôle, avec la <strong>périodicité</strong> de vérification /
-        étalonnage, les certificats et le statut (à jour / bientôt / dépassé).
-      </p>
-    ),
-    example:
-      "pied à coulisse n°12, étalonnage annuel, dernier certificat en janvier → prochain en janvier prochain ; un mois avant, il passe en « bientôt ».",
-  },
   'nonconforming-outputs': {
     title: 'Produits / services non conformes',
     body: (
@@ -426,16 +415,6 @@ export const PAGE_GUIDES = {
       </p>
     ),
     example: "CCP « cuisson à cœur ≥ 72 °C » → relevé à chaque fournée → si 68 °C : recuisson et blocage du lot.",
-  },
-  measuringEquipmentDetail: {
-    title: "Suivi d'un équipement",
-    body: (
-      <p>
-        Renseignez la <strong>périodicité</strong> d'étalonnage / vérification : la prochaine échéance et le statut
-        (à jour / bientôt / dépassé) en découlent. Joignez les certificats.
-      </p>
-    ),
-    example: "balance de laboratoire, vérification semestrielle, dernier contrôle le 1ᵉʳ mars → prochaine échéance le 1ᵉʳ septembre.",
   },
   qqoqccpDetail: {
     title: "Remplir l'analyse",

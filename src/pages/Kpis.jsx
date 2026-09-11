@@ -2540,8 +2540,6 @@ const MODULE_KPI_LABELS = {
   risk: 'Risques',
   supplier: 'Fournisseurs',
   supplier_evaluation: 'Fournisseurs',
-  equipment: 'Étalonnage',
-  equipment_calibration: 'Étalonnage',
   document: 'Documents',
   haccp_hazard: 'HACCP',
   haccp_monitoring: 'HACCP',

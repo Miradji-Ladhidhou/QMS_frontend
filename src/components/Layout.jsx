@@ -26,7 +26,6 @@ import {
   Siren,
   Smile,
   CalendarClock,
-  Gauge,
   Thermometer,
   Truck,
   Users2,
@@ -101,7 +100,6 @@ export const NAV_ITEMS = [
   { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck },
   { key: 'accidents', to: '/accidents', label: 'Accidents du travail', icon: Siren },
   { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw },
-  { key: 'measuring-equipment', to: '/measuring-equipment', label: 'Étalonnage', icon: Gauge },
   {
     key: 'nonconforming-outputs',
     to: '/nonconforming-outputs',
