@@ -18,7 +18,7 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
 
-function EditSurveyModal({ survey, services, categories, onClose, onUpdated }) {
+function EditSurveyModal({ survey, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     customer_name: survey.customer_name,
     survey_date: survey.survey_date,
@@ -27,6 +27,7 @@ function EditSurveyModal({ survey, services, categories, onClose, onUpdated }) {
     comments: survey.comments || '',
     service_id: survey.service_id || '',
     category_id: survey.category_id || '',
+    category_name: survey.category?.name || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(survey.is_private_to_me));
   const [error, setError] = useState('');
@@ -167,9 +168,12 @@ function EditSurveyModal({ survey, services, categories, onClose, onUpdated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="customer_satisfaction"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -370,7 +374,6 @@ export default function CustomerSatisfactionDetail() {
   const [survey, setSurvey] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -394,10 +397,6 @@ export default function CustomerSatisfactionDetail() {
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
-      .catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'customer_satisfaction' } })
-      .then(({ data }) => setCategories(data))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -516,7 +515,6 @@ export default function CustomerSatisfactionDetail() {
         <EditSurveyModal
           survey={survey}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setSurvey((prev) => ({ ...prev, ...data }));

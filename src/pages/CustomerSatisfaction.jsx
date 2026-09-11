@@ -1,23 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, Search, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { SATISFACTION_METHOD_LABELS } from '../lib/customerSatisfactionStatus.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SatisfactionMethodBadge from '../components/SatisfactionMethodBadge.jsx';
 import SatisfactionScoreBadge from '../components/SatisfactionScoreBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const SURVEY_RESOURCE_TYPE = 'customer_satisfaction';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -37,7 +44,7 @@ function getSurveySortValue(survey, key) {
 // Modale de création — ouverte à tous les rôles côté backend (POST /customer-satisfaction) :
 // n'importe qui en contact avec le client peut consigner une enquête, même principe que
 // Accidents.jsx/NonconformingOutputs.jsx.
-function NewSurveyModal({ services, categories, onClose, onCreated }) {
+function NewSurveyModal({ services, onClose, onCreated }) {
   const [form, setForm] = useState({
     customer_name: '',
     survey_date: new Date().toISOString().slice(0, 10),
@@ -46,6 +53,7 @@ function NewSurveyModal({ services, categories, onClose, onCreated }) {
     comments: '',
     service_id: '',
     category_id: '',
+    category_name: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -188,9 +196,12 @@ function NewSurveyModal({ services, categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={SURVEY_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -213,7 +224,6 @@ export default function CustomerSatisfaction() {
   const canManage = isManagerRole(currentUser?.role);
   const [surveys, setSurveys] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [methodFilter, setMethodFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -221,34 +231,30 @@ export default function CustomerSatisfaction() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingSurvey, setMovingSurvey] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: SURVEY_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, survey) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(survey.id);
+  async function handleMoveSurvey(folderId) {
+    const survey = movingSurvey;
+    setMovingSurvey(null);
     try {
-      const { data } = await api.patch(`/customer-satisfaction/${survey.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/customer-satisfaction/${survey.id}`, { category_id: folderId || null });
       setSurveys((prev) => prev.map((item) => (item.id === survey.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cette enquête.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -277,14 +283,12 @@ export default function CustomerSatisfaction() {
     try {
       const params = {};
       if (methodFilter) params.method = methodFilter;
-      const [surveysRes, servicesRes, categoriesRes] = await Promise.all([
+      const [surveysRes, servicesRes] = await Promise.all([
         api.get('/customer-satisfaction', { params }),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'customer_satisfaction' } }),
       ]);
       setSurveys(surveysRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger le registre des enquêtes de satisfaction.');
     } finally {
@@ -320,26 +324,16 @@ export default function CustomerSatisfaction() {
     return (sum / sortedSurveys.length).toFixed(1);
   }, [sortedSurveys]);
 
-  // Un dossier par catégorie (module_categories, resource_type='customer_satisfaction'), plus
-  // un dossier "Sans dossier" en dernier — même principe que NonconformingOutputs.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const survey of sortedSurveys) {
-      if (survey.category_id && byCategory.has(survey.category_id)) byCategory.get(survey.category_id).push(survey);
-      else unfiled.push(survey);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, surveys: byCategory.get(category.id) || [] }))
-      .filter((group) => group.surveys.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, surveys: unfiled });
-    return groups;
-  }, [sortedSurveys, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const surveyGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, surveys: sortedSurveys }];
+  // sortedSurveys reste la liste COMPLÈTE (recherche + tri) : naviguer dans un dossier ne fait
+  // que choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderSurveys = useMemo(
+    () => sortedSurveys.filter((survey) => (survey.category_id || null) === currentFolderId),
+    [sortedSurveys, currentFolderId]
+  );
   // Miroir de DELETE /customer-satisfaction/:id côté backend : admin/manager uniquement.
-  const deletableIds = canManage ? sortedSurveys.map((survey) => survey.id) : [];
+  const deletableIds = canManage ? currentFolderSurveys.map((survey) => survey.id) : [];
 
   function handleCreated(survey) {
     setIsModalOpen(false);
@@ -405,28 +399,7 @@ export default function CustomerSatisfaction() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les enquêtes" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -451,125 +424,155 @@ export default function CustomerSatisfaction() {
         />
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : surveys.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucune enquête de satisfaction enregistrée pour l'instant</p>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          >
-            <Plus size={18} />
-            Consigner la première enquête
-          </button>
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {surveyGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.surveys.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.surveys.map((survey) => (
-                    <div
-                      key={survey.id}
-                      onClick={() => navigate(`/customer-satisfaction/${survey.id}`)}
-                      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        {canManage && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(survey.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleSelect(survey.id)}
-                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-900">{survey.customer_name}</p>
-                          <p className="truncate text-sm text-slate-500">
-                            {formatDate(survey.survey_date)}
-                            {survey.service?.name ? ` · ${survey.service.name}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <SatisfactionMethodBadge method={survey.method} />
-                          <SatisfactionScoreBadge score={survey.score} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CategoryBadge category={survey.category} />
-                        {survey.linked_capa && (
-                          <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-                            CAPA {survey.linked_capa.number}
-                          </span>
-                        )}
-                        {canManage && (
-                          <select
-                            value={survey.category_id || ''}
-                            disabled={updatingCategoryId === survey.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, survey)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
+          )}
+
+          {surveys.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucune enquête de satisfaction enregistrée pour l'instant</p>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Plus size={18} />
+                Consigner la première enquête
+              </button>
+            </div>
+          ) : currentFolderSurveys.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune enquête directement dans ce dossier.' : 'Aucune enquête sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderSurveys.map((survey) => (
+                <div
+                  key={survey.id}
+                  onClick={() => navigate(`/customer-satisfaction/${survey.id}`)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(survey.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(survey.id)}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{survey.customer_name}</p>
+                      <p className="truncate text-sm text-slate-500">
+                        {formatDate(survey.survey_date)}
+                        {survey.service?.name ? ` · ${survey.service.name}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <SatisfactionMethodBadge method={survey.method} />
+                      <SatisfactionScoreBadge score={survey.score} />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {survey.linked_capa && (
+                      <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        CAPA {survey.linked_capa.number}
+                      </span>
+                    )}
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingSurvey(survey);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
-        <NewSurveyModal services={services} categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewSurveyModal services={services} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
       )}
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="customer_satisfaction"
+          resourceType={SURVEY_RESOURCE_TYPE}
           endpoint="/customer-satisfaction/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
         />
       )}
 
-      {isManageCategoriesOpen && <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="customer_satisfaction"
+      {isManageCategoriesOpen && (
+        <ManageCategoriesModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={SURVEY_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
-        />}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={SURVEY_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingSurvey && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={SURVEY_RESOURCE_TYPE}
+          initialFolderId={movingSurvey.category_id || null}
+          title="Déplacer"
+          subtitle={movingSurvey.customer_name}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingSurvey(null)}
+          onSelect={handleMoveSurvey}
+        />
+      )}
     </div>
   );
 }
