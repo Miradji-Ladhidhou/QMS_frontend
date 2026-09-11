@@ -21,8 +21,7 @@ function formatDate(dateStr) {
 }
 
 // Pas de statut "overdue" dédié en base — juste une échéance dépassée, calculée ici à
-// l'affichage. Un équipement désactivé n'a plus de retard à signaler, même logique que
-// isTargetOverdue dans QualityObjectives.jsx.
+// l'affichage. Un équipement désactivé n'a plus de retard à signaler.
 function isCalibrationOverdue(equipment) {
   if (!equipment.next_calibration_date || !equipment.is_active) return false;
   return equipment.next_calibration_date < new Date().toISOString().slice(0, 10);
@@ -293,7 +292,7 @@ export default function MeasuringEquipment() {
   );
 
   // Un dossier par catégorie (module_categories, resource_type='measuring_equipment'), plus un
-  // dossier "Sans dossier" en dernier — même principe que QualityObjectives.jsx/Pdca.jsx.
+  // dossier "Sans dossier" en dernier — même principe que Pdca.jsx.
   const groupedByFolder = useMemo(() => {
     const byCategory = new Map(categories.map((category) => [category.id, []]));
     const unfiled = [];
@@ -311,7 +310,7 @@ export default function MeasuringEquipment() {
   const isFolderView = viewMode === 'folder';
   const equipmentGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, equipment: sortedEquipment }];
   // Miroir de DELETE /measuring-equipment/:id côté backend : admin/manager uniquement, sans
-  // restriction créateur — même principe que risks.js/quality-objectives.
+  // restriction créateur — même principe que risks.js.
   const deletableIds = canManage ? sortedEquipment.map((equipment) => equipment.id) : [];
 
   function handleCreated(equipment) {

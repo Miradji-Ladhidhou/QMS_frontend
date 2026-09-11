@@ -41,8 +41,6 @@ const Accidents = lazy(() => import('./pages/Accidents.jsx'));
 const AccidentDetail = lazy(() => import('./pages/AccidentDetail.jsx'));
 const Pdca = lazy(() => import('./pages/Pdca.jsx'));
 const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
-const QualityObjectives = lazy(() => import('./pages/QualityObjectives.jsx'));
-const QualityObjectiveDetail = lazy(() => import('./pages/QualityObjectiveDetail.jsx'));
 const MeasuringEquipment = lazy(() => import('./pages/MeasuringEquipment.jsx'));
 const MeasuringEquipmentDetail = lazy(() => import('./pages/MeasuringEquipmentDetail.jsx'));
 const NonconformingOutputs = lazy(() => import('./pages/NonconformingOutputs.jsx'));
@@ -131,8 +129,6 @@ export default function App() {
               <Route path="accidents/:id" element={<AccidentDetail />} />
               <Route path="pdca" element={<Pdca />} />
               <Route path="pdca/:id" element={<PdcaDetail />} />
-              <Route path="quality-objectives" element={<QualityObjectives />} />
-              <Route path="quality-objectives/:id" element={<QualityObjectiveDetail />} />
               <Route path="measuring-equipment" element={<MeasuringEquipment />} />
               <Route path="measuring-equipment/:id" element={<MeasuringEquipmentDetail />} />
               <Route path="nonconforming-outputs" element={<NonconformingOutputs />} />

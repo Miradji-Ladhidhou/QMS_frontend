@@ -2542,7 +2542,6 @@ const MODULE_KPI_LABELS = {
   supplier_evaluation: 'Fournisseurs',
   equipment: 'Étalonnage',
   equipment_calibration: 'Étalonnage',
-  quality_objective: 'Objectifs qualité',
   document: 'Documents',
   haccp_hazard: 'HACCP',
   haccp_monitoring: 'HACCP',

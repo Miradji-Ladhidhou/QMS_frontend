@@ -175,17 +175,6 @@ export const PAGE_GUIDES = {
     example:
       "projet « réduire les rebuts de 30 % » : Plan (analyse + objectif) → Do (nouveau réglage) → Check (mesure sur 1 mois) → Act (on standardise ou on ajuste).",
   },
-  'quality-objectives': {
-    title: "Les objectifs qualité de l'entreprise",
-    body: (
-      <p>
-        Un objectif <strong>mesurable</strong>, avec une échéance et un responsable, dont on suit l'avancement. Peut être
-        relié à un KPI pour se mettre à jour tout seul.
-      </p>
-    ),
-    example:
-      "« atteindre 98 % de satisfaction client d'ici décembre », responsable : direction commerciale, suivi via le KPI satisfaction.",
-  },
   'measuring-equipment': {
     title: "Suivi d'étalonnage des équipements de mesure",
     body: (
@@ -377,16 +366,6 @@ export const PAGE_GUIDES = {
       </p>
     ),
     example: "étape Check : « rebuts passés de 8 % à 5 % sur avril » → étape Act : on inscrit le nouveau réglage dans la procédure.",
-  },
-  qualityObjectiveDetail: {
-    title: "Suivi d'un objectif",
-    body: (
-      <p>
-        Fixez la <strong>cible</strong> et l'échéance, puis mettez à jour l'avancement — ou reliez un <strong>KPI</strong>{' '}
-        pour qu'il se mette à jour seul.
-      </p>
-    ),
-    example: "objectif « ≤ 2 % de retours clients » relié au KPI « taux de retours » → l'avancement suit la courbe du KPI.",
   },
   supplierDetail: {
     title: "Évaluation d'un fournisseur",
