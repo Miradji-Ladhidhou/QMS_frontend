@@ -18,6 +18,7 @@ import {
   MessageSquareWarning,
   PackageX,
   RefreshCw,
+  ScrollText,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -111,6 +112,13 @@ export const NAV_ITEMS = [
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
   // rester joignable quel que soit ce que l'admin a caché pour ce rôle.
   { to: '/prise-en-main', label: 'Prise en main', icon: BookOpen, alwaysVisible: true },
+  // Même raisonnement, pour une raison différente : pas de key car ISO 9001 §5.2 exige que la
+  // politique qualité reste "communiquée, comprise et disponible" pour tout le tenant — un
+  // module configurable pourrait être masqué par un admin pour un rôle, ce qui irait à
+  // l'encontre de cette exigence. Anciennement un onglet de Paramètres, sorti en page de menu
+  // à part entière (voir QualityPolicy.jsx) faute de quoi il restait de fait inatteignable
+  // pour qui n'est pas admin.
+  { to: '/quality-policy', label: 'Politique qualité', icon: ScrollText, alwaysVisible: true },
   // Configurables comme les autres (Paramètres > Visibilité), mais masquées par défaut pour
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
   // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations

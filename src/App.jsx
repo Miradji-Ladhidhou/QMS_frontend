@@ -51,6 +51,7 @@ const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
+const QualityPolicy = lazy(() => import('./pages/QualityPolicy.jsx'));
 const Services = lazy(() => import('./pages/Services.jsx'));
 const Employees = lazy(() => import('./pages/Employees.jsx'));
 const MyApprovals = lazy(() => import('./pages/MyApprovals.jsx'));
@@ -137,6 +138,7 @@ export default function App() {
               <Route path="procedures" element={<Procedures />} />
               <Route path="procedures/:id" element={<ProcedureDetail />} />
               <Route path="settings" element={<Settings />} />
+              <Route path="quality-policy" element={<QualityPolicy />} />
               <Route path="services" element={<Services />} />
               <Route path="employees" element={<Employees />} />
               <Route path="my-approvals" element={<MyApprovals />} />
