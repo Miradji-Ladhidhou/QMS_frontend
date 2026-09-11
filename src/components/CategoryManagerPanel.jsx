@@ -11,12 +11,21 @@ const DEFAULT_FORM = { name: '', color: DEFAULT_COLOR, is_restricted: false };
 // Un seul composant paramétré : `baseUrl` = '/module-categories' (générique, avec
 // `resourceType`) ou '/categories' (Documents). Les deux back-ends partagent exactement les
 // mêmes verbes (POST / PUT / DELETE + /:id/permissions).
+// CAPA et réclamations ont une visibilité cloisonnée par propriétaire (voir
+// backend/services/ownershipVisibility.js) : un dossier NON restreint ne rend plus rien
+// visible par défaut, contrairement aux autres modules — chacun n'y voit déjà que ce qu'il a
+// créé/assigné/partagé. Le choix "ouvert" n'a donc plus aucun effet distinct de "restreint
+// sans permission accordée" : on retire la bascule et chaque dossier de ces deux modules est
+// systématiquement un groupe de permission, jamais un simple rangement sans conséquence.
+const ALWAYS_RESTRICTED_RESOURCE_TYPES = ['capa', 'complaint'];
+
 export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, onChanged }) {
+  const alwaysRestricted = ALWAYS_RESTRICTED_RESOURCE_TYPES.includes(resourceType);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
-  const [form, setForm] = useState(DEFAULT_FORM);
+  const [form, setForm] = useState({ ...DEFAULT_FORM, is_restricted: alwaysRestricted });
   const [saving, setSaving] = useState(false);
   const [expandedPermissionsId, setExpandedPermissionsId] = useState(null);
 
@@ -44,12 +53,16 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
 
   function startCreate() {
     setEditingId('new');
-    setForm(DEFAULT_FORM);
+    setForm({ ...DEFAULT_FORM, is_restricted: alwaysRestricted });
   }
 
   function startEdit(category) {
     setEditingId(category.id);
-    setForm({ name: category.name, color: category.color || DEFAULT_COLOR, is_restricted: category.is_restricted || false });
+    setForm({
+      name: category.name,
+      color: category.color || DEFAULT_COLOR,
+      is_restricted: alwaysRestricted ? true : category.is_restricted || false,
+    });
   }
 
   function cancelEdit() {
@@ -116,15 +129,22 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
           </div>
         </div>
 
-        <label className="flex items-center gap-2 text-sm text-slate-700">
-          <input
-            type="checkbox"
-            checked={form.is_restricted}
-            onChange={(e) => setForm((prev) => ({ ...prev, is_restricted: e.target.checked }))}
-            className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-          />
-          Dossier restreint (accès limité aux utilisateurs/groupes autorisés)
-        </label>
+        {alwaysRestricted ? (
+          <p className="text-xs text-slate-500">
+            Chacun ne voit déjà que ce qu'il a créé, ce qui lui est assigné, ou ce qu'on lui a partagé. Ce dossier sert à
+            donner l'accès à un groupe de personnes en plus de ça — choisis-les juste après l'avoir créé.
+          </p>
+        ) : (
+          <label className="flex items-center gap-2 text-sm text-slate-700">
+            <input
+              type="checkbox"
+              checked={form.is_restricted}
+              onChange={(e) => setForm((prev) => ({ ...prev, is_restricted: e.target.checked }))}
+              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+            Dossier restreint (accès limité aux utilisateurs/groupes autorisés)
+          </label>
+        )}
 
         <div className="flex gap-2">
           <button
@@ -189,7 +209,7 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
                   >
                     <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: category.color || '#94A3B8' }} />
                     <span className="text-sm font-medium text-slate-800">{category.name}</span>
-                    {category.is_restricted && (
+                    {category.is_restricted && !alwaysRestricted && (
                       <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
                         <Lock size={12} />
                         Restreint
