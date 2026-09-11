@@ -2544,7 +2544,6 @@ const MODULE_KPI_LABELS = {
   haccp_hazard: 'HACCP',
   haccp_monitoring: 'HACCP',
   pdca: 'PDCA',
-  qms_change: 'Planification des modifications',
   management_review_action: 'Revues de direction',
   procedure: 'Procédures',
   document_workflow: 'Documents',

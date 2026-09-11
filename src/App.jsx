@@ -43,8 +43,6 @@ const Pdca = lazy(() => import('./pages/Pdca.jsx'));
 const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
 const NonconformingOutputs = lazy(() => import('./pages/NonconformingOutputs.jsx'));
 const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutputDetail.jsx'));
-const QmsChanges = lazy(() => import('./pages/QmsChanges.jsx'));
-const QmsChangeDetail = lazy(() => import('./pages/QmsChangeDetail.jsx'));
 const CustomerSatisfaction = lazy(() => import('./pages/CustomerSatisfaction.jsx'));
 const CustomerSatisfactionDetail = lazy(() => import('./pages/CustomerSatisfactionDetail.jsx'));
 const CommunicationPlan = lazy(() => import('./pages/CommunicationPlan.jsx'));
@@ -127,8 +125,6 @@ export default function App() {
               <Route path="pdca/:id" element={<PdcaDetail />} />
               <Route path="nonconforming-outputs" element={<NonconformingOutputs />} />
               <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
-              <Route path="qms-changes" element={<QmsChanges />} />
-              <Route path="qms-changes/:id" element={<QmsChangeDetail />} />
               <Route path="customer-satisfaction" element={<CustomerSatisfaction />} />
               <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />
               <Route path="communication-plan" element={<CommunicationPlan />} />

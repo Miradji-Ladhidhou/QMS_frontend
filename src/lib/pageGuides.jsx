@@ -186,17 +186,6 @@ export const PAGE_GUIDES = {
     example:
       "50 pièces usinées hors tolérance détectées au contrôle final → décision : tri à 100 % → 12 rebutées, 38 reprises.",
   },
-  'qms-changes': {
-    title: 'Modifier le système de façon maîtrisée',
-    body: (
-      <p>
-        Planifier une modification du système de management : objet, <strong>impact</strong>, ressources nécessaires,
-        approbation — pour qu'elle ne se fasse pas dans l'improvisation.
-      </p>
-    ),
-    example:
-      "« passage à un nouveau logiciel de GPAO » : impact sur 4 processus, formation à prévoir, budget chiffré, validation de la direction avant démarrage.",
-  },
   'customer-satisfaction': {
     title: 'Mesurer la perception des clients',
     body: (
@@ -314,16 +303,6 @@ export const PAGE_GUIDES = {
       </p>
     ),
     example: "lot de 200 pièces avec un défaut d'aspect → disposition « dérogation acceptée par le client » → clôture.",
-  },
-  qmsChangeDetail: {
-    title: "Cycle d'une modification",
-    body: (
-      <p>
-        <strong>Planifiée → Approuvée → Mise en œuvre</strong> (ou Annulée). Chaque passage d'étape est daté ; on ne
-        saute pas d'étape.
-      </p>
-    ),
-    example: "changement de fournisseur d'emballage : planifié, approuvé par la direction, puis mis en œuvre le 1ᵉʳ du mois.",
   },
   pdcaDetail: {
     title: 'Avancer dans le cycle PDCA',
