@@ -1688,7 +1688,7 @@ export default function Trainings() {
                 <button
                   type="button"
                   onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-left text-sm font-medium text-slate-700"
+                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
                 >
                   {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                   <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
