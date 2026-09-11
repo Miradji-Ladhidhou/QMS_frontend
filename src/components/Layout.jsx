@@ -118,10 +118,16 @@ export const NAV_ITEMS = [
   // la page en l'ouvrant à d'autres rôles.
   { key: 'services', to: '/services', label: 'Services', icon: Wrench },
   { key: 'employees', to: '/employees', label: 'Personnel', icon: Contact },
-  // Jamais configurable, contrairement aux deux au-dessus : c'est le seul endroit qui permet
-  // de corriger ce réglage, donc aucune combinaison de règles ne doit jamais pouvoir le faire
-  // disparaître pour un admin.
-  { to: '/settings', label: 'Paramètres', icon: Settings, adminOnly: true },
+  // Jamais configurable, comme Prise en main plus haut : c'est le seul endroit qui permet de
+  // corriger la visibilité du menu, donc aucune combinaison de règles ne doit jamais pouvoir le
+  // faire disparaître pour un admin. Pas adminOnly non plus (corrigé) : la page elle-même
+  // filtre déjà ses onglets par rôle (voir Settings.jsx, TAB_GROUPS) — "Mon profil",
+  // "Notifications" et surtout "Politique qualité" (ISO 9001 §5.2, doit rester consultable par
+  // tout le monde) y restent accessibles à un manager/member. Sans ce lien de menu, ces
+  // onglets étaient inatteignables en pratique (route /settings non gardée par rôle, mais
+  // jamais liée) : la politique qualité était donc invisible pour quiconque n'est pas admin,
+  // malgré son intention explicite d'être ouverte à tout le tenant.
+  { to: '/settings', label: 'Paramètres', icon: Settings, alwaysVisible: true },
 ];
 
 export default function Layout() {
