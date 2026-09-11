@@ -1,19 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, HeartPulse, List, Plus, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, HeartPulse, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { ACCIDENT_STATUS_LABELS, ACCIDENT_SEVERITY_LABELS } from '../lib/accidentStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AccidentStatusBadge from '../components/AccidentStatusBadge.jsx';
 import AccidentSeverityBadge from '../components/AccidentSeverityBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -21,6 +25,9 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const ACCIDENT_RESOURCE_TYPE = 'accident';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -92,7 +99,7 @@ function PersonField({ users, employees, value, onChange }) {
 // Modale de création — ouverte à tous les rôles côté backend (POST /accidents), contrairement
 // à la plupart des autres registres SMQ : déclarer un accident du travail doit rester simple
 // pour quiconque en est témoin.
-function NewAccidentModal({ users, employees, services, categories, onClose, onCreated }) {
+function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     occurred_at: new Date().toISOString().slice(0, 10),
@@ -106,6 +113,7 @@ function NewAccidentModal({ users, employees, services, categories, onClose, onC
     with_lost_time: false,
     lost_days: '',
     category_id: '',
+    category_name: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -298,9 +306,12 @@ function NewAccidentModal({ users, employees, services, categories, onClose, onC
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={ACCIDENT_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -326,7 +337,6 @@ export default function Accidents() {
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
@@ -343,34 +353,30 @@ export default function Accidents() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingAccident, setMovingAccident] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: ACCIDENT_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, accident) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(accident.id);
+  async function handleMoveAccident(folderId) {
+    const accident = movingAccident;
+    setMovingAccident(null);
     try {
-      const { data } = await api.patch(`/accidents/${accident.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/accidents/${accident.id}`, { category_id: folderId || null });
       setAccidents((prev) => prev.map((item) => (item.id === accident.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cet accident.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -402,18 +408,16 @@ export default function Accidents() {
       if (severityFilter) params.severity = severityFilter;
       if (serviceFilter) params.service_id = serviceFilter;
       if (lostTimeFilter) params.with_lost_time = 'true';
-      const [accidentsRes, usersRes, employeesRes, servicesRes, categoriesRes] = await Promise.all([
+      const [accidentsRes, usersRes, employeesRes, servicesRes] = await Promise.all([
         api.get('/accidents', { params }),
         api.get('/users'),
         api.get('/employees'),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'accident' } }),
       ]);
       setAccidents(accidentsRes.data);
       setUsers(usersRes.data);
       setEmployees(employeesRes.data.filter((employee) => employee.is_active));
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError("Impossible de charger le registre des accidents du travail.");
     } finally {
@@ -433,26 +437,16 @@ export default function Accidents() {
     'desc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='accident'), plus un dossier
-  // "Sans dossier" en dernier pour les accidents non classés — jamais affiché s'il est vide.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const accident of sortedAccidents) {
-      if (accident.category_id && byCategory.has(accident.category_id)) byCategory.get(accident.category_id).push(accident);
-      else unfiled.push(accident);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, accidents: byCategory.get(category.id) || [] }))
-      .filter((group) => group.accidents.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, accidents: unfiled });
-    return groups;
-  }, [sortedAccidents, categories]);
+  // sortedAccidents reste la liste COMPLÈTE (filtrée seulement par statut/gravité/service/
+  // arrêt de travail) : naviguer dans un dossier ne fait que choisir, côté affichage, quel
+  // sous-ensemble montrer — filtrage client de la liste déjà chargée, même principe que
+  // Risks.jsx. "Sans dossier" (racine) = category_id null.
+  const currentFolderAccidents = useMemo(
+    () => sortedAccidents.filter((accident) => (accident.category_id || null) === currentFolderId),
+    [sortedAccidents, currentFolderId]
+  );
 
-  const isFolderView = viewMode === 'folder';
-  const accidentGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, accidents: sortedAccidents }];
-
-  const deletableIds = sortedAccidents.filter((accident) => canDeleteAccident(accident, currentUser)).map((accident) => accident.id);
+  const deletableIds = currentFolderAccidents.filter((accident) => canDeleteAccident(accident, currentUser)).map((accident) => accident.id);
 
   function handleCreated(accident) {
     setIsModalOpen(false);
@@ -714,28 +708,7 @@ export default function Accidents() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les accidents" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -771,98 +744,100 @@ export default function Accidents() {
         onClear={() => setSelectedIds([])}
       />
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : accidents.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucun accident du travail enregistré pour l'instant</p>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          >
-            <Plus size={18} />
-            Déclarer le premier accident
-          </button>
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {accidentGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.accidents.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.accidents.map((accident) => (
-                    <div
-                      key={accident.id}
-                      onClick={() => navigate(`/accidents/${accident.id}`)}
-                      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        {canDeleteAccident(accident, currentUser) && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(accident.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleSelect(accident.id)}
-                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-900">{accident.title}</p>
-                          <p className="truncate text-sm text-slate-500">{accidentSubtitle(accident)}</p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <AccidentSeverityBadge severity={accident.severity} />
-                          <AccidentStatusBadge status={accident.status} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CategoryBadge category={accident.category} />
-                        {accident.with_lost_time && (
-                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-                            Arrêt de travail{accident.lost_days ? ` — ${accident.lost_days} j` : ''}
-                          </span>
-                        )}
-                        {canManage && (
-                          <select
-                            value={accident.category_id || ''}
-                            disabled={updatingCategoryId === accident.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, accident)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
+          )}
+
+          {accidents.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucun accident du travail enregistré pour l'instant</p>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Plus size={18} />
+                Déclarer le premier accident
+              </button>
+            </div>
+          ) : currentFolderAccidents.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucun accident directement dans ce dossier.' : 'Aucun accident sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderAccidents.map((accident) => (
+                <div
+                  key={accident.id}
+                  onClick={() => navigate(`/accidents/${accident.id}`)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {canDeleteAccident(accident, currentUser) && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(accident.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(accident.id)}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{accident.title}</p>
+                      <p className="truncate text-sm text-slate-500">{accidentSubtitle(accident)}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <AccidentSeverityBadge severity={accident.severity} />
+                      <AccidentStatusBadge status={accident.status} />
+                    </div>
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {accident.with_lost_time && (
+                      <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+                        Arrêt de travail{accident.lost_days ? ` — ${accident.lost_days} j` : ''}
+                      </span>
+                    )}
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingAccident(accident);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
@@ -870,7 +845,6 @@ export default function Accidents() {
           users={users}
           employees={employees}
           services={services}
-          categories={categories}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />
@@ -878,9 +852,9 @@ export default function Accidents() {
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="accident"
+          resourceType={ACCIDENT_RESOURCE_TYPE}
           endpoint="/accidents/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -889,11 +863,37 @@ export default function Accidents() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="accident"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={ACCIDENT_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={ACCIDENT_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingAccident && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={ACCIDENT_RESOURCE_TYPE}
+          initialFolderId={movingAccident.category_id || null}
+          title="Déplacer"
+          subtitle={movingAccident.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingAccident(null)}
+          onSelect={handleMoveAccident}
         />
       )}
     </div>

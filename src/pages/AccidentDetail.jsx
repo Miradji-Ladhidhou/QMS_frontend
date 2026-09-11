@@ -57,7 +57,7 @@ function injuredPersonName(accident) {
   return accident.injured_user?.full_name || accident.injured_employee?.full_name || null;
 }
 
-function EditAccidentModal({ accident, users, employees, services, categories, onClose, onUpdated }) {
+function EditAccidentModal({ accident, users, employees, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: accident.title,
     occurred_at: accident.occurred_at,
@@ -72,6 +72,7 @@ function EditAccidentModal({ accident, users, employees, services, categories, o
     with_lost_time: accident.with_lost_time,
     lost_days: accident.lost_days ? String(accident.lost_days) : '',
     category_id: accident.category_id || '',
+    category_name: accident.category?.name || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(accident.is_private_to_me));
   const [error, setError] = useState('');
@@ -286,9 +287,12 @@ function EditAccidentModal({ accident, users, employees, services, categories, o
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="accident"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -542,7 +546,6 @@ export default function AccidentDetail() {
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -578,10 +581,6 @@ export default function AccidentDetail() {
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'accident' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -754,7 +753,6 @@ export default function AccidentDetail() {
           users={users}
           employees={employees}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setAccident((prev) => ({ ...prev, ...data }));
