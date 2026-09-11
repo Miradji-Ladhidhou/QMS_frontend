@@ -190,7 +190,7 @@ function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
   );
 }
 
-function EditReviewModal({ review, categories, onClose, onUpdated }) {
+function EditReviewModal({ review, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: review.title,
     review_date: review.review_date,
@@ -198,6 +198,7 @@ function EditReviewModal({ review, categories, onClose, onUpdated }) {
     period_start: review.period_start || '',
     period_end: review.period_end || '',
     category_id: review.category_id || '',
+    category_name: review.category?.name || '',
     previous_actions_status: review.previous_actions_status || '',
     context_changes: review.context_changes || '',
     resource_adequacy: review.resource_adequacy || '',
@@ -230,9 +231,10 @@ function EditReviewModal({ review, categories, onClose, onUpdated }) {
 
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
+    const { category_name, ...formForApi } = form;
     let response;
     try {
-      response = await api.patch(`/management-reviews/${review.id}`, { ...form, category_id: categoryId });
+      response = await api.patch(`/management-reviews/${review.id}`, { ...formForApi, category_id: categoryId });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier cette revue.');
       setSubmitting(false);
@@ -316,9 +318,12 @@ function EditReviewModal({ review, categories, onClose, onUpdated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="management_review"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -579,7 +584,6 @@ export default function ManagementReviewDetail() {
   const [review, setReview] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -612,10 +616,6 @@ export default function ManagementReviewDetail() {
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'management_review' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -850,7 +850,6 @@ export default function ManagementReviewDetail() {
       {isEditModalOpen && (
         <EditReviewModal
           review={review}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setReview((prev) => ({ ...prev, ...data }));

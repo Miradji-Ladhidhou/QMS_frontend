@@ -1,17 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import ReviewStatusBadge from '../components/ReviewStatusBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -19,6 +23,9 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const REVIEW_RESOURCE_TYPE = 'management_review';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -45,13 +52,14 @@ function defaultPeriodStart() {
   return date.toISOString().slice(0, 10);
 }
 
-function NewReviewModal({ categories, onClose, onCreated }) {
+function NewReviewModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('');
   const [reviewDate, setReviewDate] = useState(new Date().toISOString().slice(0, 10));
   const [participants, setParticipants] = useState('');
   const [periodStart, setPeriodStart] = useState(defaultPeriodStart());
   const [periodEnd, setPeriodEnd] = useState(new Date().toISOString().slice(0, 10));
   const [categoryId, setCategoryId] = useState('');
+  const [categoryName, setCategoryName] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -165,9 +173,12 @@ function NewReviewModal({ categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={REVIEW_RESOURCE_TYPE}
+            categoryName={categoryName}
             categoryId={categoryId}
             onCategoryIdChange={setCategoryId}
+            onCategoryNameChange={setCategoryName}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -190,7 +201,6 @@ export default function ManagementReviews() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [reviews, setReviews] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -203,30 +213,26 @@ export default function ManagementReviews() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingReview, setMovingReview] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: REVIEW_RESOURCE_TYPE });
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, review) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(review.id);
+  async function handleMoveReview(folderId) {
+    const review = movingReview;
+    setMovingReview(null);
     try {
-      const { data } = await api.patch(`/management-reviews/${review.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/management-reviews/${review.id}`, { category_id: folderId || null });
       setReviews((prev) => prev.map((item) => (item.id === review.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cette revue.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -239,16 +245,8 @@ export default function ManagementReviews() {
       .finally(() => setLoading(false));
   }
 
-  function loadCategories() {
-    api
-      .get('/module-categories', { params: { resource_type: 'management_review' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
-  }
-
   useEffect(() => {
     loadReviews();
-    loadCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -282,26 +280,14 @@ export default function ManagementReviews() {
     'desc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='management_review'), plus un
-  // dossier "Sans dossier" en dernier pour les revues non classées — jamais affiché s'il est
-  // vide. Reprend sortedReviews (déjà trié) pour que le mode dossier reste cohérent avec le
-  // mode liste, même principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const review of sortedReviews) {
-      if (review.category_id && byCategory.has(review.category_id)) byCategory.get(review.category_id).push(review);
-      else unfiled.push(review);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, reviews: byCategory.get(category.id) || [] }))
-      .filter((group) => group.reviews.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, reviews: unfiled });
-    return groups;
-  }, [sortedReviews, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const reviewGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, reviews: sortedReviews }];
+  // sortedReviews reste la liste COMPLÈTE (déjà triée) : naviguer dans un dossier ne fait que
+  // choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderReviews = useMemo(
+    () => sortedReviews.filter((review) => (review.category_id || null) === currentFolderId),
+    [sortedReviews, currentFolderId]
+  );
 
   function handleCreated(review) {
     setIsModalOpen(false);
@@ -493,28 +479,7 @@ export default function ManagementReviews() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les revues" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -529,7 +494,7 @@ export default function ManagementReviews() {
       </div>
 
       {canManage && (
-        <SelectAllToggle ids={sortedReviews.map((review) => review.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+        <SelectAllToggle ids={currentFolderReviews.map((review) => review.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
       )}
 
       {canManage && (
@@ -561,101 +526,103 @@ export default function ManagementReviews() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : reviews.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucune revue de direction pour l'instant</p>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
-              <Plus size={18} />
-              Créer la première revue
-            </button>
-          )}
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {reviewGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.reviews.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.reviews.map((review) => (
-                    <div
-                      key={review.id}
-                      onClick={() => navigate(`/management-reviews/${review.id}`)}
-                      className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      {canManage && (
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(review.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleSelect(review.id)}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-slate-900">{review.title}</p>
-                        <p className="text-sm text-slate-500">{formatDate(review.review_date)}</p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <CategoryBadge category={review.category} />
-                          {canManage && (
-                            <select
-                              value={review.category_id || ''}
-                              disabled={updatingCategoryId === review.id}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => handleCategoryChange(e, review)}
-                              className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Sans dossier</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      </div>
-                      <ReviewStatusBadge status={review.status} />
-                    </div>
-                  ))}
-                </div>
+            </div>
+          )}
+
+          {reviews.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucune revue de direction pour l'instant</p>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                >
+                  <Plus size={18} />
+                  Créer la première revue
+                </button>
               )}
             </div>
-          ))}
-        </div>
+          ) : currentFolderReviews.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune revue directement dans ce dossier.' : 'Aucune revue sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderReviews.map((review) => (
+                <div
+                  key={review.id}
+                  onClick={() => navigate(`/management-reviews/${review.id}`)}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  {canManage && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(review.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelect(review.id)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-900">{review.title}</p>
+                    <p className="text-sm text-slate-500">{formatDate(review.review_date)}</p>
+                    {canManage && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMovingReview(review);
+                          }}
+                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                          <FolderInput size={12} />
+                          Déplacer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <ReviewStatusBadge status={review.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
-        <NewReviewModal categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewReviewModal onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
       )}
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="management_review"
+          resourceType={REVIEW_RESOURCE_TYPE}
           endpoint="/management-reviews/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -664,11 +631,37 @@ export default function ManagementReviews() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="management_review"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={REVIEW_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadCategories}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={REVIEW_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingReview && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={REVIEW_RESOURCE_TYPE}
+          initialFolderId={movingReview.category_id || null}
+          title="Déplacer"
+          subtitle={movingReview.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingReview(null)}
+          onSelect={handleMoveReview}
         />
       )}
     </div>
