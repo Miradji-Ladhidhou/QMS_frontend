@@ -7,10 +7,13 @@ import CategoryVisibilityField from './CategoryVisibilityField.jsx';
 // Modale partagée par toutes les listes qui supportent le déplacement en masse vers une
 // catégorie (voir PATCH /<module>/bulk-category, réservé admin/manager côté backend — cette
 // modale n'est donc jamais montée pour un member). `endpoint` est le chemin complet de l'API
-// (ex: '/capas/bulk-category'), `resourceType` sert uniquement à résoudre la catégorie
-// personnelle si "Uniquement moi" est choisi.
-export default function BulkMoveCategoryModal({ resourceType, endpoint, categories, selectedIds, onClose, onMoved }) {
+// (ex: '/capas/bulk-category'), `resourceType` sert à la fois à résoudre la catégorie
+// personnelle si "Uniquement moi" est choisi, et (mode dossiers imbriqués) de paramètre pour
+// FolderPickerModal — voir CategoryVisibilityField pour les deux modes possibles
+// (`categories` plat vs `baseUrl` imbriqué).
+export default function BulkMoveCategoryModal({ resourceType, endpoint, categories, baseUrl, selectedIds, onClose, onMoved }) {
   const [categoryId, setCategoryId] = useState('');
+  const [categoryName, setCategoryName] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -64,8 +67,12 @@ export default function BulkMoveCategoryModal({ resourceType, endpoint, categori
         <form onSubmit={handleSubmit} className="space-y-4">
           <CategoryVisibilityField
             categories={categories}
+            baseUrl={baseUrl}
+            resourceType={resourceType}
+            categoryName={categoryName}
             categoryId={categoryId}
             onCategoryIdChange={setCategoryId}
+            onCategoryNameChange={setCategoryName}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />

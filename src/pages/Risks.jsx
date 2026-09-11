@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, Sparkles, X } from 'lucide-react';
+import { FolderCog, FolderInput, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import {
   RISK_TYPE_LABELS,
   RISK_STATUS_LABELS,
@@ -18,9 +19,11 @@ import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
 import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -29,6 +32,9 @@ import SortSelect from '../components/SortSelect.jsx';
 import AiRiskSuggestion from '../components/AiRiskSuggestion.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const RISK_RESOURCE_TYPE = 'risk';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -104,7 +110,7 @@ function RiskMatrix({ risks }) {
   );
 }
 
-function NewRiskModal({ users, services, categories, onClose, onCreated }) {
+function NewRiskModal({ users, services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     type: 'risk',
@@ -116,6 +122,7 @@ function NewRiskModal({ users, services, categories, onClose, onCreated }) {
     impact: '3',
     review_date: '',
     category_id: '',
+    category_name: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -307,9 +314,12 @@ function NewRiskModal({ users, services, categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={RISK_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -385,7 +395,6 @@ export default function Risks() {
   const [risks, setRisks] = useState([]);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
@@ -402,34 +411,29 @@ export default function Risks() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isAnalyzeModalOpen, setIsAnalyzeModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [movingRisk, setMovingRisk] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: RISK_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, risk) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(risk.id);
+  async function handleMoveRisk(folderId) {
+    const risk = movingRisk;
+    setMovingRisk(null);
     try {
-      const { data } = await api.patch(`/risks/${risk.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/risks/${risk.id}`, { category_id: folderId || null });
       setRisks((prev) => prev.map((item) => (item.id === risk.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de ce risque.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -460,16 +464,14 @@ export default function Risks() {
       if (typeFilter) params.type = typeFilter;
       if (statusFilter) params.status = statusFilter;
       if (serviceFilter) params.service_id = serviceFilter;
-      const [risksRes, usersRes, servicesRes, categoriesRes] = await Promise.all([
+      const [risksRes, usersRes, servicesRes] = await Promise.all([
         api.get('/risks', { params }),
         api.get('/users'),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'risk' } }),
       ]);
       setRisks(risksRes.data);
       setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger le registre des risques.');
     } finally {
@@ -489,26 +491,17 @@ export default function Risks() {
     'desc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='risk'), plus un dossier "Sans
-  // dossier" en dernier pour les risques non classés — jamais affiché s'il est vide. Reprend
-  // sortedRisks (déjà trié) pour que le mode dossier reste cohérent avec le mode liste, même
-  // principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const risk of sortedRisks) {
-      if (risk.category_id && byCategory.has(risk.category_id)) byCategory.get(risk.category_id).push(risk);
-      else unfiled.push(risk);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, risks: byCategory.get(category.id) || [] }))
-      .filter((group) => group.risks.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, risks: unfiled });
-    return groups;
-  }, [sortedRisks, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const riskGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, risks: sortedRisks }];
+  // sortedRisks reste la liste COMPLÈTE (tous dossiers confondus, filtrée seulement par
+  // type/statut/service) : la matrice des risques et les exports en ont besoin telle quelle,
+  // un portefeuille de risques n'a de sens qu'au global. Naviguer dans un dossier ne fait que
+  // choisir, côté affichage, quel sous-ensemble de cette même liste montrer — un filtrage
+  // client (pas un aller-retour serveur par dossier) puisque la liste complète est de toute
+  // façon déjà chargée pour la matrice. "Sans dossier" (racine) = category_id null, même
+  // convention que folder_id sur les KPI.
+  const currentFolderRisks = useMemo(
+    () => sortedRisks.filter((risk) => (risk.category_id || null) === currentFolderId),
+    [sortedRisks, currentFolderId]
+  );
 
   function handleCreated(risk) {
     setIsModalOpen(false);
@@ -810,28 +803,7 @@ export default function Risks() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les risques" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -846,7 +818,7 @@ export default function Risks() {
       </div>
 
       {canManage && (
-        <SelectAllToggle ids={sortedRisks.map((risk) => risk.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+        <SelectAllToggle ids={currentFolderRisks.map((risk) => risk.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
       )}
 
       {canManage && (
@@ -868,106 +840,97 @@ export default function Risks() {
         />
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : risks.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucun risque enregistré pour l'instant</p>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
-              <Plus size={18} />
-              Créer le premier risque
-            </button>
-          )}
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {riskGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {folders.length > 0 && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+            </div>
+          )}
+
+          {risks.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucun risque enregistré pour l'instant</p>
+              {canManage && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsModalOpen(true)}
+                  className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.risks.length})</span>
+                  <Plus size={18} />
+                  Créer le premier risque
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.risks.map((risk) => (
-                    <div
-                      key={risk.id}
-                      onClick={() => navigate(`/risks/${risk.id}`)}
-                      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        {canManage && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(risk.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleSelect(risk.id)}
-                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-900">{risk.title}</p>
-                          <p className="truncate text-sm text-slate-500">
-                            {RISK_TYPE_LABELS[risk.type]}
-                            {risk.owner_user ? ` · ${risk.owner_user.full_name}` : ''}
-                            {risk.review_date ? ` · Revue le ${formatDate(risk.review_date)}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <RiskScoreBadge score={risk.risk_score} />
-                          <RiskStatusBadge status={risk.status} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CategoryBadge category={risk.folder} />
-                        {canManage && (
-                          <select
-                            value={risk.category_id || ''}
-                            disabled={updatingCategoryId === risk.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, risk)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
+          ) : currentFolderRisks.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucun risque directement dans ce dossier.' : 'Aucun risque sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderRisks.map((risk) => (
+                <div
+                  key={risk.id}
+                  onClick={() => navigate(`/risks/${risk.id}`)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(risk.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(risk.id)}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{risk.title}</p>
+                      <p className="truncate text-sm text-slate-500">
+                        {RISK_TYPE_LABELS[risk.type]}
+                        {risk.owner_user ? ` · ${risk.owner_user.full_name}` : ''}
+                        {risk.review_date ? ` · Revue le ${formatDate(risk.review_date)}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <RiskScoreBadge score={risk.risk_score} />
+                      <RiskStatusBadge status={risk.status} />
+                    </div>
+                  </div>
+                  {canManage && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingRisk(risk);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
         <NewRiskModal
           users={users}
           services={services}
-          categories={categories}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />
@@ -979,9 +942,9 @@ export default function Risks() {
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="risk"
+          resourceType={RISK_RESOURCE_TYPE}
           endpoint="/risks/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -990,11 +953,24 @@ export default function Risks() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="risk"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={RISK_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {movingRisk && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={RISK_RESOURCE_TYPE}
+          initialFolderId={movingRisk.category_id || null}
+          title="Déplacer"
+          subtitle={movingRisk.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingRisk(null)}
+          onSelect={handleMoveRisk}
         />
       )}
     </div>

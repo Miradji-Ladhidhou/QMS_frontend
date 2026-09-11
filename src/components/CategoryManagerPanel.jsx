@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Lock, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Folder, Lock, Pencil, Plus, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
+import FolderBreadcrumb from './FolderBreadcrumb.jsx';
 import CategoryPermissionsPanel from './CategoryPermissionsPanel.jsx';
 
 const DEFAULT_COLOR = '#1F3864';
@@ -10,7 +12,11 @@ const DEFAULT_FORM = { name: '', color: DEFAULT_COLOR, is_restricted: false };
 // concernée via ManageCategoriesModal — remplace les anciens onglets Paramètres > Catégories.
 // Un seul composant paramétré : `baseUrl` = '/module-categories' (générique, avec
 // `resourceType`) ou '/categories' (Documents). Les deux back-ends partagent exactement les
-// mêmes verbes (POST / PUT / DELETE + /:id/permissions).
+// mêmes verbes (GET avec parent_id / breadcrumb, POST / PUT / DELETE + /:id/permissions).
+// Dossiers imbriqués (arbitrairement profonds, comme Kpis.jsx) : useFolderNavigation gère la
+// navigation dans l'arbre, ce panneau n'affiche jamais que le niveau actuellement ouvert —
+// "Nouveau dossier" y crée systématiquement un enfant, jamais un choix de parent séparé (même
+// principe que FolderFormModal dans Kpis.jsx).
 // CAPA et réclamations ont une visibilité cloisonnée par propriétaire (voir
 // backend/services/ownershipVisibility.js) : un dossier NON restreint ne rend plus rien
 // visible par défaut, contrairement aux autres modules — chacun n'y voit déjà que ce qu'il a
@@ -21,35 +27,18 @@ const ALWAYS_RESTRICTED_RESOURCE_TYPES = ['capa', 'complaint'];
 
 export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, onChanged }) {
   const alwaysRestricted = ALWAYS_RESTRICTED_RESOURCE_TYPES.includes(resourceType);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { currentFolderId, navigateToFolder, breadcrumb, folders: categories, foldersLoading: loading, reloadFolders } =
+    useFolderNavigation({ baseUrl, resourceType });
   const [error, setError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState({ ...DEFAULT_FORM, is_restricted: alwaysRestricted });
   const [saving, setSaving] = useState(false);
   const [expandedPermissionsId, setExpandedPermissionsId] = useState(null);
 
-  const listParams = resourceType ? { params: { resource_type: resourceType } } : undefined;
-
-  async function loadCategories() {
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await api.get(baseUrl, listParams);
-      setCategories(data);
-    } catch {
-      setError('Impossible de charger les dossiers.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
-    loadCategories();
     setEditingId(null);
     setExpandedPermissionsId(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseUrl, resourceType]);
+  }, [currentFolderId]);
 
   function startCreate() {
     setEditingId('new');
@@ -76,13 +65,13 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
 
     try {
       if (editingId === 'new') {
-        const payload = resourceType ? { ...form, resource_type: resourceType } : form;
-        const { data } = await api.post(baseUrl, payload);
-        setCategories((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)));
+        const payload = { ...form, parent_id: currentFolderId || undefined };
+        if (resourceType) payload.resource_type = resourceType;
+        await api.post(baseUrl, payload);
       } else {
-        const { data } = await api.put(`${baseUrl}/${editingId}`, form);
-        setCategories((prev) => prev.map((category) => (category.id === editingId ? data : category)));
+        await api.put(`${baseUrl}/${editingId}`, form);
       }
+      await reloadFolders();
       setEditingId(null);
       onChanged?.();
     } catch (err) {
@@ -97,7 +86,7 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
 
     try {
       await api.delete(`${baseUrl}/${category.id}`);
-      setCategories((prev) => prev.filter((item) => item.id !== category.id));
+      await reloadFolders();
       onChanged?.();
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer ce dossier.');
@@ -168,11 +157,13 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
 
   return (
     <div>
+      <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Racine" />
+
       {isAdmin && editingId === null && (
         <button
           type="button"
           onClick={startCreate}
-          className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
+          className="mt-3 flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
         >
           <Plus size={16} />
           Nouveau dossier
@@ -190,7 +181,7 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
           ))}
         </div>
       ) : categories.length === 0 ? (
-        <p className="mt-4 text-sm text-slate-500">Aucun dossier pour l'instant.</p>
+        <p className="mt-4 text-sm text-slate-500">Aucun dossier ici pour l'instant.</p>
       ) : (
         <ul className="mt-4 divide-y divide-slate-100">
           {categories.map((category) =>
@@ -203,24 +194,25 @@ export default function CategoryManagerPanel({ baseUrl, resourceType, isAdmin, o
                 <div className="flex items-center justify-between gap-3">
                   <button
                     type="button"
-                    disabled={!category.is_restricted}
-                    onClick={() => setExpandedPermissionsId(expandedPermissionsId === category.id ? null : category.id)}
-                    className="flex flex-1 items-center gap-3 text-left disabled:cursor-default"
+                    onClick={() => navigateToFolder(category.id)}
+                    className="flex flex-1 items-center gap-3 text-left"
                   >
-                    <span className="h-4 w-4 shrink-0 rounded-full" style={{ backgroundColor: category.color || '#94A3B8' }} />
+                    <Folder size={16} className="shrink-0 text-primary" />
                     <span className="text-sm font-medium text-slate-800">{category.name}</span>
                     {category.is_restricted && !alwaysRestricted && (
-                      <span className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setExpandedPermissionsId(expandedPermissionsId === category.id ? null : category.id);
+                        }}
+                        className="flex shrink-0 items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700 hover:bg-amber-200"
+                      >
                         <Lock size={12} />
                         Restreint
-                      </span>
+                        {expandedPermissionsId === category.id ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                      </button>
                     )}
-                    {category.is_restricted &&
-                      (expandedPermissionsId === category.id ? (
-                        <ChevronUp size={14} className="shrink-0 text-slate-400" />
-                      ) : (
-                        <ChevronDown size={14} className="shrink-0 text-slate-400" />
-                      ))}
                   </button>
                   {isAdmin && (
                     <div className="flex shrink-0 gap-1">

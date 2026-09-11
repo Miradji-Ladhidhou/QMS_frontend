@@ -59,7 +59,7 @@ function ScoreCard({ label, likelihood, impact, score }) {
   );
 }
 
-function EditRiskModal({ risk, users, services, categories, onClose, onUpdated }) {
+function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: risk.title,
     type: risk.type,
@@ -75,6 +75,7 @@ function EditRiskModal({ risk, users, services, categories, onClose, onUpdated }
     residual_impact: risk.residual_impact ? String(risk.residual_impact) : '',
     review_date: risk.review_date || '',
     category_id: risk.category_id || '',
+    category_name: risk.folder?.name || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(risk.is_private_to_me));
   const [error, setError] = useState('');
@@ -100,12 +101,15 @@ function EditRiskModal({ risk, users, services, categories, onClose, onUpdated }
       }
     }
 
+    // eslint-disable-next-line no-unused-vars
+    const { category_name, ...formForApi } = form;
+
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
     let response;
     try {
       response = await api.patch(`/risks/${risk.id}`, {
-        ...form,
+        ...formForApi,
         category_id: categoryId,
         likelihood: Number(form.likelihood),
         impact: Number(form.impact),
@@ -313,9 +317,12 @@ function EditRiskModal({ risk, users, services, categories, onClose, onUpdated }
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="risk"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -562,7 +569,6 @@ export default function RiskDetail() {
   const [risk, setRisk] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -590,10 +596,6 @@ export default function RiskDetail() {
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'risk' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -763,7 +765,6 @@ export default function RiskDetail() {
           risk={risk}
           users={users}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setRisk((prev) => ({ ...prev, ...data }));
