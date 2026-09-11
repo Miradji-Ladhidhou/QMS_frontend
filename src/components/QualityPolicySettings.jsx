@@ -1,11 +1,76 @@
 import { useEffect, useState } from 'react';
-import { Check, Pencil } from 'lucide-react';
+import { Check, Download, Pencil } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { openBlankTab } from '../lib/openInNewTab.js';
 import AutoTextarea from './AutoTextarea.jsx';
 
 function formatDateTime(value) {
   if (!value) return '—';
   return new Date(value).toLocaleString('fr-FR', { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// Panneau admin/manager "qui a lu / qui n'a pas encore" — même principe que
+// AcknowledgmentPanel dans DocumentDetail.jsx, chargement à part (n'a besoin d'être appelé que
+// pour ce rôle, jamais pour un member qui n'y a pas accès, 403 sinon).
+function AcknowledgmentPanel() {
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get('/quality-policy/acknowledgments')
+      .then(({ data: res }) => {
+        if (!cancelled) setData(res);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Impossible de charger les accusés de lecture.");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <div className="mt-5 border-t border-slate-200 pt-4">
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-slate-500">Accusés de lecture</p>
+      {error ? (
+        <p className="text-sm text-red-600">{error}</p>
+      ) : !data ? (
+        <p className="text-sm text-slate-500">Chargement...</p>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div>
+            <p className="mb-1 text-xs font-medium text-emerald-700">Ont lu ({data.acknowledged.length})</p>
+            {data.acknowledged.length === 0 ? (
+              <p className="text-sm text-slate-500">Personne pour l'instant.</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-slate-700">
+                {data.acknowledged.map((entry) => (
+                  <li key={entry.user_id}>
+                    {entry.user?.full_name || 'Utilisateur supprimé'}
+                    <span className="text-slate-400"> · {formatDateTime(entry.acknowledged_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-medium text-amber-700">En attente ({data.pending.length})</p>
+            {data.pending.length === 0 ? (
+              <p className="text-sm text-slate-500">Tout le monde a lu.</p>
+            ) : (
+              <ul className="space-y-1 text-sm text-slate-700">
+                {data.pending.map((user) => (
+                  <li key={user.id}>{user.full_name}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ISO 9001 §5.2 : la politique qualité doit être documentée, communiquée, comprise et
@@ -15,7 +80,7 @@ function formatDateTime(value) {
 // rend immédiatement "en vigueur", pas de workflow de validation séparé — voir
 // routes/qualityPolicy.js. L'accusé de lecture et l'agrégat "X/Y ont pris connaissance"
 // donnent la preuve concrète de la diffusion et de la compréhension exigées par la norme.
-export default function QualityPolicySettings({ isAdmin }) {
+export default function QualityPolicySettings({ isAdmin, isManager }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -25,6 +90,7 @@ export default function QualityPolicySettings({ isAdmin }) {
   const [saving, setSaving] = useState(false);
   const [acknowledging, setAcknowledging] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
 
   // silent: true pour un rechargement après une action déjà en cours (publier/accuser
   // réception) — sans ça, le skeleton de chargement remplaçait tout le panneau, y compris le
@@ -70,6 +136,26 @@ export default function QualityPolicySettings({ isAdmin }) {
     }
   }
 
+  // Même schéma que le certificat de signature/les rapports KPI (DocumentDetail.jsx,
+  // Kpis.jsx) : ouvre le PDF dans un nouvel onglet plutôt qu'un téléchargement forcé, pour
+  // permettre un aperçu avant impression. openBlankTab() doit être appelé de façon SYNCHRONE,
+  // avant le premier await, sous peine d'être bloqué par Safari iOS.
+  async function handleDownloadPdf() {
+    const tab = openBlankTab();
+    setError('');
+    setDownloadingPdf(true);
+    try {
+      const response = await api.get('/quality-policy/pdf', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      if (tab) tab.location.href = url;
+    } catch {
+      tab?.close();
+      setError('Impossible de générer le PDF.');
+    } finally {
+      setDownloadingPdf(false);
+    }
+  }
+
   async function handleAcknowledge() {
     setError('');
     setAcknowledging(true);
@@ -94,16 +180,29 @@ export default function QualityPolicySettings({ isAdmin }) {
     <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Politique qualité</h2>
-        {isAdmin && !isEditing && (
-          <button
-            type="button"
-            onClick={startEditing}
-            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Pencil size={16} />
-            {current ? 'Réviser' : 'Publier'}
-          </button>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {current && !isEditing && (
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <Download size={16} />
+              {downloadingPdf ? 'Génération...' : 'PDF'}
+            </button>
+          )}
+          {isAdmin && !isEditing && (
+            <button
+              type="button"
+              onClick={startEditing}
+              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Pencil size={16} />
+              {current ? 'Réviser' : 'Publier'}
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -175,6 +274,8 @@ export default function QualityPolicySettings({ isAdmin }) {
               </button>
             )}
           </div>
+
+          {isManager && <AcknowledgmentPanel />}
 
           {history.length > 0 && (
             <div className="mt-5 border-t border-slate-200 pt-4">
