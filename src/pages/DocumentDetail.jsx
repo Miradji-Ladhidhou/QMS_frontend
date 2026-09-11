@@ -152,6 +152,7 @@ function NewVersionModal({ documentId, onClose, onUploaded }) {
 }
 
 function BumpVersionModal({ documentId, onClose, onBumped }) {
+  const [file, setFile] = useState(null);
   const [changeNote, setChangeNote] = useState('');
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -162,9 +163,13 @@ function BumpVersionModal({ documentId, onClose, onBumped }) {
     setError(null);
     setSubmitting(true);
 
+    const formData = new FormData();
+    if (file) formData.append('file', file);
+    if (changeNote) formData.append('change_note', changeNote);
+
     let data;
     try {
-      ({ data } = await api.post(`/documents/${documentId}/versions/bump`, changeNote ? { change_note: changeNote } : {}));
+      ({ data } = await api.post(`/documents/${documentId}/versions/bump`, formData));
     } catch (err) {
       setError({ message: err.response?.data?.error || "Impossible de créer la nouvelle version.", code: err.response?.data?.code });
       setSubmitting(false);
@@ -184,11 +189,23 @@ function BumpVersionModal({ documentId, onClose, onBumped }) {
           </button>
         </div>
 
-        <p className="mb-4 text-sm text-slate-600">Fait évoluer le numéro de version, sans changer le fichier actuel.</p>
+        <p className="mb-4 text-sm text-slate-600">
+          Fait évoluer le numéro de version. Joignez un fichier pour le remplacer en même temps, ou laissez vide pour
+          garder le fichier actuel.
+        </p>
 
         <UploadErrorMessage error={error} />
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Fichier (optionnel)</label>
+            <input
+              type="file"
+              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              className="w-full text-sm text-slate-600 file:mr-3 file:rounded-md file:border-0 file:bg-primary-50 file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary"
+            />
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Commentaire (optionnel)</label>
             <AutoTextarea
