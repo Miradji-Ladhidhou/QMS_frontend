@@ -1,6 +1,6 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
@@ -10,11 +10,15 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -22,6 +26,9 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const COMPLAINT_RESOURCE_TYPE = 'complaint';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -43,7 +50,7 @@ function getComplaintSortValue(complaint, key) {
   return complaint[key];
 }
 
-function NewComplaintModal({ users, services, categories, onClose, onCreated }) {
+function NewComplaintModal({ users, services, onClose, onCreated }) {
   const [form, setForm] = useState({
     customer_name: '',
     customer_contact: '',
@@ -54,6 +61,7 @@ function NewComplaintModal({ users, services, categories, onClose, onCreated }) 
     severity: 'medium',
     service_id: '',
     category_id: '',
+    category_name: '',
     assigned_to: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
@@ -237,9 +245,12 @@ function NewComplaintModal({ users, services, categories, onClose, onCreated }) 
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={COMPLAINT_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -264,7 +275,6 @@ export default function Complaints() {
   const [complaints, setComplaints] = useState([]);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -278,34 +288,30 @@ export default function Complaints() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingComplaint, setMovingComplaint] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: COMPLAINT_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, complaint) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(complaint.id);
+  async function handleMoveComplaint(folderId) {
+    const complaint = movingComplaint;
+    setMovingComplaint(null);
     try {
-      const { data } = await api.patch(`/complaints/${complaint.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/complaints/${complaint.id}`, { category_id: folderId || null });
       setComplaints((prev) => prev.map((item) => (item.id === complaint.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cette réclamation.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -334,16 +340,14 @@ export default function Complaints() {
     setLoading(true);
     setError('');
     try {
-      const [complaintsRes, usersRes, servicesRes, categoriesRes] = await Promise.all([
+      const [complaintsRes, usersRes, servicesRes] = await Promise.all([
         api.get('/complaints', { params: statusFilter ? { status: statusFilter } : {} }),
         api.get('/users'),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'complaint' } }),
       ]);
       setComplaints(complaintsRes.data);
       setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les réclamations.');
     } finally {
@@ -363,26 +367,14 @@ export default function Complaints() {
     'desc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='complaint'), plus un dossier
-  // "Sans dossier" en dernier pour les réclamations non classées — jamais affiché s'il est vide.
-  // Reprend sortedComplaints (déjà trié) pour que le mode dossier reste cohérent avec le mode
-  // liste, même principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const complaint of sortedComplaints) {
-      if (complaint.category_id && byCategory.has(complaint.category_id)) byCategory.get(complaint.category_id).push(complaint);
-      else unfiled.push(complaint);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, complaints: byCategory.get(category.id) || [] }))
-      .filter((group) => group.complaints.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, complaints: unfiled });
-    return groups;
-  }, [sortedComplaints, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const complaintGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, complaints: sortedComplaints }];
+  // sortedComplaints reste la liste COMPLÈTE (filtrée seulement par statut) : naviguer dans un
+  // dossier ne fait que choisir, côté affichage, quel sous-ensemble montrer — filtrage client
+  // de la liste déjà chargée, même principe que Risks.jsx. "Sans dossier" (racine) =
+  // category_id null.
+  const currentFolderComplaints = useMemo(
+    () => sortedComplaints.filter((complaint) => (complaint.category_id || null) === currentFolderId),
+    [sortedComplaints, currentFolderId]
+  );
 
   function handleCreated(complaint) {
     setIsModalOpen(false);
@@ -612,28 +604,7 @@ export default function Complaints() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les réclamations" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -649,7 +620,7 @@ export default function Complaints() {
 
       {canManage && (
         <SelectAllToggle
-          ids={sortedComplaints.map((complaint) => complaint.id)}
+          ids={currentFolderComplaints.map((complaint) => complaint.id)}
           selectedIds={selectedIds}
           onChange={setSelectedIds}
         />
@@ -684,101 +655,102 @@ export default function Complaints() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : complaints.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucune réclamation pour l'instant</p>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          >
-            <Plus size={18} />
-            Enregistrer la première réclamation
-          </button>
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {complaintGroups.map((group) => (
-            <Fragment key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.complaints.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.complaints.map((complaint) => (
-                    <div
-                      key={complaint.id}
-                      onClick={() => navigate(`/complaints/${complaint.id}`)}
-                      className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      {canManage && (
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(complaint.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleSelect(complaint.id)}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-slate-900">{complaint.customer_name}</p>
-                        <p className="truncate text-sm text-slate-500">
-                          {formatDate(complaint.received_date)}
-                          {complaint.assigned ? ` · ${complaint.assigned.full_name}` : ''}
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <CategoryBadge category={complaint.category} />
-                          {canManage && (
-                            <select
-                              value={complaint.category_id || ''}
-                              disabled={updatingCategoryId === complaint.id}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => handleCategoryChange(e, complaint)}
-                              className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Sans dossier</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
+            </div>
+          )}
+
+          {complaints.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucune réclamation pour l'instant</p>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Plus size={18} />
+                Enregistrer la première réclamation
+              </button>
+            </div>
+          ) : currentFolderComplaints.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune réclamation directement dans ce dossier.' : 'Aucune réclamation sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderComplaints.map((complaint) => (
+                <div
+                  key={complaint.id}
+                  onClick={() => navigate(`/complaints/${complaint.id}`)}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  {canManage && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(complaint.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelect(complaint.id)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-900">{complaint.customer_name}</p>
+                    <p className="truncate text-sm text-slate-500">
+                      {formatDate(complaint.received_date)}
+                      {complaint.assigned ? ` · ${complaint.assigned.full_name}` : ''}
+                    </p>
+                    {canManage && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMovingComplaint(complaint);
+                          }}
+                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                          <FolderInput size={12} />
+                          Déplacer
+                        </button>
                       </div>
-                      <div className="flex shrink-0 items-center gap-2">
-                        <CapaPriorityBadge priority={complaint.severity} />
-                        <ComplaintStatusBadge status={complaint.status} />
-                      </div>
-                    </div>
-                  ))}
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <CapaPriorityBadge priority={complaint.severity} />
+                    <ComplaintStatusBadge status={complaint.status} />
+                  </div>
                 </div>
-              )}
-            </Fragment>
-          ))}
-        </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
         <NewComplaintModal
           users={users}
           services={services}
-          categories={categories}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />
@@ -786,9 +758,9 @@ export default function Complaints() {
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="complaint"
+          resourceType={COMPLAINT_RESOURCE_TYPE}
           endpoint="/complaints/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -797,11 +769,37 @@ export default function Complaints() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="complaint"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={COMPLAINT_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={COMPLAINT_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingComplaint && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={COMPLAINT_RESOURCE_TYPE}
+          initialFolderId={movingComplaint.category_id || null}
+          title="Déplacer"
+          subtitle={movingComplaint.customer_name}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingComplaint(null)}
+          onSelect={handleMoveComplaint}
         />
       )}
     </div>

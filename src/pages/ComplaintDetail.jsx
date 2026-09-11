@@ -32,7 +32,7 @@ function getDelayDays(priority, priorityDelays) {
   return priorityDelays?.[priority] ?? null;
 }
 
-function EditComplaintModal({ complaint, users, services, categories, onClose, onUpdated }) {
+function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     customer_name: complaint.customer_name,
     customer_contact: complaint.customer_contact || '',
@@ -43,6 +43,7 @@ function EditComplaintModal({ complaint, users, services, categories, onClose, o
     severity: complaint.severity,
     service_id: complaint.service_id || '',
     category_id: complaint.category_id || '',
+    category_name: complaint.category?.name || '',
     assigned_to: complaint.assigned_to || '',
     root_cause: complaint.root_cause || '',
     resolution: complaint.resolution || '',
@@ -73,12 +74,15 @@ function EditComplaintModal({ complaint, users, services, categories, onClose, o
       }
     }
 
+    // eslint-disable-next-line no-unused-vars
+    const { category_name, ...formForApi } = form;
+
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le state du parent ne doit pas se faire passer pour un échec de l'appel API.
     let response;
     try {
       response = await api.patch(`/complaints/${complaint.id}`, {
-        ...form,
+        ...formForApi,
         category_id: categoryId,
         customer_satisfied: form.customer_satisfied === '' ? null : form.customer_satisfied === 'true',
       });
@@ -199,9 +203,12 @@ function EditComplaintModal({ complaint, users, services, categories, onClose, o
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="complaint"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -492,7 +499,6 @@ export default function ComplaintDetail() {
   const [complaint, setComplaint] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -518,10 +524,6 @@ export default function ComplaintDetail() {
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
-      .catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'complaint' } })
-      .then(({ data }) => setCategories(data))
       .catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -711,7 +713,6 @@ export default function ComplaintDetail() {
           complaint={complaint}
           users={users}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setComplaint((prev) => ({ ...prev, ...data }));
