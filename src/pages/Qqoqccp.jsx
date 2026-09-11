@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Download, FileType, Folder, FolderCog, List, Loader2, Plus, X } from 'lucide-react';
+import { Download, FileType, FolderCog, FolderInput, FolderPlus, Loader2, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
 import { QQOQCCP_STATUS_LABELS } from '../lib/qqoqccpStatus.js';
@@ -8,15 +8,22 @@ import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const QQOQCCP_RESOURCE_TYPE = 'qqoqccp';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -29,9 +36,10 @@ const QQOQCCP_SORT_OPTIONS = [
   { key: 'status', label: 'statut' },
 ];
 
-function NewAnalysisModal({ categories, onClose, onCreated }) {
+function NewAnalysisModal({ onClose, onCreated }) {
   const [title, setTitle] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [categoryName, setCategoryName] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -95,9 +103,12 @@ function NewAnalysisModal({ categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={QQOQCCP_RESOURCE_TYPE}
+            categoryName={categoryName}
             categoryId={categoryId}
             onCategoryIdChange={setCategoryId}
+            onCategoryNameChange={setCategoryName}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -119,7 +130,6 @@ export default function Qqoqccp() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [analyses, setAnalyses] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -127,10 +137,17 @@ export default function Qqoqccp() {
   const [exportingWord, setExportingWord] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingAnalysis, setMovingAnalysis] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: QQOQCCP_RESOURCE_TYPE });
 
   // Miroir exact du gate côté backend (PATCH /api/qqoqccp/:id, qqoqccp.js) : admin/manager
   // modifient toute analyse, un member seulement la sienne tant qu'elle n'est pas validée.
@@ -139,25 +156,14 @@ export default function Qqoqccp() {
     return analysis.created_by === currentUser?.id && analysis.status !== 'validated';
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, analysis) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(analysis.id);
+  async function handleMoveAnalysis(folderId) {
+    const analysis = movingAnalysis;
+    setMovingAnalysis(null);
     try {
-      const { data } = await api.patch(`/qqoqccp/${analysis.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/qqoqccp/${analysis.id}`, { category_id: folderId || null });
       setAnalyses((prev) => prev.map((item) => (item.id === analysis.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cette analyse.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -170,16 +176,8 @@ export default function Qqoqccp() {
       .finally(() => setLoading(false));
   }
 
-  function loadCategories() {
-    api
-      .get('/module-categories', { params: { resource_type: 'qqoqccp' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
-  }
-
   useEffect(() => {
     loadAnalyses();
-    loadCategories();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -215,26 +213,14 @@ export default function Qqoqccp() {
     'desc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='qqoqccp'), plus un dossier
-  // "Sans dossier" en dernier pour les analyses non classées — jamais affiché s'il est vide.
-  // Reprend sortedAnalyses (déjà trié) pour que le mode dossier reste cohérent avec le mode
-  // liste, même principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const analysis of sortedAnalyses) {
-      if (analysis.category_id && byCategory.has(analysis.category_id)) byCategory.get(analysis.category_id).push(analysis);
-      else unfiled.push(analysis);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, analyses: byCategory.get(category.id) || [] }))
-      .filter((group) => group.analyses.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, analyses: unfiled });
-    return groups;
-  }, [sortedAnalyses, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const analysisGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, analyses: sortedAnalyses }];
+  // sortedAnalyses reste la liste COMPLÈTE (déjà triée) : naviguer dans un dossier ne fait que
+  // choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderAnalyses = useMemo(
+    () => sortedAnalyses.filter((analysis) => (analysis.category_id || null) === currentFolderId),
+    [sortedAnalyses, currentFolderId]
+  );
 
   function handleCreated(analysis) {
     setIsModalOpen(false);
@@ -337,28 +323,7 @@ export default function Qqoqccp() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les analyses" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -374,7 +339,7 @@ export default function Qqoqccp() {
 
       {canManage && (
         <SelectAllToggle
-          ids={sortedAnalyses.map((analysis) => analysis.id)}
+          ids={currentFolderAnalyses.map((analysis) => analysis.id)}
           selectedIds={selectedIds}
           onChange={setSelectedIds}
         />
@@ -397,106 +362,108 @@ export default function Qqoqccp() {
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : analyses.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucune analyse QQOQCCP pour l'instant</p>
-          <p className="mt-1 max-w-sm text-sm text-slate-500">
-            Créez votre première analyse pour structurer un problème avec la méthode Qui/Quoi/Où/Quand/Comment/Combien/Pourquoi.
-          </p>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          >
-            <Plus size={18} />
-            Nouvelle analyse
-          </button>
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {analysisGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.analyses.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.analyses.map((analysis) => (
-                    <div
-                      key={analysis.id}
-                      onClick={() => navigate(`/qqoqccp/${analysis.id}`)}
-                      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
-                          {canManage && (
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(analysis.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={() => toggleSelect(analysis.id)}
-                              className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                            />
-                          )}
-                          <div className="min-w-0">
-                            <p className="truncate font-medium text-slate-900">{analysis.title}</p>
-                            <p className="text-sm text-slate-500">{formatDate(analysis.created_at)}</p>
-                          </div>
-                        </div>
-                        <QqoqccpStatusBadge status={analysis.status} />
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CategoryBadge category={analysis.category} />
-                        {canEditAnalysis(analysis) && (
-                          <select
-                            value={analysis.category_id || ''}
-                            disabled={updatingCategoryId === analysis.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, analysis)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
+            </div>
+          )}
+
+          {analyses.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucune analyse QQOQCCP pour l'instant</p>
+              <p className="mt-1 max-w-sm text-sm text-slate-500">
+                Créez votre première analyse pour structurer un problème avec la méthode Qui/Quoi/Où/Quand/Comment/Combien/Pourquoi.
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Plus size={18} />
+                Nouvelle analyse
+              </button>
+            </div>
+          ) : currentFolderAnalyses.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune analyse directement dans ce dossier.' : 'Aucune analyse sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderAnalyses.map((analysis) => (
+                <div
+                  key={analysis.id}
+                  onClick={() => navigate(`/qqoqccp/${analysis.id}`)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {canManage && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(analysis.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelect(analysis.id)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                      )}
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-slate-900">{analysis.title}</p>
+                        <p className="text-sm text-slate-500">{formatDate(analysis.created_at)}</p>
                       </div>
                     </div>
-                  ))}
+                    <QqoqccpStatusBadge status={analysis.status} />
+                  </div>
+                  {canEditAnalysis(analysis) && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingAnalysis(analysis);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
-        <NewAnalysisModal categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewAnalysisModal onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
       )}
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="qqoqccp"
+          resourceType={QQOQCCP_RESOURCE_TYPE}
           endpoint="/qqoqccp/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -505,11 +472,37 @@ export default function Qqoqccp() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="qqoqccp"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={QQOQCCP_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadCategories}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={QQOQCCP_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingAnalysis && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={QQOQCCP_RESOURCE_TYPE}
+          initialFolderId={movingAnalysis.category_id || null}
+          title="Déplacer"
+          subtitle={movingAnalysis.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingAnalysis(null)}
+          onSelect={handleMoveAnalysis}
         />
       )}
     </div>
