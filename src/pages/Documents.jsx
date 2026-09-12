@@ -1,20 +1,24 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Download, Folder, FolderCog, HardDrive, List, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
+import { Download, Folder, FolderCog, FolderInput, FolderPlus, HardDrive, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { isManagerRole } from '../lib/roles.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import StatusBadge from '../components/StatusBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import SearchSnippet from '../components/SearchSnippet.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import UploadErrorMessage from '../components/UploadErrorMessage.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import DocumentBulkMoveModal from '../components/DocumentBulkMoveModal.jsx';
@@ -23,6 +27,7 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import PageGuide from '../components/PageGuide.jsx';
 
+const CATEGORIES_BASE_URL = '/categories';
 const SEARCH_DEBOUNCE_MS = 300;
 
 const DOCUMENT_SORT_OPTIONS = [
@@ -86,16 +91,18 @@ function StorageProvenanceIcon({ doc, onOpenInDrive, opening }) {
   );
 }
 
-function DocumentModal({ categories, onClose, onCreated }) {
+function DocumentModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     number: '',
     title: '',
     description: '',
     category_id: '',
+    category_name: '',
     review_date: '',
     review_frequency_months: '',
   });
   const [file, setFile] = useState(null);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -177,19 +184,28 @@ function DocumentModal({ categories, onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Catégorie</label>
-            <select
-              value={form.category_id}
-              onChange={(e) => updateField('category_id', e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            <label className="mb-1 block text-sm font-medium text-slate-700">Dossier</label>
+            <button
+              type="button"
+              onClick={() => setIsPickerOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md border border-slate-300 px-3 py-2.5 text-left text-base text-slate-700 hover:bg-slate-50"
             >
-              <option value="">Aucune</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              <Folder size={16} className="shrink-0 text-primary" />
+              <span className="truncate">{form.category_name || 'Aucun dossier'}</span>
+            </button>
+            {isPickerOpen && (
+              <FolderPickerModal
+                baseUrl={CATEGORIES_BASE_URL}
+                initialFolderId={form.category_id || null}
+                subtitle="Dossier de rattachement"
+                onClose={() => setIsPickerOpen(false)}
+                onSelect={(folderId, folderName) => {
+                  updateField('category_id', folderId || '');
+                  updateField('category_name', folderName || '');
+                  setIsPickerOpen(false);
+                }}
+              />
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -398,7 +414,6 @@ export default function Documents() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [documents, setDocuments] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -406,7 +421,6 @@ export default function Documents() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
@@ -421,20 +435,17 @@ export default function Documents() {
   const [openingDriveId, setOpeningDriveId] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingDocument, setMovingDocument] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -461,17 +472,14 @@ export default function Documents() {
     }
   }
 
-  async function handleCategoryChange(event, doc) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(doc.id);
+  async function handleMoveDocument(folderId) {
+    const doc = movingDocument;
+    setMovingDocument(null);
     try {
-      const { data } = await api.patch(`/documents/${doc.id}/category`, { category_id: categoryId });
+      const { data } = await api.patch(`/documents/${doc.id}/category`, { category_id: folderId || null });
       setDocuments((prev) => prev.map((d) => (d.id === doc.id ? data : d)));
     } catch {
-      setError('Impossible de changer la catégorie de ce document.');
-    } finally {
-      setUpdatingCategoryId(null);
+      setError('Impossible de changer le dossier de ce document.');
     }
   }
 
@@ -479,9 +487,8 @@ export default function Documents() {
     setLoading(true);
     setError('');
     try {
-      const [documentsRes, categoriesRes] = await Promise.all([api.get('/documents'), api.get('/categories')]);
-      setDocuments(documentsRes.data);
-      setCategories(categoriesRes.data);
+      const { data } = await api.get('/documents');
+      setDocuments(data);
     } catch {
       setError('Impossible de charger les documents.');
     } finally {
@@ -549,12 +556,8 @@ export default function Documents() {
 
   const filteredDocuments = useMemo(() => {
     const base = searchResultDocuments ?? documents;
-    return base.filter((doc) => {
-      const matchesStatus = !statusFilter || doc.status === statusFilter;
-      const matchesCategory = !categoryFilter || doc.category_id === categoryFilter;
-      return matchesStatus && matchesCategory;
-    });
-  }, [documents, searchResultDocuments, statusFilter, categoryFilter]);
+    return base.filter((doc) => !statusFilter || doc.status === statusFilter);
+  }, [documents, searchResultDocuments, statusFilter]);
 
   const { sorted: sortedDocuments, sortKey, direction, setSortKey, toggleSort } = useSort(
     filteredDocuments,
@@ -563,30 +566,19 @@ export default function Documents() {
     'asc'
   );
 
-  // Un dossier par catégorie (déjà triées par nom côté backend), plus un dossier "Sans dossier"
-  // en dernier pour les documents non classés — jamais affiché s'il est vide. Reprend
-  // sortedDocuments (déjà filtré/trié) pour que le mode dossier reste cohérent avec le mode
-  // liste, seule la présentation change.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const doc of sortedDocuments) {
-      if (doc.category_id && byCategory.has(doc.category_id)) byCategory.get(doc.category_id).push(doc);
-      else unfiled.push(doc);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, docs: byCategory.get(category.id) || [] }))
-      .filter((group) => group.docs.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, docs: unfiled });
-    return groups;
-  }, [sortedDocuments, categories]);
-
-  // Le mode dossier n'a pas de sens pendant une recherche plein texte (le classement par
-  // pertinence prime alors sur le rangement) — un seul groupe "virtuel" fait retomber les deux
-  // blocs de rendu (mobile/desktop) sur exactement le même comportement qu'avant l'ajout des
-  // dossiers, sans dupliquer leur JSX pour un cas "liste plate".
-  const isFolderView = viewMode === 'folder' && !isSearchActive;
-  const docGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, docs: sortedDocuments }];
+  // sortedDocuments reste la liste COMPLÈTE (recherche + statut + tri) : naviguer dans un
+  // dossier ne fait que choisir, côté affichage, quel sous-ensemble montrer — filtrage client de
+  // la liste déjà chargée, même principe que Risks.jsx/Suppliers.jsx. Pendant une recherche
+  // plein texte, le classement par pertinence prime sur le rangement par dossier (voir
+  // isSearchActive plus bas) : la navigation par dossier est alors simplement masquée, pas
+  // recalculée sur les résultats de recherche.
+  const currentFolderDocuments = useMemo(
+    () => sortedDocuments.filter((doc) => (doc.category_id || null) === currentFolderId),
+    [sortedDocuments, currentFolderId]
+  );
+  // Pendant une recherche plein texte, la navigation par dossier est masquée (voir plus bas) :
+  // la liste affichée redevient sortedDocuments au complet, non scopée à un dossier.
+  const visibleDocuments = isSearchActive ? sortedDocuments : currentFolderDocuments;
 
   // file_path peut être un chemin Supabase ou un id de fichier Google Drive selon le provider
   // du document (voir B3) — seul le backend sait lequel et construit l'URL correspondante,
@@ -669,7 +661,6 @@ export default function Documents() {
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
       await exportTableCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, 'Documents', columns, rows, {
         generatedBy: currentUser?.full_name,
         subtitle: [countLabel, ...filterParts].join(' · '),
@@ -710,7 +701,6 @@ export default function Documents() {
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
       await exportToPdf(`documents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Documents', columns, rows, {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
@@ -751,7 +741,6 @@ export default function Documents() {
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
       await exportToXlsx(`documents-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Documents', columns, rows, {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
@@ -792,7 +781,6 @@ export default function Documents() {
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
       await exportToWord(`documents-${new Date().toISOString().slice(0, 10)}.docx`, 'Documents', columns, rows, {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
@@ -834,7 +822,6 @@ export default function Documents() {
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      if (categoryFilter) filterParts.push(`Catégorie : ${source.find((d) => d.category_id === categoryFilter)?.category?.name || categoryFilter}`);
       await exportToDrive('DOC', 'Documents', columns, rows, {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
@@ -928,19 +915,6 @@ export default function Documents() {
           ))}
         </select>
 
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-        >
-          <option value="">Toutes les catégories</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-
         <SortSelect
           options={DOCUMENT_SORT_OPTIONS}
           sortKey={sortKey}
@@ -952,28 +926,7 @@ export default function Documents() {
 
       {!isSearchActive && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setViewMode('folder')}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Folder size={16} />
-              Par dossier
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <List size={16} />
-              Liste
-            </button>
-          </div>
+          <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les documents" />
 
           {currentUser?.role === 'admin' && (
             <button
@@ -989,7 +942,7 @@ export default function Documents() {
       )}
 
       {canManage && (
-        <SelectAllToggle ids={sortedDocuments.map((doc) => doc.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+        <SelectAllToggle ids={visibleDocuments.map((doc) => doc.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
       )}
 
       {canManage && (
@@ -1017,187 +970,70 @@ export default function Documents() {
         </p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : filteredDocuments.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">
-          {isSearchActive
-            ? `Aucun résultat pour « ${search.trim()} ».`
-            : 'Aucun document ne correspond à ces critères.'}
-        </p>
       ) : (
         <>
-          <div className="mt-4 space-y-3 md:hidden">
-            {docGroups.map((group) => (
-              <div key={group.key}>
-                {isFolderView && (
-                  <button
-                    type="button"
-                    onClick={() => toggleFolder(group.key)}
-                    className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
-                  >
-                    {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                    {group.category ? group.category.name : 'Sans dossier'}
-                    <span className="font-normal text-slate-400">({group.docs.length})</span>
-                  </button>
-                )}
-                {(!isFolderView || expandedFolders.has(group.key)) && (
-                  <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                    {group.docs.map((doc) => (
-              <div
-                key={doc.id}
-                onClick={() => navigate(`/documents/${doc.id}`)}
-                className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-2">
-                    {canManage && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(doc.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleSelect(doc.id)}
-                        className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
-                    )}
-                    <div>
-                      <p className="font-medium text-slate-900">{doc.title}</p>
-                      <p className="text-sm text-slate-500">
-                        {doc.number} · v{doc.version}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    {doc.file_path && (
-                      <StorageProvenanceIcon doc={doc} onOpenInDrive={handleOpenInDrive} opening={openingDriveId === doc.id} />
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => handleDownload(e, doc)}
-                      disabled={!doc.file_path || downloadingId === doc.id}
-                      aria-label="Télécharger"
-                      className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary disabled:opacity-30"
-                    >
-                      {downloadingId === doc.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-                    </button>
-                  </div>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <CategoryBadge category={doc.category} />
-                  <StatusBadge status={doc.status} />
-                  <MatchLocationBadge location={doc.match_location} />
-                </div>
-                {doc.review_date && (
-                  <p className="mt-2 text-xs text-slate-500">Prochaine révision : {formatDate(doc.review_date)}</p>
-                )}
-                {canManage && (
-                  <select
-                    value={doc.category_id || ''}
-                    disabled={updatingCategoryId === doc.id}
-                    onClick={(e) => e.stopPropagation()}
-                    onChange={(e) => handleCategoryChange(e, doc)}
-                    className="mt-3 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                  >
-                    <option value="">Aucune catégorie</option>
-                    {categories.map((category) => (
-                      <option key={category.id} value={category.id}>
-                        {category.name}
-                      </option>
-                    ))}
-                  </select>
-                )}
-                <SearchSnippet snippet={doc.snippet} />
-              </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
+          {!isSearchActive && (folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
+                </button>
+              )}
+            </div>
+          )}
 
-          <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  {canManage && <th className="w-8 px-4 py-3" />}
-                  <SortableTh label="Numéro" sortKey="number" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <SortableTh label="Titre" sortKey="title" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <SortableTh label="Catégorie" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <SortableTh label="Version" sortKey="version" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <SortableTh label="Statut" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <SortableTh label="Prochaine révision" sortKey="review_date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <th className="px-4 py-3 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {docGroups.map((group) => (
-                  <Fragment key={group.key}>
-                    {isFolderView && (
-                      <tr className="cursor-pointer bg-slate-50 hover:bg-slate-100" onClick={() => toggleFolder(group.key)}>
-                        <td colSpan={canManage ? 8 : 7} className="px-4 py-2.5">
-                          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                            {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                            {group.category ? group.category.name : 'Sans dossier'}
-                            <span className="font-normal text-slate-400">({group.docs.length})</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    {(!isFolderView || expandedFolders.has(group.key)) &&
-                      group.docs.map((doc) => (
-                  <tr key={doc.id} onClick={() => navigate(`/documents/${doc.id}`)} className="cursor-pointer hover:bg-slate-50">
-                    {canManage && (
-                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(doc.id)}
-                          onChange={() => toggleSelect(doc.id)}
-                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                      </td>
-                    )}
-                    <td className="px-4 py-3 font-medium text-slate-800">{doc.number}</td>
-                    <td className="max-w-sm px-4 py-3 text-slate-700">
-                      <div className="flex items-center gap-2">
-                        {doc.title}
-                        <MatchLocationBadge location={doc.match_location} />
-                      </div>
-                      <SearchSnippet snippet={doc.snippet} />
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <CategoryBadge category={doc.category} />
+          {filteredDocuments.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-500">
+              {isSearchActive
+                ? `Aucun résultat pour « ${search.trim()} ».`
+                : 'Aucun document ne correspond à ces critères.'}
+            </p>
+          ) : !isSearchActive && visibleDocuments.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucun document directement dans ce dossier.' : 'Aucun document sans dossier.'}
+            </p>
+          ) : (
+            <>
+              <div className="mt-4 space-y-3 md:hidden">
+                {visibleDocuments.map((doc) => (
+                  <div
+                    key={doc.id}
+                    onClick={() => navigate(`/documents/${doc.id}`)}
+                    className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-2">
                         {canManage && (
-                          <select
-                            value={doc.category_id || ''}
-                            disabled={updatingCategoryId === doc.id}
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(doc.id)}
                             onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, doc)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Aucune catégorie</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={() => toggleSelect(doc.id)}
+                            className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                          />
                         )}
+                        <div>
+                          <p className="font-medium text-slate-900">{doc.title}</p>
+                          <p className="text-sm text-slate-500">
+                            {doc.number} · v{doc.version}
+                          </p>
+                        </div>
                       </div>
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{doc.version}</td>
-                    <td className="px-4 py-3">
-                      <StatusBadge status={doc.status} />
-                    </td>
-                    <td className="px-4 py-3 text-slate-600">{formatDate(doc.review_date) || '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-1">
+                      <div className="flex shrink-0 items-center gap-1">
                         {doc.file_path && (
                           <StorageProvenanceIcon doc={doc} onOpenInDrive={handleOpenInDrive} opening={openingDriveId === doc.id} />
                         )}
@@ -1211,19 +1047,117 @@ export default function Documents() {
                           {downloadingId === doc.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                      ))}
-                  </Fragment>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <StatusBadge status={doc.status} />
+                      <MatchLocationBadge location={doc.match_location} />
+                    </div>
+                    {doc.review_date && (
+                      <p className="mt-2 text-xs text-slate-500">Prochaine révision : {formatDate(doc.review_date)}</p>
+                    )}
+                    {canManage && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingDocument(doc);
+                        }}
+                        className="mt-3 flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    )}
+                    <SearchSnippet snippet={doc.snippet} />
+                  </div>
                 ))}
-              </tbody>
-            </table>
-          </div>
+              </div>
+
+              <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      {canManage && <th className="w-8 px-4 py-3" />}
+                      <SortableTh label="Numéro" sortKey="number" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                      <SortableTh label="Titre" sortKey="title" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                      <SortableTh label="Catégorie" sortKey="category" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                      <SortableTh label="Version" sortKey="version" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                      <SortableTh label="Statut" sortKey="status" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                      <SortableTh label="Prochaine révision" sortKey="review_date" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                      <th className="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {visibleDocuments.map((doc) => (
+                      <tr key={doc.id} onClick={() => navigate(`/documents/${doc.id}`)} className="cursor-pointer hover:bg-slate-50">
+                        {canManage && (
+                          <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(doc.id)}
+                              onChange={() => toggleSelect(doc.id)}
+                              className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                            />
+                          </td>
+                        )}
+                        <td className="px-4 py-3 font-medium text-slate-800">{doc.number}</td>
+                        <td className="max-w-sm px-4 py-3 text-slate-700">
+                          <div className="flex items-center gap-2">
+                            {doc.title}
+                            <MatchLocationBadge location={doc.match_location} />
+                          </div>
+                          <SearchSnippet snippet={doc.snippet} />
+                        </td>
+                        <td className="px-4 py-3">
+                          {canManage ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setMovingDocument(doc);
+                              }}
+                              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                            >
+                              <FolderInput size={12} />
+                              Déplacer
+                            </button>
+                          ) : (
+                            doc.category?.name || '—'
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{doc.version}</td>
+                        <td className="px-4 py-3">
+                          <StatusBadge status={doc.status} />
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{formatDate(doc.review_date) || '—'}</td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {doc.file_path && (
+                              <StorageProvenanceIcon doc={doc} onOpenInDrive={handleOpenInDrive} opening={openingDriveId === doc.id} />
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => handleDownload(e, doc)}
+                              disabled={!doc.file_path || downloadingId === doc.id}
+                              aria-label="Télécharger"
+                              className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary disabled:opacity-30"
+                            >
+                              {downloadingId === doc.id ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </>
       )}
 
       {isModalOpen && (
-        <DocumentModal categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <DocumentModal onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
       )}
 
       {isImportModalOpen && (
@@ -1232,7 +1166,6 @@ export default function Documents() {
 
       {isBulkMoveModalOpen && (
         <DocumentBulkMoveModal
-          categories={categories}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -1241,10 +1174,34 @@ export default function Documents() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/categories"
+          baseUrl={CATEGORIES_BASE_URL}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingDocument && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          initialFolderId={movingDocument.category_id || null}
+          title="Déplacer"
+          subtitle={movingDocument.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingDocument(null)}
+          onSelect={handleMoveDocument}
         />
       )}
     </div>
