@@ -37,6 +37,7 @@ function buildTreatmentForm(capa) {
   return {
     service_id: capa.service_id || '',
     category_id: capa.category_id || '',
+    category_name: capa.category?.name || '',
     description: capa.description || '',
     root_cause: capa.root_cause || '',
     corrective_action: capa.corrective_action || '',
@@ -206,7 +207,6 @@ export default function CapaDetail() {
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -267,10 +267,6 @@ export default function CapaDetail() {
       // GET /services renvoie aussi les services désactivés (nécessaire à la page de
       // gestion) — ce formulaire ne doit proposer que les actifs.
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
-      .catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'capa' } })
-      .then(({ data }) => setCategories(data))
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -626,9 +622,12 @@ export default function CapaDetail() {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="capa"
+            categoryName={treatmentForm.category_name}
             categoryId={treatmentForm.category_id}
             onCategoryIdChange={(value) => setTreatmentForm((prev) => ({ ...prev, category_id: value }))}
+            onCategoryNameChange={(value) => setTreatmentForm((prev) => ({ ...prev, category_name: value }))}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
             disabled={!canManage}
