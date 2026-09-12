@@ -64,7 +64,6 @@ const AccidentDetail = lazy(() => import('./pages/AccidentDetail.jsx'));
 const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
 const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutputDetail.jsx'));
 const CustomerSatisfactionDetail = lazy(() => import('./pages/CustomerSatisfactionDetail.jsx'));
-const CommunicationPlan = lazy(() => import('./pages/CommunicationPlan.jsx'));
 const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
@@ -145,7 +144,6 @@ export default function App() {
               <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
               <Route path="customer-satisfaction" element={<CustomerFeedback />} />
               <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />
-              <Route path="communication-plan" element={<CommunicationPlan />} />
               <Route path="haccp" element={<RiskManagement />} />
               <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />

@@ -7,7 +7,7 @@ import FolderPickerModal from './FolderPickerModal.jsx';
 // catégories distinct (document_categories, sans notion de catégorie personnelle "Uniquement
 // moi"), d'où un simple bouton "Dossier" ouvrant FolderPickerModal plutôt que
 // CategoryVisibilityField (qui impose le bascule "Tout le monde"/"Uniquement moi" inexistant
-// ici) — même principe que Employees.jsx/CommunicationPlan.jsx.
+// ici) — même principe que Employees.jsx.
 export default function DocumentBulkMoveModal({ selectedIds, onClose, onMoved }) {
   const [categoryId, setCategoryId] = useState('');
   const [categoryName, setCategoryName] = useState('');

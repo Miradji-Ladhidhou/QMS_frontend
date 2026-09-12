@@ -197,17 +197,6 @@ export const PAGE_GUIDES = {
     example:
       "enquête annuelle envoyée à 40 clients, note moyenne 4,2/5 → une réponse à 2/5 déclenche l'ouverture d'une CAPA depuis la fiche.",
   },
-  'communication-plan': {
-    title: 'Qui communique quoi, à qui, quand',
-    body: (
-      <p>
-        La liste des communications <strong>internes et externes</strong> du système de management : sujet, cible,
-        fréquence, canal, responsable.
-      </p>
-    ),
-    example:
-      "« résultats de la revue de direction » → à tout le personnel → 1 fois par an → affichage + réunion d'équipe → responsable : la direction.",
-  },
   'my-approvals': {
     title: "Votre file d'attente d'approbations",
     body: (

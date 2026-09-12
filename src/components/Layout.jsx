@@ -13,7 +13,6 @@ import {
   HelpCircle,
   LayoutDashboard,
   LogOut,
-  Megaphone,
   Menu,
   MessageSquareWarning,
   PackageX,
@@ -140,7 +139,6 @@ export const NAV_ITEMS = [
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'complaints'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'customer-satisfaction', to: '/customer-satisfaction', label: 'Satisfaction client', icon: Smile, hiddenFromSidebar: true },
-  { key: 'communication-plan', to: '/communication-plan', label: 'Plan de communication', icon: Megaphone },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
