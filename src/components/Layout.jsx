@@ -17,7 +17,6 @@ import {
   MessageSquareWarning,
   PackageX,
   RefreshCw,
-  ScrollText,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -84,7 +83,17 @@ function initialsOf(fullName) {
 export const NAV_ITEMS = [
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { key: 'planning', to: '/planning', label: 'Planning', icon: CalendarClock },
-  { key: 'documents', to: '/documents', label: 'Documents', icon: FileText },
+  // Gardée uniquement pour la configuration de visibilité (voir le lien fusionné juste en
+  // dessous, qui reste alwaysVisible pour préserver l'accessibilité de Politique qualité —
+  // ISO 9001 §5.2) : n'apparaît plus comme lien séparé dans le menu latéral.
+  { key: 'documents', to: '/documents', label: 'Documents', icon: FileText, hiddenFromSidebar: true },
+  // Fusionne Documents, Mes approbations ('my-approvals' plus bas) et Politique qualité (voir
+  // DocumentsHub.jsx) — lien de menu volontairement alwaysVisible (pas de `key` propre, comme
+  // l'était Politique qualité seule auparavant) : ISO 9001 §5.2 exige que la politique qualité
+  // reste joignable quel que soit ce que l'admin a caché pour un rôle, y compris si 'documents'
+  // ou 'my-approvals' sont masqués — DocumentsHub.jsx n'affiche alors plus que l'onglet
+  // Politique qualité. Voir aussi le commentaire équivalent sur 'prise-en-main' plus bas.
+  { to: '/documents', label: 'Documents', icon: FileText, alwaysVisible: true },
   // Fusionné avec PDCA et QQOQCCP (voir ImprovementActions.jsx, qui assemble les trois pages
   // en onglets) sous ce seul lien de menu — même principe que 'complaints' plus bas : les
   // entrées 'pdca' et 'qqoqccp' restent dans ce tableau pour MenuVisibilitySettings.jsx mais
@@ -143,18 +152,13 @@ export const NAV_ITEMS = [
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'complaints'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'customer-satisfaction', to: '/customer-satisfaction', label: 'Satisfaction client', icon: Smile, hiddenFromSidebar: true },
-  { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
+  // Gardée uniquement pour la configuration de visibilité (voir le lien fusionné plus haut,
+  // sur 'documents') : n'apparaît plus comme lien séparé dans le menu latéral.
+  { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare, hiddenFromSidebar: true },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
   // rester joignable quel que soit ce que l'admin a caché pour ce rôle.
   { to: '/prise-en-main', label: 'Prise en main', icon: BookOpen, alwaysVisible: true },
-  // Même raisonnement, pour une raison différente : pas de key car ISO 9001 §5.2 exige que la
-  // politique qualité reste "communiquée, comprise et disponible" pour tout le tenant — un
-  // module configurable pourrait être masqué par un admin pour un rôle, ce qui irait à
-  // l'encontre de cette exigence. Anciennement un onglet de Paramètres, sorti en page de menu
-  // à part entière (voir QualityPolicy.jsx) faute de quoi il restait de fait inatteignable
-  // pour qui n'est pas admin.
-  { to: '/quality-policy', label: 'Politique qualité', icon: ScrollText, alwaysVisible: true },
   // Configurables comme les autres (Paramètres > Visibilité), mais masquées par défaut pour
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
   // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations

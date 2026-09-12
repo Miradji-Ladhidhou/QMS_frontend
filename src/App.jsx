@@ -18,7 +18,11 @@ import CookieNotice from './components/CookieNotice.jsx';
 // gain que seule une fraction des visiteurs (déjà connectés) utilise réellement.
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Planning = lazy(() => import('./pages/Planning.jsx'));
-const Documents = lazy(() => import('./pages/Documents.jsx'));
+// Documents.jsx, MyApprovals.jsx et QualityPolicy.jsx ne sont plus chargées directement en
+// tant que routes : elles sont maintenant trois onglets assemblés par DocumentsHub.jsx (fusion
+// des menus "Documents"/"Mes approbations"/"Politique qualité", voir Layout.jsx), et
+// lazy-importées depuis ce fichier-là.
+const DocumentsHub = lazy(() => import('./pages/DocumentsHub.jsx'));
 const DocumentDetail = lazy(() => import('./pages/DocumentDetail.jsx'));
 // Capas.jsx, Pdca.jsx et Qqoqccp.jsx ne sont plus chargées directement en tant que routes :
 // elles sont maintenant trois onglets assemblés par ImprovementActions.jsx (fusion des menus
@@ -68,9 +72,7 @@ const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
-const QualityPolicy = lazy(() => import('./pages/QualityPolicy.jsx'));
 const Services = lazy(() => import('./pages/Services.jsx'));
-const MyApprovals = lazy(() => import('./pages/MyApprovals.jsx'));
 const GettingStarted = lazy(() => import('./pages/GettingStarted.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
 
@@ -121,7 +123,7 @@ export default function App() {
             <Route path="/" element={<Layout />}>
               <Route index element={<Dashboard />} />
               <Route path="planning" element={<Planning />} />
-              <Route path="documents" element={<Documents />} />
+              <Route path="documents" element={<DocumentsHub />} />
               <Route path="documents/:id" element={<DocumentDetail />} />
               <Route path="capas" element={<ImprovementActions />} />
               <Route path="capas/:id" element={<CapaDetail />} />
@@ -153,10 +155,10 @@ export default function App() {
               <Route path="procedures" element={<Procedures />} />
               <Route path="procedures/:id" element={<ProcedureDetail />} />
               <Route path="settings" element={<Settings />} />
-              <Route path="quality-policy" element={<QualityPolicy />} />
+              <Route path="quality-policy" element={<DocumentsHub />} />
               <Route path="services" element={<Services />} />
               <Route path="employees" element={<HumanResources />} />
-              <Route path="my-approvals" element={<MyApprovals />} />
+              <Route path="my-approvals" element={<DocumentsHub />} />
               <Route path="prise-en-main" element={<GettingStarted />} />
             </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
