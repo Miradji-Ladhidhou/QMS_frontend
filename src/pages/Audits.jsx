@@ -1,18 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -20,6 +24,9 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const AUDIT_RESOURCE_TYPE = 'audit';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -42,7 +49,7 @@ function getAuditSortValue(audit, key) {
   return audit[key];
 }
 
-function NewAuditModal({ users, services, categories, onClose, onCreated }) {
+function NewAuditModal({ users, services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     audit_type: 'process',
@@ -51,6 +58,7 @@ function NewAuditModal({ users, services, categories, onClose, onCreated }) {
     lead_auditor: '',
     planned_date: '',
     category_id: '',
+    category_name: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -199,9 +207,12 @@ function NewAuditModal({ users, services, categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={AUDIT_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -226,7 +237,6 @@ export default function Audits() {
   const [audits, setAudits] = useState([]);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -240,34 +250,30 @@ export default function Audits() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingAudit, setMovingAudit] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: AUDIT_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, audit) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(audit.id);
+  async function handleMoveAudit(folderId) {
+    const audit = movingAudit;
+    setMovingAudit(null);
     try {
-      const { data } = await api.patch(`/audits/${audit.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/audits/${audit.id}`, { category_id: folderId || null });
       setAudits((prev) => prev.map((item) => (item.id === audit.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cet audit.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -294,16 +300,14 @@ export default function Audits() {
     setLoading(true);
     setError('');
     try {
-      const [auditsRes, usersRes, servicesRes, categoriesRes] = await Promise.all([
+      const [auditsRes, usersRes, servicesRes] = await Promise.all([
         api.get('/audits', { params: statusFilter ? { status: statusFilter } : {} }),
         api.get('/users'),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'audit' } }),
       ]);
       setAudits(auditsRes.data);
       setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les audits.');
     } finally {
@@ -323,26 +327,14 @@ export default function Audits() {
     'desc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='audit'), plus un dossier "Sans
-  // dossier" en dernier pour les audits non classés — jamais affiché s'il est vide. Reprend
-  // sortedAudits (déjà trié) pour que le mode dossier reste cohérent avec le mode liste, même
-  // principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const audit of sortedAudits) {
-      if (audit.category_id && byCategory.has(audit.category_id)) byCategory.get(audit.category_id).push(audit);
-      else unfiled.push(audit);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, audits: byCategory.get(category.id) || [] }))
-      .filter((group) => group.audits.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, audits: unfiled });
-    return groups;
-  }, [sortedAudits, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const auditGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, audits: sortedAudits }];
+  // sortedAudits reste la liste COMPLÈTE (déjà triée) : naviguer dans un dossier ne fait que
+  // choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderAudits = useMemo(
+    () => sortedAudits.filter((audit) => (audit.category_id || null) === currentFolderId),
+    [sortedAudits, currentFolderId]
+  );
 
   function handleCreated(audit) {
     setIsModalOpen(false);
@@ -574,28 +566,7 @@ export default function Audits() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les audits" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -610,7 +581,7 @@ export default function Audits() {
       </div>
 
       {canManage && (
-        <SelectAllToggle ids={sortedAudits.map((audit) => audit.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+        <SelectAllToggle ids={currentFolderAudits.map((audit) => audit.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
       )}
 
       {canManage && (
@@ -642,101 +613,102 @@ export default function Audits() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : audits.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucun audit pour l'instant</p>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
-              <Plus size={18} />
-              Planifier un audit
-            </button>
-          )}
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {auditGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.audits.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.audits.map((audit) => (
-                    <div
-                      key={audit.id}
-                      onClick={() => navigate(`/audits/${audit.id}`)}
-                      className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      {canManage && (
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(audit.id)}
-                          onClick={(e) => e.stopPropagation()}
-                          onChange={() => toggleSelect(audit.id)}
-                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                        />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate font-medium text-slate-900">{audit.title}</p>
-                        <p className="text-sm text-slate-500">
-                          {AUDIT_TYPE_LABELS[audit.audit_type]} · {formatDate(audit.planned_date)}
-                          {audit.service ? ` · ${audit.service.name}` : ''}
-                          {audit.lead ? ` · ${audit.lead.full_name}` : ''}
-                        </p>
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <CategoryBadge category={audit.category} />
-                          {canManage && (
-                            <select
-                              value={audit.category_id || ''}
-                              disabled={updatingCategoryId === audit.id}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => handleCategoryChange(e, audit)}
-                              className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Sans dossier</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      </div>
-                      <AuditStatusBadge status={audit.status} />
-                    </div>
-                  ))}
-                </div>
+            </div>
+          )}
+
+          {audits.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucun audit pour l'instant</p>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                >
+                  <Plus size={18} />
+                  Planifier un audit
+                </button>
               )}
             </div>
-          ))}
-        </div>
+          ) : currentFolderAudits.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucun audit directement dans ce dossier.' : 'Aucun audit sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderAudits.map((audit) => (
+                <div
+                  key={audit.id}
+                  onClick={() => navigate(`/audits/${audit.id}`)}
+                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  {canManage && (
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(audit.id)}
+                      onClick={(e) => e.stopPropagation()}
+                      onChange={() => toggleSelect(audit.id)}
+                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                    />
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium text-slate-900">{audit.title}</p>
+                    <p className="text-sm text-slate-500">
+                      {AUDIT_TYPE_LABELS[audit.audit_type]} · {formatDate(audit.planned_date)}
+                      {audit.service ? ` · ${audit.service.name}` : ''}
+                      {audit.lead ? ` · ${audit.lead.full_name}` : ''}
+                    </p>
+                    {canManage && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMovingAudit(audit);
+                          }}
+                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                          <FolderInput size={12} />
+                          Déplacer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  <AuditStatusBadge status={audit.status} />
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
         <NewAuditModal
           users={users}
           services={services}
-          categories={categories}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />
@@ -744,9 +716,9 @@ export default function Audits() {
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="audit"
+          resourceType={AUDIT_RESOURCE_TYPE}
           endpoint="/audits/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -755,11 +727,37 @@ export default function Audits() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="audit"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={AUDIT_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={AUDIT_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingAudit && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={AUDIT_RESOURCE_TYPE}
+          initialFolderId={movingAudit.category_id || null}
+          title="Déplacer"
+          subtitle={movingAudit.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingAudit(null)}
+          onSelect={handleMoveAudit}
         />
       )}
     </div>

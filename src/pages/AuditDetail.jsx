@@ -31,7 +31,7 @@ function getDelayDays(priority, priorityDelays) {
   return priorityDelays?.[priority] ?? null;
 }
 
-function EditAuditModal({ audit, users, services, categories, onClose, onUpdated }) {
+function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: audit.title,
     audit_type: audit.audit_type,
@@ -42,6 +42,7 @@ function EditAuditModal({ audit, users, services, categories, onClose, onUpdated
     completed_date: audit.completed_date || '',
     conclusion: audit.conclusion || '',
     category_id: audit.category_id || '',
+    category_name: audit.category?.name || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(audit.is_private_to_me));
   const [error, setError] = useState('');
@@ -208,9 +209,12 @@ function EditAuditModal({ audit, users, services, categories, onClose, onUpdated
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl="/module-categories"
+            resourceType="audit"
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -236,7 +240,6 @@ export default function AuditDetail() {
   const [audit, setAudit] = useState(null);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -268,10 +271,6 @@ export default function AuditDetail() {
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))
       .catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'audit' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -490,7 +489,6 @@ export default function AuditDetail() {
           audit={audit}
           users={users}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setAudit((prev) => ({ ...prev, ...data }));
