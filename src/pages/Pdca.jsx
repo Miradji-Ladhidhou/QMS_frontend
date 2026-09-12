@@ -1,22 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertTriangle, ChevronDown, ChevronUp, Folder, FolderCog, List, Plus, Search, X } from 'lucide-react';
+import { AlertTriangle, FolderCog, FolderInput, FolderPlus, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { PDCA_STATUS_LABELS } from '../lib/pdcaStatus.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PdcaStatusBadge from '../components/PdcaStatusBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const PDCA_RESOURCE_TYPE = 'pdca';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -48,7 +55,7 @@ function canDeletePdca(pdca, currentUser) {
   return currentUser.role === 'admin' || pdca.created_by === currentUser.id;
 }
 
-function NewPdcaModal({ users, services, categories, onClose, onCreated }) {
+function NewPdcaModal({ users, services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     description: '',
@@ -57,6 +64,7 @@ function NewPdcaModal({ users, services, categories, onClose, onCreated }) {
     target_date: '',
     plan_content: '',
     category_id: '',
+    category_name: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -196,9 +204,12 @@ function NewPdcaModal({ users, services, categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={PDCA_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -222,7 +233,6 @@ export default function Pdca() {
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
@@ -231,34 +241,30 @@ export default function Pdca() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingPdca, setMovingPdca] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: PDCA_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, pdca) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(pdca.id);
+  async function handleMovePdca(folderId) {
+    const pdca = movingPdca;
+    setMovingPdca(null);
     try {
-      const { data } = await api.patch(`/pdca/${pdca.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/pdca/${pdca.id}`, { category_id: folderId || null });
       setProjects((prev) => prev.map((item) => (item.id === pdca.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de ce projet.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -288,16 +294,14 @@ export default function Pdca() {
       const params = {};
       if (statusFilter) params.status = statusFilter;
       if (serviceFilter) params.service_id = serviceFilter;
-      const [pdcaRes, usersRes, servicesRes, categoriesRes] = await Promise.all([
+      const [pdcaRes, usersRes, servicesRes] = await Promise.all([
         api.get('/pdca', { params }),
         api.get('/users'),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'pdca' } }),
       ]);
       setProjects(pdcaRes.data);
       setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les projets PDCA.');
     } finally {
@@ -325,27 +329,15 @@ export default function Pdca() {
     'asc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='pdca'), plus un dossier "Sans
-  // dossier" en dernier pour les projets non classés — jamais affiché s'il est vide. Reprend
-  // sortedProjects (déjà trié/filtré) pour que le mode dossier reste cohérent avec le mode
-  // liste, même principe que Risks.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const pdca of sortedProjects) {
-      if (pdca.category_id && byCategory.has(pdca.category_id)) byCategory.get(pdca.category_id).push(pdca);
-      else unfiled.push(pdca);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, projects: byCategory.get(category.id) || [] }))
-      .filter((group) => group.projects.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, projects: unfiled });
-    return groups;
-  }, [sortedProjects, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const pdcaGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, projects: sortedProjects }];
-  const deletableIds = sortedProjects.filter((pdca) => canDeletePdca(pdca, currentUser)).map((pdca) => pdca.id);
+  // sortedProjects reste la liste COMPLÈTE (recherche + filtres + tri) : naviguer dans un
+  // dossier ne fait que choisir, côté affichage, quel sous-ensemble montrer — filtrage client
+  // de la liste déjà chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier"
+  // (racine) = category_id null.
+  const currentFolderProjects = useMemo(
+    () => sortedProjects.filter((pdca) => (pdca.category_id || null) === currentFolderId),
+    [sortedProjects, currentFolderId]
+  );
+  const deletableIds = currentFolderProjects.filter((pdca) => canDeletePdca(pdca, currentUser)).map((pdca) => pdca.id);
 
   function handleCreated(pdca) {
     setIsModalOpen(false);
@@ -410,28 +402,7 @@ export default function Pdca() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les projets" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -456,124 +427,154 @@ export default function Pdca() {
         />
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : projects.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucun projet PDCA enregistré pour l'instant</p>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-          >
-            <Plus size={18} />
-            Créer le premier projet
-          </button>
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {pdcaGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.projects.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.projects.map((pdca) => {
-                    const overdue = isTargetOverdue(pdca);
-                    return (
-                      <div
-                        key={pdca.id}
-                        onClick={() => navigate(`/pdca/${pdca.id}`)}
-                        className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md ${
-                          overdue ? 'border-red-300' : 'border-slate-200'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          {canDeletePdca(pdca, currentUser) && (
-                            <input
-                              type="checkbox"
-                              checked={selectedIds.includes(pdca.id)}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={() => toggleSelect(pdca.id)}
-                              className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                            />
-                          )}
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate font-medium text-slate-900">{pdca.title}</p>
-                            <p className={`truncate text-sm ${overdue ? 'font-medium text-red-600' : 'text-slate-500'}`}>
-                              {overdue && <AlertTriangle size={14} className="mr-1 inline" />}
-                              {pdca.service?.name ? `${pdca.service.name} · ` : ''}
-                              {pdca.owner_user ? `${pdca.owner_user.full_name} · ` : ''}
-                              {pdca.target_date ? `Cible : ${formatDate(pdca.target_date)}` : 'Sans date cible'}
-                            </p>
-                          </div>
-                          <PdcaStatusBadge status={pdca.status} />
-                        </div>
-                        <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <CategoryBadge category={pdca.category} />
-                          {canManage && (
-                            <select
-                              value={pdca.category_id || ''}
-                              disabled={updatingCategoryId === pdca.id}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => handleCategoryChange(e, pdca)}
-                              className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Sans dossier</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
-                                </option>
-                              ))}
-                            </select>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
             </div>
-          ))}
-        </div>
+          )}
+
+          {projects.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucun projet PDCA enregistré pour l'instant</p>
+              <button
+                type="button"
+                onClick={() => setIsModalOpen(true)}
+                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Plus size={18} />
+                Créer le premier projet
+              </button>
+            </div>
+          ) : currentFolderProjects.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucun projet directement dans ce dossier.' : 'Aucun projet sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderProjects.map((pdca) => {
+                const overdue = isTargetOverdue(pdca);
+                return (
+                  <div
+                    key={pdca.id}
+                    onClick={() => navigate(`/pdca/${pdca.id}`)}
+                    className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md ${
+                      overdue ? 'border-red-300' : 'border-slate-200'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      {canDeletePdca(pdca, currentUser) && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(pdca.id)}
+                          onClick={(e) => e.stopPropagation()}
+                          onChange={() => toggleSelect(pdca.id)}
+                          className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium text-slate-900">{pdca.title}</p>
+                        <p className={`truncate text-sm ${overdue ? 'font-medium text-red-600' : 'text-slate-500'}`}>
+                          {overdue && <AlertTriangle size={14} className="mr-1 inline" />}
+                          {pdca.service?.name ? `${pdca.service.name} · ` : ''}
+                          {pdca.owner_user ? `${pdca.owner_user.full_name} · ` : ''}
+                          {pdca.target_date ? `Cible : ${formatDate(pdca.target_date)}` : 'Sans date cible'}
+                        </p>
+                      </div>
+                      <PdcaStatusBadge status={pdca.status} />
+                    </div>
+                    {canManage && (
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMovingPdca(pdca);
+                          }}
+                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                          <FolderInput size={12} />
+                          Déplacer
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
-        <NewPdcaModal users={users} services={services} categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewPdcaModal users={users} services={services} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
       )}
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="pdca"
+          resourceType={PDCA_RESOURCE_TYPE}
           endpoint="/pdca/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
         />
       )}
 
-      {isManageCategoriesOpen && <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="pdca"
+      {isManageCategoriesOpen && (
+        <ManageCategoriesModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PDCA_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
-        />}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PDCA_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingPdca && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PDCA_RESOURCE_TYPE}
+          initialFolderId={movingPdca.category_id || null}
+          title="Déplacer"
+          subtitle={movingPdca.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingPdca(null)}
+          onSelect={handleMovePdca}
+        />
+      )}
     </div>
   );
 }
