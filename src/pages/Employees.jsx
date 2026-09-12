@@ -1,26 +1,38 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Ban, CheckCircle2, ChevronDown, ChevronUp, Folder, FolderCog, List, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Ban, CheckCircle2, Folder, FolderCog, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
-import CategoryBadge from '../components/CategoryBadge.jsx';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const EMPLOYEE_RESOURCE_TYPE = 'employee';
 
 const EMPLOYEE_SORT_OPTIONS = [
   { key: 'full_name', label: 'nom' },
   { key: 'is_active', label: 'statut' },
 ];
 
-function EmployeeModal({ employee, categories, onClose, onSaved }) {
+// Pas de notion de visibilité personnelle sur ce module (page réservée aux admins) : un simple
+// bouton "Dossier" ouvrant FolderPickerModal, sans le bascule "Tout le monde"/"Uniquement moi"
+// de CategoryVisibilityField.
+function EmployeeModal({ employee, onClose, onSaved }) {
   const isNew = !employee;
   const [fullName, setFullName] = useState(employee?.full_name || '');
   const [email, setEmail] = useState(employee?.email || '');
   const [jobTitle, setJobTitle] = useState(employee?.job_title || '');
   const [categoryId, setCategoryId] = useState(employee?.category_id || '');
+  const [categoryName, setCategoryName] = useState(employee?.category?.name || '');
   const [isActive, setIsActive] = useState(employee?.is_active ?? true);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -105,18 +117,28 @@ function EmployeeModal({ employee, categories, onClose, onSaved }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Dossier</label>
-            <select
-              value={categoryId}
-              onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            <button
+              type="button"
+              onClick={() => setIsPickerOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md border border-slate-300 px-3 py-2.5 text-left text-base text-slate-700 hover:bg-slate-50"
             >
-              <option value="">Sans dossier</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              <Folder size={16} className="shrink-0 text-primary" />
+              <span className="truncate">{categoryName || 'Aucun dossier'}</span>
+            </button>
+            {isPickerOpen && (
+              <FolderPickerModal
+                baseUrl={CATEGORIES_BASE_URL}
+                resourceType={EMPLOYEE_RESOURCE_TYPE}
+                initialFolderId={categoryId || null}
+                subtitle="Dossier de rattachement"
+                onClose={() => setIsPickerOpen(false)}
+                onSelect={(folderId, folderName) => {
+                  setCategoryId(folderId || '');
+                  setCategoryName(folderName || '');
+                  setIsPickerOpen(false);
+                }}
+              />
+            )}
           </div>
 
           {!isNew && (
@@ -144,7 +166,7 @@ function EmployeeModal({ employee, categories, onClose, onSaved }) {
   );
 }
 
-function EmployeeCard({ employee, categories, updatingCategoryId, togglingId, deletingId, onToggleActive, onEdit, onDelete, onCategoryChange }) {
+function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit, onDelete, onMove }) {
   return (
     <div
       className={`flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
@@ -202,20 +224,14 @@ function EmployeeCard({ employee, categories, updatingCategoryId, togglingId, de
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <CategoryBadge category={employee.category} />
-        <select
-          value={employee.category_id || ''}
-          disabled={updatingCategoryId === employee.id}
-          onChange={(e) => onCategoryChange(e, employee)}
-          className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        <button
+          type="button"
+          onClick={() => onMove(employee)}
+          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
         >
-          <option value="">Sans dossier</option>
-          {categories.map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
+          <FolderInput size={12} />
+          Déplacer
+        </button>
       </div>
     </div>
   );
@@ -224,9 +240,6 @@ function EmployeeCard({ employee, categories, updatingCategoryId, togglingId, de
 export default function Employees() {
   const currentUser = useCurrentUser();
   const [employees, setEmployees] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -234,7 +247,16 @@ export default function Employees() {
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingEmployee, setMovingEmployee] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: EMPLOYEE_RESOURCE_TYPE });
   const { sorted: sortedEmployees, sortKey, direction, setSortKey, toggleSort } = useSort(
     employees,
     (employee, key) => employee[key],
@@ -246,12 +268,8 @@ export default function Employees() {
     setLoading(true);
     setError('');
     try {
-      const [employeesRes, categoriesRes] = await Promise.all([
-        api.get('/employees'),
-        api.get('/module-categories', { params: { resource_type: 'employee' } }),
-      ]);
-      setEmployees(employeesRes.data);
-      setCategories(categoriesRes.data);
+      const { data } = await api.get('/employees');
+      setEmployees(data);
     } catch {
       setError('Impossible de charger le personnel.');
     } finally {
@@ -269,13 +287,15 @@ export default function Employees() {
     return <Navigate to="/" replace />;
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  async function handleMoveEmployee(folderId) {
+    const employee = movingEmployee;
+    setMovingEmployee(null);
+    try {
+      const { data } = await api.patch(`/employees/${employee.id}`, { category_id: folderId || null });
+      setEmployees((prev) => prev.map((e) => (e.id === employee.id ? data : e)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de changer le dossier de cette personne.');
+    }
   }
 
   function handleCreated(employee) {
@@ -301,19 +321,6 @@ export default function Employees() {
     }
   }
 
-  async function handleCategoryChange(event, employee) {
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(employee.id);
-    try {
-      const { data } = await api.patch(`/employees/${employee.id}`, { category_id: categoryId });
-      setEmployees((prev) => prev.map((e) => (e.id === employee.id ? data : e)));
-    } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de changer le dossier de cette personne.');
-    } finally {
-      setUpdatingCategoryId(null);
-    }
-  }
-
   async function handleDelete(employee) {
     if (!window.confirm(`Supprimer définitivement "${employee.full_name}" du personnel suivi ?`)) return;
 
@@ -329,22 +336,14 @@ export default function Employees() {
     }
   }
 
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const employee of sortedEmployees) {
-      if (employee.category_id && byCategory.has(employee.category_id)) byCategory.get(employee.category_id).push(employee);
-      else unfiled.push(employee);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, employees: byCategory.get(category.id) || [] }))
-      .filter((group) => group.employees.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, employees: unfiled });
-    return groups;
-  }, [sortedEmployees, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const employeeGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, employees: sortedEmployees }];
+  // sortedEmployees reste la liste COMPLÈTE (déjà triée) : naviguer dans un dossier ne fait que
+  // choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderEmployees = useMemo(
+    () => sortedEmployees.filter((employee) => (employee.category_id || null) === currentFolderId),
+    [sortedEmployees, currentFolderId]
+  );
 
   return (
     <div>
@@ -367,27 +366,9 @@ export default function Employees() {
 
       {employees.length > 0 && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setViewMode('folder')}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <Folder size={16} />
-              Par dossier
-            </button>
-            <button
-              type="button"
-              onClick={() => setViewMode('list')}
-              className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <List size={16} />
-              Liste
-            </button>
+          <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tout le personnel" />
+
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => setIsManageCategoriesOpen(true)}
@@ -396,77 +377,102 @@ export default function Employees() {
               <FolderCog size={16} />
               Gérer les dossiers
             </button>
+            <SortSelect
+              options={EMPLOYEE_SORT_OPTIONS}
+              sortKey={sortKey}
+              direction={direction}
+              onChangeKey={setSortKey}
+              onToggleDirection={() => toggleSort(sortKey)}
+            />
           </div>
-
-          <SortSelect
-            options={EMPLOYEE_SORT_OPTIONS}
-            sortKey={sortKey}
-            direction={direction}
-            onChangeKey={setSortKey}
-            onToggleDirection={() => toggleSort(sortKey)}
-          />
         </div>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-2">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-14 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : employees.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">Aucune personne enregistrée pour l'instant.</p>
       ) : (
-        <div className="mt-4 space-y-3">
-          {employeeGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
-                <button
-                  type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
-                >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.employees.length})</span>
-                </button>
-              )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`grid gap-3 sm:grid-cols-2 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.employees.map((employee) => (
-                    <EmployeeCard
-                      key={employee.id}
-                      employee={employee}
-                      categories={categories}
-                      updatingCategoryId={updatingCategoryId}
-                      togglingId={togglingId}
-                      deletingId={deletingId}
-                      onToggleActive={handleToggleActive}
-                      onEdit={setEditing}
-                      onDelete={handleDelete}
-                      onCategoryChange={handleCategoryChange}
-                    />
-                  ))}
-                </div>
-              )}
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              <button
+                type="button"
+                onClick={() => setIsNewFolderOpen(true)}
+                className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
+              >
+                <FolderPlus size={26} />
+                <span className="text-sm font-medium">Nouveau dossier</span>
+              </button>
             </div>
-          ))}
-        </div>
+          )}
+
+          {employees.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-500">Aucune personne enregistrée pour l'instant.</p>
+          ) : currentFolderEmployees.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune personne directement dans ce dossier.' : 'Aucune personne sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {currentFolderEmployees.map((employee) => (
+                <EmployeeCard
+                  key={employee.id}
+                  employee={employee}
+                  togglingId={togglingId}
+                  deletingId={deletingId}
+                  onToggleActive={handleToggleActive}
+                  onEdit={setEditing}
+                  onDelete={handleDelete}
+                  onMove={setMovingEmployee}
+                />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {isCreating && <EmployeeModal categories={categories} onClose={() => setIsCreating(false)} onSaved={handleCreated} />}
-      {editing && (
-        <EmployeeModal employee={editing} categories={categories} onClose={() => setEditing(null)} onSaved={handleUpdated} />
-      )}
+      {isCreating && <EmployeeModal onClose={() => setIsCreating(false)} onSaved={handleCreated} />}
+      {editing && <EmployeeModal employee={editing} onClose={() => setEditing(null)} onSaved={handleUpdated} />}
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="employee"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={EMPLOYEE_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadEmployees}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={EMPLOYEE_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingEmployee && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={EMPLOYEE_RESOURCE_TYPE}
+          initialFolderId={movingEmployee.category_id || null}
+          title="Déplacer"
+          subtitle={movingEmployee.full_name}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingEmployee(null)}
+          onSelect={handleMoveEmployee}
         />
       )}
     </div>
