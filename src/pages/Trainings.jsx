@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   Award,
@@ -6,10 +6,10 @@ import {
   ChevronUp,
   Download,
   FileSignature,
-  Folder,
   FolderCog,
+  FolderInput,
+  FolderPlus,
   Grid3x3,
-  List,
   Loader2,
   Pencil,
   Plus,
@@ -25,6 +25,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useSort } from '../lib/useSort.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SortSelect from '../components/SortSelect.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
@@ -33,9 +34,15 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const TRAINING_RESOURCE_TYPE = 'training';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -260,7 +267,7 @@ function JobTitleRequirementsField({ availableJobTitles, selected, onChange }) {
   );
 }
 
-function NewTrainingModal({ categories, users, employees, onClose, onCreated }) {
+function NewTrainingModal({ users, employees, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     type: '',
@@ -270,6 +277,7 @@ function NewTrainingModal({ categories, users, employees, onClose, onCreated }) 
     duration: '',
     description: '',
     category_id: '',
+    category_name: '',
   });
   const [requiredJobTitles, setRequiredJobTitles] = useState([]);
   const [isPrivate, setIsPrivate] = useState(false);
@@ -423,9 +431,12 @@ function NewTrainingModal({ categories, users, employees, onClose, onCreated }) 
           />
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={TRAINING_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -443,7 +454,7 @@ function NewTrainingModal({ categories, users, employees, onClose, onCreated }) 
   );
 }
 
-function EditTrainingModal({ training, categories, users, employees, onClose, onUpdated }) {
+function EditTrainingModal({ training, users, employees, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: training.title,
     type: training.type || '',
@@ -453,6 +464,7 @@ function EditTrainingModal({ training, categories, users, employees, onClose, on
     duration: training.duration || '',
     description: training.description || '',
     category_id: training.category_id || '',
+    category_name: training.category?.name || '',
   });
   const [requiredJobTitles, setRequiredJobTitles] = useState(training.required_job_titles || []);
   const [isPrivate, setIsPrivate] = useState(Boolean(training.is_private_to_me));
@@ -604,9 +616,12 @@ function EditTrainingModal({ training, categories, users, employees, onClose, on
           />
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={TRAINING_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -1069,7 +1084,6 @@ export default function Trainings() {
   const [trainings, setTrainings] = useState([]);
   const [users, setUsers] = useState([]);
   const [employees, setEmployees] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -1089,39 +1103,34 @@ export default function Trainings() {
   const [certificateDownloadingId, setCertificateDownloadingId] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingTraining, setMovingTraining] = useState(null);
   const [search, setSearch] = useState('');
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: TRAINING_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
   // PATCH /trainings/:id renvoie la ligne brute (pas de jointure records/category, voir
-  // trainings.js) — on fusionne dans l'item existant pour garder ses réalisations déjà chargées,
-  // et on reconstruit `category` depuis le state local plutôt que de la laisser périmée.
-  async function handleCategoryChange(event, training) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(training.id);
+  // trainings.js) — on fusionne dans l'item existant pour garder ses réalisations déjà chargées
+  // (la carte n'affiche plus de badge de dossier, seulement le bouton "Déplacer").
+  async function handleMoveTraining(folderId) {
+    const training = movingTraining;
+    setMovingTraining(null);
     try {
-      const { data } = await api.patch(`/trainings/${training.id}`, { category_id: categoryId });
-      const category = categories.find((c) => c.id === categoryId) || null;
-      setTrainings((prev) => prev.map((item) => (item.id === training.id ? { ...item, ...data, category } : item)));
+      const { data } = await api.patch(`/trainings/${training.id}`, { category_id: folderId || null });
+      setTrainings((prev) => prev.map((item) => (item.id === training.id ? { ...item, ...data } : item)));
     } catch {
       setError('Impossible de changer le dossier de cette formation.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -1150,18 +1159,16 @@ export default function Trainings() {
     setLoading(true);
     setError('');
     try {
-      const [trainingsRes, usersRes, employeesRes, categoriesRes] = await Promise.all([
+      const [trainingsRes, usersRes, employeesRes] = await Promise.all([
         api.get('/trainings'),
         api.get('/users'),
         api.get('/employees'),
-        api.get('/module-categories', { params: { resource_type: 'training' } }),
       ]);
       setTrainings(trainingsRes.data);
       setUsers(usersRes.data);
       // GET /employees renvoie aussi les inactifs (utile à la page de gestion du personnel) —
       // ce sélecteur d'enregistrement de réalisation ne doit proposer que les actifs.
       setEmployees(employeesRes.data.filter((employee) => employee.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les formations.');
     } finally {
@@ -1461,26 +1468,14 @@ export default function Trainings() {
     'asc'
   );
 
-  // Un dossier par catégorie (module_categories, resource_type='training'), plus un dossier "Sans
-  // dossier" en dernier pour les formations non classées — jamais affiché s'il est vide. Reprend
-  // sortedTrainings (déjà trié) pour que le mode dossier reste cohérent avec le mode liste, même
-  // principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const training of sortedTrainings) {
-      if (training.category_id && byCategory.has(training.category_id)) byCategory.get(training.category_id).push(training);
-      else unfiled.push(training);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, trainings: byCategory.get(category.id) || [] }))
-      .filter((group) => group.trainings.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, trainings: unfiled });
-    return groups;
-  }, [sortedTrainings, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const trainingGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, trainings: sortedTrainings }];
+  // sortedTrainings reste la liste COMPLÈTE (recherche + tri) : naviguer dans un dossier ne fait
+  // que choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderTrainings = useMemo(
+    () => sortedTrainings.filter((training) => (training.category_id || null) === currentFolderId),
+    [sortedTrainings, currentFolderId]
+  );
 
   const excludedPeople = combinePeople(users, employees).filter((p) => p.training_exempt);
 
@@ -1554,28 +1549,7 @@ export default function Trainings() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les formations" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -1591,7 +1565,7 @@ export default function Trainings() {
 
       {canManage && (
         <SelectAllToggle
-          ids={sortedTrainings.map((training) => training.id)}
+          ids={currentFolderTrainings.map((training) => training.id)}
           selectedIds={selectedIds}
           onChange={setSelectedIds}
         />
@@ -1670,34 +1644,43 @@ export default function Trainings() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 flex max-w-4xl flex-col gap-4">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : trainings.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">Aucune formation pour l'instant.</p>
-      ) : sortedTrainings.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">Aucune formation ne correspond à cette recherche.</p>
       ) : (
-        <div className="mt-4 flex max-w-4xl flex-col gap-4">
-          {trainingGroups.map((group) => (
-            <Fragment key={group.key}>
-              {isFolderView && (
+        <div className="max-w-4xl">
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.trainings.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) &&
-                group.trainings.map((training) => {
+            </div>
+          )}
+
+          {trainings.length === 0 && folders.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-500">Aucune formation pour l'instant.</p>
+          ) : sortedTrainings.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-500">Aucune formation ne correspond à cette recherche.</p>
+          ) : currentFolderTrainings.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune formation directement dans ce dossier.' : 'Aucune formation sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 flex flex-col gap-4">
+              {currentFolderTrainings.map((training) => {
                   const isExpanded = expandedId === training.id;
                   const overdueCount = countOverdueRecords(training, today);
 
@@ -1767,22 +1750,15 @@ export default function Trainings() {
                             Aucune réalisation
                           </span>
                         )}
-                        <CategoryBadge category={training.category} />
                         {canManage && (
-                          <select
-                            value={training.category_id || ''}
-                            disabled={updatingCategoryId === training.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, training)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                          <button
+                            type="button"
+                            onClick={() => setMovingTraining(training)}
+                            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                           >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
+                            <FolderInput size={12} />
+                            Déplacer
+                          </button>
                         )}
                       </div>
 
@@ -1882,15 +1858,14 @@ export default function Trainings() {
                       </div>
                     </div>
                   );
-                })}
-            </Fragment>
-          ))}
+              })}
+            </div>
+          )}
         </div>
       )}
 
       {isNewModalOpen && (
         <NewTrainingModal
-          categories={categories}
           users={users}
           employees={employees}
           onClose={() => setIsNewModalOpen(false)}
@@ -1929,7 +1904,6 @@ export default function Trainings() {
       {editingTraining && (
         <EditTrainingModal
           training={editingTraining}
-          categories={categories}
           users={users}
           employees={employees}
           onClose={() => setEditingTraining(null)}
@@ -1948,9 +1922,9 @@ export default function Trainings() {
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="training"
+          resourceType={TRAINING_RESOURCE_TYPE}
           endpoint="/trainings/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -1959,11 +1933,37 @@ export default function Trainings() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="training"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={TRAINING_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={TRAINING_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingTraining && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={TRAINING_RESOURCE_TYPE}
+          initialFolderId={movingTraining.category_id || null}
+          title="Déplacer"
+          subtitle={movingTraining.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingTraining(null)}
+          onSelect={handleMoveTraining}
         />
       )}
     </div>
