@@ -1,13 +1,11 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
-  ChevronDown,
-  ChevronUp,
   FileText,
-  Folder,
   FolderCog,
-  List,
+  FolderInput,
+  FolderPlus,
   Loader2,
   Plus,
   Sparkles,
@@ -19,10 +17,14 @@ import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive 
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import StatusBadge from '../components/StatusBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -33,6 +35,9 @@ import NewProcedureFullDraftModal from '../components/NewProcedureFullDraftModal
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const PROCEDURE_RESOURCE_TYPE = 'procedure';
 
 const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
 
@@ -56,12 +61,13 @@ function isReviewOverdue(procedure) {
 // pour n'importe quel autre point de départ (gabarit vide, ou déclenché depuis une analyse
 // QQOQCCP via qqoqccpId). Jamais republié automatiquement : reste un brouillon normal tant que
 // "Créer la procédure" n'a pas été soumis.
-function NewProcedureModal({ template, categories, qqoqccpId, initialTitle, initialContent, initialAiGenerated, onClose, onCreated }) {
+function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, initialAiGenerated, onClose, onCreated }) {
   const [number, setNumber] = useState('');
   const [title, setTitle] = useState(initialTitle || '');
   const [process, setProcess] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [categoryName, setCategoryName] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
   const [content, setContent] = useState(initialContent || EMPTY_CONTENT);
   const [aiGenerated, setAiGenerated] = useState(Boolean(initialAiGenerated));
@@ -209,9 +215,12 @@ function NewProcedureModal({ template, categories, qqoqccpId, initialTitle, init
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={PROCEDURE_RESOURCE_TYPE}
+            categoryName={categoryName}
             categoryId={categoryId}
             onCategoryIdChange={setCategoryId}
+            onCategoryNameChange={setCategoryName}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -266,7 +275,6 @@ export default function Procedures() {
   const tenant = useTenant();
   const [procedures, setProcedures] = useState([]);
   const [template, setTemplate] = useState(null);
-  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(Boolean(qqoqccpId));
@@ -282,12 +290,19 @@ export default function Procedures() {
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingProcedure, setMovingProcedure] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: PROCEDURE_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -314,25 +329,14 @@ export default function Procedures() {
     }
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, procedure) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(procedure.id);
+  async function handleMoveProcedure(folderId) {
+    const procedure = movingProcedure;
+    setMovingProcedure(null);
     try {
-      const { data } = await api.patch(`/procedures/${procedure.id}/category`, { category_id: categoryId });
+      const { data } = await api.patch(`/procedures/${procedure.id}/category`, { category_id: folderId || null });
       setProcedures((prev) => prev.map((item) => (item.id === procedure.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de cette procédure.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -360,10 +364,6 @@ export default function Procedures() {
       .get('/procedure-templates')
       .then(({ data }) => setTemplate(data))
       .catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'procedure' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -373,24 +373,14 @@ export default function Procedures() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [statusFilter, processFilter, search]);
 
-  // Un dossier par catégorie, plus un dossier "Sans dossier" en dernier pour les procédures non
-  // classées — jamais affiché s'il est vide. Même principe que Capas.jsx/Documents.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const procedure of procedures) {
-      if (procedure.category_id && byCategory.has(procedure.category_id)) byCategory.get(procedure.category_id).push(procedure);
-      else unfiled.push(procedure);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, procedures: byCategory.get(category.id) || [] }))
-      .filter((group) => group.procedures.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, procedures: unfiled });
-    return groups;
-  }, [procedures, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const procedureGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, procedures }];
+  // procedures reste la liste COMPLÈTE (déjà filtrée côté serveur par statut/processus/
+  // recherche) : naviguer dans un dossier ne fait que choisir, côté affichage, quel
+  // sous-ensemble montrer — filtrage client de la liste déjà chargée, même principe que
+  // Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id null.
+  const currentFolderProcedures = useMemo(
+    () => procedures.filter((procedure) => (procedure.category_id || null) === currentFolderId),
+    [procedures, currentFolderId]
+  );
 
   function handleCreated(procedure) {
     setIsModalOpen(false);
@@ -601,28 +591,7 @@ export default function Procedures() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les procédures" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -637,7 +606,7 @@ export default function Procedures() {
       </div>
 
       {canManage && (
-        <SelectAllToggle ids={procedures.map((procedure) => procedure.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+        <SelectAllToggle ids={currentFolderProcedures.map((procedure) => procedure.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
       )}
 
       {canManage && (
@@ -659,192 +628,165 @@ export default function Procedures() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : procedures.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">Aucune procédure pour l'instant.</p>
       ) : (
         <>
-          <div className="mt-4 space-y-3 md:hidden">
-            {procedureGroups.map((group) => (
-              <div key={group.key}>
-                {isFolderView && (
-                  <button
-                    type="button"
-                    onClick={() => toggleFolder(group.key)}
-                    className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
-                  >
-                    {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                    {group.category ? group.category.name : 'Sans dossier'}
-                    <span className="font-normal text-slate-400">({group.procedures.length})</span>
-                  </button>
-                )}
-                {(!isFolderView || expandedFolders.has(group.key)) && (
-                  <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                    {group.procedures.map((procedure) => {
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
+                <button
+                  type="button"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
+                >
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
+                </button>
+              )}
+            </div>
+          )}
+
+          {procedures.length === 0 && folders.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-500">Aucune procédure pour l'instant.</p>
+          ) : currentFolderProcedures.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune procédure directement dans ce dossier.' : 'Aucune procédure sans dossier.'}
+            </p>
+          ) : (
+            <>
+              <div className="mt-4 space-y-3 md:hidden">
+                {currentFolderProcedures.map((procedure) => {
+                  const overdue = isReviewOverdue(procedure);
+                  return (
+                    <div
+                      key={procedure.id}
+                      onClick={() => navigate(`/procedures/${procedure.id}`)}
+                      className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm ${
+                        overdue ? 'border-red-300' : 'border-slate-200'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex items-start gap-2">
+                          {canManage && (
+                            <input
+                              type="checkbox"
+                              checked={selectedIds.includes(procedure.id)}
+                              onClick={(e) => e.stopPropagation()}
+                              onChange={() => toggleSelect(procedure.id)}
+                              className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                            />
+                          )}
+                          <div>
+                            <p className="font-medium text-slate-900">{procedure.title}</p>
+                            <p className="text-sm text-slate-500">
+                              {procedure.number} · {procedure.process || 'Processus non précisé'}
+                            </p>
+                          </div>
+                        </div>
+                        <StatusBadge status={procedure.status} />
+                      </div>
+                      <p className={`mt-2 flex items-center gap-1 text-sm ${overdue ? 'font-medium text-red-600' : 'text-slate-500'}`}>
+                        {overdue && <AlertTriangle size={14} />}
+                        Prochaine révision : {formatDate(procedure.next_review_date)}
+                      </p>
+                      {canManage && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setMovingProcedure(procedure);
+                          }}
+                          className="mt-3 flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        >
+                          <FolderInput size={12} />
+                          Déplacer
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
+                <table className="w-full text-left text-sm">
+                  <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                    <tr>
+                      {canManage && <th className="w-8 px-4 py-3" />}
+                      <th className="px-4 py-3">Numéro</th>
+                      <th className="px-4 py-3">Titre</th>
+                      <th className="px-4 py-3">Processus</th>
+                      <th className="px-4 py-3">Version en cours</th>
+                      <th className="px-4 py-3">Statut</th>
+                      <th className="px-4 py-3">Prochaine révision</th>
+                      {canManage && <th className="px-4 py-3">Dossier</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {currentFolderProcedures.map((procedure) => {
                       const overdue = isReviewOverdue(procedure);
                       return (
-                        <div
+                        <tr
                           key={procedure.id}
                           onClick={() => navigate(`/procedures/${procedure.id}`)}
-                          className={`cursor-pointer rounded-xl border bg-white p-4 shadow-sm ${
-                            overdue ? 'border-red-300' : 'border-slate-200'
-                          }`}
+                          className={`cursor-pointer hover:bg-slate-50 ${overdue ? 'bg-red-50/50' : ''}`}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-2">
-                              {canManage && (
-                                <input
-                                  type="checkbox"
-                                  checked={selectedIds.includes(procedure.id)}
-                                  onClick={(e) => e.stopPropagation()}
-                                  onChange={() => toggleSelect(procedure.id)}
-                                  className="mt-1 h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                />
-                              )}
-                              <div>
-                                <p className="font-medium text-slate-900">{procedure.title}</p>
-                                <p className="text-sm text-slate-500">
-                                  {procedure.number} · {procedure.process || 'Processus non précisé'}
-                                </p>
-                              </div>
-                            </div>
-                            <StatusBadge status={procedure.status} />
-                          </div>
-                          <div className="mt-2 flex flex-wrap items-center gap-2">
-                            <CategoryBadge category={procedure.category} />
-                          </div>
-                          <p className={`mt-2 flex items-center gap-1 text-sm ${overdue ? 'font-medium text-red-600' : 'text-slate-500'}`}>
-                            {overdue && <AlertTriangle size={14} />}
-                            Prochaine révision : {formatDate(procedure.next_review_date)}
-                          </p>
                           {canManage && (
-                            <select
-                              value={procedure.category_id || ''}
-                              disabled={updatingCategoryId === procedure.id}
-                              onClick={(e) => e.stopPropagation()}
-                              onChange={(e) => handleCategoryChange(e, procedure)}
-                              className="mt-3 w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                            >
-                              <option value="">Sans dossier</option>
-                              {categories.map((category) => (
-                                <option key={category.id} value={category.id}>
-                                  {category.name}
-                                </option>
-                              ))}
-                            </select>
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(procedure.id)}
+                                onChange={() => toggleSelect(procedure.id)}
+                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                              />
+                            </td>
                           )}
-                        </div>
+                          <td className="px-4 py-3 font-medium text-slate-800">{procedure.number}</td>
+                          <td className="px-4 py-3 text-slate-700">{procedure.title}</td>
+                          <td className="px-4 py-3 text-slate-600">{procedure.process || '—'}</td>
+                          <td className="px-4 py-3 text-slate-600">{procedure.current_version?.version || '—'}</td>
+                          <td className="px-4 py-3">
+                            <StatusBadge status={procedure.status} />
+                          </td>
+                          <td className={`px-4 py-3 ${overdue ? 'font-medium text-red-600' : 'text-slate-600'}`}>
+                            <span className="flex items-center gap-1">
+                              {overdue && <AlertTriangle size={14} />}
+                              {formatDate(procedure.next_review_date)}
+                            </span>
+                          </td>
+                          {canManage && (
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                              <button
+                                type="button"
+                                onClick={() => setMovingProcedure(procedure)}
+                                className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                              >
+                                <FolderInput size={12} />
+                                Déplacer
+                              </button>
+                            </td>
+                          )}
+                        </tr>
                       );
                     })}
-                  </div>
-                )}
+                  </tbody>
+                </table>
               </div>
-            ))}
-          </div>
-
-          <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  {canManage && <th className="w-8 px-4 py-3" />}
-                  <th className="px-4 py-3">Numéro</th>
-                  <th className="px-4 py-3">Titre</th>
-                  <th className="px-4 py-3">Processus</th>
-                  <th className="px-4 py-3">Dossier</th>
-                  <th className="px-4 py-3">Version en cours</th>
-                  <th className="px-4 py-3">Statut</th>
-                  <th className="px-4 py-3">Prochaine révision</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {procedureGroups.map((group) => (
-                  <Fragment key={group.key}>
-                    {isFolderView && (
-                      <tr className="cursor-pointer bg-slate-50 hover:bg-slate-100" onClick={() => toggleFolder(group.key)}>
-                        <td colSpan={canManage ? 8 : 7} className="px-4 py-2.5">
-                          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
-                            {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                            <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                            {group.category ? group.category.name : 'Sans dossier'}
-                            <span className="font-normal text-slate-400">({group.procedures.length})</span>
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                    {(!isFolderView || expandedFolders.has(group.key)) &&
-                      group.procedures.map((procedure) => {
-                        const overdue = isReviewOverdue(procedure);
-                        return (
-                          <tr
-                            key={procedure.id}
-                            onClick={() => navigate(`/procedures/${procedure.id}`)}
-                            className={`cursor-pointer hover:bg-slate-50 ${overdue ? 'bg-red-50/50' : ''}`}
-                          >
-                            {canManage && (
-                              <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                                <input
-                                  type="checkbox"
-                                  checked={selectedIds.includes(procedure.id)}
-                                  onChange={() => toggleSelect(procedure.id)}
-                                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
-                                />
-                              </td>
-                            )}
-                            <td className="px-4 py-3 font-medium text-slate-800">{procedure.number}</td>
-                            <td className="px-4 py-3 text-slate-700">{procedure.title}</td>
-                            <td className="px-4 py-3 text-slate-600">{procedure.process || '—'}</td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <CategoryBadge category={procedure.category} />
-                                {canManage && (
-                                  <select
-                                    value={procedure.category_id || ''}
-                                    disabled={updatingCategoryId === procedure.id}
-                                    onClick={(e) => e.stopPropagation()}
-                                    onChange={(e) => handleCategoryChange(e, procedure)}
-                                    className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                                  >
-                                    <option value="">Sans dossier</option>
-                                    {categories.map((category) => (
-                                      <option key={category.id} value={category.id}>
-                                        {category.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 text-slate-600">{procedure.current_version?.version || '—'}</td>
-                            <td className="px-4 py-3">
-                              <StatusBadge status={procedure.status} />
-                            </td>
-                            <td className={`px-4 py-3 ${overdue ? 'font-medium text-red-600' : 'text-slate-600'}`}>
-                              <span className="flex items-center gap-1">
-                                {overdue && <AlertTriangle size={14} />}
-                                {formatDate(procedure.next_review_date)}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+            </>
+          )}
         </>
       )}
 
       {isModalOpen && (
         <NewProcedureModal
           template={template}
-          categories={categories}
           qqoqccpId={qqoqccpId}
           initialTitle={fullDraftSeed?.title}
           initialContent={fullDraftSeed?.content}
@@ -863,22 +805,48 @@ export default function Procedures() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="procedure"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PROCEDURE_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadProcedures}
+          onChanged={reloadFolders}
         />
       )}
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="procedure"
+          resourceType={PROCEDURE_RESOURCE_TYPE}
           endpoint="/procedures/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PROCEDURE_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingProcedure && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PROCEDURE_RESOURCE_TYPE}
+          initialFolderId={movingProcedure.category_id || null}
+          title="Déplacer"
+          subtitle={movingProcedure.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingProcedure(null)}
+          onSelect={handleMoveProcedure}
         />
       )}
     </div>
