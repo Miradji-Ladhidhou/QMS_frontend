@@ -18,10 +18,10 @@ import CookieNotice from './components/CookieNotice.jsx';
 // gain que seule une fraction des visiteurs (déjà connectés) utilise réellement.
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Planning = lazy(() => import('./pages/Planning.jsx'));
-// Documents.jsx, MyApprovals.jsx et QualityPolicy.jsx ne sont plus chargées directement en
-// tant que routes : elles sont maintenant trois onglets assemblés par DocumentsHub.jsx (fusion
-// des menus "Documents"/"Mes approbations"/"Politique qualité", voir Layout.jsx), et
-// lazy-importées depuis ce fichier-là.
+// Documents.jsx, Procedures.jsx, MyApprovals.jsx et QualityPolicy.jsx ne sont plus chargées
+// directement en tant que routes : elles sont maintenant quatre onglets assemblés par
+// DocumentsHub.jsx (fusion des menus "Documents"/"Procédures"/"Mes approbations"/"Politique
+// qualité", voir Layout.jsx), et lazy-importées depuis ce fichier-là.
 const DocumentsHub = lazy(() => import('./pages/DocumentsHub.jsx'));
 const DocumentDetail = lazy(() => import('./pages/DocumentDetail.jsx'));
 // Capas.jsx, Pdca.jsx et Qqoqccp.jsx ne sont plus chargées directement en tant que routes :
@@ -45,7 +45,6 @@ const QqoqccpDetail = lazy(() => import('./pages/QqoqccpDetail.jsx'));
 const QmsOversight = lazy(() => import('./pages/QmsOversight.jsx'));
 const AuditDetail = lazy(() => import('./pages/AuditDetail.jsx'));
 const ManagementReviewDetail = lazy(() => import('./pages/ManagementReviewDetail.jsx'));
-const Procedures = lazy(() => import('./pages/Procedures.jsx'));
 const ProcedureDetail = lazy(() => import('./pages/ProcedureDetail.jsx'));
 // Complaints.jsx et CustomerSatisfaction.jsx ne sont plus chargées directement en tant que
 // routes : elles sont maintenant deux onglets assemblés par CustomerFeedback.jsx (fusion des
@@ -152,7 +151,7 @@ export default function App() {
               <Route path="suppliers/:id" element={<SupplierDetail />} />
               <Route path="management-reviews" element={<QmsOversight />} />
               <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
-              <Route path="procedures" element={<Procedures />} />
+              <Route path="procedures" element={<DocumentsHub />} />
               <Route path="procedures/:id" element={<ProcedureDetail />} />
               <Route path="settings" element={<Settings />} />
               <Route path="quality-policy" element={<DocumentsHub />} />

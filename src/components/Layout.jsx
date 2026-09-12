@@ -87,12 +87,13 @@ export const NAV_ITEMS = [
   // dessous, qui reste alwaysVisible pour préserver l'accessibilité de Politique qualité —
   // ISO 9001 §5.2) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'documents', to: '/documents', label: 'Documents', icon: FileText, hiddenFromSidebar: true },
-  // Fusionne Documents, Mes approbations ('my-approvals' plus bas) et Politique qualité (voir
-  // DocumentsHub.jsx) — lien de menu volontairement alwaysVisible (pas de `key` propre, comme
-  // l'était Politique qualité seule auparavant) : ISO 9001 §5.2 exige que la politique qualité
-  // reste joignable quel que soit ce que l'admin a caché pour un rôle, y compris si 'documents'
-  // ou 'my-approvals' sont masqués — DocumentsHub.jsx n'affiche alors plus que l'onglet
-  // Politique qualité. Voir aussi le commentaire équivalent sur 'prise-en-main' plus bas.
+  // Fusionne Documents, Procédures ('procedures' plus bas), Mes approbations ('my-approvals'
+  // plus bas) et Politique qualité (voir DocumentsHub.jsx) — lien de menu volontairement
+  // alwaysVisible (pas de `key` propre, comme l'était Politique qualité seule auparavant) :
+  // ISO 9001 §5.2 exige que la politique qualité reste joignable quel que soit ce que l'admin a
+  // caché pour un rôle, y compris si 'documents', 'procedures' ou 'my-approvals' sont masqués —
+  // DocumentsHub.jsx n'affiche alors plus que l'onglet Politique qualité. Voir aussi le
+  // commentaire équivalent sur 'prise-en-main' plus bas.
   { to: '/documents', label: 'Documents', icon: FileText, alwaysVisible: true },
   // Fusionné avec PDCA et QQOQCCP (voir ImprovementActions.jsx, qui assemble les trois pages
   // en onglets) sous ce seul lien de menu — même principe que 'complaints' plus bas : les
@@ -131,7 +132,11 @@ export const NAV_ITEMS = [
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'audits'
   // plus haut) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2, hiddenFromSidebar: true },
-  { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck },
+  // Gardée uniquement pour la configuration de visibilité (voir le lien fusionné sur
+  // 'documents' plus haut, qui reste alwaysVisible pour préserver l'accessibilité de
+  // Politique qualité — ISO 9001 §5.2) : n'apparaît plus comme lien séparé dans le menu
+  // latéral.
+  { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck, hiddenFromSidebar: true },
   // Fusionné avec Non-conformités produit/service (voir Incidents.jsx, qui assemble les deux
   // pages en onglets) sous ce seul lien de menu — même principe que 'complaints' plus haut :
   // l'entrée 'nonconforming-outputs' plus bas reste dans ce tableau pour
