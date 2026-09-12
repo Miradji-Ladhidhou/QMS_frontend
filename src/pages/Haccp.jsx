@@ -1,12 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  ChevronDown,
-  ChevronUp,
   ClipboardCheck,
-  Folder,
   FolderCog,
-  List,
+  FolderInput,
+  FolderPlus,
   Loader2,
   Plus,
   X,
@@ -16,14 +14,18 @@ import { openBlankTab } from '../lib/openInNewTab.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { PLAN_STATUS_LABELS } from '../lib/haccpStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
@@ -31,6 +33,9 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const HACCP_RESOURCE_TYPE = 'haccp_plan';
 
 const PLAN_SORT_OPTIONS = [
   { key: 'title', label: 'titre' },
@@ -42,7 +47,7 @@ function getPlanSortValue(plan, key) {
   return plan[key];
 }
 
-function NewPlanModal({ services, categories, onClose, onCreated }) {
+function NewPlanModal({ services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     product_description: '',
@@ -50,6 +55,7 @@ function NewPlanModal({ services, categories, onClose, onCreated }) {
     team: '',
     service_id: '',
     category_id: '',
+    category_name: '',
   });
   const [isPrivate, setIsPrivate] = useState(false);
   const [error, setError] = useState('');
@@ -171,9 +177,12 @@ function NewPlanModal({ services, categories, onClose, onCreated }) {
           </div>
 
           <CategoryVisibilityField
-            categories={categories}
+            baseUrl={CATEGORIES_BASE_URL}
+            resourceType={HACCP_RESOURCE_TYPE}
+            categoryName={form.category_name}
             categoryId={form.category_id}
             onCategoryIdChange={(value) => updateField('category_id', value)}
+            onCategoryNameChange={(value) => updateField('category_name', value)}
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
@@ -197,7 +206,6 @@ export default function Haccp() {
   const canManage = isManagerRole(currentUser?.role);
   const [plans, setPlans] = useState([]);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -212,34 +220,30 @@ export default function Haccp() {
   const [exportingAuditPdf, setExportingAuditPdf] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingPlan, setMovingPlan] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: HACCP_RESOURCE_TYPE });
 
   function toggleSelect(id) {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   }
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  }
-  async function handleCategoryChange(event, plan) {
-    event.stopPropagation();
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(plan.id);
+  async function handleMovePlan(folderId) {
+    const plan = movingPlan;
+    setMovingPlan(null);
     try {
-      const { data } = await api.patch(`/haccp/plans/${plan.id}`, { category_id: categoryId });
+      const { data } = await api.patch(`/haccp/plans/${plan.id}`, { category_id: folderId || null });
       setPlans((prev) => prev.map((item) => (item.id === plan.id ? data : item)));
     } catch {
       setError('Impossible de changer le dossier de ce plan HACCP.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -268,14 +272,12 @@ export default function Haccp() {
     try {
       const params = {};
       if (statusFilter) params.status = statusFilter;
-      const [plansRes, servicesRes, categoriesRes] = await Promise.all([
+      const [plansRes, servicesRes] = await Promise.all([
         api.get('/haccp/plans', { params }),
         api.get('/services'),
-        api.get('/module-categories', { params: { resource_type: 'haccp_plan' } }),
       ]);
       setPlans(plansRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger les plans HACCP.');
     } finally {
@@ -290,26 +292,14 @@ export default function Haccp() {
 
   const { sorted: sortedPlans, sortKey, direction, setSortKey, toggleSort } = useSort(plans, getPlanSortValue, 'created_at', 'desc');
 
-  // Un dossier par catégorie (module_categories, resource_type='haccp_plan'), plus un dossier
-  // "Sans dossier" en dernier pour les plans non classés — jamais affiché s'il est vide. Reprend
-  // sortedPlans (déjà trié) pour que le mode dossier reste cohérent avec le mode liste, même
-  // principe que Capas.jsx.
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const plan of sortedPlans) {
-      if (plan.category_id && byCategory.has(plan.category_id)) byCategory.get(plan.category_id).push(plan);
-      else unfiled.push(plan);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, plans: byCategory.get(category.id) || [] }))
-      .filter((group) => group.plans.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, plans: unfiled });
-    return groups;
-  }, [sortedPlans, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const planGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, plans: sortedPlans }];
+  // sortedPlans reste la liste COMPLÈTE (déjà triée) : naviguer dans un dossier ne fait que
+  // choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
+  // chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) = category_id
+  // null.
+  const currentFolderPlans = useMemo(
+    () => sortedPlans.filter((plan) => (plan.category_id || null) === currentFolderId),
+    [sortedPlans, currentFolderId]
+  );
 
   function handleCreated(plan) {
     setIsModalOpen(false);
@@ -564,28 +554,7 @@ export default function Haccp() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les plans" />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -599,7 +568,9 @@ export default function Haccp() {
         )}
       </div>
 
-      {canManage && <SelectAllToggle ids={sortedPlans.map((plan) => plan.id)} selectedIds={selectedIds} onChange={setSelectedIds} />}
+      {canManage && (
+        <SelectAllToggle ids={currentFolderPlans.map((plan) => plan.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+      )}
 
       {canManage && (
         <BulkSelectionBar
@@ -620,108 +591,110 @@ export default function Haccp() {
         />
       )}
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : plans.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucun plan HACCP enregistré pour l'instant</p>
-          {canManage && (
-            <button
-              type="button"
-              onClick={() => setIsModalOpen(true)}
-              className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
-              <Plus size={18} />
-              Créer le premier plan
-            </button>
-          )}
-        </div>
       ) : (
-        <div className="mt-4 space-y-3">
-          {planGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || currentUser?.role === 'admin') && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {currentUser?.role === 'admin' && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.plans.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`space-y-3 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.plans.map((plan) => (
-                    <div
-                      key={plan.id}
-                      onClick={() => navigate(`/haccp/${plan.id}`)}
-                      className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        {canManage && (
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.includes(plan.id)}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={() => toggleSelect(plan.id)}
-                            className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                          />
-                        )}
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate font-medium text-slate-900">{plan.title}</p>
-                          <p className="truncate text-sm text-slate-500">
-                            {plan.product_description ? plan.product_description : 'Aucun produit décrit'}
-                            {plan.service ? ` · ${plan.service.name}` : ''}
-                          </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                          <PlanStatusBadge status={plan.status} />
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        <CategoryBadge category={plan.category} />
-                        {canManage && (
-                          <select
-                            value={plan.category_id || ''}
-                            disabled={updatingCategoryId === plan.id}
-                            onClick={(e) => e.stopPropagation()}
-                            onChange={(e) => handleCategoryChange(e, plan)}
-                            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                          >
-                            <option value="">Sans dossier</option>
-                            {categories.map((category) => (
-                              <option key={category.id} value={category.id}>
-                                {category.name}
-                              </option>
-                            ))}
-                          </select>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
+            </div>
+          )}
+
+          {plans.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucun plan HACCP enregistré pour l'instant</p>
+              {canManage && (
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                >
+                  <Plus size={18} />
+                  Créer le premier plan
+                </button>
               )}
             </div>
-          ))}
-        </div>
+          ) : currentFolderPlans.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucun plan directement dans ce dossier.' : 'Aucun plan sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 space-y-3">
+              {currentFolderPlans.map((plan) => (
+                <div
+                  key={plan.id}
+                  onClick={() => navigate(`/haccp/${plan.id}`)}
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    {canManage && (
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(plan.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(plan.id)}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{plan.title}</p>
+                      <p className="truncate text-sm text-slate-500">
+                        {plan.product_description ? plan.product_description : 'Aucun produit décrit'}
+                        {plan.service ? ` · ${plan.service.name}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <PlanStatusBadge status={plan.status} />
+                    </div>
+                  </div>
+                  {canManage && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMovingPlan(plan);
+                        }}
+                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                      >
+                        <FolderInput size={12} />
+                        Déplacer
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
 
       {isModalOpen && (
-        <NewPlanModal services={services} categories={categories} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
+        <NewPlanModal services={services} onClose={() => setIsModalOpen(false)} onCreated={handleCreated} />
       )}
 
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
-          resourceType="haccp_plan"
+          resourceType={HACCP_RESOURCE_TYPE}
           endpoint="/haccp/plans/bulk-category"
-          categories={categories}
+          baseUrl={CATEGORIES_BASE_URL}
           selectedIds={selectedIds}
           onClose={() => setIsBulkMoveModalOpen(false)}
           onMoved={handleBulkMoved}
@@ -730,11 +703,37 @@ export default function Haccp() {
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="haccp_plan"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={HACCP_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={HACCP_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingPlan && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={HACCP_RESOURCE_TYPE}
+          initialFolderId={movingPlan.category_id || null}
+          title="Déplacer"
+          subtitle={movingPlan.title}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingPlan(null)}
+          onSelect={handleMovePlan}
         />
       )}
     </div>

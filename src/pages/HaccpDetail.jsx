@@ -62,7 +62,7 @@ function ModalShell({ title, onClose, children, wide }) {
   );
 }
 
-function EditPlanModal({ plan, services, categories, onClose, onUpdated }) {
+function EditPlanModal({ plan, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: plan.title,
     product_description: plan.product_description || '',
@@ -71,6 +71,7 @@ function EditPlanModal({ plan, services, categories, onClose, onUpdated }) {
     service_id: plan.service_id || '',
     status: plan.status,
     category_id: plan.category_id || '',
+    category_name: plan.category?.name || '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(plan.is_private_to_me));
   const [error, setError] = useState('');
@@ -96,9 +97,10 @@ function EditPlanModal({ plan, services, categories, onClose, onUpdated }) {
       }
     }
 
+    const { category_name, ...formForApi } = form;
     let response;
     try {
-      response = await api.patch(`/haccp/plans/${plan.id}`, { ...form, category_id: categoryId });
+      response = await api.patch(`/haccp/plans/${plan.id}`, { ...formForApi, category_id: categoryId });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier ce plan.');
       setSubmitting(false);
@@ -152,9 +154,12 @@ function EditPlanModal({ plan, services, categories, onClose, onUpdated }) {
           </div>
         </div>
         <CategoryVisibilityField
-          categories={categories}
+          baseUrl="/module-categories"
+          resourceType="haccp_plan"
+          categoryName={form.category_name}
           categoryId={form.category_id}
           onCategoryIdChange={(value) => updateField('category_id', value)}
+          onCategoryNameChange={(value) => updateField('category_name', value)}
           isPrivate={isPrivate}
           onIsPrivateChange={setIsPrivate}
         />
@@ -825,7 +830,6 @@ export default function HaccpDetail() {
   const canManage = isManagerRole(currentUser?.role);
   const [plan, setPlan] = useState(null);
   const [services, setServices] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [users, setUsers] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -855,10 +859,6 @@ export default function HaccpDetail() {
     api.get('/services').then(({ data }) => setServices(data.filter((service) => service.is_active))).catch(() => {});
     api.get('/users').then(({ data }) => setUsers(data)).catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
-    api
-      .get('/module-categories', { params: { resource_type: 'haccp_plan' } })
-      .then(({ data }) => setCategories(data))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -1106,7 +1106,6 @@ export default function HaccpDetail() {
         <EditPlanModal
           plan={plan}
           services={services}
-          categories={categories}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setPlan((prev) => ({ ...prev, ...data }));
