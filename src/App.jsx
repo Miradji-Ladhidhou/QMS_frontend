@@ -55,10 +55,13 @@ const ComplaintDetail = lazy(() => import('./pages/ComplaintDetail.jsx'));
 // fichier-là.
 const RiskManagement = lazy(() => import('./pages/RiskManagement.jsx'));
 const RiskDetail = lazy(() => import('./pages/RiskDetail.jsx'));
-const Accidents = lazy(() => import('./pages/Accidents.jsx'));
+// Accidents.jsx et NonconformingOutputs.jsx ne sont plus chargées directement en tant que
+// routes : elles sont maintenant deux onglets assemblés par Incidents.jsx (fusion des menus
+// "Accidents du travail"/"Non-conformités produit/service" en "Signalements", voir
+// Layout.jsx), et lazy-importées depuis ce fichier-là.
+const Incidents = lazy(() => import('./pages/Incidents.jsx'));
 const AccidentDetail = lazy(() => import('./pages/AccidentDetail.jsx'));
 const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
-const NonconformingOutputs = lazy(() => import('./pages/NonconformingOutputs.jsx'));
 const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutputDetail.jsx'));
 const CustomerSatisfactionDetail = lazy(() => import('./pages/CustomerSatisfactionDetail.jsx'));
 const CommunicationPlan = lazy(() => import('./pages/CommunicationPlan.jsx'));
@@ -134,11 +137,11 @@ export default function App() {
               <Route path="audits/:id" element={<AuditDetail />} />
               <Route path="risks" element={<RiskManagement />} />
               <Route path="risks/:id" element={<RiskDetail />} />
-              <Route path="accidents" element={<Accidents />} />
+              <Route path="accidents" element={<Incidents />} />
               <Route path="accidents/:id" element={<AccidentDetail />} />
               <Route path="pdca" element={<ImprovementActions />} />
               <Route path="pdca/:id" element={<PdcaDetail />} />
-              <Route path="nonconforming-outputs" element={<NonconformingOutputs />} />
+              <Route path="nonconforming-outputs" element={<Incidents />} />
               <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
               <Route path="customer-satisfaction" element={<CustomerFeedback />} />
               <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />

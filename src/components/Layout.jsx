@@ -120,15 +120,22 @@ export const NAV_ITEMS = [
   // plus haut) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2, hiddenFromSidebar: true },
   { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck },
-  { key: 'accidents', to: '/accidents', label: 'Accidents du travail', icon: Siren },
+  // Fusionné avec Non-conformités produit/service (voir Incidents.jsx, qui assemble les deux
+  // pages en onglets) sous ce seul lien de menu — même principe que 'complaints' plus haut :
+  // l'entrée 'nonconforming-outputs' plus bas reste dans ce tableau pour
+  // MenuVisibilitySettings.jsx mais masquée du menu latéral.
+  { key: 'accidents', to: '/accidents', label: 'Signalements', icon: Siren },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
   // haut) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw, hiddenFromSidebar: true },
+  // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'accidents'
+  // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
   {
     key: 'nonconforming-outputs',
     to: '/nonconforming-outputs',
     label: 'Non-conformités produit/service',
     icon: PackageX,
+    hiddenFromSidebar: true,
   },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'complaints'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
