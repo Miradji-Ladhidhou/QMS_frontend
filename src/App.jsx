@@ -45,7 +45,11 @@ const ProcedureDetail = lazy(() => import('./pages/ProcedureDetail.jsx'));
 // lazy-importées depuis ce fichier-là plutôt que d'ici.
 const CustomerFeedback = lazy(() => import('./pages/CustomerFeedback.jsx'));
 const ComplaintDetail = lazy(() => import('./pages/ComplaintDetail.jsx'));
-const Risks = lazy(() => import('./pages/Risks.jsx'));
+// Risks.jsx et Haccp.jsx ne sont plus chargées directement en tant que routes : elles sont
+// maintenant deux onglets assemblés par RiskManagement.jsx (fusion des menus "Registre des
+// risques"/"HACCP" en "Gestion des risques", voir Layout.jsx), et lazy-importées depuis ce
+// fichier-là.
+const RiskManagement = lazy(() => import('./pages/RiskManagement.jsx'));
 const RiskDetail = lazy(() => import('./pages/RiskDetail.jsx'));
 const Accidents = lazy(() => import('./pages/Accidents.jsx'));
 const AccidentDetail = lazy(() => import('./pages/AccidentDetail.jsx'));
@@ -54,7 +58,6 @@ const NonconformingOutputs = lazy(() => import('./pages/NonconformingOutputs.jsx
 const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutputDetail.jsx'));
 const CustomerSatisfactionDetail = lazy(() => import('./pages/CustomerSatisfactionDetail.jsx'));
 const CommunicationPlan = lazy(() => import('./pages/CommunicationPlan.jsx'));
-const Haccp = lazy(() => import('./pages/Haccp.jsx'));
 const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
@@ -128,7 +131,7 @@ export default function App() {
               <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
               <Route path="audits" element={<QmsOversight />} />
               <Route path="audits/:id" element={<AuditDetail />} />
-              <Route path="risks" element={<Risks />} />
+              <Route path="risks" element={<RiskManagement />} />
               <Route path="risks/:id" element={<RiskDetail />} />
               <Route path="accidents" element={<Accidents />} />
               <Route path="accidents/:id" element={<AccidentDetail />} />
@@ -139,7 +142,7 @@ export default function App() {
               <Route path="customer-satisfaction" element={<CustomerFeedback />} />
               <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />
               <Route path="communication-plan" element={<CommunicationPlan />} />
-              <Route path="haccp" element={<Haccp />} />
+              <Route path="haccp" element={<RiskManagement />} />
               <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />
               <Route path="suppliers/:id" element={<SupplierDetail />} />

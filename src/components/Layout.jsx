@@ -103,8 +103,13 @@ export const NAV_ITEMS = [
   // même principe que 'complaints' plus haut : l'entrée 'management-reviews' reste dans ce
   // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
   { key: 'audits', to: '/audits', label: 'Pilotage du SMQ', icon: ClipboardCheck },
-  { key: 'risks', to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
-  { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer },
+  // Fusionné avec HACCP (voir RiskManagement.jsx, qui assemble les deux pages en onglets)
+  // sous ce seul lien de menu — même principe que 'complaints' plus haut : l'entrée 'haccp'
+  // reste dans ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
+  { key: 'risks', to: '/risks', label: 'Gestion des risques', icon: ShieldAlert },
+  // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'risks'
+  // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
+  { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer, hiddenFromSidebar: true },
   { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'audits'
   // plus haut) : n'apparaît plus comme lien séparé dans le menu latéral.
