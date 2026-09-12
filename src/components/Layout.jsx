@@ -85,9 +85,10 @@ export const NAV_ITEMS = [
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { key: 'planning', to: '/planning', label: 'Planning', icon: CalendarClock },
   { key: 'documents', to: '/documents', label: 'Documents', icon: FileText },
-  // Fusionné avec PDCA (voir ImprovementActions.jsx, qui assemble les deux pages en onglets)
-  // sous ce seul lien de menu — même principe que 'complaints' plus bas : l'entrée 'pdca'
-  // reste dans ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
+  // Fusionné avec PDCA et QQOQCCP (voir ImprovementActions.jsx, qui assemble les trois pages
+  // en onglets) sous ce seul lien de menu — même principe que 'complaints' plus bas : les
+  // entrées 'pdca' et 'qqoqccp' restent dans ce tableau pour MenuVisibilitySettings.jsx mais
+  // masquées du menu latéral.
   { key: 'capas', to: '/capas', label: "Actions d'amélioration", icon: ClipboardList },
   // Fusionné avec Satisfaction client (voir CustomerFeedback.jsx, qui assemble les deux pages
   // en onglets) sous ce seul lien de menu — l'entrée 'customer-satisfaction' plus bas reste
@@ -102,7 +103,10 @@ export const NAV_ITEMS = [
   // ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
   { key: 'trainings', to: '/trainings', label: 'Ressources humaines', icon: GraduationCap },
   { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
-  { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
+  // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
+  // haut, fusionné avec PDCA et QQOQCCP dans ImprovementActions.jsx) : n'apparaît plus comme
+  // lien séparé dans le menu latéral.
+  { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle, hiddenFromSidebar: true },
   // Fusionné avec Revues de direction (voir QmsOversight.jsx) sous ce seul lien de menu —
   // même principe que 'complaints' plus haut : l'entrée 'management-reviews' reste dans ce
   // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.

@@ -20,9 +20,10 @@ const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Planning = lazy(() => import('./pages/Planning.jsx'));
 const Documents = lazy(() => import('./pages/Documents.jsx'));
 const DocumentDetail = lazy(() => import('./pages/DocumentDetail.jsx'));
-// Capas.jsx et Pdca.jsx ne sont plus chargées directement en tant que routes : elles sont
-// maintenant deux onglets assemblés par ImprovementActions.jsx (fusion des menus "CAPA"/"PDCA"
-// en "Actions d'amélioration", voir Layout.jsx), et lazy-importées depuis ce fichier-là.
+// Capas.jsx, Pdca.jsx et Qqoqccp.jsx ne sont plus chargées directement en tant que routes :
+// elles sont maintenant trois onglets assemblés par ImprovementActions.jsx (fusion des menus
+// "CAPA"/"PDCA"/"QQOQCCP" en "Actions d'amélioration", voir Layout.jsx), et lazy-importées
+// depuis ce fichier-là.
 const ImprovementActions = lazy(() => import('./pages/ImprovementActions.jsx'));
 const CapaDetail = lazy(() => import('./pages/CapaDetail.jsx'));
 // Trainings.jsx et Employees.jsx ne sont plus chargées directement en tant que routes : elles
@@ -32,7 +33,6 @@ const CapaDetail = lazy(() => import('./pages/CapaDetail.jsx'));
 const HumanResources = lazy(() => import('./pages/HumanResources.jsx'));
 const SkillMatrix = lazy(() => import('./pages/SkillMatrix.jsx'));
 const Kpis = lazy(() => import('./pages/Kpis.jsx'));
-const Qqoqccp = lazy(() => import('./pages/Qqoqccp.jsx'));
 const QqoqccpDetail = lazy(() => import('./pages/QqoqccpDetail.jsx'));
 // Audits.jsx et ManagementReviews.jsx ne sont plus chargées directement en tant que routes :
 // elles sont maintenant deux onglets assemblés par QmsOversight.jsx (fusion des menus "Audits
@@ -130,7 +130,7 @@ export default function App() {
               <Route path="trainings" element={<HumanResources />} />
               <Route path="trainings/matrix" element={<SkillMatrix />} />
               <Route path="kpis" element={<Kpis />} />
-              <Route path="qqoqccp" element={<Qqoqccp />} />
+              <Route path="qqoqccp" element={<ImprovementActions />} />
               <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
               <Route path="audits" element={<QmsOversight />} />
               <Route path="audits/:id" element={<AuditDetail />} />
