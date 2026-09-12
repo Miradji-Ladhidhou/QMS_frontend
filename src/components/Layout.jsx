@@ -86,7 +86,10 @@ export const NAV_ITEMS = [
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { key: 'planning', to: '/planning', label: 'Planning', icon: CalendarClock },
   { key: 'documents', to: '/documents', label: 'Documents', icon: FileText },
-  { key: 'capas', to: '/capas', label: 'CAPA', icon: ClipboardList },
+  // Fusionné avec PDCA (voir ImprovementActions.jsx, qui assemble les deux pages en onglets)
+  // sous ce seul lien de menu — même principe que 'complaints' plus bas : l'entrée 'pdca'
+  // reste dans ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
+  { key: 'capas', to: '/capas', label: "Actions d'amélioration", icon: ClipboardList },
   // Fusionné avec Satisfaction client (voir CustomerFeedback.jsx, qui assemble les deux pages
   // en onglets) sous ce seul lien de menu — l'entrée 'customer-satisfaction' plus bas reste
   // dans ce tableau (nécessaire à MenuVisibilitySettings.jsx et à sa propre clé de visibilité)
@@ -96,14 +99,21 @@ export const NAV_ITEMS = [
   { key: 'trainings', to: '/trainings', label: 'Formations', icon: GraduationCap },
   { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
-  { key: 'audits', to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
+  // Fusionné avec Revues de direction (voir QmsOversight.jsx) sous ce seul lien de menu —
+  // même principe que 'complaints' plus haut : l'entrée 'management-reviews' reste dans ce
+  // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
+  { key: 'audits', to: '/audits', label: 'Pilotage du SMQ', icon: ClipboardCheck },
   { key: 'risks', to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
   { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer },
   { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
-  { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
+  // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'audits'
+  // plus haut) : n'apparaît plus comme lien séparé dans le menu latéral.
+  { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2, hiddenFromSidebar: true },
   { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck },
   { key: 'accidents', to: '/accidents', label: 'Accidents du travail', icon: Siren },
-  { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw },
+  // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
+  // haut) : n'apparaît plus comme lien séparé dans le menu latéral.
+  { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw, hiddenFromSidebar: true },
   {
     key: 'nonconforming-outputs',
     to: '/nonconforming-outputs',
@@ -130,9 +140,11 @@ export const NAV_ITEMS = [
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
   // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations
   // restent réservées à l'admin (voir services.js/employees.js), donc pas de risque de casser
-  // la page en l'ouvrant à d'autres rôles.
-  { key: 'services', to: '/services', label: 'Services', icon: Wrench },
-  { key: 'employees', to: '/employees', label: 'Personnel', icon: Contact },
+  // la page en l'ouvrant à d'autres rôles. Fusionnées entre elles (voir Organization.jsx) sous
+  // ce seul lien de menu — même principe que 'complaints' plus haut : 'employees' reste dans ce
+  // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
+  { key: 'services', to: '/services', label: 'Organisation', icon: Wrench },
+  { key: 'employees', to: '/employees', label: 'Personnel', icon: Contact, hiddenFromSidebar: true },
   // Jamais configurable, comme Prise en main plus haut : c'est le seul endroit qui permet de
   // corriger la visibilité du menu, donc aucune combinaison de règles ne doit jamais pouvoir le
   // faire disparaître pour un admin. Pas adminOnly non plus (corrigé) : la page elle-même

@@ -20,16 +20,22 @@ const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const Planning = lazy(() => import('./pages/Planning.jsx'));
 const Documents = lazy(() => import('./pages/Documents.jsx'));
 const DocumentDetail = lazy(() => import('./pages/DocumentDetail.jsx'));
-const Capas = lazy(() => import('./pages/Capas.jsx'));
+// Capas.jsx et Pdca.jsx ne sont plus chargées directement en tant que routes : elles sont
+// maintenant deux onglets assemblés par ImprovementActions.jsx (fusion des menus "CAPA"/"PDCA"
+// en "Actions d'amélioration", voir Layout.jsx), et lazy-importées depuis ce fichier-là.
+const ImprovementActions = lazy(() => import('./pages/ImprovementActions.jsx'));
 const CapaDetail = lazy(() => import('./pages/CapaDetail.jsx'));
 const Trainings = lazy(() => import('./pages/Trainings.jsx'));
 const SkillMatrix = lazy(() => import('./pages/SkillMatrix.jsx'));
 const Kpis = lazy(() => import('./pages/Kpis.jsx'));
 const Qqoqccp = lazy(() => import('./pages/Qqoqccp.jsx'));
 const QqoqccpDetail = lazy(() => import('./pages/QqoqccpDetail.jsx'));
-const Audits = lazy(() => import('./pages/Audits.jsx'));
+// Audits.jsx et ManagementReviews.jsx ne sont plus chargées directement en tant que routes :
+// elles sont maintenant deux onglets assemblés par QmsOversight.jsx (fusion des menus "Audits
+// internes"/"Revues de direction" en "Pilotage du SMQ", voir Layout.jsx), et lazy-importées
+// depuis ce fichier-là.
+const QmsOversight = lazy(() => import('./pages/QmsOversight.jsx'));
 const AuditDetail = lazy(() => import('./pages/AuditDetail.jsx'));
-const ManagementReviews = lazy(() => import('./pages/ManagementReviews.jsx'));
 const ManagementReviewDetail = lazy(() => import('./pages/ManagementReviewDetail.jsx'));
 const Procedures = lazy(() => import('./pages/Procedures.jsx'));
 const ProcedureDetail = lazy(() => import('./pages/ProcedureDetail.jsx'));
@@ -43,7 +49,6 @@ const Risks = lazy(() => import('./pages/Risks.jsx'));
 const RiskDetail = lazy(() => import('./pages/RiskDetail.jsx'));
 const Accidents = lazy(() => import('./pages/Accidents.jsx'));
 const AccidentDetail = lazy(() => import('./pages/AccidentDetail.jsx'));
-const Pdca = lazy(() => import('./pages/Pdca.jsx'));
 const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
 const NonconformingOutputs = lazy(() => import('./pages/NonconformingOutputs.jsx'));
 const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutputDetail.jsx'));
@@ -55,8 +60,10 @@ const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const QualityPolicy = lazy(() => import('./pages/QualityPolicy.jsx'));
-const Services = lazy(() => import('./pages/Services.jsx'));
-const Employees = lazy(() => import('./pages/Employees.jsx'));
+// Services.jsx et Employees.jsx ne sont plus chargées directement en tant que routes : elles
+// sont maintenant deux onglets assemblés par Organization.jsx (fusion des menus "Services"/
+// "Personnel" en "Organisation", voir Layout.jsx), et lazy-importées depuis ce fichier-là.
+const Organization = lazy(() => import('./pages/Organization.jsx'));
 const MyApprovals = lazy(() => import('./pages/MyApprovals.jsx'));
 const GettingStarted = lazy(() => import('./pages/GettingStarted.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
@@ -110,7 +117,7 @@ export default function App() {
               <Route path="planning" element={<Planning />} />
               <Route path="documents" element={<Documents />} />
               <Route path="documents/:id" element={<DocumentDetail />} />
-              <Route path="capas" element={<Capas />} />
+              <Route path="capas" element={<ImprovementActions />} />
               <Route path="capas/:id" element={<CapaDetail />} />
               <Route path="complaints" element={<CustomerFeedback />} />
               <Route path="complaints/:id" element={<ComplaintDetail />} />
@@ -119,13 +126,13 @@ export default function App() {
               <Route path="kpis" element={<Kpis />} />
               <Route path="qqoqccp" element={<Qqoqccp />} />
               <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
-              <Route path="audits" element={<Audits />} />
+              <Route path="audits" element={<QmsOversight />} />
               <Route path="audits/:id" element={<AuditDetail />} />
               <Route path="risks" element={<Risks />} />
               <Route path="risks/:id" element={<RiskDetail />} />
               <Route path="accidents" element={<Accidents />} />
               <Route path="accidents/:id" element={<AccidentDetail />} />
-              <Route path="pdca" element={<Pdca />} />
+              <Route path="pdca" element={<ImprovementActions />} />
               <Route path="pdca/:id" element={<PdcaDetail />} />
               <Route path="nonconforming-outputs" element={<NonconformingOutputs />} />
               <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
@@ -136,14 +143,14 @@ export default function App() {
               <Route path="haccp/:id" element={<HaccpDetail />} />
               <Route path="suppliers" element={<Suppliers />} />
               <Route path="suppliers/:id" element={<SupplierDetail />} />
-              <Route path="management-reviews" element={<ManagementReviews />} />
+              <Route path="management-reviews" element={<QmsOversight />} />
               <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
               <Route path="procedures" element={<Procedures />} />
               <Route path="procedures/:id" element={<ProcedureDetail />} />
               <Route path="settings" element={<Settings />} />
               <Route path="quality-policy" element={<QualityPolicy />} />
-              <Route path="services" element={<Services />} />
-              <Route path="employees" element={<Employees />} />
+              <Route path="services" element={<Organization />} />
+              <Route path="employees" element={<Organization />} />
               <Route path="my-approvals" element={<MyApprovals />} />
               <Route path="prise-en-main" element={<GettingStarted />} />
             </Route>
