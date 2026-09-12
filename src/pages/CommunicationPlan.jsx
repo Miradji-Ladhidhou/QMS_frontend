@@ -1,15 +1,22 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, Folder, FolderCog, List, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
+import { Folder, FolderCog, FolderInput, FolderPlus, Pencil, Plus, Search, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
+import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { COMMUNICATION_SCOPE_LABELS } from '../lib/communicationPlanLabels.js';
 import CommunicationScopeBadge from '../components/CommunicationScopeBadge.jsx';
-import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
+import FolderTile from '../components/FolderTile.jsx';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import FolderPickerModal from '../components/FolderPickerModal.jsx';
+import NewFolderModal from '../components/NewFolderModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+
+const CATEGORIES_BASE_URL = '/module-categories';
+const PLAN_RESOURCE_TYPE = 'communication_plan';
 
 const PLAN_SORT_OPTIONS = [
   { key: 'subject', label: 'objet' },
@@ -21,7 +28,10 @@ function getPlanSortValue(item, key) {
   return item[key];
 }
 
-function ItemModal({ item, users, categories, onClose, onSaved }) {
+// Pas de notion de visibilité personnelle sur ce module (page réservée aux admins) : un simple
+// bouton "Dossier" ouvrant FolderPickerModal, sans le bascule "Tout le monde"/"Uniquement moi"
+// de CategoryVisibilityField.
+function ItemModal({ item, users, onClose, onSaved }) {
   const isNew = !item;
   const [form, setForm] = useState({
     subject: item?.subject || '',
@@ -32,8 +42,10 @@ function ItemModal({ item, users, categories, onClose, onSaved }) {
     responsible_user_id: item?.responsible_user_id || '',
     notes: item?.notes || '',
     category_id: item?.category_id || '',
+    category_name: item?.category?.name || '',
     is_active: item?.is_active ?? true,
   });
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -170,18 +182,28 @@ function ItemModal({ item, users, categories, onClose, onSaved }) {
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Dossier</label>
-            <select
-              value={form.category_id}
-              onChange={(e) => updateField('category_id', e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            <button
+              type="button"
+              onClick={() => setIsPickerOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md border border-slate-300 px-3 py-2.5 text-left text-base text-slate-700 hover:bg-slate-50"
             >
-              <option value="">Sans dossier</option>
-              {categories.map((category) => (
-                <option key={category.id} value={category.id}>
-                  {category.name}
-                </option>
-              ))}
-            </select>
+              <Folder size={16} className="shrink-0 text-primary" />
+              <span className="truncate">{form.category_name || 'Aucun dossier'}</span>
+            </button>
+            {isPickerOpen && (
+              <FolderPickerModal
+                baseUrl={CATEGORIES_BASE_URL}
+                resourceType={PLAN_RESOURCE_TYPE}
+                initialFolderId={form.category_id || null}
+                subtitle="Dossier de rattachement"
+                onClose={() => setIsPickerOpen(false)}
+                onSelect={(folderId, folderName) => {
+                  updateField('category_id', folderId || '');
+                  updateField('category_name', folderName || '');
+                  setIsPickerOpen(false);
+                }}
+              />
+            )}
           </div>
 
           <div>
@@ -219,7 +241,7 @@ function ItemModal({ item, users, categories, onClose, onSaved }) {
   );
 }
 
-function ItemCard({ item, isAdmin, categories, updatingCategoryId, onEdit, onDelete, onCategoryChange }) {
+function ItemCard({ item, isAdmin, onEdit, onDelete, onMove }) {
   return (
     <div className={`rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${item.is_active ? '' : 'opacity-60'}`}>
       <div className="flex items-start justify-between gap-3">
@@ -275,24 +297,18 @@ function ItemCard({ item, isAdmin, categories, updatingCategoryId, onEdit, onDel
 
       {item.notes && <p className="mt-2 text-xs text-slate-500">{item.notes}</p>}
 
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        <CategoryBadge category={item.category} />
-        {isAdmin && (
-          <select
-            value={item.category_id || ''}
-            disabled={updatingCategoryId === item.id}
-            onChange={(e) => onCategoryChange(e, item)}
-            className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+      {isAdmin && (
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onMove(item)}
+            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
           >
-            <option value="">Sans dossier</option>
-            {categories.map((category) => (
-              <option key={category.id} value={category.id}>
-                {category.name}
-              </option>
-            ))}
-          </select>
-        )}
-      </div>
+            <FolderInput size={12} />
+            Déplacer
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -302,31 +318,32 @@ export default function CommunicationPlan() {
   const isAdmin = currentUser?.role === 'admin';
   const [items, setItems] = useState([]);
   const [users, setUsers] = useState([]);
-  const [categories, setCategories] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [scopeFilter, setScopeFilter] = useState('');
   const [showInactive, setShowInactive] = useState(true);
-  const [viewMode, setViewMode] = useState('folder');
-  const [expandedFolders, setExpandedFolders] = useState(() => new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [modalItem, setModalItem] = useState(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
-  const [updatingCategoryId, setUpdatingCategoryId] = useState(null);
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [movingItem, setMovingItem] = useState(null);
+  const {
+    currentFolderId,
+    navigateToFolder,
+    breadcrumb,
+    folders,
+    foldersLoading,
+    reloadFolders,
+  } = useFolderNavigation({ baseUrl: CATEGORIES_BASE_URL, resourceType: PLAN_RESOURCE_TYPE });
 
   async function loadData() {
     setLoading(true);
     setError('');
     try {
-      const [itemsRes, usersRes, categoriesRes] = await Promise.all([
-        api.get('/communication-plan'),
-        api.get('/users'),
-        api.get('/module-categories', { params: { resource_type: 'communication_plan' } }),
-      ]);
+      const [itemsRes, usersRes] = await Promise.all([api.get('/communication-plan'), api.get('/users')]);
       setItems(itemsRes.data);
       setUsers(usersRes.data);
-      setCategories(categoriesRes.data);
     } catch {
       setError('Impossible de charger le plan de communication.');
     } finally {
@@ -338,13 +355,15 @@ export default function CommunicationPlan() {
     loadData();
   }, []);
 
-  function toggleFolder(key) {
-    setExpandedFolders((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  async function handleMoveItem(folderId) {
+    const item = movingItem;
+    setMovingItem(null);
+    try {
+      const { data } = await api.patch(`/communication-plan/${item.id}`, { category_id: folderId || null });
+      setItems((prev) => prev.map((i) => (i.id === item.id ? data : i)));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de changer le dossier de cette ligne.');
+    }
   }
 
   async function handleDelete(item) {
@@ -354,19 +373,6 @@ export default function CommunicationPlan() {
       setItems((prev) => prev.filter((i) => i.id !== item.id));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer cette ligne.');
-    }
-  }
-
-  async function handleCategoryChange(event, item) {
-    const categoryId = event.target.value || null;
-    setUpdatingCategoryId(item.id);
-    try {
-      const { data } = await api.patch(`/communication-plan/${item.id}`, { category_id: categoryId });
-      setItems((prev) => prev.map((i) => (i.id === item.id ? data : i)));
-    } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de changer le dossier de cette ligne.');
-    } finally {
-      setUpdatingCategoryId(null);
     }
   }
 
@@ -404,22 +410,14 @@ export default function CommunicationPlan() {
 
   const { sorted, sortKey, direction, setSortKey, toggleSort } = useSort(filteredItems, getPlanSortValue, 'scope', 'asc');
 
-  const groupedByFolder = useMemo(() => {
-    const byCategory = new Map(categories.map((category) => [category.id, []]));
-    const unfiled = [];
-    for (const item of sorted) {
-      if (item.category_id && byCategory.has(item.category_id)) byCategory.get(item.category_id).push(item);
-      else unfiled.push(item);
-    }
-    const groups = categories
-      .map((category) => ({ key: category.id, category, items: byCategory.get(category.id) || [] }))
-      .filter((group) => group.items.length > 0);
-    if (unfiled.length > 0) groups.push({ key: 'unfiled', category: null, items: unfiled });
-    return groups;
-  }, [sorted, categories]);
-
-  const isFolderView = viewMode === 'folder';
-  const itemGroups = isFolderView ? groupedByFolder : [{ key: 'all', category: null, items: sorted }];
+  // sorted reste la liste COMPLÈTE (recherche + filtres + tri) : naviguer dans un dossier ne
+  // fait que choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste
+  // déjà chargée, même principe que Risks.jsx/Suppliers.jsx. "Sans dossier" (racine) =
+  // category_id null.
+  const currentFolderItems = useMemo(
+    () => sorted.filter((item) => (item.category_id || null) === currentFolderId),
+    [sorted, currentFolderId]
+  );
 
   return (
     <div>
@@ -486,28 +484,7 @@ export default function CommunicationPlan() {
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex gap-2">
-          <button
-            type="button"
-            onClick={() => setViewMode('folder')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'folder' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <Folder size={16} />
-            Par dossier
-          </button>
-          <button
-            type="button"
-            onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-              viewMode === 'list' ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            <List size={16} />
-            Liste
-          </button>
-        </div>
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tout le plan" />
 
         {isAdmin && (
           <button
@@ -521,82 +498,97 @@ export default function CommunicationPlan() {
         )}
       </div>
 
-      {loading ? (
+      {loading || foldersLoading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-14 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
-      ) : items.length === 0 ? (
-        <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-          <p className="text-base font-medium text-slate-700">Aucune ligne dans le plan de communication</p>
-          {isAdmin && (
-            <button
-              type="button"
-              onClick={openNew}
-              className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-            >
-              <Plus size={18} />
-              Ajouter la première ligne
-            </button>
-          )}
-        </div>
-      ) : sorted.length === 0 ? (
-        <p className="mt-6 text-sm text-slate-500">Aucune ligne ne correspond aux filtres.</p>
       ) : (
-        <div className="mt-4 space-y-3">
-          {itemGroups.map((group) => (
-            <div key={group.key}>
-              {isFolderView && (
+        <>
+          {(folders.length > 0 || isAdmin) && (
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
+              {folders.map((folder) => (
+                <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
+              ))}
+              {isAdmin && (
                 <button
                   type="button"
-                  onClick={() => toggleFolder(group.key)}
-                  className="flex w-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-left text-sm font-medium text-slate-700 shadow-sm"
+                  onClick={() => setIsNewFolderOpen(true)}
+                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
                 >
-                  {expandedFolders.has(group.key) ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                  <Folder size={14} style={group.category?.color ? { color: group.category.color } : undefined} />
-                  {group.category ? group.category.name : 'Sans dossier'}
-                  <span className="font-normal text-slate-400">({group.items.length})</span>
+                  <FolderPlus size={26} />
+                  <span className="text-sm font-medium">Nouveau dossier</span>
                 </button>
               )}
-              {(!isFolderView || expandedFolders.has(group.key)) && (
-                <div className={`grid gap-3 sm:grid-cols-2 ${isFolderView ? 'mt-2' : ''}`}>
-                  {group.items.map((item) => (
-                    <ItemCard
-                      key={item.id}
-                      item={item}
-                      isAdmin={isAdmin}
-                      categories={categories}
-                      updatingCategoryId={updatingCategoryId}
-                      onEdit={openEdit}
-                      onDelete={handleDelete}
-                      onCategoryChange={handleCategoryChange}
-                    />
-                  ))}
-                </div>
+            </div>
+          )}
+
+          {items.length === 0 && folders.length === 0 ? (
+            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
+              <p className="text-base font-medium text-slate-700">Aucune ligne dans le plan de communication</p>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={openNew}
+                  className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                >
+                  <Plus size={18} />
+                  Ajouter la première ligne
+                </button>
               )}
             </div>
-          ))}
-        </div>
+          ) : sorted.length === 0 ? (
+            <p className="mt-6 text-sm text-slate-500">Aucune ligne ne correspond aux filtres.</p>
+          ) : currentFolderItems.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              {currentFolderId ? 'Aucune ligne directement dans ce dossier.' : 'Aucune ligne sans dossier.'}
+            </p>
+          ) : (
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              {currentFolderItems.map((item) => (
+                <ItemCard key={item.id} item={item} isAdmin={isAdmin} onEdit={openEdit} onDelete={handleDelete} onMove={setMovingItem} />
+              ))}
+            </div>
+          )}
+        </>
       )}
 
-      {modalOpen && (
-        <ItemModal
-          item={modalItem}
-          users={users}
-          categories={categories}
-          onClose={() => setModalOpen(false)}
-          onSaved={handleSaved}
-        />
-      )}
+      {modalOpen && <ItemModal item={modalItem} users={users} onClose={() => setModalOpen(false)} onSaved={handleSaved} />}
 
       {isManageCategoriesOpen && (
         <ManageCategoriesModal
-          baseUrl="/module-categories"
-          resourceType="communication_plan"
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PLAN_RESOURCE_TYPE}
           isAdmin
           onClose={() => setIsManageCategoriesOpen(false)}
-          onChanged={loadData}
+          onChanged={reloadFolders}
+        />
+      )}
+
+      {isNewFolderOpen && (
+        <NewFolderModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PLAN_RESOURCE_TYPE}
+          parentId={currentFolderId}
+          onClose={() => setIsNewFolderOpen(false)}
+          onCreated={() => {
+            setIsNewFolderOpen(false);
+            reloadFolders();
+          }}
+        />
+      )}
+
+      {movingItem && (
+        <FolderPickerModal
+          baseUrl={CATEGORIES_BASE_URL}
+          resourceType={PLAN_RESOURCE_TYPE}
+          initialFolderId={movingItem.category_id || null}
+          title="Déplacer"
+          subtitle={movingItem.subject}
+          confirmLabel="Déplacer ici"
+          onClose={() => setMovingItem(null)}
+          onSelect={handleMoveItem}
         />
       )}
     </div>
