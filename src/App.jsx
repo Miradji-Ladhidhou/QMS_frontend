@@ -33,7 +33,11 @@ const ManagementReviews = lazy(() => import('./pages/ManagementReviews.jsx'));
 const ManagementReviewDetail = lazy(() => import('./pages/ManagementReviewDetail.jsx'));
 const Procedures = lazy(() => import('./pages/Procedures.jsx'));
 const ProcedureDetail = lazy(() => import('./pages/ProcedureDetail.jsx'));
-const Complaints = lazy(() => import('./pages/Complaints.jsx'));
+// Complaints.jsx et CustomerSatisfaction.jsx ne sont plus chargées directement en tant que
+// routes : elles sont maintenant deux onglets assemblés par CustomerFeedback.jsx (fusion des
+// deux menus "Réclamations clients"/"Satisfaction client" en un seul, voir Layout.jsx), et
+// lazy-importées depuis ce fichier-là plutôt que d'ici.
+const CustomerFeedback = lazy(() => import('./pages/CustomerFeedback.jsx'));
 const ComplaintDetail = lazy(() => import('./pages/ComplaintDetail.jsx'));
 const Risks = lazy(() => import('./pages/Risks.jsx'));
 const RiskDetail = lazy(() => import('./pages/RiskDetail.jsx'));
@@ -43,7 +47,6 @@ const Pdca = lazy(() => import('./pages/Pdca.jsx'));
 const PdcaDetail = lazy(() => import('./pages/PdcaDetail.jsx'));
 const NonconformingOutputs = lazy(() => import('./pages/NonconformingOutputs.jsx'));
 const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutputDetail.jsx'));
-const CustomerSatisfaction = lazy(() => import('./pages/CustomerSatisfaction.jsx'));
 const CustomerSatisfactionDetail = lazy(() => import('./pages/CustomerSatisfactionDetail.jsx'));
 const CommunicationPlan = lazy(() => import('./pages/CommunicationPlan.jsx'));
 const Haccp = lazy(() => import('./pages/Haccp.jsx'));
@@ -109,7 +112,7 @@ export default function App() {
               <Route path="documents/:id" element={<DocumentDetail />} />
               <Route path="capas" element={<Capas />} />
               <Route path="capas/:id" element={<CapaDetail />} />
-              <Route path="complaints" element={<Complaints />} />
+              <Route path="complaints" element={<CustomerFeedback />} />
               <Route path="complaints/:id" element={<ComplaintDetail />} />
               <Route path="trainings" element={<Trainings />} />
               <Route path="trainings/matrix" element={<SkillMatrix />} />
@@ -126,7 +129,7 @@ export default function App() {
               <Route path="pdca/:id" element={<PdcaDetail />} />
               <Route path="nonconforming-outputs" element={<NonconformingOutputs />} />
               <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
-              <Route path="customer-satisfaction" element={<CustomerSatisfaction />} />
+              <Route path="customer-satisfaction" element={<CustomerFeedback />} />
               <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />
               <Route path="communication-plan" element={<CommunicationPlan />} />
               <Route path="haccp" element={<Haccp />} />

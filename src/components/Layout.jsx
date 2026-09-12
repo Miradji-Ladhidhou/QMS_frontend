@@ -87,7 +87,12 @@ export const NAV_ITEMS = [
   { key: 'planning', to: '/planning', label: 'Planning', icon: CalendarClock },
   { key: 'documents', to: '/documents', label: 'Documents', icon: FileText },
   { key: 'capas', to: '/capas', label: 'CAPA', icon: ClipboardList },
-  { key: 'complaints', to: '/complaints', label: 'Réclamations clients', icon: MessageSquareWarning },
+  // Fusionné avec Satisfaction client (voir CustomerFeedback.jsx, qui assemble les deux pages
+  // en onglets) sous ce seul lien de menu — l'entrée 'customer-satisfaction' plus bas reste
+  // dans ce tableau (nécessaire à MenuVisibilitySettings.jsx et à sa propre clé de visibilité)
+  // mais masquée du menu latéral via hiddenFromSidebar : chaque module garde sa visibilité
+  // configurable indépendamment, CustomerFeedback.jsx respecte les deux séparément.
+  { key: 'complaints', to: '/complaints', label: 'Retours clients', icon: MessageSquareWarning },
   { key: 'trainings', to: '/trainings', label: 'Formations', icon: GraduationCap },
   { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
@@ -105,7 +110,9 @@ export const NAV_ITEMS = [
     label: 'Non-conformités produit/service',
     icon: PackageX,
   },
-  { key: 'customer-satisfaction', to: '/customer-satisfaction', label: 'Satisfaction client', icon: Smile },
+  // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'complaints'
+  // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
+  { key: 'customer-satisfaction', to: '/customer-satisfaction', label: 'Satisfaction client', icon: Smile, hiddenFromSidebar: true },
   { key: 'communication-plan', to: '/communication-plan', label: 'Plan de communication', icon: Megaphone },
   { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
@@ -255,6 +262,7 @@ export default function Layout() {
         <nav className="flex-1 space-y-1 px-3">
           {NAV_ITEMS.filter(
             (item) =>
+              !item.hiddenFromSidebar &&
               (!item.adminOnly || role === 'admin') &&
               (item.adminOnly || item.alwaysVisible || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
           ).map(({ to, label, icon: Icon, end }) => (
