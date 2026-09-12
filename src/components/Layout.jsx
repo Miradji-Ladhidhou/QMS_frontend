@@ -96,7 +96,12 @@ export const NAV_ITEMS = [
   // mais masquée du menu latéral via hiddenFromSidebar : chaque module garde sa visibilité
   // configurable indépendamment, CustomerFeedback.jsx respecte les deux séparément.
   { key: 'complaints', to: '/complaints', label: 'Retours clients', icon: MessageSquareWarning },
-  { key: 'trainings', to: '/trainings', label: 'Formations', icon: GraduationCap },
+  // Fusionné avec Personnel (voir HumanResources.jsx, qui assemble les deux pages en onglets)
+  // sous ce seul lien de menu — clé porteuse volontairement 'trainings' plutôt que 'employees'
+  // (masquée par défaut pour manager/member, voir DEFAULT_HIDDEN_FOR_ROLE côté backend) : voir
+  // le commentaire détaillé dans HumanResources.jsx. L'entrée 'employees' plus bas reste dans
+  // ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
+  { key: 'trainings', to: '/trainings', label: 'Ressources humaines', icon: GraduationCap },
   { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
   { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   // Fusionné avec Revues de direction (voir QmsOversight.jsx) sous ce seul lien de menu —
@@ -145,10 +150,11 @@ export const NAV_ITEMS = [
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
   // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations
   // restent réservées à l'admin (voir services.js/employees.js), donc pas de risque de casser
-  // la page en l'ouvrant à d'autres rôles. Fusionnées entre elles (voir Organization.jsx) sous
-  // ce seul lien de menu — même principe que 'complaints' plus haut : 'employees' reste dans ce
-  // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'services', to: '/services', label: 'Organisation', icon: Wrench },
+  // la page en l'ouvrant à d'autres rôles.
+  { key: 'services', to: '/services', label: 'Services', icon: Wrench },
+  // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'trainings'
+  // plus haut, fusionné avec Personnel dans HumanResources.jsx) : n'apparaît plus comme lien
+  // séparé dans le menu latéral.
   { key: 'employees', to: '/employees', label: 'Personnel', icon: Contact, hiddenFromSidebar: true },
   // Jamais configurable, comme Prise en main plus haut : c'est le seul endroit qui permet de
   // corriger la visibilité du menu, donc aucune combinaison de règles ne doit jamais pouvoir le

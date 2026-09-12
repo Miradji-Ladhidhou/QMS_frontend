@@ -1,23 +1,30 @@
 import { lazy, Suspense } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Contact, Wrench } from 'lucide-react';
+import { Contact, GraduationCap } from 'lucide-react';
 import { useMenuVisibility } from '../lib/useMenuVisibility.js';
 
-const Services = lazy(() => import('./Services.jsx'));
 const Employees = lazy(() => import('./Employees.jsx'));
+const Trainings = lazy(() => import('./Trainings.jsx'));
 
 const TABS = [
-  { key: 'services', to: '/services', menuKey: 'services', label: 'Services', icon: Wrench },
   { key: 'employees', to: '/employees', menuKey: 'employees', label: 'Personnel', icon: Contact },
+  { key: 'trainings', to: '/trainings', menuKey: 'trainings', label: 'Formations', icon: GraduationCap },
 ];
 
-// Fusionne Services et Personnel sous un seul lien de menu ("Organisation", voir
-// Layout.jsx#NAV_ITEMS) — même principe que CustomerFeedback.jsx : deux référentiels simples,
-// gérés par l'admin, masqués par défaut pour manager/member (voir DEFAULT_HIDDEN_FOR_ROLE côté
-// backend, déjà identique pour les deux clés), réutilisés tels quels via deux onglets calés
-// sur les URLs historiques (/services, /employees) pour ne rien casser des liens existants
-// (sélecteurs de service/personne dans les autres modules).
-export default function Organization() {
+// Fusionne Personnel et Formations sous un seul lien de menu ("Ressources humaines", voir
+// Layout.jsx#NAV_ITEMS) — même principe que CustomerFeedback.jsx, mais ici les deux modules
+// ont un vrai lien de données (pas seulement thématique) : chaque formation suivie est
+// rattachée à une personne, et Trainings.jsx contient déjà une matrice de compétences
+// (/trainings/matrix, route séparée, inchangée) qui croise employés × compétences. Chaque
+// module reste néanmoins une page complète et autonome (données, formulaires, exports), via
+// deux onglets calés sur les URLs historiques (/employees, /trainings).
+//
+// Clé de menu porteuse volontairement 'trainings', pas 'employees' : 'employees' est masqué
+// par défaut pour manager/member (voir DEFAULT_HIDDEN_FOR_ROLE côté backend) alors que
+// 'trainings' est visible par défaut pour tous les rôles — si le lien latéral dépendait
+// d'employees, tout le menu (y compris l'onglet Formations, aujourd'hui visible pour tous)
+// disparaîtrait par défaut pour manager/member. Voir Layout.jsx#NAV_ITEMS pour ce choix.
+export default function HumanResources() {
   const location = useLocation();
   const navigate = useNavigate();
   const visibleMenuKeys = useMenuVisibility();
@@ -54,7 +61,7 @@ export default function Organization() {
       )}
 
       <Suspense fallback={<div className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />}>
-        {activeTab.key === 'services' ? <Services /> : <Employees />}
+        {activeTab.key === 'employees' ? <Employees /> : <Trainings />}
       </Suspense>
     </div>
   );

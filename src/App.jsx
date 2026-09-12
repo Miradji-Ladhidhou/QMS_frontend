@@ -25,7 +25,11 @@ const DocumentDetail = lazy(() => import('./pages/DocumentDetail.jsx'));
 // en "Actions d'amélioration", voir Layout.jsx), et lazy-importées depuis ce fichier-là.
 const ImprovementActions = lazy(() => import('./pages/ImprovementActions.jsx'));
 const CapaDetail = lazy(() => import('./pages/CapaDetail.jsx'));
-const Trainings = lazy(() => import('./pages/Trainings.jsx'));
+// Trainings.jsx et Employees.jsx ne sont plus chargées directement en tant que routes : elles
+// sont maintenant deux onglets assemblés par HumanResources.jsx (fusion des menus "Formations"/
+// "Personnel" en "Ressources humaines", voir Layout.jsx), et lazy-importées depuis ce
+// fichier-là. /trainings/matrix reste une route séparée, inchangée.
+const HumanResources = lazy(() => import('./pages/HumanResources.jsx'));
 const SkillMatrix = lazy(() => import('./pages/SkillMatrix.jsx'));
 const Kpis = lazy(() => import('./pages/Kpis.jsx'));
 const Qqoqccp = lazy(() => import('./pages/Qqoqccp.jsx'));
@@ -63,10 +67,7 @@ const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
 const QualityPolicy = lazy(() => import('./pages/QualityPolicy.jsx'));
-// Services.jsx et Employees.jsx ne sont plus chargées directement en tant que routes : elles
-// sont maintenant deux onglets assemblés par Organization.jsx (fusion des menus "Services"/
-// "Personnel" en "Organisation", voir Layout.jsx), et lazy-importées depuis ce fichier-là.
-const Organization = lazy(() => import('./pages/Organization.jsx'));
+const Services = lazy(() => import('./pages/Services.jsx'));
 const MyApprovals = lazy(() => import('./pages/MyApprovals.jsx'));
 const GettingStarted = lazy(() => import('./pages/GettingStarted.jsx'));
 const SuperAdmin = lazy(() => import('./pages/SuperAdmin.jsx'));
@@ -124,7 +125,7 @@ export default function App() {
               <Route path="capas/:id" element={<CapaDetail />} />
               <Route path="complaints" element={<CustomerFeedback />} />
               <Route path="complaints/:id" element={<ComplaintDetail />} />
-              <Route path="trainings" element={<Trainings />} />
+              <Route path="trainings" element={<HumanResources />} />
               <Route path="trainings/matrix" element={<SkillMatrix />} />
               <Route path="kpis" element={<Kpis />} />
               <Route path="qqoqccp" element={<Qqoqccp />} />
@@ -152,8 +153,8 @@ export default function App() {
               <Route path="procedures/:id" element={<ProcedureDetail />} />
               <Route path="settings" element={<Settings />} />
               <Route path="quality-policy" element={<QualityPolicy />} />
-              <Route path="services" element={<Organization />} />
-              <Route path="employees" element={<Organization />} />
+              <Route path="services" element={<Services />} />
+              <Route path="employees" element={<HumanResources />} />
               <Route path="my-approvals" element={<MyApprovals />} />
               <Route path="prise-en-main" element={<GettingStarted />} />
             </Route>
