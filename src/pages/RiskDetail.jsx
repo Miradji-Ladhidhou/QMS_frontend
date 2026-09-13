@@ -15,6 +15,7 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import RiskStatusBadge from '../components/RiskStatusBadge.jsx';
 import RiskScoreBadge from '../components/RiskScoreBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
+import AiRiskTreatmentSuggestion from '../components/AiRiskTreatmentSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
@@ -238,6 +239,24 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
+
+          <AiRiskTreatmentSuggestion
+            title={form.title}
+            description={form.description}
+            category={form.category}
+            type={form.type}
+            likelihood={Number(form.likelihood)}
+            impact={Number(form.impact)}
+            currentControls={form.current_controls}
+            onGenerated={(suggestion) => {
+              setForm((prev) => ({
+                ...prev,
+                treatment_plan: suggestion.treatment_plan || prev.treatment_plan,
+                residual_likelihood: suggestion.residual_likelihood ? String(suggestion.residual_likelihood) : prev.residual_likelihood,
+                residual_impact: suggestion.residual_impact ? String(suggestion.residual_impact) : prev.residual_impact,
+              }));
+            }}
+          />
 
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Évaluation résiduelle (après traitement)</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
