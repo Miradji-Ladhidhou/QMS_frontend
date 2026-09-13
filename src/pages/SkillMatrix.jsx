@@ -166,7 +166,7 @@ export default function SkillMatrix() {
 
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Matrice des compétences</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={handleExportCsv}

@@ -1472,7 +1472,7 @@ export default function Planning() {
           {filteredItems.length} élément{filteredItems.length > 1 ? 's' : ''}
           {filteredItems.length !== items.length + doneTaskItems.length && ` sur ${items.length + doneTaskItems.length}`}
         </p>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setViewMode('list')}

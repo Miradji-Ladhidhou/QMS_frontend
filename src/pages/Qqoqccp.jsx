@@ -281,7 +281,7 @@ export default function Qqoqccp() {
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">QQOQCCP</h1>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => handleExportCsv()}
