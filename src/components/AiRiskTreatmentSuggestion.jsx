@@ -74,7 +74,7 @@ export default function AiRiskTreatmentSuggestion({ title, description, category
               <Sparkles size={12} />
               Généré par IA — déjà appliqué au formulaire ci-dessous
             </span>
-            {suggestion.residual_likelihood && suggestion.residual_impact && (
+            {LIKELIHOOD_LABELS[suggestion.residual_likelihood] && IMPACT_LABELS[suggestion.residual_impact] && (
               <span className="text-xs font-medium text-slate-500">
                 Résiduel estimé : P{suggestion.residual_likelihood} ({LIKELIHOOD_LABELS[suggestion.residual_likelihood]}) · G
                 {suggestion.residual_impact} ({IMPACT_LABELS[suggestion.residual_impact]})

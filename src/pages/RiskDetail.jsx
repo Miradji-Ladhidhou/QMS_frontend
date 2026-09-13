@@ -249,11 +249,22 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
             impact={Number(form.impact)}
             currentControls={form.current_controls}
             onGenerated={(suggestion) => {
+              // Le contrat JSON demandé à l'IA impose 1-5, mais rien ne garantit qu'elle le
+              // respecte strictement (response_format ne garantit que du JSON valide, pas les
+              // contraintes numériques du prompt) — sans ce garde-fou, une valeur hors bornes
+              // atterrirait dans le <select> résiduel (aucune option ne matcherait) puis
+              // ferait échouer l'enregistrement côté base (check residual_likelihood
+              // between 1 and 5) avec un message peu clair.
+              const isValidScore = (value) => Number.isInteger(value) && value >= 1 && value <= 5;
               setForm((prev) => ({
                 ...prev,
                 treatment_plan: suggestion.treatment_plan || prev.treatment_plan,
-                residual_likelihood: suggestion.residual_likelihood ? String(suggestion.residual_likelihood) : prev.residual_likelihood,
-                residual_impact: suggestion.residual_impact ? String(suggestion.residual_impact) : prev.residual_impact,
+                residual_likelihood: isValidScore(suggestion.residual_likelihood)
+                  ? String(suggestion.residual_likelihood)
+                  : prev.residual_likelihood,
+                residual_impact: isValidScore(suggestion.residual_impact)
+                  ? String(suggestion.residual_impact)
+                  : prev.residual_impact,
               }));
             }}
           />
