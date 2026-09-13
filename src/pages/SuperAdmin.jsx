@@ -1467,12 +1467,12 @@ export default function SuperAdmin() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="flex items-center justify-between bg-slate-900 px-4 py-3 text-white sm:px-6">
-        <div className="flex items-center gap-2">
-          <ShieldCheck size={22} />
-          <span className="text-base font-semibold sm:text-lg">Super Admin</span>
+      <header className="flex flex-wrap items-center justify-between gap-2 bg-slate-900 px-4 py-3 text-white sm:px-6">
+        <div className="flex min-w-0 items-center gap-2">
+          <ShieldCheck size={22} className="shrink-0" />
+          <span className="truncate text-base font-semibold sm:text-lg">Super Admin</span>
         </div>
-        <Link to="/" className="flex items-center gap-1.5 text-sm text-white/80 hover:text-white">
+        <Link to="/" className="flex shrink-0 items-center gap-1.5 text-sm text-white/80 hover:text-white">
           <ArrowLeft size={16} />
           Retour à l'application
         </Link>
