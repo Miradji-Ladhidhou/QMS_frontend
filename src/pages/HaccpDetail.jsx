@@ -130,7 +130,7 @@ function EditPlanModal({ plan, services, onClose, onUpdated }) {
           <label className="mb-1 block text-sm font-medium text-slate-700">Équipe HACCP</label>
           <input type="text" value={form.team} onChange={(e) => updateField('team', e.target.value)} className={FIELD_CLASS} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service concerné</label>
             <select value={form.service_id} onChange={(e) => updateField('service_id', e.target.value)} className={FIELD_CLASS}>
@@ -286,7 +286,7 @@ function HazardFormModal({ stepId, hazard, onClose, onSaved }) {
           <label className="mb-1 block text-sm font-medium text-slate-700">Mesures de maîtrise existantes</label>
           <AutoTextarea rows={2} value={form.existing_controls} onChange={(e) => updateField('existing_controls', e.target.value)} className={FIELD_CLASS} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Probabilité (1-5)</label>
             <select value={form.likelihood} onChange={(e) => updateField('likelihood', e.target.value)} className={FIELD_CLASS}>
@@ -385,7 +385,7 @@ function CcpFormModal({ hazardId, ccp, users, onClose, onSaved }) {
           <label className="mb-1 block text-sm font-medium text-slate-700">Procédure de surveillance</label>
           <AutoTextarea rows={2} required value={form.monitoring_procedure} onChange={(e) => updateField('monitoring_procedure', e.target.value)} className={FIELD_CLASS} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence de surveillance</label>
             <input type="text" placeholder="Ex : En continu" value={form.monitoring_frequency} onChange={(e) => updateField('monitoring_frequency', e.target.value)} className={FIELD_CLASS} />
@@ -406,7 +406,7 @@ function CcpFormModal({ hazardId, ccp, users, onClose, onSaved }) {
           <label className="mb-1 block text-sm font-medium text-slate-700">Actions correctives prévues</label>
           <AutoTextarea rows={2} value={form.corrective_action_procedure} onChange={(e) => updateField('corrective_action_procedure', e.target.value)} className={FIELD_CLASS} />
         </div>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Procédure de vérification</label>
             <AutoTextarea rows={2} value={form.verification_procedure} onChange={(e) => updateField('verification_procedure', e.target.value)} className={FIELD_CLASS} />
@@ -516,7 +516,7 @@ function CreateCapaFromLogModal({ log, ccp, users, services, priorityDelays, onC
           onSelectAction={handleAiSelectAction}
         />
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
             <select value={form.priority} onChange={(e) => handlePriorityChange(e.target.value)} className={FIELD_CLASS}>
@@ -554,7 +554,7 @@ function CreateCapaFromLogModal({ log, ccp, users, services, priorityDelays, onC
           <AutoTextarea rows={2} value={form.preventive_action} onChange={(e) => updateField('preventive_action', e.target.value)} className={FIELD_CLASS} />
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
             <select value={form.service_id} onChange={(e) => updateField('service_id', e.target.value)} className={FIELD_CLASS}>

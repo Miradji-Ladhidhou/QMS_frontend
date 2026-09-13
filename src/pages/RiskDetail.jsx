@@ -43,7 +43,7 @@ function ScoreCard({ label, likelihood, impact, score }) {
         <h2 className="text-sm font-semibold text-slate-900">{label}</h2>
         <RiskScoreBadge score={score} />
       </div>
-      <div className="mt-3 grid grid-cols-2 gap-3">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <p className="text-xs text-slate-500">Probabilité</p>
           <p className="text-sm font-medium text-slate-800">

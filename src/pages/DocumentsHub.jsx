@@ -54,7 +54,7 @@ export default function DocumentsHub() {
   return (
     <div>
       {visibleTabs.length > 1 && (
-        <div className="mb-4 flex gap-1 border-b border-slate-200">
+        <div className="mb-4 flex gap-1 overflow-x-auto border-b border-slate-200">
           {visibleTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = tab.key === activeTab.key;
@@ -63,7 +63,7 @@ export default function DocumentsHub() {
                 key={tab.key}
                 type="button"
                 onClick={() => navigate(tab.to)}
-                className={`flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                   isActive ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
                 }`}
               >

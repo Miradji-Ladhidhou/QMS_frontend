@@ -545,7 +545,7 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
             onSelectAction={handleAiSelectAction}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
               <select
@@ -623,7 +623,7 @@ function NewCapaModal({ users, services, priorityDelays, onClose, onCreated }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
               <select

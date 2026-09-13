@@ -270,7 +270,7 @@ function EditReviewModal({ review, onClose, onUpdated }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Date de revue</label>
               <input
@@ -299,7 +299,7 @@ function EditReviewModal({ review, onClose, onUpdated }) {
                 <span className="ml-1 font-normal text-slate-400">(figée, la revue est clôturée)</span>
               )}
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input
                 type="date"
                 disabled={review.status === 'completed'}
@@ -464,7 +464,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
             onSelectAction={handleAiSelectAction}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
               <select
@@ -530,7 +530,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
               <select
@@ -751,7 +751,7 @@ export default function ManagementReviewDetail() {
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+      <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 sm:p-5">
         <div>
           <p className="text-xs text-slate-500">Date de revue</p>
           <p className="text-sm font-medium text-slate-800">{formatDate(review.review_date)}</p>

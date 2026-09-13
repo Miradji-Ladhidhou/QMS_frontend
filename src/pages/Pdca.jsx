@@ -149,7 +149,7 @@ function NewPdcaModal({ users, services, onClose, onCreated }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service concerné</label>
               <select

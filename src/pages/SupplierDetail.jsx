@@ -109,7 +109,7 @@ function EditSupplierModal({ supplier, services, onClose, onUpdated }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Nom</label>
               <input
@@ -131,7 +131,7 @@ function EditSupplierModal({ supplier, services, onClose, onUpdated }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Contact</label>
               <input
@@ -152,7 +152,7 @@ function EditSupplierModal({ supplier, services, onClose, onUpdated }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Criticité</label>
               <select
@@ -183,7 +183,7 @@ function EditSupplierModal({ supplier, services, onClose, onUpdated }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service concerné</label>
               <select
@@ -343,7 +343,7 @@ function CreateCapaFromEvaluationModal({ supplierId, supplierName, evaluation, u
             onSelectAction={handleAiSelectAction}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
               <select
@@ -409,7 +409,7 @@ function CreateCapaFromEvaluationModal({ supplierId, supplierName, evaluation, u
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
               <select
@@ -676,7 +676,7 @@ export default function SupplierDetail() {
                 </div>
               </div>
 
-              <div className="mt-2 grid grid-cols-4 gap-2">
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {SCORE_FIELDS.map(({ key, label }) => (
                   <div key={key} className="rounded-md bg-slate-50 px-2 py-1.5 text-center">
                     <p className="text-sm font-semibold text-slate-800">{evaluation[key]}/5</p>
@@ -755,7 +755,7 @@ export default function SupplierDetail() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {SCORE_FIELDS.map(({ key, label }) => (
                   <div key={key}>
                     <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>

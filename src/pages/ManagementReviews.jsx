@@ -156,7 +156,7 @@ function NewReviewModal({ onClose, onCreated }) {
               Période des données d'entrée
               <span className="ml-1 font-normal text-slate-400">(KPI, audits, réclamations, CAPA, risques)</span>
             </label>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <input
                 type="date"
                 value={periodStart}

@@ -110,7 +110,7 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Client</label>
               <input
@@ -143,7 +143,7 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
               <select
@@ -169,7 +169,7 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service concerné</label>
               <select
@@ -233,7 +233,7 @@ function EditComplaintModal({ complaint, users, services, onClose, onUpdated }) 
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Date de résolution</label>
               <input
@@ -379,7 +379,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
             onSelectAction={handleAiSelectAction}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
               <select
@@ -445,7 +445,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
               <select

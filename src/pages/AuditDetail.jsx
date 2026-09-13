@@ -118,7 +118,7 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Type</label>
               <select
@@ -155,7 +155,7 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service audité</label>
               <select
@@ -678,7 +678,7 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, priorit
             onSelectAction={handleAiSelectAction}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
               <select
@@ -744,7 +744,7 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, priorit
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
               <select

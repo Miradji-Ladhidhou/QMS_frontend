@@ -256,7 +256,7 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Priorité</label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {Object.entries(PRIORITY_CONFIG).map(([value, config]) => (
                 <button
                   key={value}
@@ -277,7 +277,7 @@ function TaskFormModal({ task, users, employees, categories, onClose, onSaved })
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Assigner à</label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               {[
                 { value: 'none', label: 'Personne' },
                 { value: 'user', label: 'Un compte' },
