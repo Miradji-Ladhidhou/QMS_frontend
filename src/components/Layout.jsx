@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   BookOpen,
@@ -94,24 +94,28 @@ export const NAV_ITEMS = [
   // caché pour un rôle, y compris si 'documents', 'procedures' ou 'my-approvals' sont masqués —
   // DocumentsHub.jsx n'affiche alors plus que l'onglet Politique qualité. Voir aussi le
   // commentaire équivalent sur 'prise-en-main' plus bas.
-  { to: '/documents', label: 'Documents', icon: FileText, alwaysVisible: true },
+  // matchPaths : NavLink ne matche que sur `to`, donc changer d'onglet dans DocumentsHub.jsx
+  // (vers /procedures, /my-approvals ou /quality-policy) faisait perdre la surbrillance de ce
+  // lien puisque l'URL ne commence plus par /documents — voir isNavItemActive ci-dessous, qui
+  // remplace la détection automatique de NavLink par ces chemins connus.
+  { to: '/documents', label: 'Documents', icon: FileText, alwaysVisible: true, matchPaths: ['/documents', '/procedures', '/my-approvals', '/quality-policy'] },
   // Fusionné avec PDCA et QQOQCCP (voir ImprovementActions.jsx, qui assemble les trois pages
   // en onglets) sous ce seul lien de menu — même principe que 'complaints' plus bas : les
   // entrées 'pdca' et 'qqoqccp' restent dans ce tableau pour MenuVisibilitySettings.jsx mais
   // masquées du menu latéral.
-  { key: 'capas', to: '/capas', label: "Actions d'amélioration", icon: ClipboardList },
+  { key: 'capas', to: '/capas', label: "Actions d'amélioration", icon: ClipboardList, matchPaths: ['/capas', '/pdca', '/qqoqccp'] },
   // Fusionné avec Satisfaction client (voir CustomerFeedback.jsx, qui assemble les deux pages
   // en onglets) sous ce seul lien de menu — l'entrée 'customer-satisfaction' plus bas reste
   // dans ce tableau (nécessaire à MenuVisibilitySettings.jsx et à sa propre clé de visibilité)
   // mais masquée du menu latéral via hiddenFromSidebar : chaque module garde sa visibilité
   // configurable indépendamment, CustomerFeedback.jsx respecte les deux séparément.
-  { key: 'complaints', to: '/complaints', label: 'Retours clients', icon: MessageSquareWarning },
+  { key: 'complaints', to: '/complaints', label: 'Retours clients', icon: MessageSquareWarning, matchPaths: ['/complaints', '/customer-satisfaction'] },
   // Fusionné avec Personnel (voir HumanResources.jsx, qui assemble les deux pages en onglets)
   // sous ce seul lien de menu — clé porteuse volontairement 'trainings' plutôt que 'employees'
   // (masquée par défaut pour manager/member, voir DEFAULT_HIDDEN_FOR_ROLE côté backend) : voir
   // le commentaire détaillé dans HumanResources.jsx. L'entrée 'employees' plus bas reste dans
   // ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'trainings', to: '/trainings', label: 'Ressources humaines', icon: GraduationCap },
+  { key: 'trainings', to: '/trainings', label: 'Ressources humaines', icon: GraduationCap, matchPaths: ['/trainings', '/employees'] },
   { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
   // haut, fusionné avec PDCA et QQOQCCP dans ImprovementActions.jsx) : n'apparaît plus comme
@@ -120,11 +124,11 @@ export const NAV_ITEMS = [
   // Fusionné avec Revues de direction (voir QmsOversight.jsx) sous ce seul lien de menu —
   // même principe que 'complaints' plus haut : l'entrée 'management-reviews' reste dans ce
   // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'audits', to: '/audits', label: 'Pilotage du SMQ', icon: ClipboardCheck },
+  { key: 'audits', to: '/audits', label: 'Pilotage du SMQ', icon: ClipboardCheck, matchPaths: ['/audits', '/management-reviews'] },
   // Fusionné avec HACCP (voir RiskManagement.jsx, qui assemble les deux pages en onglets)
   // sous ce seul lien de menu — même principe que 'complaints' plus haut : l'entrée 'haccp'
   // reste dans ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'risks', to: '/risks', label: 'Gestion des risques', icon: ShieldAlert },
+  { key: 'risks', to: '/risks', label: 'Gestion des risques', icon: ShieldAlert, matchPaths: ['/risks', '/haccp'] },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'risks'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer, hiddenFromSidebar: true },
@@ -141,7 +145,7 @@ export const NAV_ITEMS = [
   // pages en onglets) sous ce seul lien de menu — même principe que 'complaints' plus haut :
   // l'entrée 'nonconforming-outputs' plus bas reste dans ce tableau pour
   // MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'accidents', to: '/accidents', label: 'Signalements', icon: Siren },
+  { key: 'accidents', to: '/accidents', label: 'Signalements', icon: Siren, matchPaths: ['/accidents', '/nonconforming-outputs'] },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
   // haut) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw, hiddenFromSidebar: true },
@@ -186,6 +190,16 @@ export const NAV_ITEMS = [
   { to: '/settings', label: 'Paramètres', icon: Settings, alwaysVisible: true },
 ];
 
+// Remplace la détection d'activation automatique de NavLink (qui ne compare que `to`) pour les
+// liens fusionnés ci-dessus : un onglet de page fusionnée (ex. /procedures dans DocumentsHub.jsx)
+// doit garder en surbrillance le lien de menu qui l'a ouvert (ex. "Documents") même si son URL
+// ne commence pas par /documents. `end` (Dashboard uniquement) reste une comparaison stricte.
+function isNavItemActive(item, pathname) {
+  if (item.end) return pathname === item.to;
+  const paths = item.matchPaths || [item.to];
+  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
+
 export default function Layout() {
   useInactivityLogout(INACTIVITY_TIMEOUT_MS);
   const currentUser = useCurrentUser();
@@ -196,6 +210,7 @@ export default function Layout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
+  const location = useLocation();
   const now = useNow();
   const timeZone = tenant?.timezone || 'UTC';
   // Paramétrable via Paramètres > Informations de l'entreprise (voir CompanySettings.jsx) —
@@ -306,21 +321,21 @@ export default function Layout() {
               !item.hiddenFromSidebar &&
               (!item.adminOnly || role === 'admin') &&
               (item.adminOnly || item.alwaysVisible || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
-          ).map(({ to, label, icon: Icon, end }) => (
+          ).map((item) => (
             <NavLink
-              key={to}
-              to={to}
-              end={end}
+              key={item.to}
+              to={item.to}
+              end={item.end}
               onClick={closeMenu}
-              className={({ isActive }) =>
+              className={() =>
                 `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  isNavItemActive(item, location.pathname) ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
                 }`
               }
             >
-              <Icon size={20} />
-              <span className="flex-1">{label}</span>
-              {to === '/my-approvals' && pendingApprovalsCount > 0 && (
+              <item.icon size={20} />
+              <span className="flex-1">{item.label}</span>
+              {item.to === '/my-approvals' && pendingApprovalsCount > 0 && (
                 <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
                   {pendingApprovalsCount}
                 </span>
