@@ -12,6 +12,8 @@ import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AiHazardSuggestion from '../components/AiHazardSuggestion.jsx';
+import AiCcpSignificanceSuggestion from '../components/AiCcpSignificanceSuggestion.jsx';
+import AiCcpDefinitionSuggestion from '../components/AiCcpDefinitionSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
@@ -218,7 +220,7 @@ function StepFormModal({ planId, step, onClose, onSaved }) {
   );
 }
 
-function HazardFormModal({ stepId, hazard, onClose, onSaved }) {
+function HazardFormModal({ stepId, hazard, laterSteps, onClose, onSaved }) {
   const [form, setForm] = useState({
     hazard_type: hazard?.hazard_type || 'biological',
     description: hazard?.description || '',
@@ -308,6 +310,23 @@ function HazardFormModal({ stepId, hazard, onClose, onSaved }) {
             </select>
           </div>
         </div>
+
+        <AiCcpSignificanceSuggestion
+          hazardType={form.hazard_type}
+          description={form.description}
+          existingControls={form.existing_controls}
+          likelihood={Number(form.likelihood)}
+          severity={Number(form.severity)}
+          laterSteps={laterSteps}
+          onGenerated={(suggestion) => {
+            setForm((prev) => ({
+              ...prev,
+              is_significant: Boolean(suggestion.is_significant),
+              justification: suggestion.justification || prev.justification,
+            }));
+          }}
+        />
+
         <label className="flex items-center gap-2 text-sm text-slate-700">
           <input
             type="checkbox"
@@ -331,7 +350,7 @@ function HazardFormModal({ stepId, hazard, onClose, onSaved }) {
   );
 }
 
-function CcpFormModal({ hazardId, ccp, users, onClose, onSaved }) {
+function CcpFormModal({ hazardId, hazard, ccp, users, onClose, onSaved }) {
   const [form, setForm] = useState({
     ccp_number: ccp?.ccp_number || '',
     critical_limits: ccp?.critical_limits || '',
@@ -373,6 +392,28 @@ function CcpFormModal({ hazardId, ccp, users, onClose, onSaved }) {
     <ModalShell title={ccp ? 'Modifier le point critique (CCP)' : 'Nouveau point critique (CCP)'} onClose={onClose} wide>
       {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
+        {hazard && (
+          <AiCcpDefinitionSuggestion
+            hazardType={hazard.hazard_type}
+            description={hazard.description}
+            existingControls={hazard.existing_controls}
+            likelihood={hazard.likelihood}
+            severity={hazard.severity}
+            justification={hazard.justification}
+            onGenerated={(suggestion) => {
+              setForm((prev) => ({
+                ...prev,
+                critical_limits: suggestion.critical_limits || prev.critical_limits,
+                monitoring_procedure: suggestion.monitoring_procedure || prev.monitoring_procedure,
+                monitoring_frequency: suggestion.monitoring_frequency || prev.monitoring_frequency,
+                corrective_action_procedure: suggestion.corrective_action_procedure || prev.corrective_action_procedure,
+                verification_procedure: suggestion.verification_procedure || prev.verification_procedure,
+                verification_frequency: suggestion.verification_frequency || prev.verification_frequency,
+                record_keeping_procedure: suggestion.record_keeping_procedure || prev.record_keeping_procedure,
+              }));
+            }}
+          />
+        )}
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Numéro du CCP</label>
           <input type="text" placeholder="Ex : CCP1" value={form.ccp_number} onChange={(e) => updateField('ccp_number', e.target.value)} className={FIELD_CLASS} />
@@ -838,8 +879,8 @@ export default function HaccpDetail() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [stepModal, setStepModal] = useState(null); // { step } | { new: true } | null
-  const [hazardModal, setHazardModal] = useState(null); // { stepId, hazard? }
-  const [ccpModal, setCcpModal] = useState(null); // { hazardId, ccp? }
+  const [hazardModal, setHazardModal] = useState(null); // { stepId, hazard?, laterSteps }
+  const [ccpModal, setCcpModal] = useState(null); // { hazardId, hazard, ccp? }
 
   async function loadPlan() {
     setLoading(true);
@@ -1053,7 +1094,9 @@ export default function HaccpDetail() {
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setHazardModal({ stepId: step.id })}
+                    onClick={() =>
+                      setHazardModal({ stepId: step.id, laterSteps: plan.steps.filter((s) => s.step_number > step.step_number) })
+                    }
                     className="flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
                     <Plus size={14} />
@@ -1075,10 +1118,16 @@ export default function HaccpDetail() {
                       key={hazard.id}
                       hazard={hazard}
                       canManage={canManage}
-                      onEditHazard={(h) => setHazardModal({ stepId: step.id, hazard: h })}
+                      onEditHazard={(h) =>
+                        setHazardModal({
+                          stepId: step.id,
+                          hazard: h,
+                          laterSteps: plan.steps.filter((s) => s.step_number > step.step_number),
+                        })
+                      }
                       onDeleteHazard={handleDeleteHazard}
-                      onAddCcp={(h) => setCcpModal({ hazardId: h.id })}
-                      onEditCcp={(ccp) => setCcpModal({ hazardId: hazard.id, ccp })}
+                      onAddCcp={(h) => setCcpModal({ hazardId: h.id, hazard: h })}
+                      onEditCcp={(ccp) => setCcpModal({ hazardId: hazard.id, ccp, hazard })}
                       onDeleteCcp={handleDeleteCcp}
                     />
                   ))}
@@ -1130,6 +1179,7 @@ export default function HaccpDetail() {
         <HazardFormModal
           stepId={hazardModal.stepId}
           hazard={hazardModal.hazard}
+          laterSteps={hazardModal.laterSteps}
           onClose={() => setHazardModal(null)}
           onSaved={() => {
             setHazardModal(null);
@@ -1141,6 +1191,7 @@ export default function HaccpDetail() {
       {ccpModal && (
         <CcpFormModal
           hazardId={ccpModal.hazardId}
+          hazard={ccpModal.hazard}
           ccp={ccpModal.ccp}
           users={users}
           onClose={() => setCcpModal(null)}
