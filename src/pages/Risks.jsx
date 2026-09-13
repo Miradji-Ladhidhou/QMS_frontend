@@ -73,14 +73,21 @@ function RiskMatrix({ risks }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <h2 className="mb-3 text-sm font-semibold text-slate-900">Matrice des risques</h2>
+      {/* Cellules et colonne d'étiquettes réduites sur mobile (5 × 56px + 96px = 376px ne
+          tenait pas dans une carte à ~260-310px de large sur téléphone, forçant un défilement
+          horizontal peu lisible pour un petit widget 5x5 censé se voir d'un coup d'œil) — repli
+          sur des cellules 36px/colonne 48px qui tiennent sans défiler, taille d'origine dès
+          sm:. overflow-x-auto sur le conteneur reste un filet de sécurité, pas la solution. */}
       <div className="inline-block">
         <div className="flex">
-          <div className="w-24 shrink-0" />
-          <div className="flex-1 text-center text-xs font-medium text-slate-500">Probabilité →</div>
+          <div className="w-12 shrink-0 sm:w-24" />
+          <div className="flex-1 text-center text-[11px] font-medium text-slate-500 sm:text-xs">Probabilité →</div>
         </div>
         {impacts.map((impact) => (
           <div key={impact} className="flex items-center">
-            <div className="w-24 shrink-0 pr-2 text-right text-xs text-slate-500">{IMPACT_LABELS[impact]}</div>
+            <div className="w-12 shrink-0 truncate pr-1 text-right text-[10px] text-slate-500 sm:w-24 sm:pr-2 sm:text-xs">
+              {IMPACT_LABELS[impact]}
+            </div>
             {likelihoods.map((likelihood) => {
               const score = likelihood * impact;
               const level = riskLevel(score);
@@ -89,7 +96,7 @@ function RiskMatrix({ risks }) {
                 <div
                   key={likelihood}
                   title={`Probabilité ${likelihood} × Gravité ${impact} = ${score}`}
-                  className={`flex h-14 w-14 shrink-0 items-center justify-center border border-white text-sm font-semibold text-slate-800 ${RISK_LEVEL_CELL_STYLES[level]}`}
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center border border-white text-xs font-semibold text-slate-800 sm:h-14 sm:w-14 sm:text-sm ${RISK_LEVEL_CELL_STYLES[level]}`}
                 >
                   {count > 0 ? count : ''}
                 </div>
@@ -98,9 +105,9 @@ function RiskMatrix({ risks }) {
           </div>
         ))}
         <div className="mt-1 flex">
-          <div className="w-24 shrink-0" />
+          <div className="w-12 shrink-0 sm:w-24" />
           {likelihoods.map((likelihood) => (
-            <div key={likelihood} className="w-14 shrink-0 text-center text-xs text-slate-400">
+            <div key={likelihood} className="w-9 shrink-0 text-center text-[10px] text-slate-400 sm:w-14 sm:text-xs">
               {likelihood}
             </div>
           ))}
