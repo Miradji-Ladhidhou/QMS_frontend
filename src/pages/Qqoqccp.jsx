@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, FileType, FolderCog, FolderInput, FolderPlus, Loader2, Plus, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
 import { QQOQCCP_STATUS_LABELS } from '../lib/qqoqccpStatus.js';
@@ -20,6 +20,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -282,24 +283,13 @@ export default function Qqoqccp() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">QQOQCCP</h1>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => handleExportCsv()}
-            disabled={analyses.length === 0 || exportingCsv}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingCsv ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Exporter CSV
-          </button>
-          <button
-            type="button"
-            onClick={() => handleExportWord()}
-            disabled={analyses.length === 0 || exportingWord}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            {exportingWord ? <Loader2 size={18} className="animate-spin" /> : <FileType size={18} />}
-            Exporter Word
-          </button>
+          <ExportMenu
+            disabled={analyses.length === 0}
+            onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
+          />
           <button
             type="button"
             onClick={() => setIsModalOpen(true)}

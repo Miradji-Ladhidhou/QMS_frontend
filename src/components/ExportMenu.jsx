@@ -1,11 +1,13 @@
 import { useState } from 'react';
 import { Cloud, Download, FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-react';
 
-// Regroupe les 3-5 boutons "Exporter CSV/PDF/Excel/Word/Drive" — jusque-là posés côte à côte sur
+// Regroupe les 1-5 boutons "Exporter CSV/PDF/Excel/Word/Drive" — jusque-là posés côte à côte sur
 // chaque page de liste — derrière un seul bouton "Exporter" et un petit menu déroulant, même
-// esprit que le menu d'export déjà utilisé sur chaque carte KPI (Kpis.jsx). onExportDrive/
-// onExportWord absents (plutôt que juste cachés) omettent complètement l'entrée, comme les
-// boutons qu'ils remplacent.
+// esprit que le menu d'export déjà utilisé sur chaque carte KPI (Kpis.jsx). Chaque entrée
+// (onExportCsv/Pdf/Xlsx/Word/Drive) absente plutôt que juste cachée omet complètement le
+// bouton correspondant, comme les boutons qu'elle remplace — pas seulement Word/Drive : une
+// page qui n'a que 2 formats (ex. CapaDetail.jsx : PDF + Drive) ne doit voir QUE ces deux
+// entrées, jamais un bouton CSV/Excel fantôme qui planterait au clic (onClick undefined).
 export default function ExportMenu({
   disabled,
   onExportCsv,
@@ -43,33 +45,39 @@ export default function ExportMenu({
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           <div className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg sm:left-auto sm:right-0">
-            <button
-              type="button"
-              onClick={() => handleSelect(onExportCsv)}
-              disabled={exportingCsv}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {exportingCsv ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-              CSV
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelect(onExportPdf)}
-              disabled={exportingPdf}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-              PDF
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelect(onExportXlsx)}
-              disabled={exportingXlsx}
-              className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {exportingXlsx ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
-              Excel
-            </button>
+            {onExportCsv && (
+              <button
+                type="button"
+                onClick={() => handleSelect(onExportCsv)}
+                disabled={exportingCsv}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {exportingCsv ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                CSV
+              </button>
+            )}
+            {onExportPdf && (
+              <button
+                type="button"
+                onClick={() => handleSelect(onExportPdf)}
+                disabled={exportingPdf}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {exportingPdf ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
+                PDF
+              </button>
+            )}
+            {onExportXlsx && (
+              <button
+                type="button"
+                onClick={() => handleSelect(onExportXlsx)}
+                disabled={exportingXlsx}
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+              >
+                {exportingXlsx ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />}
+                Excel
+              </button>
+            )}
             {onExportWord && (
               <button
                 type="button"

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Check, Download, EyeOff, FileType, Loader2, Minus, RefreshCw, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Check, EyeOff, Minus, RefreshCw, X as XIcon } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
@@ -8,6 +8,7 @@ import { useSort } from '../lib/useSort.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import SortableTh from '../components/SortableTh.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 
 const CELL_STYLES = {
   up_to_date: 'bg-emerald-100 text-emerald-700',
@@ -167,33 +168,15 @@ export default function SkillMatrix() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Matrice des compétences</h1>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            disabled={exportingCsv || people.length === 0}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingCsv ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            CSV
-          </button>
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={exportingPdf || people.length === 0}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingPdf ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            PDF
-          </button>
-          <button
-            type="button"
-            onClick={handleExportWord}
-            disabled={exportingWord || people.length === 0}
-            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingWord ? <Loader2 size={18} className="animate-spin" /> : <FileType size={18} />}
-            Word
-          </button>
+          <ExportMenu
+            disabled={people.length === 0}
+            onExportCsv={handleExportCsv}
+            exportingCsv={exportingCsv}
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+          />
         </div>
       </div>
       {exportError && <p className="mt-2 text-sm text-red-600">{exportError}</p>}

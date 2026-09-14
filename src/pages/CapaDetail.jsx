@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Cloud, Download, Loader2, Lock, Plus, Save, Send, Trash2, X, XCircle } from 'lucide-react';
+import { ArrowLeft, Lock, Plus, Save, Send, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -15,6 +15,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import LinkItemModal from '../components/LinkItemModal.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
@@ -462,26 +463,12 @@ export default function CapaDetail() {
         </button>
 
         <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={exportingPdf}
-            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-          >
-            {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Exporter PDF
-          </button>
-          {tenant?.storage_provider === 'google_drive' && (
-            <button
-              type="button"
-              onClick={handleExportDrive}
-              disabled={exportingDrive}
-              className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-            >
-              {exportingDrive ? <Loader2 size={16} className="animate-spin" /> : <Cloud size={16} />}
-              Enregistrer sur Drive
-            </button>
-          )}
+          <ExportMenu
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           {canManage && (
             <>
               <ShareRecordPanel resourceType="capa" resourceId={capa.id} />
