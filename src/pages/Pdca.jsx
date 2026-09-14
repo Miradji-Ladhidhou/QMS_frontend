@@ -4,8 +4,10 @@ import { AlertTriangle, FolderCog, FolderInput, FolderPlus, Plus, Search, X } fr
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { PDCA_STATUS_LABELS } from '../lib/pdcaStatus.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PdcaStatusBadge from '../components/PdcaStatusBadge.jsx';
@@ -20,6 +22,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -229,6 +232,7 @@ function NewPdcaModal({ users, services, onClose, onCreated }) {
 export default function Pdca() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [projects, setProjects] = useState([]);
   const [users, setUsers] = useState([]);
@@ -239,6 +243,13 @@ export default function Pdca() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
+  const [exportError, setExportError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
@@ -344,22 +355,155 @@ export default function Pdca() {
     navigate(`/pdca/${pdca.id}`);
   }
 
+  // Mêmes cinq formats qu'ailleurs (Capas.jsx, Complaints.jsx...) — entièrement générés côté
+  // client depuis projects déjà chargé, aucune route backend dédiée.
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.24 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.12 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.16 : undefined },
+      { key: 'owner', label: 'Responsable', width: forPdf ? 0.16 : undefined },
+      { key: 'target_date', label: 'Date cible', width: forPdf ? 0.12 : undefined },
+      { key: 'description', label: 'Description', width: forPdf ? 0.2 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((pdca) => ({
+      title: pdca.title,
+      status: PDCA_STATUS_LABELS[pdca.status] || pdca.status,
+      service: pdca.service?.name || '',
+      owner: pdca.owner_user?.full_name || '',
+      target_date: formatDate(pdca.target_date),
+      description: pdca.description || '',
+    }));
+  }
+
+  function exportSubtitle(source) {
+    const countLabel = `${source.length} projet${source.length > 1 ? 's' : ''} PDCA`;
+    return statusFilter ? `${countLabel} · Statut : ${PDCA_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel;
+  }
+
+  async function handleExportCsv(scopeIds) {
+    const source = scopeIds ? projects.filter((pdca) => scopeIds.includes(pdca.id)) : projects;
+    setExportingCsv(true);
+    setExportError('');
+    try {
+      await exportTableCsv(`pdca-${new Date().toISOString().slice(0, 10)}.csv`, 'PDCA — Amélioration continue', buildExportColumns(), buildExportRows(source), {
+        generatedBy: currentUser?.full_name,
+        subtitle: exportSubtitle(source),
+      });
+    } catch {
+      setExportError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
+  }
+
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? projects.filter((pdca) => scopeIds.includes(pdca.id)) : projects;
+    setExportingPdf(true);
+    setExportError('');
+    try {
+      await exportToPdf(
+        `pdca-${new Date().toISOString().slice(0, 10)}.pdf`,
+        'PDCA — Amélioration continue',
+        buildExportColumns({ forPdf: true }),
+        buildExportRows(source),
+        { subtitle: exportSubtitle(source), generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? projects.filter((pdca) => scopeIds.includes(pdca.id)) : projects;
+    setExportingXlsx(true);
+    setExportError('');
+    try {
+      await exportToXlsx(`pdca-${new Date().toISOString().slice(0, 10)}.xlsx`, 'PDCA — Amélioration continue', buildExportColumns(), buildExportRows(source), {
+        subtitle: exportSubtitle(source),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? projects.filter((pdca) => scopeIds.includes(pdca.id)) : projects;
+    setExportingWord(true);
+    setExportError('');
+    try {
+      await exportToWord(`pdca-${new Date().toISOString().slice(0, 10)}.docx`, 'PDCA — Amélioration continue', buildExportColumns(), buildExportRows(source), {
+        subtitle: exportSubtitle(source),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? projects.filter((pdca) => scopeIds.includes(pdca.id)) : projects;
+    setExportingDrive(true);
+    setExportError('');
+    setDriveSuccess('');
+    try {
+      await exportToDrive('PDCA', 'PDCA — Amélioration continue', buildExportColumns(), buildExportRows(source), {
+        subtitle: exportSubtitle(source),
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">PDCA — Amélioration continue</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouveau projet PDCA
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <ExportMenu
+            disabled={projects.length === 0}
+            onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+            exportingDrive={exportingDrive}
+          />
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            <Plus size={18} />
+            Nouveau projet PDCA
+          </button>
+        </div>
       </div>
       <PageGuide id="pdca" />
 
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {exportError && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportError}</p>}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
+      )}
 
       <div className="relative mt-4">
         <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -422,6 +566,16 @@ export default function Pdca() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={canManage ? () => setIsBulkMoveModalOpen(true) : undefined}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

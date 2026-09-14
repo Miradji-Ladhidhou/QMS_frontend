@@ -4,8 +4,10 @@ import { FolderCog, FolderInput, FolderPlus, Plus, Search, X } from 'lucide-reac
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { SATISFACTION_METHOD_LABELS } from '../lib/customerSatisfactionStatus.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SatisfactionMethodBadge from '../components/SatisfactionMethodBadge.jsx';
@@ -21,6 +23,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -221,6 +224,7 @@ function NewSurveyModal({ services, onClose, onCreated }) {
 export default function CustomerSatisfaction() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [surveys, setSurveys] = useState([]);
   const [services, setServices] = useState([]);
@@ -229,6 +233,13 @@ export default function CustomerSatisfaction() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
+  const [exportError, setExportError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
@@ -340,22 +351,164 @@ export default function CustomerSatisfaction() {
     navigate(`/customer-satisfaction/${survey.id}`);
   }
 
+  // Mêmes cinq formats qu'ailleurs (Complaints.jsx, Capas.jsx...) — entièrement générés côté
+  // client depuis surveys déjà chargé, aucune route backend dédiée.
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'customer_name', label: 'Client', width: forPdf ? 0.18 : undefined },
+      { key: 'survey_date', label: 'Date', width: forPdf ? 0.1 : undefined },
+      { key: 'method', label: 'Méthode', width: forPdf ? 0.14 : undefined },
+      { key: 'score', label: 'Note', width: forPdf ? 0.08 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.15 : undefined },
+      { key: 'comments', label: 'Commentaires', width: forPdf ? 0.35 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((survey) => ({
+      customer_name: survey.customer_name,
+      survey_date: formatDate(survey.survey_date),
+      method: SATISFACTION_METHOD_LABELS[survey.method] || survey.method,
+      score: `${survey.score}/5`,
+      service: survey.service?.name || '',
+      comments: survey.comments || '',
+    }));
+  }
+
+  function exportSubtitle(source) {
+    const countLabel = `${source.length} enquête${source.length > 1 ? 's' : ''}`;
+    return methodFilter ? `${countLabel} · Méthode : ${SATISFACTION_METHOD_LABELS[methodFilter] || methodFilter}` : countLabel;
+  }
+
+  async function handleExportCsv(scopeIds) {
+    const source = scopeIds ? surveys.filter((survey) => scopeIds.includes(survey.id)) : surveys;
+    setExportingCsv(true);
+    setExportError('');
+    try {
+      await exportTableCsv(
+        `satisfaction-client-${new Date().toISOString().slice(0, 10)}.csv`,
+        'Satisfaction client',
+        buildExportColumns(),
+        buildExportRows(source),
+        { generatedBy: currentUser?.full_name, subtitle: exportSubtitle(source) }
+      );
+    } catch {
+      setExportError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
+  }
+
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? surveys.filter((survey) => scopeIds.includes(survey.id)) : surveys;
+    setExportingPdf(true);
+    setExportError('');
+    try {
+      await exportToPdf(
+        `satisfaction-client-${new Date().toISOString().slice(0, 10)}.pdf`,
+        'Satisfaction client',
+        buildExportColumns({ forPdf: true }),
+        buildExportRows(source),
+        { subtitle: exportSubtitle(source), generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? surveys.filter((survey) => scopeIds.includes(survey.id)) : surveys;
+    setExportingXlsx(true);
+    setExportError('');
+    try {
+      await exportToXlsx(
+        `satisfaction-client-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        'Satisfaction client',
+        buildExportColumns(),
+        buildExportRows(source),
+        { subtitle: exportSubtitle(source), generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? surveys.filter((survey) => scopeIds.includes(survey.id)) : surveys;
+    setExportingWord(true);
+    setExportError('');
+    try {
+      await exportToWord(
+        `satisfaction-client-${new Date().toISOString().slice(0, 10)}.docx`,
+        'Satisfaction client',
+        buildExportColumns(),
+        buildExportRows(source),
+        { subtitle: exportSubtitle(source), generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? surveys.filter((survey) => scopeIds.includes(survey.id)) : surveys;
+    setExportingDrive(true);
+    setExportError('');
+    setDriveSuccess('');
+    try {
+      await exportToDrive('SATISF', 'Satisfaction client', buildExportColumns(), buildExportRows(source), {
+        subtitle: exportSubtitle(source),
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Satisfaction client</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouvelle enquête
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <ExportMenu
+            disabled={surveys.length === 0}
+            onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+            exportingDrive={exportingDrive}
+          />
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            <Plus size={18} />
+            Nouvelle enquête
+          </button>
+        </div>
       </div>
       <PageGuide id="customer-satisfaction" />
 
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {exportError && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportError}</p>}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
+      )}
 
       {averageScore !== null && (
         <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm">
@@ -419,6 +572,16 @@ export default function CustomerSatisfaction() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

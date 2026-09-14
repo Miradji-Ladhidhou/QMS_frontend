@@ -4,8 +4,10 @@ import { FolderCog, FolderInput, FolderPlus, Plus, Search, X } from 'lucide-reac
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { NONCONFORMING_OUTPUT_STATUS_LABELS, NONCONFORMING_OUTPUT_DISPOSITION_LABELS } from '../lib/nonconformingOutputStatus.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import NonconformingOutputStatusBadge from '../components/NonconformingOutputStatusBadge.jsx';
@@ -21,6 +23,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -220,6 +223,7 @@ function NewOutputModal({ services, onClose, onCreated }) {
 export default function NonconformingOutputs() {
   const navigate = useNavigate();
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [outputs, setOutputs] = useState([]);
   const [services, setServices] = useState([]);
@@ -228,6 +232,13 @@ export default function NonconformingOutputs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
+  const [exportError, setExportError] = useState('');
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
@@ -332,22 +343,166 @@ export default function NonconformingOutputs() {
     navigate(`/nonconforming-outputs/${output.id}`);
   }
 
+  // Mêmes cinq formats qu'ailleurs (Accidents.jsx, Complaints.jsx...) — entièrement générés
+  // côté client depuis outputs déjà chargé, aucune route backend dédiée.
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.26 : undefined },
+      { key: 'detected_at', label: 'Date de détection', width: forPdf ? 0.14 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.14 : undefined },
+      { key: 'disposition', label: 'Traitement', width: forPdf ? 0.16 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.14 : undefined },
+      { key: 'customer_informed', label: 'Client informé', width: forPdf ? 0.16 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((output) => ({
+      title: output.title,
+      detected_at: formatDate(output.detected_at),
+      status: NONCONFORMING_OUTPUT_STATUS_LABELS[output.status] || output.status,
+      disposition: NONCONFORMING_OUTPUT_DISPOSITION_LABELS[output.disposition] || output.disposition,
+      service: output.service?.name || '',
+      customer_informed: output.customer_informed ? 'Oui' : 'Non',
+    }));
+  }
+
+  function exportSubtitle(source) {
+    const countLabel = `${source.length} non-conformité${source.length > 1 ? 's' : ''}`;
+    return statusFilter
+      ? `${countLabel} · Statut : ${NONCONFORMING_OUTPUT_STATUS_LABELS[statusFilter] || statusFilter}`
+      : countLabel;
+  }
+
+  async function handleExportCsv(scopeIds) {
+    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    setExportingCsv(true);
+    setExportError('');
+    try {
+      await exportTableCsv(
+        `non-conformites-${new Date().toISOString().slice(0, 10)}.csv`,
+        'Non-conformités produit/service',
+        buildExportColumns(),
+        buildExportRows(source),
+        { generatedBy: currentUser?.full_name, subtitle: exportSubtitle(source) }
+      );
+    } catch {
+      setExportError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
+  }
+
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    setExportingPdf(true);
+    setExportError('');
+    try {
+      await exportToPdf(
+        `non-conformites-${new Date().toISOString().slice(0, 10)}.pdf`,
+        'Non-conformités produit/service',
+        buildExportColumns({ forPdf: true }),
+        buildExportRows(source),
+        { subtitle: exportSubtitle(source), generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    setExportingXlsx(true);
+    setExportError('');
+    try {
+      await exportToXlsx(
+        `non-conformites-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        'Non-conformités produit/service',
+        buildExportColumns(),
+        buildExportRows(source),
+        { subtitle: exportSubtitle(source), generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    setExportingWord(true);
+    setExportError('');
+    try {
+      await exportToWord(
+        `non-conformites-${new Date().toISOString().slice(0, 10)}.docx`,
+        'Non-conformités produit/service',
+        buildExportColumns(),
+        buildExportRows(source),
+        { subtitle: exportSubtitle(source), generatedBy: currentUser?.full_name }
+      );
+    } catch {
+      setExportError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    setExportingDrive(true);
+    setExportError('');
+    setDriveSuccess('');
+    try {
+      await exportToDrive('NC', 'Non-conformités produit/service', buildExportColumns(), buildExportRows(source), {
+        subtitle: exportSubtitle(source),
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Non-conformités produit/service</h1>
-        <button
-          type="button"
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Signaler une non-conformité
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <ExportMenu
+            disabled={outputs.length === 0}
+            onExportCsv={() => handleExportCsv()}
+            exportingCsv={exportingCsv}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
+            onExportWord={() => handleExportWord()}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+            exportingDrive={exportingDrive}
+          />
+          <button
+            type="button"
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            <Plus size={18} />
+            Signaler une non-conformité
+          </button>
+        </div>
       </div>
       <PageGuide id="nonconforming-outputs" />
 
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {exportError && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportError}</p>}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
+      )}
 
       <div className="relative mt-4">
         <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -404,6 +559,16 @@ export default function NonconformingOutputs() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportCsv={() => handleExportCsv(selectedIds)}
+          exportingCsv={exportingCsv}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

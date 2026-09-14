@@ -3,14 +3,17 @@ import { Navigate } from 'react-router-dom';
 import { Ban, CheckCircle2, Folder, FolderCog, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { useSort } from '../lib/useSort.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
+import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import FolderTile from '../components/FolderTile.jsx';
 import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
 import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import NewFolderModal from '../components/NewFolderModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -239,6 +242,7 @@ function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit
 
 export default function Employees() {
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -246,6 +250,13 @@ export default function Employees() {
   const [editing, setEditing] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
+  const [exportError, setExportError] = useState('');
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingEmployee, setMovingEmployee] = useState(null);
@@ -345,23 +356,147 @@ export default function Employees() {
     [sortedEmployees, currentFolderId]
   );
 
+  // Mêmes cinq formats qu'ailleurs (Trainings.jsx, Complaints.jsx...) — entièrement générés
+  // côté client depuis employees déjà chargé, aucune route backend dédiée. Pas de sélection en
+  // masse sur cette page (contrairement à la plupart des listes) : export uniquement sur
+  // l'ensemble du personnel, pas de scopeIds.
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'full_name', label: 'Nom complet', width: forPdf ? 0.28 : undefined },
+      { key: 'job_title', label: 'Fonction', width: forPdf ? 0.24 : undefined },
+      { key: 'email', label: 'Email', width: forPdf ? 0.26 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.12 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((employee) => ({
+      full_name: employee.full_name,
+      job_title: employee.job_title || '',
+      email: employee.email || '',
+      status: employee.is_active ? 'Actif' : 'Inactif',
+      category: employee.category?.name || '',
+    }));
+  }
+
+  function exportSubtitle(source) {
+    return `${source.length} personne${source.length > 1 ? 's' : ''}`;
+  }
+
+  async function handleExportCsv() {
+    setExportingCsv(true);
+    setExportError('');
+    try {
+      await exportTableCsv(`personnel-${new Date().toISOString().slice(0, 10)}.csv`, 'Personnel', buildExportColumns(), buildExportRows(employees), {
+        generatedBy: currentUser?.full_name,
+        subtitle: exportSubtitle(employees),
+      });
+    } catch {
+      setExportError('Impossible de générer le CSV.');
+    } finally {
+      setExportingCsv(false);
+    }
+  }
+
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setExportError('');
+    try {
+      await exportToPdf('personnel-' + new Date().toISOString().slice(0, 10) + '.pdf', 'Personnel', buildExportColumns({ forPdf: true }), buildExportRows(employees), {
+        subtitle: exportSubtitle(employees),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx() {
+    setExportingXlsx(true);
+    setExportError('');
+    try {
+      await exportToXlsx(`personnel-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Personnel', buildExportColumns(), buildExportRows(employees), {
+        subtitle: exportSubtitle(employees),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setExportingWord(true);
+    setExportError('');
+    try {
+      await exportToWord(`personnel-${new Date().toISOString().slice(0, 10)}.docx`, 'Personnel', buildExportColumns(), buildExportRows(employees), {
+        subtitle: exportSubtitle(employees),
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive() {
+    setExportingDrive(true);
+    setExportError('');
+    setDriveSuccess('');
+    try {
+      await exportToDrive('PERSONNEL', 'Personnel', buildExportColumns(), buildExportRows(employees), {
+        subtitle: exportSubtitle(employees),
+        generatedBy: currentUser?.full_name,
+      });
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Personnel</h1>
-        <button
-          type="button"
-          onClick={() => setIsCreating(true)}
-          className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-        >
-          <Plus size={18} />
-          Nouvelle personne
-        </button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <ExportMenu
+            disabled={employees.length === 0}
+            onExportCsv={handleExportCsv}
+            exportingCsv={exportingCsv}
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
+          <button
+            type="button"
+            onClick={() => setIsCreating(true)}
+            className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+          >
+            <Plus size={18} />
+            Nouvelle personne
+          </button>
+        </div>
       </div>
       <PageGuide id="employees" />
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+      )}
+      {exportError && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportError}</p>}
+      {driveSuccess && (
+        <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
       {employees.length > 0 && (
