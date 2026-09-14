@@ -468,24 +468,40 @@ export default function Layout() {
                 </div>
 
                 {expanded && (
-                  <div className="mt-1 space-y-0.5 border-l border-white/15 pl-3">
+                  // Panneau creusé (bg-black/15) plutôt qu'un simple filet vertical : l'ancien
+                  // rendu réutilisait les mêmes teintes que le lien parent (bg-white/15 sur
+                  // actif, text-white/70-80 sinon), rendant les deux niveaux difficiles à
+                  // distinguer d'un coup d'œil. L'onglet actif devient une pastille blanche
+                  // pleine (texte couleur primaire, même traitement que le badge de
+                  // "Mes approbations" ci-dessus) — nettement différente du surlignage
+                  // translucide du lien parent, pour qu'on distingue "la section" de
+                  // "l'onglet précis" dans la section.
+                  <div className="mt-1 space-y-0.5 rounded-lg bg-black/15 p-1">
                     {visibleChildren.map((child) => (
                       <NavLink
                         key={child.to}
                         to={child.to}
                         onClick={closeMenu}
                         className={({ isActive }) =>
-                          `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
-                            isActive ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                          `flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
+                            isActive ? 'bg-white text-primary font-medium shadow-sm' : 'text-white/60 hover:bg-white/10 hover:text-white'
                           }`
                         }
                       >
-                        <child.icon size={16} />
-                        <span className="flex-1">{child.label}</span>
-                        {child.to === '/my-approvals' && pendingApprovalsCount > 0 && (
-                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
-                            {pendingApprovalsCount}
-                          </span>
+                        {({ isActive }) => (
+                          <>
+                            <child.icon size={16} />
+                            <span className="flex-1">{child.label}</span>
+                            {child.to === '/my-approvals' && pendingApprovalsCount > 0 && (
+                              <span
+                                className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
+                                  isActive ? 'bg-primary text-white' : 'bg-white text-primary'
+                                }`}
+                              >
+                                {pendingApprovalsCount}
+                              </span>
+                            )}
+                          </>
                         )}
                       </NavLink>
                     ))}
