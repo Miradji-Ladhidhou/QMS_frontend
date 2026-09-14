@@ -288,9 +288,12 @@ export default function Layout() {
   const visibleMenuKeys = useMenuVisibility();
   const logoUrl = getTenantLogoPublicUrl(tenant?.logo_url);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // Sous-menus des pages fusionnées ouverts manuellement (par `to`) — indépendant de la page
-  // courante : un groupe reste par ailleurs déplié tant qu'on est dessus, voir isGroupExpanded.
-  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
+  // Sous-menus des pages fusionnées : par défaut un groupe se déplie tout seul quand on est
+  // dessus (voir isGroupExpanded) — mais un clic sur le chevron doit pouvoir aussi bien l'ouvrir
+  // que le refermer, y compris sur le groupe actif. `to` -> booléen explicite qui prime alors
+  // sur ce comportement par défaut (Map plutôt que Set : true = forcé ouvert, false = forcé
+  // fermé, absent = comportement par défaut).
+  const [groupOverrides, setGroupOverrides] = useState(() => new Map());
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
@@ -313,23 +316,21 @@ export default function Layout() {
     setIsMenuOpen(false);
   }
 
-  // Un groupe se voit dépliable dès qu'il est actif (on est sur une de ses pages) OU qu'on l'a
-  // déplié à la main — les deux sont indépendants pour ne pas perdre le dépliage manuel d'un
-  // groupe qu'on n'est pas en train de consulter.
+  // Par défaut, un groupe se déplie tout seul quand on est sur une de ses pages — mais un choix
+  // explicite (chevron cliqué) prime toujours dessus, sinon un groupe actif ne pouvait plus se
+  // refermer (isNavItemActive restant vrai quoi qu'on fasse tant qu'on n'a pas changé de page).
   function isGroupExpanded(item) {
-    return expandedGroups.has(item.to) || isNavItemActive(item, location.pathname);
+    if (groupOverrides.has(item.to)) return groupOverrides.get(item.to);
+    return isNavItemActive(item, location.pathname);
   }
 
   function toggleGroup(event, item) {
     event.preventDefault();
     event.stopPropagation();
-    setExpandedGroups((prev) => {
-      const next = new Set(prev);
-      if (isGroupExpanded(item)) {
-        next.delete(item.to);
-      } else {
-        next.add(item.to);
-      }
+    const currentlyExpanded = isGroupExpanded(item);
+    setGroupOverrides((prev) => {
+      const next = new Map(prev);
+      next.set(item.to, !currentlyExpanded);
       return next;
     });
   }
