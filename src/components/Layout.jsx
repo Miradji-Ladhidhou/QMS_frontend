@@ -4,6 +4,8 @@ import {
   BarChart3,
   BookOpen,
   CheckSquare,
+  ChevronDown,
+  ChevronRight,
   ClipboardCheck,
   ClipboardList,
   Contact,
@@ -17,6 +19,7 @@ import {
   MessageSquareWarning,
   PackageX,
   RefreshCw,
+  ScrollText,
   Settings,
   ShieldAlert,
   ShieldCheck,
@@ -98,24 +101,71 @@ export const NAV_ITEMS = [
   // (vers /procedures, /my-approvals ou /quality-policy) faisait perdre la surbrillance de ce
   // lien puisque l'URL ne commence plus par /documents — voir isNavItemActive ci-dessous, qui
   // remplace la détection automatique de NavLink par ces chemins connus.
-  { to: '/documents', label: 'Documents', icon: FileText, alwaysVisible: true, matchPaths: ['/documents', '/procedures', '/my-approvals', '/quality-policy'] },
+  // children : mêmes onglets que DocumentsHub.jsx#TABS (to/label/icon/menuKey identiques) —
+  // affichés en sous-menu dépliable pour qu'on sache ce qu'il y a dans "Documents" sans avoir
+  // à l'ouvrir, et pour sauter directement sur un onglet. quality-policy sans menuKey : jamais
+  // filtré, comme dans DocumentsHub.jsx (Politique qualité doit rester joignable, ISO 9001 §5.2).
+  {
+    to: '/documents',
+    label: 'Documents',
+    icon: FileText,
+    alwaysVisible: true,
+    matchPaths: ['/documents', '/procedures', '/my-approvals', '/quality-policy'],
+    children: [
+      { to: '/documents', label: 'Documents', icon: FileText, menuKey: 'documents' },
+      { to: '/procedures', label: 'Procédures', icon: FileCheck, menuKey: 'procedures' },
+      { to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare, menuKey: 'my-approvals' },
+      { to: '/quality-policy', label: 'Politique qualité', icon: ScrollText },
+    ],
+  },
   // Fusionné avec PDCA et QQOQCCP (voir ImprovementActions.jsx, qui assemble les trois pages
   // en onglets) sous ce seul lien de menu — même principe que 'complaints' plus bas : les
   // entrées 'pdca' et 'qqoqccp' restent dans ce tableau pour MenuVisibilitySettings.jsx mais
   // masquées du menu latéral.
-  { key: 'capas', to: '/capas', label: "Actions d'amélioration", icon: ClipboardList, matchPaths: ['/capas', '/pdca', '/qqoqccp'] },
+  {
+    key: 'capas',
+    to: '/capas',
+    label: "Actions d'amélioration",
+    icon: ClipboardList,
+    matchPaths: ['/capas', '/pdca', '/qqoqccp'],
+    children: [
+      { to: '/capas', label: 'CAPA', icon: ClipboardList, menuKey: 'capas' },
+      { to: '/pdca', label: 'PDCA', icon: RefreshCw, menuKey: 'pdca' },
+      { to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle, menuKey: 'qqoqccp' },
+    ],
+  },
   // Fusionné avec Satisfaction client (voir CustomerFeedback.jsx, qui assemble les deux pages
   // en onglets) sous ce seul lien de menu — l'entrée 'customer-satisfaction' plus bas reste
   // dans ce tableau (nécessaire à MenuVisibilitySettings.jsx et à sa propre clé de visibilité)
   // mais masquée du menu latéral via hiddenFromSidebar : chaque module garde sa visibilité
   // configurable indépendamment, CustomerFeedback.jsx respecte les deux séparément.
-  { key: 'complaints', to: '/complaints', label: 'Retours clients', icon: MessageSquareWarning, matchPaths: ['/complaints', '/customer-satisfaction'] },
+  {
+    key: 'complaints',
+    to: '/complaints',
+    label: 'Retours clients',
+    icon: MessageSquareWarning,
+    matchPaths: ['/complaints', '/customer-satisfaction'],
+    children: [
+      { to: '/complaints', label: 'Réclamations', icon: MessageSquareWarning, menuKey: 'complaints' },
+      { to: '/customer-satisfaction', label: 'Satisfaction', icon: Smile, menuKey: 'customer-satisfaction' },
+    ],
+  },
   // Fusionné avec Personnel (voir HumanResources.jsx, qui assemble les deux pages en onglets)
   // sous ce seul lien de menu — clé porteuse volontairement 'trainings' plutôt que 'employees'
   // (masquée par défaut pour manager/member, voir DEFAULT_HIDDEN_FOR_ROLE côté backend) : voir
   // le commentaire détaillé dans HumanResources.jsx. L'entrée 'employees' plus bas reste dans
   // ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'trainings', to: '/trainings', label: 'Ressources humaines', icon: GraduationCap, matchPaths: ['/trainings', '/employees'] },
+  {
+    key: 'trainings',
+    to: '/trainings',
+    label: 'Ressources humaines',
+    icon: GraduationCap,
+    matchPaths: ['/trainings', '/employees'],
+    children: [
+      { to: '/employees', label: 'Personnel', icon: Contact, menuKey: 'employees' },
+      { to: '/trainings', label: 'Formations', icon: GraduationCap, menuKey: 'trainings' },
+    ],
+  },
   { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
   // haut, fusionné avec PDCA et QQOQCCP dans ImprovementActions.jsx) : n'apparaît plus comme
@@ -124,11 +174,31 @@ export const NAV_ITEMS = [
   // Fusionné avec Revues de direction (voir QmsOversight.jsx) sous ce seul lien de menu —
   // même principe que 'complaints' plus haut : l'entrée 'management-reviews' reste dans ce
   // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'audits', to: '/audits', label: 'Pilotage du SMQ', icon: ClipboardCheck, matchPaths: ['/audits', '/management-reviews'] },
+  {
+    key: 'audits',
+    to: '/audits',
+    label: 'Pilotage du SMQ',
+    icon: ClipboardCheck,
+    matchPaths: ['/audits', '/management-reviews'],
+    children: [
+      { to: '/audits', label: 'Audits internes', icon: ClipboardCheck, menuKey: 'audits' },
+      { to: '/management-reviews', label: 'Revues de direction', icon: Users2, menuKey: 'management-reviews' },
+    ],
+  },
   // Fusionné avec HACCP (voir RiskManagement.jsx, qui assemble les deux pages en onglets)
   // sous ce seul lien de menu — même principe que 'complaints' plus haut : l'entrée 'haccp'
   // reste dans ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'risks', to: '/risks', label: 'Gestion des risques', icon: ShieldAlert, matchPaths: ['/risks', '/haccp'] },
+  {
+    key: 'risks',
+    to: '/risks',
+    label: 'Gestion des risques',
+    icon: ShieldAlert,
+    matchPaths: ['/risks', '/haccp'],
+    children: [
+      { to: '/risks', label: 'Registre des risques', icon: ShieldAlert, menuKey: 'risks' },
+      { to: '/haccp', label: 'HACCP', icon: Thermometer, menuKey: 'haccp' },
+    ],
+  },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'risks'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer, hiddenFromSidebar: true },
@@ -145,7 +215,17 @@ export const NAV_ITEMS = [
   // pages en onglets) sous ce seul lien de menu — même principe que 'complaints' plus haut :
   // l'entrée 'nonconforming-outputs' plus bas reste dans ce tableau pour
   // MenuVisibilitySettings.jsx mais masquée du menu latéral.
-  { key: 'accidents', to: '/accidents', label: 'Signalements', icon: Siren, matchPaths: ['/accidents', '/nonconforming-outputs'] },
+  {
+    key: 'accidents',
+    to: '/accidents',
+    label: 'Signalements',
+    icon: Siren,
+    matchPaths: ['/accidents', '/nonconforming-outputs'],
+    children: [
+      { to: '/accidents', label: 'Accidents du travail', icon: Siren, menuKey: 'accidents' },
+      { to: '/nonconforming-outputs', label: 'Non-conformités produit/service', icon: PackageX, menuKey: 'nonconforming-outputs' },
+    ],
+  },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
   // haut) : n'apparaît plus comme lien séparé dans le menu latéral.
   { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw, hiddenFromSidebar: true },
@@ -208,6 +288,9 @@ export default function Layout() {
   const visibleMenuKeys = useMenuVisibility();
   const logoUrl = getTenantLogoPublicUrl(tenant?.logo_url);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // Sous-menus des pages fusionnées ouverts manuellement (par `to`) — indépendant de la page
+  // courante : un groupe reste par ailleurs déplié tant qu'on est dessus, voir isGroupExpanded.
+  const [expandedGroups, setExpandedGroups] = useState(() => new Set());
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
@@ -228,6 +311,27 @@ export default function Layout() {
 
   function closeMenu() {
     setIsMenuOpen(false);
+  }
+
+  // Un groupe se voit dépliable dès qu'il est actif (on est sur une de ses pages) OU qu'on l'a
+  // déplié à la main — les deux sont indépendants pour ne pas perdre le dépliage manuel d'un
+  // groupe qu'on n'est pas en train de consulter.
+  function isGroupExpanded(item) {
+    return expandedGroups.has(item.to) || isNavItemActive(item, location.pathname);
+  }
+
+  function toggleGroup(event, item) {
+    event.preventDefault();
+    event.stopPropagation();
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (isGroupExpanded(item)) {
+        next.delete(item.to);
+      } else {
+        next.add(item.to);
+      }
+      return next;
+    });
   }
 
   async function handleLogout() {
@@ -321,27 +425,74 @@ export default function Layout() {
               !item.hiddenFromSidebar &&
               (!item.adminOnly || role === 'admin') &&
               (item.adminOnly || item.alwaysVisible || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
-          ).map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              onClick={closeMenu}
-              className={() =>
-                `flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                  isNavItemActive(item, location.pathname) ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
-                }`
-              }
-            >
-              <item.icon size={20} />
-              <span className="flex-1">{item.label}</span>
-              {item.to === '/my-approvals' && pendingApprovalsCount > 0 && (
-                <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
-                  {pendingApprovalsCount}
-                </span>
-              )}
-            </NavLink>
-          ))}
+          ).map((item) => {
+            // Un onglet de page fusionnée dont la clé de visibilité est masquée pour ce rôle ne
+            // doit pas apparaître dans le sous-menu — même filtre que ce que la page fusionnée
+            // elle-même applique à ses propres onglets (voir ex. DocumentsHub.jsx#visibleTabs).
+            const visibleChildren = item.children?.filter(
+              (child) => !child.menuKey || !visibleMenuKeys || visibleMenuKeys.includes(child.menuKey)
+            );
+            // Sous-menu inutile s'il ne resterait qu'un seul onglet visible (le lien principal
+            // y mène déjà) — repli silencieux sur un lien simple dans ce cas.
+            const hasGroup = visibleChildren && visibleChildren.length > 1;
+            const expanded = hasGroup && isGroupExpanded(item);
+
+            return (
+              <div key={item.to}>
+                <div
+                  className={`flex items-center rounded-md text-sm font-medium transition-colors ${hasGroup ? 'pr-1' : ''} ${
+                    isNavItemActive(item, location.pathname) ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`}
+                >
+                  <NavLink to={item.to} end={item.end} onClick={closeMenu} className="flex flex-1 items-center gap-3 px-3 py-2.5">
+                    <item.icon size={20} />
+                    <span className="flex-1">{item.label}</span>
+                    {item.to === '/my-approvals' && pendingApprovalsCount > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
+                        {pendingApprovalsCount}
+                      </span>
+                    )}
+                  </NavLink>
+                  {hasGroup && (
+                    <button
+                      type="button"
+                      onClick={(event) => toggleGroup(event, item)}
+                      aria-label={expanded ? `Réduire ${item.label}` : `Voir le contenu de ${item.label}`}
+                      aria-expanded={expanded}
+                      className="shrink-0 rounded-md p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                    >
+                      {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    </button>
+                  )}
+                </div>
+
+                {expanded && (
+                  <div className="mt-1 space-y-0.5 border-l border-white/15 pl-3">
+                    {visibleChildren.map((child) => (
+                      <NavLink
+                        key={child.to}
+                        to={child.to}
+                        onClick={closeMenu}
+                        className={({ isActive }) =>
+                          `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
+                            isActive ? 'bg-white/15 text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                          }`
+                        }
+                      >
+                        <child.icon size={16} />
+                        <span className="flex-1">{child.label}</span>
+                        {child.to === '/my-approvals' && pendingApprovalsCount > 0 && (
+                          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
+                            {pendingApprovalsCount}
+                          </span>
+                        )}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="space-y-1 px-3 pb-6 pt-3">
