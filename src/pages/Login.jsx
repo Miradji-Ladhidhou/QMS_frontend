@@ -1,15 +1,20 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import AppLogo from '../components/AppLogo.jsx';
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
+  // ?expired=1 : redirection forcée par l'intercepteur 401 de lib/api.js — une session que le
+  // backend ne reconnaissait plus, sans lien avec un mot de passe incorrect.
+  const [error, setError] = useState(
+    searchParams.get('expired') ? 'Votre session a expiré. Reconnectez-vous pour continuer.' : ''
+  );
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(event) {
