@@ -7,7 +7,6 @@ import CapaDelaysSettings from '../components/CapaDelaysSettings.jsx';
 import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
 import DriveStorageSettings from '../components/DriveStorageSettings.jsx';
 import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
-import ProcedureTemplateSettings from '../components/ProcedureTemplateSettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
 import Groups from './Groups.jsx';
 
@@ -37,19 +36,23 @@ const TAB_GROUPS = [
     tabs: [
       { id: 'capa', label: 'CAPA', adminOnly: true },
       { id: 'documents', label: 'Documents', adminOnly: true },
-      { id: 'procedures', label: 'Procédures', adminOnly: true },
     ],
   },
 ];
+// La personnalisation du gabarit des procédures (couleur, options visuelles, structure de
+// sections, logo, aperçu) se passe désormais directement sur la page Procédures — bouton
+// "Paramètres du gabarit" (voir Procedures.jsx#ProcedureTemplateSettingsModal), plus ici (voir
+// le plan de refonte de la mise en page des procédures, point 2 : "tout doit se passer à cet
+// endroit, pas une page de configuration séparée ailleurs dans l'app").
 
 export default function Settings() {
   const [currentUser, setCurrentUser] = useState(null);
   // Le callback OAuth Google Drive (backend) redirige vers /settings?drive=connected|error —
   // sans ce cas particulier, l'utilisateur atterrirait sur l'onglet "Entreprise" par défaut et
   // ne verrait jamais la confirmation d'activation ni l'erreur, puisque DriveStorageSettings
-  // ne serait pas monté. ?tab=<id> est le cas général (ex. lien "Changer" depuis
-  // NewProcedureFullDraftModal.jsx vers l'onglet Procédures) — le cas drive reste prioritaire
-  // puisqu'il pointe toujours vers "documents", jamais un autre onglet.
+  // ne serait pas monté. ?tab=<id> reste le cas général pour tout futur lien direct vers un
+  // onglet précis — le cas drive reste prioritaire puisqu'il pointe toujours vers "documents",
+  // jamais un autre onglet.
   const [activeTab, setActiveTab] = useState(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.has('drive')) return 'documents';
@@ -117,7 +120,6 @@ export default function Settings() {
             <DriveStorageSettings />
           </div>
         )}
-        {activeTab === 'procedures' && isAdmin && <ProcedureTemplateSettings />}
         {activeTab === 'visibility' && isAdmin && <MenuVisibilitySettings />}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />

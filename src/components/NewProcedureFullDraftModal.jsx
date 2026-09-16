@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { FileText, Loader2, Settings as SettingsIcon, X } from 'lucide-react';
 import { useProcedureFullDraftJob } from '../lib/useProcedureFullDraftJob.js';
 import AutoTextarea from './AutoTextarea.jsx';
@@ -21,7 +20,10 @@ import AutoTextarea from './AutoTextarea.jsx';
 // l'utiliser tel quel comme titre de procédure a déjà fait gonfler un export PDF à 444 pages
 // (voir le correctif dans pdfTheme.js). onClose : ferme sans avoir généré (ou après confirmation
 // si une génération est en cours, pour ne pas perdre la progression sans prévenir).
-export default function NewProcedureFullDraftModal({ template, onClose, onGenerated }) {
+// onOpenTemplateSettings : ferme cette modale et ouvre celle des paramètres du gabarit (voir
+// Procedures.jsx) — la personnalisation se passe désormais directement sur la page Procédures,
+// plus dans Paramètres ailleurs dans l'app (voir le plan de refonte).
+export default function NewProcedureFullDraftModal({ template, onClose, onGenerated, onOpenTemplateSettings }) {
   const [subject, setSubject] = useState('');
   const { job, starting, error, isRunning, progress, start } = useProcedureFullDraftJob();
 
@@ -35,6 +37,13 @@ export default function NewProcedureFullDraftModal({ template, onClose, onGenera
       return;
     }
     onClose();
+  }
+
+  function handleOpenTemplateSettings() {
+    if (isRunning && !window.confirm('Une génération est en cours. Continuer sans récupérer le résultat ?')) {
+      return;
+    }
+    onOpenTemplateSettings();
   }
 
   const canGenerate = subject.trim().length >= 3;
@@ -75,13 +84,14 @@ export default function NewProcedureFullDraftModal({ template, onClose, onGenera
             />
             Style du document exporté
           </span>
-          <Link
-            to="/settings?tab=procedures"
+          <button
+            type="button"
+            onClick={handleOpenTemplateSettings}
             className="flex shrink-0 items-center gap-1 text-primary hover:text-primary-700"
           >
             <SettingsIcon size={14} />
             Changer
-          </Link>
+          </button>
         </div>
 
         {!isRunning && !job && (

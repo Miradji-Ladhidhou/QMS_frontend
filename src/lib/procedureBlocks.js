@@ -15,6 +15,26 @@ export function textToParagraphBlocks(text) {
     .map((line) => ({ type: 'paragraphe', id: makeBlockId(), text: line }));
 }
 
+// Le sommaire est un bloc de contenu comme un autre (voir le plan de refonte : une section
+// key === 'sommaire', un bloc liste_puces) — jamais un mécanisme séparé. Ce helper calcule les
+// libellés à y proposer, à partir des AUTRES sections (jamais la sommaire elle-même).
+export function buildSommaireItems(sections) {
+  return (sections || []).filter((s) => s.key !== 'sommaire').map((s) => s.label);
+}
+
+// Ajoute une section "sommaire" en tête si aucune n'existe déjà — jamais si elle existe déjà
+// (voir le principe du point 1 : pré-rempli par défaut, mais jamais écrasé automatiquement une
+// fois présent, même par une génération IA ultérieure). Utilisé au tout premier amorçage d'un
+// contenu vide (ProcedureSectionsEditor.jsx) et après une fusion de brouillon IA
+// (mergeAiGeneratedSections ci-dessous), pour qu'un sommaire existe par défaut dans les deux cas
+// sans jamais toucher à un sommaire déjà personnalisé par le tenant.
+export function ensureSommaireSection(sections) {
+  if ((sections || []).some((s) => s.key === 'sommaire')) return sections;
+  const items = buildSommaireItems(sections);
+  if (!items.length) return sections;
+  return [{ key: 'sommaire', label: 'Sommaire', blocks: [{ type: 'liste_puces', id: makeBlockId(), items }] }, ...sections];
+}
+
 // Fusionne un brouillon généré par l'IA (draft/job.result : { sections: [{key,label,blocks}],
 // documents_associes }, voir POST /generate-draft et /generate-full-draft côté backend) dans le
 // contenu { sections, documents_associes } déjà en cours d'édition — par clé de section, jamais
@@ -31,7 +51,9 @@ export function mergeAiGeneratedSections(prev, draft) {
   const added = (draft.sections || []).filter((s) => !existingKeys.has(s.key));
   return {
     ...prev,
-    sections: [...merged, ...added],
+    // ensureSommaireSection n'ajoute rien si une section "sommaire" existe déjà (voir plus haut)
+    // — une génération IA ultérieure ne l'écrase donc jamais si le tenant l'a déjà personnalisée.
+    sections: ensureSommaireSection([...merged, ...added]),
     documents_associes: draft.documents_associes?.length ? draft.documents_associes : prev.documents_associes,
   };
 }

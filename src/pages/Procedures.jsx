@@ -8,6 +8,7 @@ import {
   FolderPlus,
   Loader2,
   Plus,
+  Settings as SettingsIcon,
   Sparkles,
   X,
 } from 'lucide-react';
@@ -29,13 +30,14 @@ import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
+import ProcedureTemplateSettings from '../components/ProcedureTemplateSettings.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
 import AiFullProcedureDraft from '../components/AiFullProcedureDraft.jsx';
 import NewProcedureFullDraftModal from '../components/NewProcedureFullDraftModal.jsx';
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
-import { mergeAiGeneratedSections } from '../lib/procedureBlocks.js';
+import { ensureSommaireSection, mergeAiGeneratedSections } from '../lib/procedureBlocks.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const PROCEDURE_RESOURCE_TYPE = 'procedure';
@@ -57,6 +59,27 @@ function formatDate(dateStr) {
 function isReviewOverdue(procedure) {
   if (!procedure.next_review_date || procedure.status === 'obsolete') return false;
   return procedure.next_review_date < new Date().toISOString().slice(0, 10);
+}
+
+// Chrome de modale autour de ProcedureTemplateSettings.jsx (couleur/options visuelles/structure
+// de sections/logo/aperçu) — la personnalisation du gabarit se passe désormais directement sur
+// la page Procédures (voir le plan de refonte), plus dans Paramètres > Procédures ailleurs dans
+// l'app. Même motif que ManageCategoriesModal juste en dessous : un bouton sur cette page,
+// ouvert en modale, jamais une page séparée.
+function ProcedureTemplateSettingsModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-slate-50 p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Paramètres du gabarit</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+        <ProcedureTemplateSettings />
+      </div>
+    </div>
+  );
 }
 
 // initialTitle/initialContent/initialAiGenerated : préremplissage venu du parcours de
@@ -285,6 +308,7 @@ export default function Procedures() {
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
+  const [isTemplateSettingsOpen, setIsTemplateSettingsOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingProcedure, setMovingProcedure] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
@@ -353,11 +377,15 @@ export default function Procedures() {
     }
   }
 
-  useEffect(() => {
+  function loadTemplate() {
     api
       .get('/procedure-templates')
       .then(({ data }) => setTemplate(data))
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadTemplate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -396,7 +424,11 @@ export default function Procedures() {
   // court reformulé par l'IA (pas le sujet brut potentiellement long tapé/collé dans la modale
   // précédente — voir le commentaire sur onGenerated dans NewProcedureFullDraftModal.jsx).
   function handleFullDraftGenerated(title, content) {
-    setFullDraftSeed({ title, content });
+    // ensureSommaireSection : le job de génération complète ne produit pas lui-même de section
+    // "sommaire" (voir procedureFullDraftJob.js) — ProcedureSectionsEditor.jsx n'amorce le
+    // sommaire par défaut QUE quand le contenu démarre vide, ce qui n'est pas le cas ici
+    // (sections déjà remplies par l'IA). Ajouté ici, une seule fois, avant d'ouvrir l'éditeur.
+    setFullDraftSeed({ title, content: { ...content, sections: ensureSommaireSection(content.sections || []) } });
     setIsFullDraftModalOpen(false);
     setIsModalOpen(true);
   }
@@ -590,14 +622,24 @@ export default function Procedures() {
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les procédures" />
 
         {currentUser?.role === 'admin' && (
-          <button
-            type="button"
-            onClick={() => setIsManageCategoriesOpen(true)}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            <FolderCog size={16} />
-            Gérer les dossiers
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setIsManageCategoriesOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <FolderCog size={16} />
+              Gérer les dossiers
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsTemplateSettingsOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <SettingsIcon size={16} />
+              Paramètres du gabarit
+            </button>
+          </div>
         )}
       </div>
 
@@ -796,6 +838,19 @@ export default function Procedures() {
           template={template}
           onClose={() => setIsFullDraftModalOpen(false)}
           onGenerated={handleFullDraftGenerated}
+          onOpenTemplateSettings={() => {
+            setIsFullDraftModalOpen(false);
+            setIsTemplateSettingsOpen(true);
+          }}
+        />
+      )}
+
+      {isTemplateSettingsOpen && (
+        <ProcedureTemplateSettingsModal
+          onClose={() => {
+            setIsTemplateSettingsOpen(false);
+            loadTemplate(); // reflète tout changement de couleur/structure fait dans la modale
+          }}
         />
       )}
 

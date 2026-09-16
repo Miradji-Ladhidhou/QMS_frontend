@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowDown, ArrowUp, Plus, RefreshCw, Trash2, X } from 'lucide-react';
 import AutoTextarea from './AutoTextarea.jsx';
 import TableBlockEditor from './TableBlockEditor.jsx';
+import { buildSommaireItems, ensureSommaireSection } from '../lib/procedureBlocks.js';
 
 const FIELD_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -186,10 +187,11 @@ export default function ProcedureSectionsEditor({ template, content, onChange })
     if (seededRef.current || !template) return;
     seededRef.current = true;
     if ((content.sections || []).length > 0) return;
-    onChange({
-      ...content,
-      sections: (template.section_structure || []).map((s) => ({ key: s.key, label: s.label, blocks: [] })),
-    });
+    const seeded = (template.section_structure || []).map((s) => ({ key: s.key, label: s.label, blocks: [] }));
+    // Sommaire pré-rempli par défaut (voir le plan de refonte, point 1) — une section "sommaire"
+    // en tête, éditable/réécrivable librement ensuite comme n'importe quel autre bloc, jamais
+    // recalculée automatiquement une fois créée.
+    onChange({ ...content, sections: ensureSommaireSection(seeded) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [template]);
 
@@ -223,6 +225,20 @@ export default function ProcedureSectionsEditor({ template, content, onChange })
 
   function updateSectionBlocks(sectionIndex, blocks) {
     updateSections(sections.map((s, i) => (i === sectionIndex ? { ...s, blocks } : s)));
+  }
+
+  // Régénère le SEUL bloc liste_puces de la section "sommaire" à partir des libellés actuels des
+  // autres sections — une action explicite de l'utilisateur (bouton), jamais automatique : voir
+  // le plan de refonte, le sommaire ne doit jamais être écrasé silencieusement une fois créé.
+  function regenerateSommaire(sectionIndex) {
+    const items = buildSommaireItems(sections);
+    const blocks = sections[sectionIndex].blocks || [];
+    const listIndex = blocks.findIndex((b) => b.type === 'liste_puces');
+    const nextBlocks =
+      listIndex >= 0
+        ? blocks.map((b, i) => (i === listIndex ? { ...b, items } : b))
+        : [...blocks, { type: 'liste_puces', id: makeId(), items }];
+    updateSectionBlocks(sectionIndex, nextBlocks);
   }
 
   function addBlock(sectionIndex, type) {
@@ -286,6 +302,17 @@ export default function ProcedureSectionsEditor({ template, content, onChange })
                   <AlertTriangle size={12} />
                   {failedCount > 1 ? `${failedCount} passages` : '1 passage'}
                 </span>
+              )}
+              {section.key === 'sommaire' && (
+                <button
+                  type="button"
+                  onClick={() => regenerateSommaire(sectionIndex)}
+                  title="Remplace la liste ci-dessous par les titres de section actuels — n'écrase rien d'autre"
+                  className="flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  <RefreshCw size={12} />
+                  Régénérer
+                </button>
               )}
               <ReorderControls
                 onMoveUp={() => moveSection(sectionIndex, -1)}
