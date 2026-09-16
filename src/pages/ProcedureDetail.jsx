@@ -143,6 +143,26 @@ function EditVersionModal({ procedureId, procedureTitle, procedureProcess, templ
     }));
   }
 
+  // Suite de ProcedureComplianceCheck (voir ce composant) : une correction ciblée sur UNE
+  // section, jamais le reste du contenu — contrairement à handleAiGenerated ci-dessus qui
+  // remplace potentiellement plusieurs sections d'un coup. Si la section signalée par l'audit
+  // de conformité est absente du brouillon (cas le plus fréquent : une section du gabarit
+  // jamais commencée), on la crée à partir de son libellé dans le gabarit plutôt que d'ignorer
+  // silencieusement la correction faute de ligne à mettre à jour.
+  function handleApplyCorrection(sectionKey, correctedContent) {
+    setContent((prev) => {
+      const exists = prev.sections.some((s) => s.key === sectionKey);
+      if (exists) {
+        return { ...prev, sections: prev.sections.map((s) => (s.key === sectionKey ? { ...s, content: correctedContent } : s)) };
+      }
+      const templateSection = template?.section_structure?.find((s) => s.key === sectionKey);
+      return {
+        ...prev,
+        sections: [...prev.sections, { key: sectionKey, label: templateSection?.label || sectionKey, content: correctedContent }],
+      };
+    });
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
@@ -176,6 +196,8 @@ function EditVersionModal({ procedureId, procedureTitle, procedureProcess, templ
             <AiFullProcedureDraft title={procedureTitle} onGenerated={handleAiGenerated} />
           </div>
           <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
+
+          <ProcedureComplianceCheck procedureId={procedureId} versionId={version.id} onApplyCorrection={handleApplyCorrection} />
 
           <button
             type="submit"
