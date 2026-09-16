@@ -7,10 +7,18 @@ function makeBlockId() {
   return `b${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Défense en profondeur (miroir de backend/src/lib/procedureBlocks.js) : malgré la consigne des
+// prompts IA, le modèle glisse parfois du Markdown (**gras**, "# Titre") dans un texte censé
+// être brut (correction de conformité, suggestion de révision depuis un CAPA) — jamais
+// interprété par Word, ça apparaîtrait tel quel, astérisques compris.
+function stripMarkdownArtifacts(text) {
+  return (text || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/^#{1,6}\s+/, '');
+}
+
 export function textToParagraphBlocks(text) {
   return (text || '')
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => stripMarkdownArtifacts(line.trim()))
     .filter(Boolean)
     .map((line) => ({ type: 'paragraphe', id: makeBlockId(), text: line }));
 }
