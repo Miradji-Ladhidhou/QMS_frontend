@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { FileText, Loader2, Settings as SettingsIcon, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useProcedureFullDraftJob } from '../lib/useProcedureFullDraftJob.js';
+import AutoTextarea from './AutoTextarea.jsx';
 
 // Parcours dédié "Nouvelle procédure — génération complète" depuis la liste des procédures :
 // contrairement au bouton "Document complet (IA)" niché dans le formulaire de création manuelle
@@ -13,9 +14,14 @@ import { useProcedureFullDraftJob } from '../lib/useProcedureFullDraftJob.js';
 // dédié en plus, pour ne pas dupliquer ProcedureSectionsEditor.
 //
 // template : la ligne procedure_templates du tenant (déjà chargée par Procedures.jsx).
-// onGenerated(subject, content) : appelé une fois le job terminé — le parent ferme cette modale
-// et ouvre NewProcedureModal avec ce contenu. onClose : ferme sans avoir généré (ou après
-// confirmation si une génération est en cours, pour ne pas perdre la progression sans prévenir).
+// onGenerated(title, content) : appelé une fois le job terminé — le parent ferme cette modale
+// et ouvre NewProcedureModal avec ce contenu. `title` est l'intitulé COURT reformulé par l'IA
+// (content.title, voir generateProcedureFullPlan dans groq.js), jamais le sujet brut tapé/collé
+// ici : un sujet peut légitimement faire plusieurs dizaines de lignes (voir le champ ci-dessous,
+// une zone de texte qui s'agrandit avec son contenu plutôt qu'un simple champ d'une ligne), et
+// l'utiliser tel quel comme titre de procédure a déjà fait gonfler un export PDF à 444 pages
+// (voir le correctif dans pdfTheme.js). onClose : ferme sans avoir généré (ou après confirmation
+// si une génération est en cours, pour ne pas perdre la progression sans prévenir).
 export default function NewProcedureFullDraftModal({ template, onClose, onGenerated }) {
   const [subject, setSubject] = useState('');
   const [presets, setPresets] = useState([]);
@@ -29,7 +35,7 @@ export default function NewProcedureFullDraftModal({ template, onClose, onGenera
   }, []);
 
   useEffect(() => {
-    if (job?.status === 'completed') onGenerated?.(subject, job.result);
+    if (job?.status === 'completed') onGenerated?.(job.result.title || subject, job.result);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.status]);
 
@@ -54,18 +60,19 @@ export default function NewProcedureFullDraftModal({ template, onClose, onGenera
         </div>
 
         <p className="text-sm text-slate-500">
-          Décrivez le sujet en quelques mots (ex. « procédure de préparation de commande ») — l'IA rédige un document
-          complet, section par section, que vous n'aurez plus qu'à relire, corriger et illustrer.
+          Décrivez le sujet en quelques mots (ex. « procédure de préparation de commande »), ou collez un texte plus
+          complet (notes existantes, brouillon, cahier des charges...) — l'IA en dégage un intitulé court et rédige un
+          document complet, section par section, que vous n'aurez plus qu'à relire, corriger et illustrer.
         </p>
 
         <div className="mt-4">
           <label className="mb-1 block text-sm font-medium text-slate-700">Sujet de la procédure</label>
-          <input
-            type="text"
+          <AutoTextarea
+            rows={2}
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             disabled={starting || isRunning}
-            placeholder="Ex. procédure de préparation de commande"
+            placeholder="Ex. procédure de préparation de commande — ou collez un texte plus long, l'IA le reformulera."
             className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
           />
         </div>

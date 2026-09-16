@@ -198,6 +198,7 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
             <input
               type="text"
               required
+              maxLength={300}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
@@ -398,9 +399,11 @@ export default function Procedures() {
   // Relais entre les deux modales : la génération complète (voir NewProcedureFullDraftModal.jsx)
   // se termine, on ferme cette modale et on ouvre directement l'éditeur manuel déjà existant,
   // préempli — jamais de publication automatique, l'utilisateur relit/corrige puis soumet
-  // "Créer la procédure" comme n'importe quel autre brouillon.
-  function handleFullDraftGenerated(subject, content) {
-    setFullDraftSeed({ title: subject, content });
+  // "Créer la procédure" comme n'importe quel autre brouillon. `title` est déjà l'intitulé
+  // court reformulé par l'IA (pas le sujet brut potentiellement long tapé/collé dans la modale
+  // précédente — voir le commentaire sur onGenerated dans NewProcedureFullDraftModal.jsx).
+  function handleFullDraftGenerated(title, content) {
+    setFullDraftSeed({ title, content });
     setIsFullDraftModalOpen(false);
     setIsModalOpen(true);
   }
