@@ -35,11 +35,15 @@ import NewProcedureFullDraftModal from '../components/NewProcedureFullDraftModal
 import ProcedureSectionsEditor from '../components/ProcedureSectionsEditor.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import { mergeAiGeneratedSections } from '../lib/procedureBlocks.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const PROCEDURE_RESOURCE_TYPE = 'procedure';
 
-const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
+// Objet/domaine d'application/responsabilités ne sont plus des champs séparés (voir le plan de
+// refonte de la mise en page des procédures) : ce sont des sections ordinaires, amorcées par
+// ProcedureSectionsEditor.jsx à partir du gabarit du tenant dès que "sections" démarre vide.
+const EMPTY_CONTENT = { sections: [], documents_associes: [] };
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -76,18 +80,7 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
   const [submitting, setSubmitting] = useState(false);
 
   function handleAiGenerated(draft) {
-    setContent((prev) => ({
-      ...prev,
-      objet: draft.objet || prev.objet,
-      domaine_application: draft.domaine_application || prev.domaine_application,
-      responsabilites: draft.responsabilites || prev.responsabilites,
-      sections: draft.sections?.length
-        ? prev.sections.map((section) => {
-            const generated = draft.sections.find((s) => s.key === section.key);
-            return generated ? { ...section, content: generated.content, subsections: generated.subsections } : section;
-          })
-        : prev.sections,
-    }));
+    setContent((prev) => mergeAiGeneratedSections(prev, draft));
     setAiGenerated(true);
   }
 
@@ -550,7 +543,7 @@ export default function Procedures() {
             className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
           >
             <Plus size={18} />
-            Nouvelle procédure
+            Création manuelle
           </button>
           <button
             type="button"
@@ -558,7 +551,7 @@ export default function Procedures() {
             className="flex flex-1 items-center justify-center gap-2 rounded-md border border-purple-300 px-4 py-2.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 sm:flex-none"
           >
             <FileText size={18} />
-            Nouvelle procédure — génération complète
+            Génération IA
           </button>
         </div>
       </div>

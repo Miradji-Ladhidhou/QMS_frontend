@@ -6,6 +6,7 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import { postForWordDownload } from '../lib/pdfExport.js';
+import { textToParagraphBlocks, mergeAiGeneratedSections } from '../lib/procedureBlocks.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import ProcedureVersionStatusBadge from '../components/ProcedureVersionStatusBadge.jsx';
 import AiProcedureDraft from '../components/AiProcedureDraft.jsx';
@@ -22,7 +23,10 @@ import ProcedureContentView from '../components/ProcedureContentView.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
-const EMPTY_CONTENT = { objet: '', domaine_application: '', responsabilites: '', sections: [], documents_associes: [] };
+// Objet/domaine d'application/responsabilités ne sont plus des champs séparés (voir le plan de
+// refonte de la mise en page des procédures) : ce sont des sections ordinaires, amorcées par
+// ProcedureSectionsEditor.jsx à partir du gabarit du tenant dès que "sections" démarre vide.
+const EMPTY_CONTENT = { sections: [], documents_associes: [] };
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -33,6 +37,7 @@ function formatDateTime(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleString('fr-FR');
 }
+
 
 // Nouvelle version : même principe que la création de procédure (Procedures.jsx) — un seul
 // POST /:id/versions avec le contenu déjà rédigé, il n'existe pas de route pour modifier le
@@ -53,18 +58,7 @@ function NewVersionModal({
   const [submitting, setSubmitting] = useState(false);
 
   function handleAiGenerated(draft) {
-    setContent((prev) => ({
-      ...prev,
-      objet: draft.objet || prev.objet,
-      domaine_application: draft.domaine_application || prev.domaine_application,
-      responsabilites: draft.responsabilites || prev.responsabilites,
-      sections: draft.sections?.length
-        ? prev.sections.map((section) => {
-            const generated = draft.sections.find((s) => s.key === section.key);
-            return generated ? { ...section, content: generated.content, subsections: generated.subsections } : section;
-          })
-        : prev.sections,
-    }));
+    setContent((prev) => mergeAiGeneratedSections(prev, draft));
     setAiGenerated(true);
   }
 
@@ -129,18 +123,7 @@ function EditVersionModal({ procedureId, procedureTitle, procedureProcess, templ
   const [submitting, setSubmitting] = useState(false);
 
   function handleAiGenerated(draft) {
-    setContent((prev) => ({
-      ...prev,
-      objet: draft.objet || prev.objet,
-      domaine_application: draft.domaine_application || prev.domaine_application,
-      responsabilites: draft.responsabilites || prev.responsabilites,
-      sections: draft.sections?.length
-        ? prev.sections.map((section) => {
-            const generated = draft.sections.find((s) => s.key === section.key);
-            return generated ? { ...section, content: generated.content, subsections: generated.subsections } : section;
-          })
-        : prev.sections,
-    }));
+    setContent((prev) => mergeAiGeneratedSections(prev, draft));
   }
 
   // Suite de ProcedureComplianceCheck (voir ce composant) : une correction ciblée sur UNE
@@ -148,17 +131,20 @@ function EditVersionModal({ procedureId, procedureTitle, procedureProcess, templ
   // remplace potentiellement plusieurs sections d'un coup. Si la section signalée par l'audit
   // de conformité est absente du brouillon (cas le plus fréquent : une section du gabarit
   // jamais commencée), on la crée à partir de son libellé dans le gabarit plutôt que d'ignorer
-  // silencieusement la correction faute de ligne à mettre à jour.
+  // silencieusement la correction faute de ligne à mettre à jour. correctedContent est un texte
+  // à plat (voir generateProcedureComplianceFix dans groq.js) : converti en blocs paragraphe,
+  // la seule représentation persistée désormais (voir le plan de refonte).
   function handleApplyCorrection(sectionKey, correctedContent) {
     setContent((prev) => {
+      const blocks = textToParagraphBlocks(correctedContent);
       const exists = prev.sections.some((s) => s.key === sectionKey);
       if (exists) {
-        return { ...prev, sections: prev.sections.map((s) => (s.key === sectionKey ? { ...s, content: correctedContent } : s)) };
+        return { ...prev, sections: prev.sections.map((s) => (s.key === sectionKey ? { ...s, blocks } : s)) };
       }
       const templateSection = template?.section_structure?.find((s) => s.key === sectionKey);
       return {
         ...prev,
-        sections: [...prev.sections, { key: sectionKey, label: templateSection?.label || sectionKey, content: correctedContent }],
+        sections: [...prev.sections, { key: sectionKey, label: templateSection?.label || sectionKey, blocks }],
       };
     });
   }
@@ -517,7 +503,7 @@ export default function ProcedureDetail() {
     const base = baseContent || EMPTY_CONTENT;
     const sections = (base.sections || []).map((section) => {
       const change = suggestedChanges.find((c) => c.section_key === section.key);
-      return change ? { ...section, content: change.suggested_content } : section;
+      return change ? { ...section, blocks: textToParagraphBlocks(change.suggested_content) } : section;
     });
     return { ...base, sections };
   }

@@ -1,7 +1,14 @@
 import { useEffect, useState } from 'react';
-import { ChevronDown, ChevronUp, Plus, Sparkles, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ChevronDown, ChevronUp, Download, Loader2, Plus, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { getTenantLogoPublicUrl } from '../lib/storage.js';
+import { postForWordDownload } from '../lib/pdfExport.js';
 import AutoTextarea from './AutoTextarea.jsx';
+import ProcedureAccentColorPicker from './ProcedureAccentColorPicker.jsx';
+
+const DEFAULT_ACCENT_COLOR = '#44546A';
+const DEFAULT_VISUAL_OPTIONS = { band: false, bulletStyle: 'dash', calloutStyle: 'left-border' };
 
 // Slug technique dérivé du libellé — c'est CETTE valeur que l'IA et procedure_versions.content
 // utilisent pour retrouver une section (voir section_key dans groq.js), jamais le libellé
@@ -16,19 +23,21 @@ function slugify(label) {
     .replace(/^_+|_+$/g, '');
 }
 
-// Configuration du gabarit de sections utilisé par ProcedureSectionsEditor pour tout le tenant
-// — une seule ligne (PUT upsert onConflict tenant_id), pas de CRUD section par section côté
-// API : on édite le tableau localement puis on enregistre le tout d'un coup, comme
-// MenuVisibilitySettings plutôt que comme ModuleCategoryManager (pas d'id serveur par section).
+// Configuration du gabarit de procédures pour tout le tenant — structure de sections ET
+// personnalisation visuelle (couleur/options, voir le plan de refonte de la mise en page des
+// procédures : remplace les 4 presets figés d'origine par une personnalisation directe). Une
+// seule ligne (PUT upsert onConflict tenant_id), pas de CRUD section par section côté API.
 export default function ProcedureTemplateSettings() {
   const [sections, setSections] = useState([]);
   const [fixedInstructions, setFixedInstructions] = useState('');
-  const [presets, setPresets] = useState([]);
-  const [applyingPresetId, setApplyingPresetId] = useState(null);
+  const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR);
+  const [visualOptions, setVisualOptions] = useState(DEFAULT_VISUAL_OPTIONS);
+  const [tenantLogoUrl, setTenantLogoUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [previewing, setPreviewing] = useState(false);
   const [error, setError] = useState('');
-  const [presetError, setPresetError] = useState('');
+  const [previewError, setPreviewError] = useState('');
   const [newLabel, setNewLabel] = useState('');
   const [dirty, setDirty] = useState(false);
 
@@ -37,9 +46,12 @@ export default function ProcedureTemplateSettings() {
       setLoading(true);
       setError('');
       try {
-        const { data } = await api.get('/procedure-templates');
+        const [{ data }, { data: tenant }] = await Promise.all([api.get('/procedure-templates'), api.get('/tenant')]);
         setSections(data.section_structure || []);
         setFixedInstructions(data.fixed_instructions || '');
+        setAccentColor(data.accent_color || DEFAULT_ACCENT_COLOR);
+        setVisualOptions({ ...DEFAULT_VISUAL_OPTIONS, ...(data.visual_options || {}) });
+        setTenantLogoUrl(getTenantLogoPublicUrl(tenant?.logo_url));
       } catch {
         setError('Impossible de charger le gabarit.');
       } finally {
@@ -47,11 +59,6 @@ export default function ProcedureTemplateSettings() {
       }
     }
     load();
-
-    api
-      .get('/procedure-templates/presets')
-      .then(({ data }) => setPresets(data))
-      .catch(() => {});
   }, []);
 
   function addSection(event) {
@@ -89,6 +96,11 @@ export default function ProcedureTemplateSettings() {
     setDirty(true);
   }
 
+  function updateVisualOption(key, value) {
+    setVisualOptions((prev) => ({ ...prev, [key]: value }));
+    setDirty(true);
+  }
+
   async function handleSave() {
     setSaving(true);
     setError('');
@@ -96,9 +108,13 @@ export default function ProcedureTemplateSettings() {
       const { data } = await api.put('/procedure-templates', {
         section_structure: sections,
         fixed_instructions: fixedInstructions || undefined,
+        accent_color: accentColor,
+        visual_options: visualOptions,
       });
       setSections(data.section_structure || []);
       setFixedInstructions(data.fixed_instructions || '');
+      setAccentColor(data.accent_color || DEFAULT_ACCENT_COLOR);
+      setVisualOptions({ ...DEFAULT_VISUAL_OPTIONS, ...(data.visual_options || {}) });
       setDirty(false);
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer le gabarit.");
@@ -107,29 +123,22 @@ export default function ProcedureTemplateSettings() {
     }
   }
 
-  // Copie le preset dans le gabarit du tenant — à partir de là c'est une copie normale,
-  // librement modifiable ensuite (voir POST /apply-preset côté backend). N'affecte jamais les
-  // procédures déjà rédigées : seules les PROCHAINES générations en tiendront compte.
-  async function handleApplyPreset(preset) {
-    if (
-      !window.confirm(
-        `Remplacer le gabarit actuel par "${preset.name}" ? Cette action n'affecte que les prochaines générations — les procédures déjà créées gardent leur contenu tel quel. Vous pourrez modifier le résultat ensuite.`
-      )
-    ) {
-      return;
-    }
-
-    setPresetError('');
-    setApplyingPresetId(preset.id);
+  // Applique les réglages EN COURS D'ÉDITION (pas ceux déjà enregistrés) sur un contenu
+  // générique fixe côté serveur — rien n'est appliqué avant "Enregistrer le gabarit" ci-dessus,
+  // cet aperçu est purement informatif.
+  async function handlePreview() {
+    setPreviewError('');
+    setPreviewing(true);
     try {
-      const { data } = await api.post('/procedure-templates/apply-preset', { preset_id: preset.id });
-      setSections(data.section_structure || []);
-      setFixedInstructions(data.fixed_instructions || '');
-      setDirty(false);
-    } catch (err) {
-      setPresetError(err.response?.data?.error || "Impossible d'appliquer ce preset.");
+      await postForWordDownload(
+        '/procedure-templates/preview-word',
+        { accent_color: accentColor, visual_options: visualOptions },
+        'apercu-gabarit-procedures.docx'
+      );
+    } catch {
+      setPreviewError("Impossible de générer l'aperçu.");
     } finally {
-      setApplyingPresetId(null);
+      setPreviewing(false);
     }
   }
 
@@ -139,53 +148,86 @@ export default function ProcedureTemplateSettings() {
 
   return (
     <div className="space-y-4">
-      {presets.length > 0 && (
-        <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
-          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Points de départ suggérés</h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Choisissez un style pour démarrer, puis ajustez-le librement ci-dessous — appliquer un preset remplace le
-            gabarit actuel et n'affecte que les prochaines générations.
-          </p>
+      <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Style des documents exportés</h2>
+        <p className="mt-1 text-sm text-slate-500">
+          S'applique à l'export Word de chaque procédure — neutre par défaut, personnalisable pour rester cohérent
+          avec votre charte.
+        </p>
 
-          {presetError && (
-            <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
-              {presetError}
-            </p>
-          )}
-
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {presets.map((preset) => (
-              <div key={preset.id} className="rounded-lg border border-slate-200 p-4">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="h-3 w-3 shrink-0 rounded-full"
-                    style={{ backgroundColor: preset.renderStyle?.accentColor || '#94A3B8' }}
-                  />
-                  <p className="text-sm font-semibold text-slate-900">{preset.name}</p>
-                </div>
-                <p className="mt-1.5 text-xs text-slate-500">{preset.description}</p>
-                <button
-                  type="button"
-                  onClick={() => handleApplyPreset(preset)}
-                  disabled={applyingPresetId === preset.id}
-                  className="mt-3 flex items-center gap-1.5 text-sm font-medium text-primary hover:text-primary-700 disabled:opacity-50"
-                >
-                  <Sparkles size={14} />
-                  {applyingPresetId === preset.id ? 'Application...' : 'Appliquer ce preset'}
-                </button>
-              </div>
-            ))}
+        <div className="mt-4 space-y-4">
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-slate-700">Couleur d'accent</label>
+            <ProcedureAccentColorPicker
+              value={accentColor}
+              onChange={(color) => {
+                setAccentColor(color);
+                setDirty(true);
+              }}
+            />
           </div>
+
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => updateVisualOption('band', !visualOptions.band)}
+              className={`rounded-md border px-3 py-2 text-sm font-medium ${
+                visualOptions.band ? 'border-primary bg-primary/5 text-primary-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              Bandeau de couleur en page 1 {visualOptions.band ? '(activé)' : '(désactivé)'}
+            </button>
+            <button
+              type="button"
+              onClick={() => updateVisualOption('bulletStyle', visualOptions.bulletStyle === 'round' ? 'dash' : 'round')}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Puces : {visualOptions.bulletStyle === 'round' ? 'rondes' : 'tirets'}
+            </button>
+            <button
+              type="button"
+              onClick={() => updateVisualOption('calloutStyle', visualOptions.calloutStyle === 'full-tint' ? 'left-border' : 'full-tint')}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              Encadrés : {visualOptions.calloutStyle === 'full-tint' ? 'fond teinté' : 'bordure gauche'}
+            </button>
+          </div>
+
+          <div className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5">
+            {tenantLogoUrl ? (
+              <img src={tenantLogoUrl} alt="Logo de l'entreprise" className="h-8 w-auto shrink-0 rounded bg-white object-contain p-0.5" />
+            ) : (
+              <span className="text-xs text-slate-400">Aucun logo configuré</span>
+            )}
+            <p className="text-xs text-slate-500">
+              Le logo affiché dans l'export Word est celui de l'entreprise —{' '}
+              <Link to="/settings?tab=company" className="font-medium text-primary hover:text-primary-700">
+                le changer
+              </Link>
+              .
+            </p>
+          </div>
+
+          {previewError && <p className="text-sm text-red-600">{previewError}</p>}
+
+          <button
+            type="button"
+            onClick={handlePreview}
+            disabled={previewing}
+            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            {previewing ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            {previewing ? 'Génération...' : 'Aperçu Word'}
+          </button>
         </div>
-      )}
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Gabarit des procédures</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Les sections définies ici s'affichent, dans cet ordre, à la rédaction de chaque procédure. Les
-          champs Objet, Domaine d'application et Responsabilités sont toujours présents et n'ont pas besoin
-          d'être ajoutés ici. Tant que rien n'a été enregistré, un point de départ minimal est proposé
-          ci-dessous — renommez, complétez ou supprimez-le librement avant de l'enregistrer.
+          Les sections définies ici s'affichent, dans cet ordre, à la rédaction de chaque procédure — librement
+          ajoutées/renommées/réordonnées/supprimées ensuite pour chaque procédure. Tant que rien n'a été enregistré,
+          un point de départ minimal est proposé ci-dessous.
         </p>
 
         {error && (

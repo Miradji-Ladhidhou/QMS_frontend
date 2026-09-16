@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Loader2, Settings as SettingsIcon, X } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { useProcedureFullDraftJob } from '../lib/useProcedureFullDraftJob.js';
 import AutoTextarea from './AutoTextarea.jsx';
 
@@ -24,15 +23,7 @@ import AutoTextarea from './AutoTextarea.jsx';
 // si une génération est en cours, pour ne pas perdre la progression sans prévenir).
 export default function NewProcedureFullDraftModal({ template, onClose, onGenerated }) {
   const [subject, setSubject] = useState('');
-  const [presets, setPresets] = useState([]);
   const { job, starting, error, isRunning, progress, start } = useProcedureFullDraftJob();
-
-  useEffect(() => {
-    api
-      .get('/procedure-templates/presets')
-      .then(({ data }) => setPresets(data))
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (job?.status === 'completed') onGenerated?.(job.result.title || subject, job.result);
@@ -47,7 +38,6 @@ export default function NewProcedureFullDraftModal({ template, onClose, onGenera
   }
 
   const canGenerate = subject.trim().length >= 3;
-  const activePreset = presets.find((p) => p.id === template?.active_preset_id);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
@@ -78,8 +68,12 @@ export default function NewProcedureFullDraftModal({ template, onClose, onGenera
         </div>
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm">
-          <span className="text-slate-600">
-            Style de gabarit : <span className="font-medium text-slate-800">{activePreset?.name || 'gabarit personnalisé'}</span>
+          <span className="flex items-center gap-2 text-slate-600">
+            <span
+              className="h-3 w-3 shrink-0 rounded-full border border-slate-300"
+              style={{ backgroundColor: template?.accent_color || '#44546A' }}
+            />
+            Style du document exporté
           </span>
           <Link
             to="/settings?tab=procedures"
