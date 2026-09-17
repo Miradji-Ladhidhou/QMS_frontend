@@ -1,6 +1,9 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { supabase } from './lib/supabase.js';
+import { CurrentUserProvider } from './lib/CurrentUserProvider.jsx';
+import { TenantProvider } from './lib/TenantProvider.jsx';
+import { MenuVisibilityProvider } from './lib/MenuVisibilityProvider.jsx';
 import Layout from './components/Layout.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
@@ -112,56 +115,67 @@ export default function App() {
       <CookieNotice />
       <Suspense fallback={<RouteFallback />}>
         {session ? (
-          <Routes>
-            <Route path="/login" element={<Navigate to="/" replace />} />
-            <Route path="/register" element={<Navigate to="/" replace />} />
-            <Route path="/reset-password" element={<ResetPassword />} />
-            <Route path="/legal/cgu" element={<LegalTerms />} />
-            <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
-            <Route path="/super-admin" element={<SuperAdmin />} />
-            <Route path="/" element={<Layout />}>
-              <Route index element={<Dashboard />} />
-              <Route path="planning" element={<Planning />} />
-              <Route path="documents" element={<DocumentsHub />} />
-              <Route path="documents/:id" element={<DocumentDetail />} />
-              <Route path="capas" element={<ImprovementActions />} />
-              <Route path="capas/:id" element={<CapaDetail />} />
-              <Route path="complaints" element={<CustomerFeedback />} />
-              <Route path="complaints/:id" element={<ComplaintDetail />} />
-              <Route path="trainings" element={<HumanResources />} />
-              <Route path="trainings/matrix" element={<SkillMatrix />} />
-              <Route path="kpis" element={<Kpis />} />
-              <Route path="qqoqccp" element={<ImprovementActions />} />
-              <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
-              <Route path="audits" element={<QmsOversight />} />
-              <Route path="audits/:id" element={<AuditDetail />} />
-              <Route path="risks" element={<RiskManagement />} />
-              <Route path="risks/:id" element={<RiskDetail />} />
-              <Route path="accidents" element={<Incidents />} />
-              <Route path="accidents/:id" element={<AccidentDetail />} />
-              <Route path="pdca" element={<ImprovementActions />} />
-              <Route path="pdca/:id" element={<PdcaDetail />} />
-              <Route path="nonconforming-outputs" element={<Incidents />} />
-              <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
-              <Route path="customer-satisfaction" element={<CustomerFeedback />} />
-              <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />
-              <Route path="haccp" element={<RiskManagement />} />
-              <Route path="haccp/:id" element={<HaccpDetail />} />
-              <Route path="suppliers" element={<Suppliers />} />
-              <Route path="suppliers/:id" element={<SupplierDetail />} />
-              <Route path="management-reviews" element={<QmsOversight />} />
-              <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
-              <Route path="procedures" element={<DocumentsHub />} />
-              <Route path="procedures/:id" element={<ProcedureDetail />} />
-              <Route path="settings" element={<Settings />} />
-              <Route path="quality-policy" element={<DocumentsHub />} />
-              <Route path="services" element={<Services />} />
-              <Route path="employees" element={<HumanResources />} />
-              <Route path="my-approvals" element={<DocumentsHub />} />
-              <Route path="prise-en-main" element={<GettingStarted />} />
-            </Route>
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+          // Un seul GET /users me, /tenant et /tenant/menu pour toute la session (voir
+          // CurrentUserProvider.jsx, TenantProvider.jsx, MenuVisibilityProvider.jsx) : avant,
+          // chaque page (et Layout.jsx lui-même) refaisait indépendamment ces 3 appels à chaque
+          // montage, donc à chaque navigation — c'était la première cause des pages qui
+          // "saccadaient" au chargement (bug réel constaté).
+          <CurrentUserProvider>
+            <TenantProvider>
+              <MenuVisibilityProvider>
+                <Routes>
+                  <Route path="/login" element={<Navigate to="/" replace />} />
+                  <Route path="/register" element={<Navigate to="/" replace />} />
+                  <Route path="/reset-password" element={<ResetPassword />} />
+                  <Route path="/legal/cgu" element={<LegalTerms />} />
+                  <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
+                  <Route path="/super-admin" element={<SuperAdmin />} />
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<Dashboard />} />
+                    <Route path="planning" element={<Planning />} />
+                    <Route path="documents" element={<DocumentsHub />} />
+                    <Route path="documents/:id" element={<DocumentDetail />} />
+                    <Route path="capas" element={<ImprovementActions />} />
+                    <Route path="capas/:id" element={<CapaDetail />} />
+                    <Route path="complaints" element={<CustomerFeedback />} />
+                    <Route path="complaints/:id" element={<ComplaintDetail />} />
+                    <Route path="trainings" element={<HumanResources />} />
+                    <Route path="trainings/matrix" element={<SkillMatrix />} />
+                    <Route path="kpis" element={<Kpis />} />
+                    <Route path="qqoqccp" element={<ImprovementActions />} />
+                    <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
+                    <Route path="audits" element={<QmsOversight />} />
+                    <Route path="audits/:id" element={<AuditDetail />} />
+                    <Route path="risks" element={<RiskManagement />} />
+                    <Route path="risks/:id" element={<RiskDetail />} />
+                    <Route path="accidents" element={<Incidents />} />
+                    <Route path="accidents/:id" element={<AccidentDetail />} />
+                    <Route path="pdca" element={<ImprovementActions />} />
+                    <Route path="pdca/:id" element={<PdcaDetail />} />
+                    <Route path="nonconforming-outputs" element={<Incidents />} />
+                    <Route path="nonconforming-outputs/:id" element={<NonconformingOutputDetail />} />
+                    <Route path="customer-satisfaction" element={<CustomerFeedback />} />
+                    <Route path="customer-satisfaction/:id" element={<CustomerSatisfactionDetail />} />
+                    <Route path="haccp" element={<RiskManagement />} />
+                    <Route path="haccp/:id" element={<HaccpDetail />} />
+                    <Route path="suppliers" element={<Suppliers />} />
+                    <Route path="suppliers/:id" element={<SupplierDetail />} />
+                    <Route path="management-reviews" element={<QmsOversight />} />
+                    <Route path="management-reviews/:id" element={<ManagementReviewDetail />} />
+                    <Route path="procedures" element={<DocumentsHub />} />
+                    <Route path="procedures/:id" element={<ProcedureDetail />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="quality-policy" element={<DocumentsHub />} />
+                    <Route path="services" element={<Services />} />
+                    <Route path="employees" element={<HumanResources />} />
+                    <Route path="my-approvals" element={<DocumentsHub />} />
+                    <Route path="prise-en-main" element={<GettingStarted />} />
+                  </Route>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </MenuVisibilityProvider>
+            </TenantProvider>
+          </CurrentUserProvider>
         ) : (
           <Routes>
             <Route path="/login" element={<Login />} />
