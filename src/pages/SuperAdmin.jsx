@@ -2,10 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import {
   Activity,
+  AlertTriangle,
   ArrowLeft,
   Ban,
   Building2,
   CheckCircle2,
+  Clock,
   Cloud,
   Database,
   Download,
@@ -746,6 +748,15 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
             </div>
 
             <div>
+              <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Connexion Google Drive</h3>
+              {detail.drive_connection ? (
+                <DriveConnectionStatus connection={detail.drive_connection} />
+              ) : (
+                <p className="text-sm text-slate-400">Aucune connexion Google Drive configurée pour ce tenant.</p>
+              )}
+            </div>
+
+            <div>
               <div className="mb-2 flex items-center justify-between">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                   Utilisateurs ({detail.users.length})
@@ -1142,6 +1153,44 @@ function formatBytes(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(2)} Mo`;
 }
 
+// driveTokenRefreshJob tourne toutes les 15 minutes (voir jobs/driveTokenRefreshJob.js) : au-delà
+// d'1h (large marge) sans rafraîchissement réussi du jeton d'accès pour un tenant encore actif,
+// le rafraîchissement échoue probablement en silence pour CE tenant précis (jeton révoqué côté
+// Google) — signalé en orange plutôt qu'enfoui dans les logs Render.
+const DRIVE_TOKEN_STALE_THRESHOLD_MS = 60 * 60 * 1000;
+
+// Diagnostic de connexion Google Drive d'UN tenant (voir GET /super-admin/tenants/:id côté
+// backend, fiche détaillée) — pour un ticket "mes exports Drive ne partent plus" sans avoir à
+// interroger la base directement. Jamais les jetons eux-mêmes (le backend ne les renvoie déjà
+// pas), seulement de quoi diagnostiquer.
+function DriveConnectionStatus({ connection }) {
+  const isStale = connection.is_active && Date.now() - new Date(connection.updated_at).getTime() > DRIVE_TOKEN_STALE_THRESHOLD_MS;
+  return (
+    <div className={`rounded-md border p-3 text-sm ${isStale ? 'border-amber-300 bg-amber-50' : 'border-slate-200 bg-slate-50'}`}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="font-medium text-slate-800">{connection.google_email}</p>
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-xs font-medium ${
+            connection.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-600'
+          }`}
+        >
+          {connection.is_active ? 'Active' : 'Déconnectée'}
+        </span>
+      </div>
+      <p className="mt-1 text-xs text-slate-500">
+        Connectée par {connection.connected_by_name || 'un compte supprimé'} le {formatDateTime(connection.created_at)}
+      </p>
+      <p className="mt-0.5 text-xs text-slate-500">Dernier rafraîchissement réussi du jeton : {formatDateTime(connection.updated_at)}</p>
+      {isStale && (
+        <p className="mt-1.5 text-xs font-medium text-amber-700">
+          Plus d'1h sans rafraîchissement réussi — la connexion Google a probablement été révoquée. Le prochain export Drive
+          de ce tenant échouera tant qu'il ne se reconnecte pas.
+        </p>
+      )}
+    </div>
+  );
+}
+
 // La sauvegarde locale automatique tourne tous les jours à 2h (voir backupJob.js) : au-delà de
 // 26h (marge au-delà des 24h attendues) sans nouvelle sauvegarde, le job planifié est
 // probablement en échec silencieux — signalé en orange plutôt qu'enfoui dans les logs Render.
@@ -1185,14 +1234,157 @@ function BackupStatusPanel({ status }) {
   );
 }
 
+// Noms techniques (job_name, voir jobs/*.js côté backend) -> libellé lisible pour le support.
+const JOB_LABELS = {
+  notificationJob: 'Notifications quotidiennes (échéances CAPA, formations, procédures...)',
+  backupJob: 'Sauvegarde automatique de la base de données',
+  driveTokenRefreshJob: 'Rafraîchissement des jetons Google Drive',
+  dashboardSnapshotJob: 'Instantané quotidien du tableau de bord',
+  moduleKpiJob: 'Recalcul quotidien des KPI de module',
+};
+
+const JOB_STATUS_STYLES = {
+  success: { icon: CheckCircle2, badge: 'border-emerald-200 bg-emerald-50 text-emerald-700', label: 'OK' },
+  partial: { icon: AlertTriangle, badge: 'border-amber-200 bg-amber-50 text-amber-700', label: 'Partiel' },
+  failed: { icon: XCircle, badge: 'border-red-200 bg-red-50 text-red-700', label: 'Échec' },
+  running: { icon: Clock, badge: 'border-slate-200 bg-slate-50 text-slate-600', label: 'En cours' },
+  never_run: { icon: Clock, badge: 'border-slate-200 bg-slate-50 text-slate-400', label: 'Jamais exécuté' },
+};
+
+// Dernière exécution de chaque tâche planifiée (voir GET /super-admin/job-runs,
+// services/jobRunTracker.js côté backend) — avant ça, un job en échec ne laissait de trace que
+// dans les logs bruts de l'hébergeur, invisible depuis l'app : un tenant qui dit "je ne reçois
+// plus mes notifications" ne pouvait pas être diagnostiqué sans aller les chercher à la main.
+function JobRunsPanel({ runs }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+          <Activity size={16} className="text-slate-400" />
+          Tâches planifiées
+        </h3>
+      </div>
+      <ul className="divide-y divide-slate-100">
+        {runs.map((run) => {
+          const style = JOB_STATUS_STYLES[run.status] || JOB_STATUS_STYLES.never_run;
+          const Icon = style.icon;
+          return (
+            <li key={run.job_name} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-slate-800">{JOB_LABELS[run.job_name] || run.job_name}</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  {run.started_at ? formatDateTime(run.started_at) : 'Jamais exécuté'}
+                  {run.summary ? ` · ${run.summary}` : ''}
+                </p>
+                {run.status === 'failed' && run.error && <p className="mt-0.5 break-all text-xs text-red-600">{run.error}</p>}
+              </div>
+              <span className={`flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${style.badge}`}>
+                <Icon size={12} />
+                {style.label}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// feature (voir chaque site d'appel dans services/groq.js côté backend) -> libellé lisible.
+const AI_FEATURE_LABELS = {
+  qqoqccp: 'Analyse QQOQCCP',
+  capa_suggestion: 'Suggestion CAPA',
+  haccp_hazard: 'HACCP — danger',
+  haccp_significance: 'HACCP — significativité',
+  haccp_ccp: 'HACCP — CCP',
+  risk_suggestion: 'Suggestion de risque',
+  risk_treatment: 'Traitement de risque',
+  pdca_phase: 'Phase PDCA',
+  procedure_draft: 'Brouillon de procédure',
+  procedure_draft_from_qqoqccp: 'Brouillon de procédure (depuis QQOQCCP)',
+  procedure_compliance_check: 'Vérification de conformité',
+  procedure_compliance_fix: 'Correction de conformité',
+  procedure_distribution_sheet: 'Fiche de diffusion',
+  procedure_version_comparison: 'Comparaison de versions',
+  procedure_revision_from_capa: 'Révision de procédure (depuis CAPA)',
+  procedure_full_plan: 'Génération complète — plan',
+  procedure_subsection: 'Génération complète — sous-section',
+};
+
+const AI_CATEGORY_LABELS = {
+  rate_limit: 'Quota dépassé',
+  auth: 'Authentification',
+  timeout: 'Délai dépassé',
+  network: 'Réseau',
+  empty_response: 'Réponse vide',
+  malformed_response: 'Réponse mal formée',
+  unexpected: 'Imprévu',
+};
+
+// Appels IA (Groq) en échec les plus récents, avec le tenant résolu (voir GET
+// /super-admin/ai-failures, services/groq.js#logAiFailure côté backend) — avant ça, un échec IA
+// ne partait qu'en console.error, invisible depuis l'app : un tenant qui dit "l'IA ne marche
+// pas" ne pouvait pas être diagnostiqué sans lui demander de reproduire devant vous.
+function AiFailuresPanel({ failures }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white">
+      <div className="border-b border-slate-200 px-4 py-3">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+          <AlertTriangle size={16} className="text-slate-400" />
+          Échecs IA récents
+        </h3>
+      </div>
+      <ul className="divide-y divide-slate-100">
+        {failures.map((failure) => (
+          <li key={failure.id} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-slate-800">
+                {AI_FEATURE_LABELS[failure.feature] || failure.feature}
+                {failure.tenant && <span className="font-normal text-slate-500"> · {failure.tenant.name}</span>}
+              </p>
+              <p className="mt-0.5 text-xs text-slate-500">{formatDateTime(failure.created_at)}</p>
+              {failure.message && <p className="mt-0.5 break-all text-xs text-slate-500">{failure.message}</p>}
+            </div>
+            <span className="flex shrink-0 items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+              {AI_CATEGORY_LABELS[failure.category] || failure.category}
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 function SystemTab() {
   const [driveBackups, setDriveBackups] = useState([]);
   const [loadingDriveBackups, setLoadingDriveBackups] = useState(false);
   const [driveError, setDriveError] = useState('');
   const [backupStatus, setBackupStatus] = useState(null);
+  const [jobRuns, setJobRuns] = useState([]);
+  const [aiFailures, setAiFailures] = useState([]);
   const [busyAction, setBusyAction] = useState('');
   const [message, setMessage] = useState(null);
   const [pendingRestoreFile, setPendingRestoreFile] = useState(null);
+
+  // Dernière exécution de chaque tâche planifiée (voir JobRunsPanel ci-dessus) — même
+  // principe que loadBackupStatus juste en dessous : repérer une panne silencieuse sans
+  // avoir à éplucher les logs bruts de l'hébergeur.
+  function loadJobRuns() {
+    api
+      .get('/super-admin/job-runs')
+      .then(({ data }) => setJobRuns(data))
+      .catch(() => setJobRuns([]));
+  }
+
+  // Appels IA en échec les plus récents (voir AiFailuresPanel ci-dessus) — limité aux 10 plus
+  // récents ici (la route en renvoie jusqu'à 50 par défaut) : ce panneau est un aperçu rapide,
+  // pas un historique complet à faire défiler.
+  function loadAiFailures() {
+    api
+      .get('/super-admin/ai-failures?limit=10')
+      .then(({ data }) => setAiFailures(data))
+      .catch(() => setAiFailures([]));
+  }
 
   function loadDriveBackups() {
     setLoadingDriveBackups(true);
@@ -1217,6 +1409,8 @@ function SystemTab() {
   useEffect(() => {
     loadDriveBackups();
     loadBackupStatus();
+    loadJobRuns();
+    loadAiFailures();
   }, []);
 
   async function handleManualBackup() {
@@ -1292,6 +1486,10 @@ function SystemTab() {
         sauvegarde de sécurité est prise automatiquement juste avant chaque restauration. Sauvegarde locale
         automatique tous les jours à 2h.
       </p>
+
+      {jobRuns.length > 0 && <JobRunsPanel runs={jobRuns} />}
+
+      {aiFailures.length > 0 && <AiFailuresPanel failures={aiFailures} />}
 
       {backupStatus && <BackupStatusPanel status={backupStatus} />}
 
