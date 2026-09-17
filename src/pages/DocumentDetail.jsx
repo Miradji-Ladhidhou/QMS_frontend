@@ -20,6 +20,8 @@ import {
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useUsers } from '../lib/useUsers.js';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { STATUS_LABELS as DOCUMENT_STATUS_LABELS } from '../lib/documentStatus.js';
@@ -502,8 +504,8 @@ export default function DocumentDetail() {
   const goBack = useSmartBack('/documents');
   const tenant = useTenant();
   const [doc, setDoc] = useState(null);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState([]);
+  const currentUser = useCurrentUser();
+  const users = useUsers();
   const [auditLog, setAuditLog] = useState([]);
   const [activeTab, setActiveTab] = useState('details');
   const [loading, setLoading] = useState(true);
@@ -545,14 +547,6 @@ export default function DocumentDetail() {
 
   useEffect(() => {
     loadDocument();
-    api
-      .get('/users/me')
-      .then(({ data }) => setCurrentUser(data))
-      .catch(() => {});
-    api
-      .get('/users')
-      .then(({ data }) => setUsers(data))
-      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 

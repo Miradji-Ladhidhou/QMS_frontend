@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Share2, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 
 const ROLE_LABELS = { manager: 'Managers', member: 'Membres' };
 
@@ -18,7 +19,7 @@ function nonAdminUsers(users) {
 export default function ShareRecordPanel({ resourceType, resourceId, compact = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [shares, setShares] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = nonAdminUsers(useUsers());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [subjectType, setSubjectType] = useState('user');
@@ -29,13 +30,10 @@ export default function ShareRecordPanel({ resourceType, resourceId, compact = f
   function loadShares() {
     setLoading(true);
     setError('');
-    Promise.all([
-      api.get('/shares', { params: { resource_type: resourceType, resource_id: resourceId } }),
-      api.get('/users'),
-    ])
-      .then(([{ data: shareData }, { data: userData }]) => {
+    api
+      .get('/shares', { params: { resource_type: resourceType, resource_id: resourceId } })
+      .then(({ data: shareData }) => {
         setShares(shareData);
-        setUsers(nonAdminUsers(userData));
       })
       .catch(() => setError('Impossible de récupérer les partages.'))
       .finally(() => setLoading(false));

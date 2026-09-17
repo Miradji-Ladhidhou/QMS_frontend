@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, FileCheck, Loader2, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -343,7 +344,7 @@ export default function QqoqccpDetail() {
   const [priorityTouched, setPriorityTouched] = useState(false);
   const [dueDateTouched, setDueDateTouched] = useState(false);
   const [selectedActionIndex, setSelectedActionIndex] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [capaError, setCapaError] = useState('');
@@ -377,10 +378,6 @@ export default function QqoqccpDetail() {
   // nécessaires au formulaire d'ajustement — chargés d'emblée, le bouton "Passer à
   // l'ouverture de la CAPA" pouvant apparaître sur n'importe quelle analyse.
   useEffect(() => {
-    api
-      .get('/users')
-      .then(({ data }) => setUsers(data))
-      .catch(() => {});
     api
       .get('/capas/priority-delays')
       .then(({ data }) => setPriorityDelays(data))

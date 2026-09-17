@@ -44,6 +44,7 @@ import {
 } from 'recharts';
 import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
@@ -3714,7 +3715,7 @@ export default function Kpis() {
   const [folderModal, setFolderModal] = useState(null); // null fermé, 'new' création, objet dossier édition
   const [moveModal, setMoveModal] = useState(null); // le kpi en cours de déplacement, ou null
   const [categories, setCategories] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
@@ -3829,10 +3830,6 @@ export default function Kpis() {
 
   useEffect(() => {
     loadKpiCategories();
-    api
-      .get('/users')
-      .then(({ data }) => setUsers(data))
-      .catch(() => {});
   }, []);
 
 

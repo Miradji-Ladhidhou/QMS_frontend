@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronDown, ChevronUp, Download, Loader2, Plus, Trash2 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useTenant } from '../lib/useTenant.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import { postForWordDownload } from '../lib/pdfExport.js';
 import AutoTextarea from './AutoTextarea.jsx';
@@ -28,11 +29,12 @@ function slugify(label) {
 // procédures : remplace les 4 presets figés d'origine par une personnalisation directe). Une
 // seule ligne (PUT upsert onConflict tenant_id), pas de CRUD section par section côté API.
 export default function ProcedureTemplateSettings() {
+  const tenant = useTenant();
+  const tenantLogoUrl = getTenantLogoPublicUrl(tenant?.logo_url);
   const [sections, setSections] = useState([]);
   const [fixedInstructions, setFixedInstructions] = useState('');
   const [accentColor, setAccentColor] = useState(DEFAULT_ACCENT_COLOR);
   const [visualOptions, setVisualOptions] = useState(DEFAULT_VISUAL_OPTIONS);
-  const [tenantLogoUrl, setTenantLogoUrl] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [previewing, setPreviewing] = useState(false);
@@ -46,12 +48,11 @@ export default function ProcedureTemplateSettings() {
       setLoading(true);
       setError('');
       try {
-        const [{ data }, { data: tenant }] = await Promise.all([api.get('/procedure-templates'), api.get('/tenant')]);
+        const { data } = await api.get('/procedure-templates');
         setSections(data.section_structure || []);
         setFixedInstructions(data.fixed_instructions || '');
         setAccentColor(data.accent_color || DEFAULT_ACCENT_COLOR);
         setVisualOptions({ ...DEFAULT_VISUAL_OPTIONS, ...(data.visual_options || {}) });
-        setTenantLogoUrl(getTenantLogoPublicUrl(tenant?.logo_url));
       } catch {
         setError('Impossible de charger le gabarit.');
       } finally {

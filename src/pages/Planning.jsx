@@ -32,6 +32,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -928,7 +929,7 @@ export default function Planning() {
 
   const [items, setItems] = useState([]);
   const [tasks, setTasks] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [employees, setEmployees] = useState([]);
   const [taskCategories, setTaskCategories] = useState([]);
   const [allServices, setAllServices] = useState([]);
@@ -1059,13 +1060,11 @@ export default function Planning() {
       setLoading(true);
 
       try {
-        const [usersRes, employeesRes, categoriesRes] = await Promise.all([
-          api.get('/users'),
+        const [employeesRes, categoriesRes] = await Promise.all([
           api.get('/employees'),
           api.get('/module-categories', { params: { resource_type: 'task' } }),
         ]);
         if (!cancelled) {
-          setUsers(usersRes.data);
           setEmployees(employeesRes.data.filter((employee) => employee.is_active));
           setTaskCategories(categoriesRes.data);
         }

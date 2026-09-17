@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { AlertTriangle, ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -499,7 +500,7 @@ export default function ComplaintDetail() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [complaint, setComplaint] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -522,7 +523,6 @@ export default function ComplaintDetail() {
 
   useEffect(() => {
     loadComplaint();
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {});
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))

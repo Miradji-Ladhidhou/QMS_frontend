@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
@@ -59,6 +59,20 @@ function useNow() {
   }, []);
 
   return now;
+}
+
+// Repli de <Suspense> autour du SEUL <Outlet/> (voir plus bas) plutôt que de toute l'appli
+// (comme avant, dans App.jsx) : sans ce changement, la première visite de chaque page encore
+// jamais chargée dans la session faisait disparaître tout le menu latéral (Layout entier
+// démonté par Suspense) pour le remplacer par "Chargement...", avant de tout redessiner — une
+// des principales causes des pages qui "saccadaient" (bug réel constaté). Ici, seule la zone
+// de contenu affiche cette barre pendant que le menu reste visible et cliquable.
+function ContentLoading() {
+  return (
+    <div className="relative h-1 overflow-hidden rounded-full bg-primary-100">
+      <div className="route-loading-bar absolute inset-y-0 left-0 w-1/3 rounded-full bg-primary" />
+    </div>
+  );
 }
 
 function initialsOf(fullName) {
@@ -538,7 +552,11 @@ export default function Layout() {
       </aside>
 
       <main className="min-w-0 flex-1 px-4 py-4 sm:px-6 md:px-8 md:py-6">
-        <Outlet />
+        <Suspense fallback={<ContentLoading />}>
+          <div key={location.pathname} className="page-transition">
+            <Outlet />
+          </div>
+        </Suspense>
       </main>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Eye, Loader2 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { NAV_ITEMS } from './Layout.jsx';
 
 const ROLE_COLUMNS = [
@@ -21,7 +22,7 @@ export default function MenuVisibilitySettings() {
   const [items, setItems] = useState([]);
   const [roleHidden, setRoleHidden] = useState({});
   const [userOverrides, setUserOverrides] = useState({});
-  const [users, setUsers] = useState([]);
+  const users = nonAdminUsers(useUsers());
   const [selectedUserId, setSelectedUserId] = useState('');
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -30,12 +31,12 @@ export default function MenuVisibilitySettings() {
   useEffect(() => {
     setLoading(true);
     setError('');
-    Promise.all([api.get('/tenant/menu-settings'), api.get('/users')])
-      .then(([{ data: settings }, { data: allUsers }]) => {
+    api
+      .get('/tenant/menu-settings')
+      .then(({ data: settings }) => {
         setItems(settings.items);
         setRoleHidden(settings.role_hidden_items || {});
         setUserOverrides(settings.user_overrides || {});
-        setUsers(nonAdminUsers(allUsers));
       })
       .catch(() => setError('Impossible de récupérer les réglages de visibilité.'))
       .finally(() => setLoading(false));

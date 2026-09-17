@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Download, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -873,7 +874,7 @@ export default function HaccpDetail() {
   const canManage = isManagerRole(currentUser?.role);
   const [plan, setPlan] = useState(null);
   const [services, setServices] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -900,7 +901,6 @@ export default function HaccpDetail() {
   useEffect(() => {
     loadPlan();
     api.get('/services').then(({ data }) => setServices(data.filter((service) => service.is_active))).catch(() => {});
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {});
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);

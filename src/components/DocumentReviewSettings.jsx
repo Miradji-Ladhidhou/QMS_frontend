@@ -1,26 +1,29 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Save } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useTenant } from '../lib/useTenant.js';
 
 // Même principe que CapaDelaysSettings.jsx (un délai paramétrable par tenant), mais une seule
 // valeur ici plutôt qu'une par niveau — la fréquence de révision documentaire ne varie pas par
 // gravité, contrairement au traitement d'une CAPA. Stockée sur tenants (voir GET/PATCH /tenant)
-// plutôt qu'une table dédiée, puisque c'est un scalaire unique.
+// plutôt qu'une table dédiée, puisque c'est un scalaire unique. Lit le contexte partagé (voir
+// TenantProvider.jsx) plutôt que son propre GET /tenant redondant — `months` reste un état
+// local, initialisé une seule fois dès que le tenant partagé devient disponible.
 export default function DocumentReviewSettings() {
+  const tenant = useTenant();
   const [months, setMonths] = useState('');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [backfilledCount, setBackfilledCount] = useState(0);
+  const seededRef = useRef(false);
 
   useEffect(() => {
-    api
-      .get('/tenant')
-      .then(({ data }) => setMonths(data.document_review_frequency_months || ''))
-      .catch(() => setError('Impossible de charger le paramétrage.'))
-      .finally(() => setLoading(false));
-  }, []);
+    if (tenant && !seededRef.current) {
+      seededRef.current = true;
+      setMonths(tenant.document_review_frequency_months || '');
+    }
+  }, [tenant]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -32,6 +35,7 @@ export default function DocumentReviewSettings() {
       const { data } = await api.patch('/tenant', { document_review_frequency_months: months || null });
       setMonths(data.document_review_frequency_months || '');
       setBackfilledCount(data.backfilled_review_dates_count || 0);
+      window.dispatchEvent(new CustomEvent('tenant-updated', { detail: data }));
       setSaved(true);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible d’enregistrer le paramétrage.');
@@ -40,7 +44,7 @@ export default function DocumentReviewSettings() {
     }
   }
 
-  if (loading) {
+  if (!tenant) {
     return <div className="h-32 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
 

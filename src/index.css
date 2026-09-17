@@ -1,3 +1,51 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Transition douce entre pages (voir Layout.jsx#Outlet) — remplace le passage instantané et
+   abrupt d'une page à l'autre par un léger fondu, pour que même un changement de contenu très
+   rapide (une fois les requêtes redondantes éliminées, voir CurrentUserProvider.jsx) se
+   perçoive comme fluide plutôt que comme un "saut". Rejoué à chaque navigation grâce à
+   key={location.pathname} sur le conteneur qui porte cette classe. */
+@keyframes page-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.page-transition {
+  animation: page-fade-in 200ms ease-out;
+}
+
+/* Barre de progression fine en haut de la zone de contenu pendant le chargement d'un chunk de
+   page (voir Layout.jsx#ContentLoading) — remplace un "Chargement..." qui occupait tout
+   l'espace par un indice discret, pendant que le menu latéral reste affiché et cliquable. */
+@keyframes route-loading-bar {
+  0% {
+    transform: translateX(-100%);
+  }
+  50% {
+    transform: translateX(20%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.route-loading-bar {
+  animation: route-loading-bar 1.1s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-transition {
+    animation: none;
+  }
+  .route-loading-bar {
+    animation: none;
+  }
+}

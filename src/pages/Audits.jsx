@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -235,7 +236,7 @@ export default function Audits() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [audits, setAudits] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -300,13 +301,11 @@ export default function Audits() {
     setLoading(true);
     setError('');
     try {
-      const [auditsRes, usersRes, servicesRes] = await Promise.all([
+      const [auditsRes, servicesRes] = await Promise.all([
         api.get('/audits', { params: statusFilter ? { status: statusFilter } : {} }),
-        api.get('/users'),
         api.get('/services'),
       ]);
       setAudits(auditsRes.data);
-      setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
     } catch {
       setError('Impossible de charger les audits.');

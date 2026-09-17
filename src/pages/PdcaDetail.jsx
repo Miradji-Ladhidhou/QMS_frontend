@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { PDCA_PHASES, PDCA_STATUS_LABELS } from '../lib/pdcaStatus.js';
@@ -523,7 +524,7 @@ export default function PdcaDetail() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [pdca, setPdca] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -552,7 +553,6 @@ export default function PdcaDetail() {
 
   useEffect(() => {
     loadPdca();
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {});
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))

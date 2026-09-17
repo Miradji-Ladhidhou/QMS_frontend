@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Upload } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useTenant } from '../lib/useTenant.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 
 // Liste complète des fuseaux IANA fournie par le navigateur — évite de maintenir une liste à
@@ -8,33 +9,27 @@ import { getTenantLogoPublicUrl } from '../lib/storage.js';
 const TIMEZONES = typeof Intl.supportedValuesOf === 'function' ? Intl.supportedValuesOf('timeZone') : ['UTC'];
 
 export default function CompanySettings({ isAdmin }) {
-  const [tenant, setTenant] = useState(null);
+  // Lit le contexte partagé (voir TenantProvider.jsx) plutôt que son propre GET /tenant
+  // redondant — le formulaire (name/timezone) reste un état local distinct, initialisé UNE
+  // SEULE fois dès que le tenant partagé devient disponible (seededRef), jamais à chaque
+  // changement de `tenant` : une modification survenue ailleurs (un autre onglet/admin)
+  // pendant une saisie en cours ici ne doit pas écraser une édition non enregistrée.
+  const tenant = useTenant();
   const [name, setName] = useState('');
   const [timezone, setTimezone] = useState('UTC');
-  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [savingName, setSavingName] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
-
-  async function loadTenant() {
-    setLoading(true);
-    setError('');
-    try {
-      const { data } = await api.get('/tenant');
-      setTenant(data);
-      setName(data.name);
-      setTimezone(data.timezone || 'UTC');
-    } catch {
-      setError("Impossible de charger les informations de l'entreprise.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const seededRef = useRef(false);
 
   useEffect(() => {
-    loadTenant();
-  }, []);
+    if (tenant && !seededRef.current) {
+      seededRef.current = true;
+      setName(tenant.name);
+      setTimezone(tenant.timezone || 'UTC');
+    }
+  }, [tenant]);
 
   async function handleNameSubmit(event) {
     event.preventDefault();
@@ -44,10 +39,10 @@ export default function CompanySettings({ isAdmin }) {
 
     try {
       const { data } = await api.patch('/tenant', { name, timezone });
-      setTenant(data);
-      // useTenant() (Layout.jsx, horloge du menu) ne recharge pas tout seul après ce PATCH —
-      // ce broadcast le prévient explicitement, sinon le fuseau affiché reste l'ancien tant
-      // qu'aucune navigation ne remonte le composant.
+      // TenantProvider.jsx (contexte partagé lu par useTenant() partout dans l'appli, dont ce
+      // composant lui-même) ne recharge pas tout seul après ce PATCH — ce broadcast le prévient
+      // explicitement, sinon le fuseau affiché reste l'ancien tant qu'aucune navigation ne
+      // remonte le Provider.
       window.dispatchEvent(new CustomEvent('tenant-updated', { detail: data }));
       setSuccess('Informations mises à jour.');
     } catch (err) {
@@ -69,7 +64,7 @@ export default function CompanySettings({ isAdmin }) {
       const formData = new FormData();
       formData.append('file', file);
       const { data } = await api.post('/tenant/logo', formData);
-      setTenant(data);
+      window.dispatchEvent(new CustomEvent('tenant-updated', { detail: data }));
       setSuccess('Logo mis à jour.');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le logo.');
@@ -79,7 +74,7 @@ export default function CompanySettings({ isAdmin }) {
     }
   }
 
-  if (loading) {
+  if (!tenant) {
     return <div className="h-32 animate-pulse rounded-xl border border-slate-200 bg-white" />;
   }
 

@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
@@ -240,7 +241,7 @@ export default function AuditDetail() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [audit, setAudit] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -267,7 +268,6 @@ export default function AuditDetail() {
 
   useEffect(() => {
     loadAudit();
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {});
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))

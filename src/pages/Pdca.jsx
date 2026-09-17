@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, FolderCog, FolderInput, FolderPlus, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -235,7 +236,7 @@ export default function Pdca() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [projects, setProjects] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [searchText, setSearchText] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -305,13 +306,11 @@ export default function Pdca() {
       const params = {};
       if (statusFilter) params.status = statusFilter;
       if (serviceFilter) params.service_id = serviceFilter;
-      const [pdcaRes, usersRes, servicesRes] = await Promise.all([
+      const [pdcaRes, servicesRes] = await Promise.all([
         api.get('/pdca', { params }),
-        api.get('/users'),
         api.get('/services'),
       ]);
       setProjects(pdcaRes.data);
-      setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
     } catch {
       setError('Impossible de charger les projets PDCA.');

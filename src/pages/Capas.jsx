@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -697,7 +698,7 @@ export default function Capas() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [capas, setCapas] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -770,14 +771,12 @@ export default function Capas() {
     setLoading(true);
     setError('');
     try {
-      const [capasRes, usersRes, delaysRes, servicesRes] = await Promise.all([
+      const [capasRes, delaysRes, servicesRes] = await Promise.all([
         api.get('/capas'),
-        api.get('/users'),
         api.get('/capas/priority-delays'),
         api.get('/services'),
       ]);
       setCapas(capasRes.data);
-      setUsers(usersRes.data);
       setPriorityDelays(delaysRes.data);
       // GET /services renvoie aussi les services désactivés (nécessaire à la page de
       // gestion) — un formulaire de création ne doit proposer que les actifs.

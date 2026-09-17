@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderCog, FolderInput, FolderPlus, HeartPulse, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -334,7 +335,7 @@ export default function Accidents() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [accidents, setAccidents] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [employees, setEmployees] = useState([]);
   const [services, setServices] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
@@ -408,14 +409,12 @@ export default function Accidents() {
       if (severityFilter) params.severity = severityFilter;
       if (serviceFilter) params.service_id = serviceFilter;
       if (lostTimeFilter) params.with_lost_time = 'true';
-      const [accidentsRes, usersRes, employeesRes, servicesRes] = await Promise.all([
+      const [accidentsRes, employeesRes, servicesRes] = await Promise.all([
         api.get('/accidents', { params }),
-        api.get('/users'),
         api.get('/employees'),
         api.get('/services'),
       ]);
       setAccidents(accidentsRes.data);
-      setUsers(usersRes.data);
       setEmployees(employeesRes.data.filter((employee) => employee.is_active));
       setServices(servicesRes.data.filter((service) => service.is_active));
     } catch {

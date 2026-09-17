@@ -10,6 +10,12 @@ const USER_SORT_OPTIONS = [
   { key: 'role', label: 'rôle' },
 ];
 
+// Seul composant qui garde son propre GET /users local (pas useUsers(), voir
+// lib/UsersProvider.jsx) : c'est la vraie surface de gestion (inviter/changer un rôle/
+// désactiver/supprimer), donc son état doit rester la source de vérité immédiate pour ses
+// propres mutations optimistes. Chaque mutation réussie émet 'users-updated' pour que le
+// cache partagé (utilisé en lecture seule par une vingtaine de menus déroulants "assigné à"
+// ailleurs dans l'appli) ne reste pas périmé après un invite/changement de rôle/suppression.
 export default function UserManager({ currentUser, isAdmin }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -53,6 +59,7 @@ export default function UserManager({ currentUser, isAdmin }) {
     try {
       const { data } = await api.patch(`/users/${user.id}`, { role });
       setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, ...data } : item)));
+      window.dispatchEvent(new Event('users-updated'));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le rôle.');
     } finally {
@@ -70,6 +77,7 @@ export default function UserManager({ currentUser, isAdmin }) {
     try {
       const { data } = await api.patch(`/users/${user.id}`, { job_title: jobTitle || null });
       setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, ...data } : item)));
+      window.dispatchEvent(new Event('users-updated'));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour la fonction.');
     } finally {
@@ -84,6 +92,7 @@ export default function UserManager({ currentUser, isAdmin }) {
     try {
       const { data } = await api.patch(`/users/${user.id}`, { is_active: !user.is_active });
       setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, ...data } : item)));
+      window.dispatchEvent(new Event('users-updated'));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     } finally {
@@ -106,6 +115,7 @@ export default function UserManager({ currentUser, isAdmin }) {
     try {
       await api.delete(`/users/${user.id}`);
       setUsers((prev) => prev.filter((item) => item.id !== user.id));
+      window.dispatchEvent(new Event('users-updated'));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer ce compte.');
     } finally {
@@ -145,6 +155,7 @@ export default function UserManager({ currentUser, isAdmin }) {
       setInviteSuccess(`Invitation envoyée à ${data.email}.`);
       setInviteForm({ email: '', full_name: '', role: 'member' });
       setIsInviting(false);
+      window.dispatchEvent(new Event('users-updated'));
     } catch (err) {
       setInviteError(err.response?.data?.error || "Impossible d'envoyer l'invitation.");
     } finally {

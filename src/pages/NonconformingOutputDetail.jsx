@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -427,7 +428,7 @@ export default function NonconformingOutputDetail() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [output, setOutput] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -448,7 +449,6 @@ export default function NonconformingOutputDetail() {
 
   useEffect(() => {
     loadOutput();
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {});
     api
       .get('/services')
       .then(({ data }) => setServices(data.filter((service) => service.is_active)))

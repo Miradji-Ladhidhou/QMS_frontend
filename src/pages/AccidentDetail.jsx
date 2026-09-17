@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -545,7 +546,7 @@ export default function AccidentDetail() {
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [accident, setAccident] = useState(null);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [employees, setEmployees] = useState([]);
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
@@ -573,7 +574,6 @@ export default function AccidentDetail() {
 
   useEffect(() => {
     loadAccident();
-    api.get('/users').then(({ data }) => setUsers(data)).catch(() => {});
     api
       .get('/employees')
       .then(({ data }) => setEmployees(data.filter((employee) => employee.is_active)))

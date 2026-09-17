@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Trash2, UserPlus } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 
 const LEVELS = [
   { field: 'can_view', label: 'Voir' },
@@ -25,7 +26,7 @@ const DEFAULT_LEVELS = { can_view: true, can_edit: false, can_approve: false, ca
 // seule plutôt qu'un panneau cassé.
 export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categories', isAdmin = false }) {
   const [permissions, setPermissions] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -38,13 +39,11 @@ export default function CategoryPermissionsPanel({ categoryId, baseUrl = '/categ
     setLoading(true);
     setError('');
     try {
-      const [permsRes, usersRes, groupsRes] = await Promise.all([
+      const [permsRes, groupsRes] = await Promise.all([
         api.get(`${baseUrl}/${categoryId}/permissions`),
-        api.get('/users'),
         isAdmin ? api.get('/groups') : Promise.resolve({ data: [] }),
       ]);
       setPermissions(permsRes.data);
-      setUsers(usersRes.data);
       setGroups(groupsRes.data);
     } catch {
       setError("Impossible de charger les accès de cette catégorie.");

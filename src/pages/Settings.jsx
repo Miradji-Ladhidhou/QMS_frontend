@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { api } from '../lib/api.js';
+import { useState } from 'react';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
 import CompanySettings from '../components/CompanySettings.jsx';
 import UserManager from '../components/UserManager.jsx';
 import NotificationPreferences from '../components/NotificationPreferences.jsx';
@@ -46,7 +46,7 @@ const TAB_GROUPS = [
 // endroit, pas une page de configuration séparée ailleurs dans l'app").
 
 export default function Settings() {
-  const [currentUser, setCurrentUser] = useState(null);
+  const currentUser = useCurrentUser();
   // Le callback OAuth Google Drive (backend) redirige vers /settings?drive=connected|error —
   // sans ce cas particulier, l'utilisateur atterrirait sur l'onglet "Entreprise" par défaut et
   // ne verrait jamais la confirmation d'activation ni l'erreur, puisque DriveStorageSettings
@@ -63,16 +63,6 @@ export default function Settings() {
     return known ? requested : 'company';
   });
 
-  function loadCurrentUser() {
-    api
-      .get('/users/me')
-      .then(({ data }) => setCurrentUser(data))
-      .catch(() => {});
-  }
-
-  useEffect(() => {
-    loadCurrentUser();
-  }, []);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -122,7 +112,10 @@ export default function Settings() {
         )}
         {activeTab === 'visibility' && isAdmin && <MenuVisibilitySettings />}
         {activeTab === 'profile' && currentUser && (
-          <ProfileSettings currentUser={currentUser} onUpdated={(data) => setCurrentUser((prev) => ({ ...prev, ...data }))} />
+          <ProfileSettings
+            currentUser={currentUser}
+            onUpdated={(data) => window.dispatchEvent(new CustomEvent('current-user-updated', { detail: data }))}
+          />
         )}
         {activeTab === 'notifications' && <NotificationPreferences />}
       </div>

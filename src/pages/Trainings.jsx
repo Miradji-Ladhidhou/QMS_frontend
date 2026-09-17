@@ -19,6 +19,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_EFFECTIVENESS_STYLES } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -1082,7 +1083,14 @@ export default function Trainings() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [trainings, setTrainings] = useState([]);
-  const [users, setUsers] = useState([]);
+  // Cette page MODIFIE aussi les utilisateurs (training_exempt, voir handleExcluded/
+  // handleReinstate plus bas) — contrairement aux autres pages qui lisent juste useUsers()
+  // pour un menu déroulant. userOverrides applique la mutation localement pour un retour
+  // visuel immédiat, en plus de l'événement 'users-updated' qui invalide le cache partagé pour
+  // les autres pages déjà ouvertes.
+  const sharedUsers = useUsers();
+  const [userOverrides, setUserOverrides] = useState({});
+  const users = sharedUsers.map((user) => (userOverrides[user.id] ? { ...user, ...userOverrides[user.id] } : user));
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -1159,13 +1167,11 @@ export default function Trainings() {
     setLoading(true);
     setError('');
     try {
-      const [trainingsRes, usersRes, employeesRes] = await Promise.all([
+      const [trainingsRes, employeesRes] = await Promise.all([
         api.get('/trainings'),
-        api.get('/users'),
         api.get('/employees'),
       ]);
       setTrainings(trainingsRes.data);
-      setUsers(usersRes.data);
       // GET /employees renvoie aussi les inactifs (utile à la page de gestion du personnel) —
       // ce sélecteur d'enregistrement de réalisation ne doit proposer que les actifs.
       setEmployees(employeesRes.data.filter((employee) => employee.is_active));
@@ -1198,7 +1204,8 @@ export default function Trainings() {
 
   function handleExcluded(kind, updatedPerson) {
     if (kind === 'user') {
-      setUsers((prev) => prev.map((u) => (u.id === updatedPerson.id ? updatedPerson : u)));
+      setUserOverrides((prev) => ({ ...prev, [updatedPerson.id]: updatedPerson }));
+      window.dispatchEvent(new Event('users-updated'));
     } else {
       setEmployees((prev) => prev.map((e) => (e.id === updatedPerson.id ? updatedPerson : e)));
     }
@@ -1212,7 +1219,8 @@ export default function Trainings() {
         training_exempt_reason: null,
       });
       if (person.kind === 'user') {
-        setUsers((prev) => prev.map((u) => (u.id === data.id ? data : u)));
+        setUserOverrides((prev) => ({ ...prev, [data.id]: data }));
+        window.dispatchEvent(new Event('users-updated'));
       } else {
         setEmployees((prev) => prev.map((e) => (e.id === data.id ? data : e)));
       }

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderCog, FolderInput, FolderPlus, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -401,7 +402,7 @@ export default function Risks() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [risks, setRisks] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [typeFilter, setTypeFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -473,13 +474,11 @@ export default function Risks() {
       if (typeFilter) params.type = typeFilter;
       if (statusFilter) params.status = statusFilter;
       if (serviceFilter) params.service_id = serviceFilter;
-      const [risksRes, usersRes, servicesRes] = await Promise.all([
+      const [risksRes, servicesRes] = await Promise.all([
         api.get('/risks', { params }),
-        api.get('/users'),
         api.get('/services'),
       ]);
       setRisks(risksRes.data);
-      setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
     } catch {
       setError('Impossible de charger le registre des risques.');

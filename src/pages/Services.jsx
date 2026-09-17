@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { Ban, CheckCircle2, Pencil, Plus, Trash2, UserMinus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import SortSelect from '../components/SortSelect.jsx';
@@ -303,8 +304,9 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
 
 export default function Services() {
   const currentUser = useCurrentUser();
+  const users = useUsers();
+  const managers = users.filter((u) => u.role === 'manager');
   const [services, setServices] = useState([]);
-  const [managers, setManagers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -319,9 +321,8 @@ export default function Services() {
     setLoading(true);
     setError('');
     try {
-      const [{ data: servicesData }, { data: usersData }] = await Promise.all([api.get('/services'), api.get('/users')]);
-      setServices(servicesData);
-      setManagers(usersData.filter((u) => u.role === 'manager'));
+      const { data } = await api.get('/services');
+      setServices(data);
     } catch {
       setError('Impossible de charger les services.');
     } finally {

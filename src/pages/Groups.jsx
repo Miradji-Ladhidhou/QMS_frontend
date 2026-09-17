@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronDown, ChevronUp, Pencil, Plus, Trash2, UserPlus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { useSort } from '../lib/useSort.js';
 import SortSelect from '../components/SortSelect.jsx';
 
@@ -16,7 +17,7 @@ function getGroupSortValue(group, key) {
 
 export default function Groups() {
   const [groups, setGroups] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
@@ -37,9 +38,8 @@ export default function Groups() {
     setLoading(true);
     setError('');
     try {
-      const [groupsRes, usersRes] = await Promise.all([api.get('/groups'), api.get('/users')]);
-      setGroups(groupsRes.data);
-      setUsers(usersRes.data);
+      const { data } = await api.get('/groups');
+      setGroups(data);
     } catch {
       setError('Impossible de charger les groupes.');
     } finally {

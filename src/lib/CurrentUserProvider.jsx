@@ -36,9 +36,20 @@ export function CurrentUserProvider({ children }) {
 
     attempt(RETRY_DELAYS_MS.length);
 
+    // ProfileSettings.jsx (Paramètres > Profil) émet cet événement après un PATCH /users/me
+    // réussi (nom complet modifié) — sans lui, la sidebar (initiales/nom dans Layout.jsx) et
+    // toute autre page affichant currentUser.full_name garderaient l'ancienne valeur jusqu'au
+    // prochain rechargement complet. Fusion (comme l'ancien état local de Settings.jsx),
+    // jamais un remplacement : PATCH /users/me ne renvoie pas nécessairement tous les champs.
+    function onCurrentUserUpdated(event) {
+      setCurrentUser((prev) => ({ ...prev, ...event.detail }));
+    }
+    window.addEventListener('current-user-updated', onCurrentUserUpdated);
+
     return () => {
       cancelled = true;
       clearTimeout(timeoutId);
+      window.removeEventListener('current-user-updated', onCurrentUserUpdated);
     };
   }, []);
 

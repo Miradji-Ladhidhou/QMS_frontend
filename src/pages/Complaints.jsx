@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
 import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
@@ -273,7 +274,7 @@ export default function Complaints() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [complaints, setComplaints] = useState([]);
-  const [users, setUsers] = useState([]);
+  const users = useUsers();
   const [services, setServices] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -340,13 +341,11 @@ export default function Complaints() {
     setLoading(true);
     setError('');
     try {
-      const [complaintsRes, usersRes, servicesRes] = await Promise.all([
+      const [complaintsRes, servicesRes] = await Promise.all([
         api.get('/complaints', { params: statusFilter ? { status: statusFilter } : {} }),
-        api.get('/users'),
         api.get('/services'),
       ]);
       setComplaints(complaintsRes.data);
-      setUsers(usersRes.data);
       setServices(servicesRes.data.filter((service) => service.is_active));
     } catch {
       setError('Impossible de charger les réclamations.');
