@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   ArrowLeft,
@@ -3702,7 +3702,12 @@ export default function Kpis() {
   const [proofModal, setProofModal] = useState(null); // { kpi, record } — preuve derrière un point du graphique
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
-  const [currentFolderId, setCurrentFolderId] = useState(null); // null = racine
+  // Dans l'URL (?folder=...), jamais un simple useState : sinon ouvrir des dossiers imbriqués
+  // ne crée aucune entrée d'historique et le retour natif du navigateur/téléphone saute par-
+  // dessus toute la navigation (voir lib/useFolderNavigation.js, même raisonnement — Kpis.jsx
+  // garde sa propre implémentation, antérieure à ce hook partagé).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const currentFolderId = searchParams.get('folder') || null;
   const [breadcrumb, setBreadcrumb] = useState([]); // ancêtres du dossier courant, racine → courant
   const [folders, setFolders] = useState([]); // sous-dossiers directs du dossier courant
   const [foldersLoading, setFoldersLoading] = useState(true);
@@ -3833,7 +3838,15 @@ export default function Kpis() {
 
   function navigateToFolder(folderId) {
     setOpenMenuId(null);
-    setCurrentFolderId(folderId);
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (folderId) {
+        next.set('folder', folderId);
+      } else {
+        next.delete('folder');
+      }
+      return next;
+    });
   }
 
   function handleFolderSaved(folder, isEditingFolder) {
