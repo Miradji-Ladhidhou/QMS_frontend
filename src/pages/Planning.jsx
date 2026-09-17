@@ -23,6 +23,7 @@ import {
   MessageSquareWarning,
   Pencil,
   Plus,
+  RefreshCw,
   Repeat,
   Search,
   ShieldAlert,
@@ -44,6 +45,11 @@ import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
+// pdca : le backend agrège aussi les projets PDCA à échéance dans le planning (voir
+// fetchPdcaItems, services/planningItems.js) — bug réel constaté en production (crash de toute
+// la page dès qu'un tenant a un projet PDCA avec une date cible) : cette entrée manquait ici,
+// TYPE_CONFIG[item.type] valait undefined pour ce type précis. RefreshCw : même icône que
+// l'entrée "PDCA" du menu fusionné (voir ImprovementActions.jsx#TABS), pour rester cohérent.
 const TYPE_CONFIG = {
   capa: { label: 'CAPA', icon: ClipboardList, className: 'bg-blue-100 text-blue-700', dot: 'bg-blue-500' },
   document: { label: 'Document', icon: FileText, className: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
@@ -54,6 +60,7 @@ const TYPE_CONFIG = {
   complaint: { label: 'Réclamation', icon: MessageSquareWarning, className: 'bg-rose-100 text-rose-700', dot: 'bg-rose-500' },
   risk: { label: 'Risque', icon: ShieldAlert, className: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
   supplier: { label: 'Fournisseur', icon: Truck, className: 'bg-teal-100 text-teal-700', dot: 'bg-teal-500' },
+  pdca: { label: 'PDCA', icon: RefreshCw, className: 'bg-fuchsia-100 text-fuchsia-700', dot: 'bg-fuchsia-500' },
 };
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
