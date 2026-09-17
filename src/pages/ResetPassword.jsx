@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import { api } from '../lib/api.js';
 import AppLogo from '../components/AppLogo.jsx';
 
 export default function ResetPassword() {
@@ -55,6 +56,7 @@ export default function ResetPassword() {
       return;
     }
 
+    api.post('/auth/activity', { type: 'password_reset_completed' }).catch(() => {});
     setDone(true);
   }
 

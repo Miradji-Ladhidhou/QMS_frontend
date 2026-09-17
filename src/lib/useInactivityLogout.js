@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase.js';
+import { api } from './api.js';
 
 const ACTIVITY_EVENTS = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
 // En dessous de ce seuil, une nouvelle activité n'a pas besoin de mettre à jour l'horodatage —
@@ -34,6 +35,9 @@ export function useInactivityLogout(timeoutMs) {
     async function logout() {
       if (loggedOut) return;
       loggedOut = true;
+      // Journalisé AVANT signOut() : après, le jeton nécessaire à /auth/activity a disparu
+      // (voir handleLogout dans Layout.jsx, même ordre).
+      await api.post('/auth/activity', { type: 'logout', reason: 'inactivity' }).catch(() => {});
       await supabase.auth.signOut();
       navigate('/login');
     }

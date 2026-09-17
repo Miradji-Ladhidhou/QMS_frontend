@@ -15,6 +15,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   UserPlus,
@@ -26,8 +27,10 @@ import { BarChart, Bar, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
+import { exportTableCsv } from '../lib/pdfExport.js';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const TENANT_SORT_OPTIONS = [
   { key: 'created_at', label: 'date de création' },
@@ -66,6 +69,64 @@ const MODULE_LABELS = {
   employees: 'Personnel',
   services: 'Services',
 };
+
+// Libellés pour GET /super-admin/activity-log (voir services/activityLog.js côté backend,
+// action = "${ENTITY_TYPE}_${VERBE}" en SCREAMING_SNAKE_CASE) — distinct d'ACTION_LABELS
+// ci-dessus, qui reste réservé aux actions de super_admin_audit_log (snake_case, fiche
+// détaillée d'un tenant). Complété à mesure que les modules métier sont instrumentés (Phase B).
+const ACTIVITY_ENTITY_LABELS = {
+  auth: 'Authentification',
+  export: 'Export',
+  tenant: 'Tenant',
+  user: 'Utilisateur',
+  backup: 'Sauvegarde',
+};
+const ACTIVITY_VERB_LABELS = {
+  CREATED: 'créé',
+  UPDATED: 'modifié',
+  DELETED: 'supprimé',
+  SUSPENDED: 'suspendu',
+  REACTIVATED: 'réactivé',
+  VALIDATED: 'validé',
+  SUBMITTED: 'soumis',
+  REJECTED: 'rejeté',
+  APPROVED: 'approuvé',
+  OBSOLETED: 'rendu obsolète',
+  CLOSED: 'clôturé',
+  DOWNLOADED: 'téléchargé',
+  RESTORED: 'restauré',
+};
+// Actions qui ne suivent pas le patron "${ENTITY}_${VERBE}" dérivé automatiquement.
+const ACTIVITY_IRREGULAR_LABELS = {
+  LOGIN_SUCCESS: 'Connexion réussie',
+  LOGIN_FAILED: 'Échec de connexion',
+  LOGOUT: 'Déconnexion',
+  PASSWORD_RESET_REQUESTED: 'Réinitialisation de mot de passe demandée',
+  PASSWORD_RESET_COMPLETED: 'Mot de passe réinitialisé',
+  EXPORT_PDF: 'Export PDF',
+  EXPORT_XLSX: 'Export Excel',
+  EXPORT_WORD: 'Export Word',
+  EXPORT_CSV: 'Export CSV',
+  USER_ROLE_CHANGED: 'Rôle utilisateur modifié',
+};
+
+function humanizeEntityType(entityType) {
+  return entityType.replace(/_/g, ' ').replace(/^\w/, (c) => c.toUpperCase());
+}
+
+function describeActivity(row) {
+  if (ACTIVITY_IRREGULAR_LABELS[row.action]) return ACTIVITY_IRREGULAR_LABELS[row.action];
+
+  const entityKey = row.entity_type.toUpperCase();
+  const entityLabel = ACTIVITY_ENTITY_LABELS[row.entity_type] || humanizeEntityType(row.entity_type);
+  if (row.action.startsWith(`${entityKey}_`)) {
+    const verb = row.action.slice(entityKey.length + 1);
+    const verbLabel = ACTIVITY_VERB_LABELS[verb] || verb.toLowerCase().replace(/_/g, ' ');
+    return `${entityLabel} · ${verbLabel}`;
+  }
+  return `${entityLabel} · ${row.action}`;
+}
+
 const TABS = [
   { id: 'tenants', label: 'Tenants' },
   { id: 'stats', label: 'Statistiques' },
@@ -1097,24 +1158,199 @@ function StatsTab() {
   );
 }
 
+const ACTIVITY_SORT_OPTIONS = [
+  { key: 'created_at', label: 'date' },
+  { key: 'action', label: 'action' },
+  { key: 'entity_type', label: 'type' },
+  { key: 'actor_email', label: 'acteur' },
+];
+const ACTIVITY_PAGE_SIZE = 50;
+
+function metadataSummary(metadata) {
+  if (!metadata) return null;
+  return metadata.label || metadata.reason || metadata.title || null;
+}
+
+// Journal d'activité plateforme complet (voir GET /super-admin/activity-log,
+// services/activityLog.js côté backend) — remplace l'ancien onglet minimal qui lisait
+// GET /audit-log (sans filtre ni pagination, borné à 200 lignes). Tri CÔTÉ SERVEUR
+// (sortBy/sortOrder envoyés en query) : lib/useSort.js trierait un tableau déjà entièrement
+// en mémoire, faux ici où seule la page courante l'est — seul l'en-tête cliquable SortableTh
+// est réutilisé, piloté par cet état local.
 function AuditTab() {
-  const [entries, setEntries] = useState(null);
+  const currentUser = useCurrentUser();
+  const [result, setResult] = useState(null);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(1);
+  const [sortKey, setSortKey] = useState('created_at');
+  const [direction, setDirection] = useState('desc');
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
+  const [entityFilter, setEntityFilter] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  // Recherche libre débattue à 400ms : un appel serveur par frappe serait inutilement bavard
+  // (contrairement aux autres filtres ci-dessous, qui restent des select/date discrets).
+  useEffect(() => {
+    const timeout = setTimeout(() => setSearch(searchInput.trim()), 400);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
 
   useEffect(() => {
+    setPage(1);
+  }, [search, entityFilter, dateFrom, dateTo]);
+
+  function toggleSort(key) {
+    if (key === sortKey) {
+      setDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortKey(key);
+      setDirection('asc');
+    }
+  }
+
+  function buildParams(overrides = {}) {
+    return {
+      page,
+      limit: ACTIVITY_PAGE_SIZE,
+      sortBy: sortKey,
+      sortOrder: direction,
+      ...(search && { search }),
+      ...(entityFilter && { entity: entityFilter }),
+      ...(dateFrom && { dateFrom }),
+      ...(dateTo && { dateTo }),
+      ...overrides,
+    };
+  }
+
+  useEffect(() => {
+    setResult(null);
+    setError('');
     api
-      .get('/super-admin/audit-log')
-      .then(({ data }) => setEntries(data))
-      .catch(() => setError("Impossible de charger le journal d'audit."));
-  }, []);
+      .get('/super-admin/activity-log', { params: buildParams() })
+      .then(({ data }) => setResult(data))
+      .catch(() => setError("Impossible de charger le journal d'activité."));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, sortKey, direction, search, entityFilter, dateFrom, dateTo]);
+
+  async function handleExportCsv() {
+    setExporting(true);
+    try {
+      const allRows = [];
+      let currentPage = 1;
+      let total = Infinity;
+      while (allRows.length < total) {
+        const { data } = await api.get('/super-admin/activity-log', {
+          params: buildParams({ page: currentPage, limit: 200 }),
+        });
+        if (data.data.length === 0) break;
+        allRows.push(...data.data);
+        total = data.total;
+        currentPage += 1;
+      }
+
+      const columns = [
+        { key: 'date', label: 'Date' },
+        { key: 'action', label: 'Action' },
+        { key: 'acteur', label: 'Acteur' },
+        { key: 'type', label: 'Type' },
+        { key: 'details', label: 'Détails' },
+        { key: 'ip', label: 'Adresse IP' },
+      ];
+      const rows = allRows.map((row) => ({
+        date: formatDateTime(row.created_at),
+        action: describeActivity(row),
+        acteur: row.actor?.full_name || row.actor_email || 'Compte supprimé',
+        type: ACTIVITY_ENTITY_LABELS[row.entity_type] || humanizeEntityType(row.entity_type),
+        details: metadataSummary(row.metadata) || '',
+        ip: row.ip_address || '',
+      }));
+
+      await exportTableCsv(
+        `journal-activite-${new Date().toISOString().slice(0, 10)}.csv`,
+        "Journal d'activité",
+        columns,
+        rows,
+        { generatedBy: currentUser?.full_name, subtitle: `${allRows.length} ligne${allRows.length > 1 ? 's' : ''}` }
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  const entries = result?.data || null;
+  const totalPages = result ? Math.max(1, Math.ceil(result.total / result.limit)) : 1;
 
   return (
     <div>
-      <div className="flex items-center gap-2">
-        <History size={20} className="text-slate-400" />
-        <h2 className="text-base font-semibold text-slate-900">Journal d'audit</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <History size={20} className="text-slate-400" />
+          <h2 className="text-base font-semibold text-slate-900">Journal d'activité</h2>
+        </div>
+        <button
+          type="button"
+          onClick={handleExportCsv}
+          disabled={exporting || !entries || entries.length === 0}
+          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40"
+        >
+          <Download size={14} />
+          {exporting ? 'Export en cours...' : 'Exporter en CSV'}
+        </button>
       </div>
-      <p className="mt-1 text-sm text-slate-500">Actions récentes des super administrateurs sur la plateforme.</p>
+      <p className="mt-1 text-sm text-slate-500">
+        Connexions, exports et actions CRUD de tous les tenants — réservé au super admin.
+      </p>
+
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative flex-1">
+          <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Rechercher par email, action ou type..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full rounded-md border border-slate-300 py-2.5 pl-9 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          />
+        </div>
+
+        <SortSelect
+          options={ACTIVITY_SORT_OPTIONS}
+          sortKey={sortKey}
+          direction={direction}
+          onChangeKey={setSortKey}
+          onToggleDirection={() => toggleSort(sortKey)}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <select
+          value={entityFilter}
+          onChange={(e) => setEntityFilter(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Tous les types</option>
+          {Object.entries(ACTIVITY_ENTITY_LABELS).map(([value, label]) => (
+            <option key={value} value={value}>
+              {label}
+            </option>
+          ))}
+        </select>
+        <input
+          type="date"
+          value={dateFrom}
+          onChange={(e) => setDateFrom(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        />
+        <input
+          type="date"
+          value={dateTo}
+          onChange={(e) => setDateTo(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        />
+      </div>
 
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
@@ -1126,23 +1362,58 @@ function AuditTab() {
         </div>
       )}
 
-      {entries && entries.length === 0 && <p className="mt-6 text-sm text-slate-500">Aucune action journalisée pour l'instant.</p>}
+      {entries && entries.length === 0 && (
+        <p className="mt-6 text-sm text-slate-500">Aucune activité ne correspond à ces filtres.</p>
+      )}
 
       {entries && entries.length > 0 && (
-        <ul className="mt-4 divide-y divide-slate-100 rounded-xl border border-slate-200 bg-white">
-          {entries.map((entry) => (
-            <li key={entry.id} className="flex items-center justify-between gap-3 px-4 py-3 text-sm">
-              <div>
-                <p className="font-medium text-slate-800">{ACTION_LABELS[entry.action] || entry.action}</p>
-                <p className="text-xs text-slate-500">
-                  {entry.actor?.full_name || 'Compte supprimé'}
-                  {entry.details?.tenant_name ? ` · ${entry.details.tenant_name}` : ''}
-                </p>
+        <>
+          <div className="mt-4 space-y-2 md:hidden">
+            {entries.map((entry) => (
+              <div key={entry.id} className="rounded-xl border border-slate-200 bg-white p-3 text-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="font-medium text-slate-800">{describeActivity(entry)}</p>
+                  <span className="shrink-0 text-xs text-slate-400">{formatDateTime(entry.created_at)}</span>
+                </div>
+                <p className="mt-1 text-xs text-slate-500">{entry.actor?.full_name || entry.actor_email || 'Compte supprimé'}</p>
+                {metadataSummary(entry.metadata) && (
+                  <p className="mt-1 text-xs text-slate-400">{metadataSummary(entry.metadata)}</p>
+                )}
               </div>
-              <span className="shrink-0 text-xs text-slate-400">{formatDateTime(entry.created_at)}</span>
-            </li>
-          ))}
-        </ul>
+            ))}
+          </div>
+
+          <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <SortableTh label="Date" sortKey="created_at" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Action" sortKey="action" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Type" sortKey="entity_type" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Acteur" sortKey="actor_email" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <th className="px-4 py-3">Détails</th>
+                  <th className="px-4 py-3">IP</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {entries.map((entry) => (
+                  <tr key={entry.id} className="hover:bg-slate-50">
+                    <td className="whitespace-nowrap px-4 py-3 text-slate-500">{formatDateTime(entry.created_at)}</td>
+                    <td className="px-4 py-3 font-medium text-slate-800">{describeActivity(entry)}</td>
+                    <td className="px-4 py-3 text-slate-500">
+                      {ACTIVITY_ENTITY_LABELS[entry.entity_type] || humanizeEntityType(entry.entity_type)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500">{entry.actor?.full_name || entry.actor_email || 'Compte supprimé'}</td>
+                    <td className="px-4 py-3 text-slate-400">{metadataSummary(entry.metadata) || '—'}</td>
+                    <td className="px-4 py-3 text-slate-400">{entry.ip_address || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination page={page} totalPages={totalPages} onPageChange={setPage} />
+        </>
       )}
     </div>
   );

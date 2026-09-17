@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase.js';
+import { api } from '../lib/api.js';
 import AppLogo from '../components/AppLogo.jsx';
 
 export default function ForgotPassword() {
@@ -25,6 +26,7 @@ export default function ForgotPassword() {
       return;
     }
 
+    api.post('/auth/activity', { type: 'password_reset_requested', email }).catch(() => {});
     setSent(true);
   }
 

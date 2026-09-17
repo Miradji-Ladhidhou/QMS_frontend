@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
+import { api } from '../lib/api.js';
 import AppLogo from '../components/AppLogo.jsx';
 
 export default function Login() {
@@ -27,6 +28,7 @@ export default function Login() {
     setLoading(false);
 
     if (authError) {
+      api.post('/auth/activity', { type: 'login_failed', email }).catch(() => {});
       if (authError.code === 'email_not_confirmed' || /email not confirmed/i.test(authError.message || '')) {
         setError('Confirmez votre adresse email avant de vous connecter — vérifiez votre boîte de réception.');
       } else {
@@ -35,6 +37,7 @@ export default function Login() {
       return;
     }
 
+    api.post('/auth/activity', { type: 'login_success' }).catch(() => {});
     navigate('/');
   }
 

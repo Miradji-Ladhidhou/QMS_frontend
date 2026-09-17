@@ -336,6 +336,9 @@ export default function Layout() {
   }
 
   async function handleLogout() {
+    // Journalisé AVANT signOut() : après, le jeton nécessaire à /auth/activity a disparu
+    // (voir services/activityLog.js, POST /auth/activity côté backend).
+    await api.post('/auth/activity', { type: 'logout', reason: 'manual' }).catch(() => {});
     await supabase.auth.signOut();
     navigate('/login');
   }
