@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -369,6 +370,7 @@ function CreateSurveyCapaModal({ surveyId, survey, users, services, onClose, onC
 export default function CustomerSatisfactionDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/customer-satisfaction');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [survey, setSurvey] = useState(null);
@@ -425,7 +427,7 @@ export default function CustomerSatisfactionDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/customer-satisfaction')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />

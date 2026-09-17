@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { AlertTriangle, ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -494,6 +495,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
 export default function ComplaintDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/complaints');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [complaint, setComplaint] = useState(null);
@@ -566,7 +568,7 @@ export default function ComplaintDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/complaints')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />

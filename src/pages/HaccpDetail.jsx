@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Download, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
@@ -867,6 +868,7 @@ function SurveillanceTab({ plan, users, services, priorityDelays, onCapaCreated 
 export default function HaccpDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/haccp');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [plan, setPlan] = useState(null);
@@ -979,7 +981,7 @@ export default function HaccpDetail() {
 
   return (
     <div>
-      <button type="button" onClick={() => navigate('/haccp')} className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700">
+      <button type="button" onClick={goBack} className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700">
         <ArrowLeft size={16} />
         Retour
       </button>

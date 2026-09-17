@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -540,6 +541,7 @@ function CreateAccidentCapaModal({ accidentId, accident, users, services, priori
 export default function AccidentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/accidents');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [accident, setAccident] = useState(null);
@@ -618,7 +620,7 @@ export default function AccidentDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/accidents')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />

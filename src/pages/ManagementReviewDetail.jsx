@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Minus, Pencil, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -579,6 +580,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
 export default function ManagementReviewDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/management-reviews');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [review, setReview] = useState(null);
@@ -700,7 +702,7 @@ export default function ManagementReviewDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/management-reviews')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />

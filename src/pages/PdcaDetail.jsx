@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -518,6 +519,7 @@ function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftCh
 export default function PdcaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/pdca');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [pdca, setPdca] = useState(null);
@@ -633,7 +635,7 @@ export default function PdcaDetail() {
 
   return (
     <div>
-      <button type="button" onClick={() => navigate('/pdca')} className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700">
+      <button type="button" onClick={goBack} className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700">
         <ArrowLeft size={16} />
         Retour
       </button>

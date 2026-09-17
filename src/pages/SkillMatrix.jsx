@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Check, EyeOff, Minus, RefreshCw, X as XIcon } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
@@ -41,7 +41,7 @@ function cellDateLabel(cell) {
 }
 
 export default function SkillMatrix() {
-  const navigate = useNavigate();
+  const goBack = useSmartBack('/trainings');
   const currentUser = useCurrentUser();
   const [matrix, setMatrix] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -158,7 +158,7 @@ export default function SkillMatrix() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/trainings')}
+        onClick={goBack}
         className="mb-4 flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
       >
         <ArrowLeft size={16} />

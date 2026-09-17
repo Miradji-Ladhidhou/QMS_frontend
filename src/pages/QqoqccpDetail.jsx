@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, FileCheck, Loader2, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -319,6 +320,7 @@ function CloseAnalysisModal({ analysisId, onClose, onClosed }) {
 export default function QqoqccpDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/qqoqccp');
   const currentUser = useCurrentUser();
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -655,7 +657,7 @@ export default function QqoqccpDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/qqoqccp')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />

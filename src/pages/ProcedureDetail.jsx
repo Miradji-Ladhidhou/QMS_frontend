@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { Archive, ArrowLeft, Check, Download, FileText, FileType, Loader2, Pencil, Plus, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -322,6 +323,7 @@ function ObsoleteProcedureModal({ onClose, onConfirm }) {
 export default function ProcedureDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/procedures');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
 
@@ -612,7 +614,7 @@ export default function ProcedureDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/procedures')}
+        onClick={goBack}
         className="mb-4 flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
       >
         <ArrowLeft size={16} />

@@ -20,6 +20,7 @@ import {
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { STATUS_LABELS as DOCUMENT_STATUS_LABELS } from '../lib/documentStatus.js';
 import CategoryBadge from '../components/CategoryBadge.jsx';
@@ -498,6 +499,7 @@ function AcknowledgmentPanel({ documentId }) {
 export default function DocumentDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/documents');
   const tenant = useTenant();
   const [doc, setDoc] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
@@ -704,7 +706,7 @@ export default function DocumentDetail() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <button
           type="button"
-          onClick={() => navigate('/documents')}
+          onClick={goBack}
           className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
         >
           <ArrowLeft size={16} />

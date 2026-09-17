@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Lock, Plus, Save, Send, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
@@ -199,6 +200,7 @@ function CreatePdcaModal({ capaId, defaultTitle, onClose, onCreated }) {
 export default function CapaDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/capas');
   const currentUser = useCurrentUser();
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
@@ -455,7 +457,7 @@ export default function CapaDetail() {
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <button
           type="button"
-          onClick={() => navigate('/capas')}
+          onClick={goBack}
           className="flex items-center gap-2 text-sm text-slate-600 hover:text-primary"
         >
           <ArrowLeft size={16} />

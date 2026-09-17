@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -422,6 +423,7 @@ function CreateOutputCapaModal({ outputId, output, users, services, onClose, onC
 export default function NonconformingOutputDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/nonconforming-outputs');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [output, setOutput] = useState(null);
@@ -488,7 +490,7 @@ export default function NonconformingOutputDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/nonconforming-outputs')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />

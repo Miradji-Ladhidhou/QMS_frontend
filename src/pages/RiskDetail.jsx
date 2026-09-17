@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -594,6 +595,7 @@ function CreateCapaFromRiskModal({ riskId, risk, users, services, priorityDelays
 export default function RiskDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/risks');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [risk, setRisk] = useState(null);
@@ -663,7 +665,7 @@ export default function RiskDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/risks')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />

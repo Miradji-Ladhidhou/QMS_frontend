@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import { useSmartBack } from '../lib/useSmartBack.js';
 import { AlertTriangle, ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -458,6 +459,7 @@ function CreateCapaFromEvaluationModal({ supplierId, supplierName, evaluation, u
 export default function SupplierDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const goBack = useSmartBack('/suppliers');
   const currentUser = useCurrentUser();
   const canManage = isManagerRole(currentUser?.role);
   const [supplier, setSupplier] = useState(null);
@@ -568,7 +570,7 @@ export default function SupplierDetail() {
     <div>
       <button
         type="button"
-        onClick={() => navigate('/suppliers')}
+        onClick={goBack}
         className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />
