@@ -4151,7 +4151,6 @@ export default function Kpis() {
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">KPIs</h1>
         <div className="flex flex-wrap gap-2">
           <ExportMenu
-            disabled={kpis.length === 0}
             onExportPdf={handleGenerateReport}
             exportingPdf={generatingReport}
             onExportXlsx={handleGenerateReportXlsx}
