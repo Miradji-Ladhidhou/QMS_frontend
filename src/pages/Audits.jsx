@@ -339,29 +339,45 @@ export default function Audits() {
     navigate(`/audits/${audit.id}`);
   }
 
+  // width uniquement pour le PDF (forPdf) — Excel/Word/CSV n'ont pas cette contrainte de
+  // largeur imprimée (voir listReportXlsx.js/listReportWord.js, qui l'ignorent de toute façon).
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.2 : undefined },
+      { key: 'type', label: 'Type', width: forPdf ? 0.1 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
+      { key: 'scope', label: 'Périmètre', width: forPdf ? 0.16 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.1 : undefined },
+      { key: 'auditor', label: 'Auditeur', width: forPdf ? 0.1 : undefined },
+      { key: 'planned_date', label: 'Date planifiée', width: forPdf ? 0.1 : undefined },
+      { key: 'completed_date', label: 'Date réalisée', width: forPdf ? 0.1 : undefined },
+      { key: 'conclusion', label: 'Conclusion', width: forPdf ? 0.16 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((audit) => ({
+      title: audit.title,
+      type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
+      status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
+      scope: audit.scope || '',
+      service: audit.service?.name || '',
+      auditor: audit.lead?.full_name || '',
+      planned_date: formatDate(audit.planned_date),
+      completed_date: formatDate(audit.completed_date),
+      conclusion: audit.conclusion || '',
+      category: audit.category?.name || '',
+    }));
+  }
+
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? audits.filter((audit) => scopeIds.includes(audit.id)) : audits;
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre', width: 0.32 },
-        { key: 'type', label: 'Type', width: 0.16 },
-        { key: 'status', label: 'Statut', width: 0.14 },
-        { key: 'service', label: 'Service', width: 0.16 },
-        { key: 'auditor', label: 'Auditeur', width: 0.1 },
-        { key: 'planned_date', label: 'Date', width: 0.12 },
-      ];
-      const rows = source.map((audit) => ({
-        title: audit.title,
-        type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
-        status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
-        service: audit.service?.name || '',
-        auditor: audit.lead?.full_name || '',
-        planned_date: formatDate(audit.planned_date),
-      }));
       const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
-      await exportToPdf(`audits-${new Date().toISOString().slice(0, 10)}.pdf`, 'Audits internes', columns, rows, {
+      await exportToPdf(`audits-${new Date().toISOString().slice(0, 10)}.pdf`, 'Audits internes', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -377,24 +393,8 @@ export default function Audits() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'auditor', label: 'Auditeur' },
-        { key: 'planned_date', label: 'Date' },
-      ];
-      const rows = source.map((audit) => ({
-        title: audit.title,
-        type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
-        status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
-        service: audit.service?.name || '',
-        auditor: audit.lead?.full_name || '',
-        planned_date: formatDate(audit.planned_date),
-      }));
       const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
-      await exportToXlsx(`audits-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Audits internes', columns, rows, {
+      await exportToXlsx(`audits-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Audits internes', buildExportColumns(), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -410,24 +410,8 @@ export default function Audits() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'auditor', label: 'Auditeur' },
-        { key: 'planned_date', label: 'Date' },
-      ];
-      const rows = source.map((audit) => ({
-        title: audit.title,
-        type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
-        status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
-        service: audit.service?.name || '',
-        auditor: audit.lead?.full_name || '',
-        planned_date: formatDate(audit.planned_date),
-      }));
       const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
-      await exportToWord(`audits-${new Date().toISOString().slice(0, 10)}.docx`, 'Audits internes', columns, rows, {
+      await exportToWord(`audits-${new Date().toISOString().slice(0, 10)}.docx`, 'Audits internes', buildExportColumns(), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -444,24 +428,8 @@ export default function Audits() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'auditor', label: 'Auditeur' },
-        { key: 'planned_date', label: 'Date' },
-      ];
-      const rows = source.map((audit) => ({
-        title: audit.title,
-        type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
-        status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
-        service: audit.service?.name || '',
-        auditor: audit.lead?.full_name || '',
-        planned_date: formatDate(audit.planned_date),
-      }));
       const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
-      await exportToDrive('AUDIT', 'Audits internes', columns, rows, {
+      await exportToDrive('AUDIT', 'Audits internes', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });

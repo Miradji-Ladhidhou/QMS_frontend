@@ -1292,28 +1292,47 @@ export default function Trainings() {
     }
   }
 
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'training', label: 'Formation', width: forPdf ? 0.14 : undefined },
+      { key: 'type', label: 'Type', width: forPdf ? 0.08 : undefined },
+      { key: 'description', label: 'Description', width: forPdf ? 0.14 : undefined },
+      { key: 'frequency_months', label: 'Fréquence (mois)', width: forPdf ? 0.08 : undefined },
+      { key: 'location', label: 'Lieu', width: forPdf ? 0.08 : undefined },
+      { key: 'instructor', label: 'Formateur', width: forPdf ? 0.1 : undefined },
+      { key: 'duration', label: 'Durée', width: forPdf ? 0.06 : undefined },
+      { key: 'person', label: 'Personne', width: forPdf ? 0.12 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.07 : undefined },
+      { key: 'completed_at', label: 'Réalisation', width: forPdf ? 0.07 : undefined },
+      { key: 'next_due_date', label: 'Prochaine échéance', width: forPdf ? 0.06 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.flatMap((training) =>
+      training.records.map((record) => ({
+        training: training.title,
+        type: training.type || '',
+        description: training.description || '',
+        frequency_months: training.frequency_months || '',
+        location: training.location || '',
+        instructor: training.instructor || '',
+        duration: training.duration || '',
+        person: personName(record),
+        status: record.employee_id ? 'Sans compte' : 'Compte',
+        completed_at: formatDate(record.completed_at),
+        next_due_date: formatDate(record.next_due_date),
+      }))
+    );
+  }
+
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'training', label: 'Formation', width: 0.3 },
-        { key: 'type', label: 'Type', width: 0.15 },
-        { key: 'person', label: 'Personne', width: 0.25 },
-        { key: 'status', label: 'Statut', width: 0.13 },
-        { key: 'completed_at', label: 'Réalisation', width: 0.17 },
-      ];
-      const rows = source.flatMap((training) =>
-        training.records.map((record) => ({
-          training: training.title,
-          type: training.type || '',
-          person: personName(record),
-          status: record.employee_id ? 'Sans compte' : 'Compte',
-          completed_at: formatDate(record.completed_at),
-        }))
-      );
-      await exportToPdf(`formations-${new Date().toISOString().slice(0, 10)}.pdf`, 'Formations', columns, rows, {
+      const rows = buildExportRows(source);
+      await exportToPdf(`formations-${new Date().toISOString().slice(0, 10)}.pdf`, 'Formations', buildExportColumns({ forPdf: true }), rows, {
         subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });
@@ -1329,23 +1348,8 @@ export default function Trainings() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'training', label: 'Formation' },
-        { key: 'type', label: 'Type' },
-        { key: 'person', label: 'Personne' },
-        { key: 'status', label: 'Statut' },
-        { key: 'completed_at', label: 'Réalisation' },
-      ];
-      const rows = source.flatMap((training) =>
-        training.records.map((record) => ({
-          training: training.title,
-          type: training.type || '',
-          person: personName(record),
-          status: record.employee_id ? 'Sans compte' : 'Compte',
-          completed_at: formatDate(record.completed_at),
-        }))
-      );
-      await exportToXlsx(`formations-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Formations', columns, rows, {
+      const rows = buildExportRows(source);
+      await exportToXlsx(`formations-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Formations', buildExportColumns(), rows, {
         subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });
@@ -1361,23 +1365,8 @@ export default function Trainings() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'training', label: 'Formation' },
-        { key: 'type', label: 'Type' },
-        { key: 'person', label: 'Personne' },
-        { key: 'status', label: 'Statut' },
-        { key: 'completed_at', label: 'Réalisation' },
-      ];
-      const rows = source.flatMap((training) =>
-        training.records.map((record) => ({
-          training: training.title,
-          type: training.type || '',
-          person: personName(record),
-          status: record.employee_id ? 'Sans compte' : 'Compte',
-          completed_at: formatDate(record.completed_at),
-        }))
-      );
-      await exportToWord(`formations-${new Date().toISOString().slice(0, 10)}.docx`, 'Formations', columns, rows, {
+      const rows = buildExportRows(source);
+      await exportToWord(`formations-${new Date().toISOString().slice(0, 10)}.docx`, 'Formations', buildExportColumns(), rows, {
         subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });
@@ -1394,23 +1383,8 @@ export default function Trainings() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'training', label: 'Formation' },
-        { key: 'type', label: 'Type' },
-        { key: 'person', label: 'Personne' },
-        { key: 'status', label: 'Statut' },
-        { key: 'completed_at', label: 'Réalisation' },
-      ];
-      const rows = source.flatMap((training) =>
-        training.records.map((record) => ({
-          training: training.title,
-          type: training.type || '',
-          person: personName(record),
-          status: record.employee_id ? 'Sans compte' : 'Compte',
-          completed_at: formatDate(record.completed_at),
-        }))
-      );
-      await exportToDrive('FORM', 'Formations', columns, rows, {
+      const rows = buildExportRows(source);
+      await exportToDrive('FORM', 'Formations', buildExportColumns({ forPdf: true }), rows, {
         subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });

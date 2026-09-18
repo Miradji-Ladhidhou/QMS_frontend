@@ -359,7 +359,9 @@ export default function CustomerSatisfaction() {
       { key: 'method', label: 'Méthode', width: forPdf ? 0.14 : undefined },
       { key: 'score', label: 'Note', width: forPdf ? 0.08 : undefined },
       { key: 'service', label: 'Service', width: forPdf ? 0.15 : undefined },
-      { key: 'comments', label: 'Commentaires', width: forPdf ? 0.35 : undefined },
+      { key: 'comments', label: 'Commentaires', width: forPdf ? 0.25 : undefined },
+      { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.1 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
     ];
   }
 
@@ -371,6 +373,8 @@ export default function CustomerSatisfaction() {
       score: `${survey.score}/5`,
       service: survey.service?.name || '',
       comments: survey.comments || '',
+      linked_capa: survey.linked_capa?.number || '',
+      category: survey.category?.name || '',
     }));
   }
 

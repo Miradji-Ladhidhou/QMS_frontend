@@ -293,24 +293,46 @@ export default function ManagementReviews() {
     navigate(`/management-reviews/${review.id}`);
   }
 
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.14 : undefined },
+      { key: 'review_date', label: 'Date de revue', width: forPdf ? 0.08 : undefined },
+      { key: 'period', label: 'Période', width: forPdf ? 0.1 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.08 : undefined },
+      { key: 'participants', label: 'Participants', width: forPdf ? 0.14 : undefined },
+      { key: 'previous_actions_status', label: 'Suivi des actions précédentes', width: forPdf ? 0.14 : undefined },
+      { key: 'context_changes', label: 'Évolutions du contexte', width: forPdf ? 0.14 : undefined },
+      { key: 'resource_adequacy', label: 'Adéquation des ressources', width: forPdf ? 0.14 : undefined },
+      { key: 'improvement_opportunities', label: "Opportunités d'amélioration", width: forPdf ? 0.14 : undefined },
+      { key: 'conclusions', label: 'Conclusions', width: forPdf ? 0.14 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((review) => ({
+      title: review.title,
+      review_date: formatDate(review.review_date),
+      period: review.period_start || review.period_end
+        ? `${formatDate(review.period_start)} - ${formatDate(review.period_end)}`
+        : '',
+      status: REVIEW_STATUS_LABELS[review.status] || review.status,
+      participants: review.participants || '',
+      previous_actions_status: review.previous_actions_status || '',
+      context_changes: review.context_changes || '',
+      resource_adequacy: review.resource_adequacy || '',
+      improvement_opportunities: review.improvement_opportunities || '',
+      conclusions: review.conclusions || '',
+      category: review.category?.name || '',
+    }));
+  }
+
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? reviews.filter((review) => scopeIds.includes(review.id)) : reviews;
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre', width: 0.36 },
-        { key: 'review_date', label: 'Date de revue', width: 0.18 },
-        { key: 'status', label: 'Statut', width: 0.18 },
-        { key: 'participants', label: 'Participants', width: 0.28 },
-      ];
-      const rows = source.map((review) => ({
-        title: review.title,
-        review_date: formatDate(review.review_date),
-        status: REVIEW_STATUS_LABELS[review.status] || review.status,
-        participants: review.participants || '',
-      }));
-      await exportToPdf(`revues-direction-${new Date().toISOString().slice(0, 10)}.pdf`, 'Revues de direction', columns, rows, {
+      await exportToPdf(`revues-direction-${new Date().toISOString().slice(0, 10)}.pdf`, 'Revues de direction', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });
@@ -326,19 +348,7 @@ export default function ManagementReviews() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'review_date', label: 'Date de revue' },
-        { key: 'status', label: 'Statut' },
-        { key: 'participants', label: 'Participants' },
-      ];
-      const rows = source.map((review) => ({
-        title: review.title,
-        review_date: formatDate(review.review_date),
-        status: REVIEW_STATUS_LABELS[review.status] || review.status,
-        participants: review.participants || '',
-      }));
-      await exportToXlsx(`revues-direction-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Revues de direction', columns, rows, {
+      await exportToXlsx(`revues-direction-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Revues de direction', buildExportColumns(), buildExportRows(source), {
         subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });
@@ -354,19 +364,7 @@ export default function ManagementReviews() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'review_date', label: 'Date de revue' },
-        { key: 'status', label: 'Statut' },
-        { key: 'participants', label: 'Participants' },
-      ];
-      const rows = source.map((review) => ({
-        title: review.title,
-        review_date: formatDate(review.review_date),
-        status: REVIEW_STATUS_LABELS[review.status] || review.status,
-        participants: review.participants || '',
-      }));
-      await exportToWord(`revues-direction-${new Date().toISOString().slice(0, 10)}.docx`, 'Revues de direction', columns, rows, {
+      await exportToWord(`revues-direction-${new Date().toISOString().slice(0, 10)}.docx`, 'Revues de direction', buildExportColumns(), buildExportRows(source), {
         subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });
@@ -383,19 +381,7 @@ export default function ManagementReviews() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'review_date', label: 'Date de revue' },
-        { key: 'status', label: 'Statut' },
-        { key: 'participants', label: 'Participants' },
-      ];
-      const rows = source.map((review) => ({
-        title: review.title,
-        review_date: formatDate(review.review_date),
-        status: REVIEW_STATUS_LABELS[review.status] || review.status,
-        participants: review.participants || '',
-      }));
-      await exportToDrive('REVDIR', 'Revues de direction', columns, rows, {
+      await exportToDrive('REVDIR', 'Revues de direction', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: `${source.length} revue${source.length > 1 ? 's' : ''}`,
         generatedBy: currentUser?.full_name,
       });

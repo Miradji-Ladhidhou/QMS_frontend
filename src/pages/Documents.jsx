@@ -629,36 +629,46 @@ export default function Documents() {
     return [...docs].sort((a, b) => String(a.number ?? '').localeCompare(String(b.number ?? ''), 'fr', { numeric: true }));
   }
 
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'number', label: 'Numéro', width: forPdf ? 0.08 : undefined },
+      { key: 'title', label: 'Titre', width: forPdf ? 0.14 : undefined },
+      { key: 'description', label: 'Description', width: forPdf ? 0.14 : undefined },
+      { key: 'category', label: 'Catégorie', width: forPdf ? 0.1 : undefined },
+      { key: 'version', label: 'Version', width: forPdf ? 0.06 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.08 : undefined },
+      { key: 'review_date', label: 'Proch. révision', width: forPdf ? 0.1 : undefined },
+      { key: 'review_frequency_months', label: 'Fréquence de révision', width: forPdf ? 0.1 : undefined },
+      { key: 'requires_acknowledgment', label: 'Accusé de réception requis', width: forPdf ? 0.1 : undefined },
+      { key: 'latest_version_comment', label: 'Commentaire dernière version', width: forPdf ? 0.14 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((doc) => ({
+      number: doc.number,
+      title: doc.title,
+      description: doc.description || '',
+      category: doc.category?.name || '',
+      version: doc.version,
+      status: STATUS_LABELS[doc.status] || doc.status,
+      review_date: formatDate(doc.review_date),
+      review_frequency_months: doc.review_frequency_months || '',
+      requires_acknowledgment: doc.requires_acknowledgment ? 'Oui' : 'Non',
+      latest_version_comment: doc.latest_version_comment || '',
+    }));
+  }
+
   async function handleExportPdf(scopeIds) {
     const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
     const source = sortByNumber(scoped);
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro', width: 0.09 },
-        { key: 'title', label: 'Titre', width: 0.18 },
-        { key: 'description', label: 'Description', width: 0.18 },
-        { key: 'category', label: 'Catégorie', width: 0.11 },
-        { key: 'version', label: 'Version', width: 0.06 },
-        { key: 'status', label: 'Statut', width: 0.09 },
-        { key: 'review_date', label: 'Proch. révision', width: 0.11 },
-        { key: 'latest_version_comment', label: 'Commentaire dernière version', width: 0.18 },
-      ];
-      const rows = source.map((doc) => ({
-        number: doc.number,
-        title: doc.title,
-        description: doc.description || '',
-        category: doc.category?.name || '',
-        version: doc.version,
-        status: STATUS_LABELS[doc.status] || doc.status,
-        review_date: formatDate(doc.review_date),
-        latest_version_comment: doc.latest_version_comment || '',
-      }));
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      await exportToPdf(`documents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Documents', columns, rows, {
+      await exportToPdf(`documents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Documents', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -675,30 +685,10 @@ export default function Documents() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro' },
-        { key: 'title', label: 'Titre' },
-        { key: 'description', label: 'Description' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'version', label: 'Version' },
-        { key: 'status', label: 'Statut' },
-        { key: 'review_date', label: 'Proch. révision' },
-        { key: 'latest_version_comment', label: 'Commentaire dernière version' },
-      ];
-      const rows = source.map((doc) => ({
-        number: doc.number,
-        title: doc.title,
-        description: doc.description || '',
-        category: doc.category?.name || '',
-        version: doc.version,
-        status: STATUS_LABELS[doc.status] || doc.status,
-        review_date: formatDate(doc.review_date),
-        latest_version_comment: doc.latest_version_comment || '',
-      }));
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      await exportToXlsx(`documents-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Documents', columns, rows, {
+      await exportToXlsx(`documents-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Documents', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -715,30 +705,10 @@ export default function Documents() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro' },
-        { key: 'title', label: 'Titre' },
-        { key: 'description', label: 'Description' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'version', label: 'Version' },
-        { key: 'status', label: 'Statut' },
-        { key: 'review_date', label: 'Proch. révision' },
-        { key: 'latest_version_comment', label: 'Commentaire dernière version' },
-      ];
-      const rows = source.map((doc) => ({
-        number: doc.number,
-        title: doc.title,
-        description: doc.description || '',
-        category: doc.category?.name || '',
-        version: doc.version,
-        status: STATUS_LABELS[doc.status] || doc.status,
-        review_date: formatDate(doc.review_date),
-        latest_version_comment: doc.latest_version_comment || '',
-      }));
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      await exportToWord(`documents-${new Date().toISOString().slice(0, 10)}.docx`, 'Documents', columns, rows, {
+      await exportToWord(`documents-${new Date().toISOString().slice(0, 10)}.docx`, 'Documents', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -756,30 +726,10 @@ export default function Documents() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro' },
-        { key: 'title', label: 'Titre' },
-        { key: 'description', label: 'Description' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'version', label: 'Version' },
-        { key: 'status', label: 'Statut' },
-        { key: 'review_date', label: 'Proch. révision' },
-        { key: 'latest_version_comment', label: 'Commentaire dernière version' },
-      ];
-      const rows = source.map((doc) => ({
-        number: doc.number,
-        title: doc.title,
-        description: doc.description || '',
-        category: doc.category?.name || '',
-        version: doc.version,
-        status: STATUS_LABELS[doc.status] || doc.status,
-        review_date: formatDate(doc.review_date),
-        latest_version_comment: doc.latest_version_comment || '',
-      }));
       const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      await exportToDrive('DOC', 'Documents', columns, rows, {
+      await exportToDrive('DOC', 'Documents', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });

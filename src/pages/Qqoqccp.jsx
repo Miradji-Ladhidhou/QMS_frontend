@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { exportToWord } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
 import { QQOQCCP_STATUS_LABELS } from '../lib/qqoqccpStatus.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
@@ -134,6 +134,8 @@ export default function Qqoqccp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -227,21 +229,90 @@ export default function Qqoqccp() {
     navigate(`/qqoqccp/${analysis.id}`);
   }
 
-  async function handleExportWord(scopeIds) {
-    const source = scopeIds ? analyses.filter((analysis) => scopeIds.includes(analysis.id)) : analyses;
-    setExportingWord(true);
+  // Le contenu détaillé (les 7 champs QQOQCCP + synthèse IA) n'est jamais chargé par la liste
+  // (GET /qqoqccp, volontairement allégée — voir le commentaire de la route côté backend) :
+  // un export doit refléter le contenu réel des analyses, donc on redemande la liste complète
+  // via ?full=true juste avant de construire le document, plutôt que d'exporter des colonnes
+  // vides depuis `analyses` déjà en mémoire.
+  async function fetchFullAnalyses(scopeIds) {
+    const { data } = await api.get('/qqoqccp', { params: { full: 'true' } });
+    return scopeIds ? data.filter((analysis) => scopeIds.includes(analysis.id)) : data;
+  }
+
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.12 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.08 : undefined },
+      { key: 'qui', label: 'Qui ?', width: forPdf ? 0.1 : undefined },
+      { key: 'quoi', label: 'Quoi ?', width: forPdf ? 0.1 : undefined },
+      { key: 'ou_', label: 'Où ?', width: forPdf ? 0.1 : undefined },
+      { key: 'quand_', label: 'Quand ?', width: forPdf ? 0.1 : undefined },
+      { key: 'comment_', label: 'Comment ?', width: forPdf ? 0.1 : undefined },
+      { key: 'combien', label: 'Combien ?', width: forPdf ? 0.1 : undefined },
+      { key: 'pourquoi', label: 'Pourquoi ?', width: forPdf ? 0.1 : undefined },
+      { key: 'ai_synthesis', label: 'Synthèse IA', width: forPdf ? 0.14 : undefined },
+      { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.08 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.08 : undefined },
+      { key: 'created_at', label: 'Créée le', width: forPdf ? 0.08 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((analysis) => ({
+      title: analysis.title,
+      status: QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
+      qui: analysis.qui || '',
+      quoi: analysis.quoi || '',
+      ou_: analysis.ou_ || '',
+      quand_: analysis.quand_ || '',
+      comment_: analysis.comment_ || '',
+      combien: analysis.combien || '',
+      pourquoi: analysis.pourquoi || '',
+      ai_synthesis: analysis.ai_synthesis || '',
+      linked_capa: analysis.capa?.number || '',
+      category: analysis.category?.name || '',
+      created_at: formatDate(analysis.created_at),
+    }));
+  }
+
+  async function handleExportPdf(scopeIds) {
+    setExportingPdf(true);
+    setError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'status', label: 'Statut' },
-        { key: 'created_at', label: 'Créée le' },
-      ];
-      const rows = source.map((analysis) => ({
-        title: analysis.title,
-        status: QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
-        created_at: formatDate(analysis.created_at),
-      }));
-      await exportToWord(`qqoqccp-${new Date().toISOString().slice(0, 10)}.docx`, 'QQOQCCP', columns, rows, {
+      const source = await fetchFullAnalyses(scopeIds);
+      await exportToPdf(`qqoqccp-${new Date().toISOString().slice(0, 10)}.pdf`, 'QQOQCCP', buildExportColumns({ forPdf: true }), buildExportRows(source), {
+        generatedBy: currentUser?.full_name,
+        subtitle: `${source.length} analyse${source.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setError('Impossible de générer le PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx(scopeIds) {
+    setExportingXlsx(true);
+    setError('');
+    try {
+      const source = await fetchFullAnalyses(scopeIds);
+      await exportToXlsx(`qqoqccp-${new Date().toISOString().slice(0, 10)}.xlsx`, 'QQOQCCP', buildExportColumns(), buildExportRows(source), {
+        generatedBy: currentUser?.full_name,
+        subtitle: `${source.length} analyse${source.length > 1 ? 's' : ''}`,
+      });
+    } catch {
+      setError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord(scopeIds) {
+    setExportingWord(true);
+    setError('');
+    try {
+      const source = await fetchFullAnalyses(scopeIds);
+      await exportToWord(`qqoqccp-${new Date().toISOString().slice(0, 10)}.docx`, 'QQOQCCP', buildExportColumns(), buildExportRows(source), {
         generatedBy: currentUser?.full_name,
         subtitle: `${source.length} analyse${source.length > 1 ? 's' : ''}`,
       });
@@ -259,6 +330,10 @@ export default function Qqoqccp() {
         <div className="flex flex-wrap gap-2">
           <ExportMenu
             disabled={analyses.length === 0}
+            onExportPdf={() => handleExportPdf()}
+            exportingPdf={exportingPdf}
+            onExportXlsx={() => handleExportXlsx()}
+            exportingXlsx={exportingXlsx}
             onExportWord={() => handleExportWord()}
             exportingWord={exportingWord}
           />
@@ -311,6 +386,10 @@ export default function Qqoqccp() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
           onExportWord={() => handleExportWord(selectedIds)}
           exportingWord={exportingWord}
           onDelete={handleBulkDelete}

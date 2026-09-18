@@ -348,29 +348,43 @@ export default function Suppliers() {
     navigate(`/suppliers/${supplier.id}`);
   }
 
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'name', label: 'Nom', width: forPdf ? 0.16 : undefined },
+      { key: 'category', label: 'Catégorie', width: forPdf ? 0.12 : undefined },
+      { key: 'criticality', label: 'Criticité', width: forPdf ? 0.1 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.1 : undefined },
+      { key: 'contact', label: 'Contact', width: forPdf ? 0.1 : undefined },
+      { key: 'contact_email', label: 'Email', width: forPdf ? 0.12 : undefined },
+      { key: 'contact_phone', label: 'Téléphone', width: forPdf ? 0.1 : undefined },
+      { key: 'next_evaluation_date', label: 'Prochaine éval.', width: forPdf ? 0.08 : undefined },
+      { key: 'folder', label: 'Dossier', width: forPdf ? 0.08 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((supplier) => ({
+      name: supplier.name,
+      category: supplier.category || '',
+      criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
+      status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
+      service: supplier.service?.name || '',
+      contact: supplier.contact_name || '',
+      contact_email: supplier.contact_email || '',
+      contact_phone: supplier.contact_phone || '',
+      next_evaluation_date: formatDate(supplier.next_evaluation_date),
+      folder: supplier.folder?.name || '',
+    }));
+  }
+
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'name', label: 'Nom', width: 0.24 },
-        { key: 'category', label: 'Catégorie', width: 0.2 },
-        { key: 'criticality', label: 'Criticité', width: 0.14 },
-        { key: 'status', label: 'Statut', width: 0.14 },
-        { key: 'contact', label: 'Contact', width: 0.14 },
-        { key: 'next_evaluation_date', label: 'Prochaine éval.', width: 0.14 },
-      ];
-      const rows = source.map((supplier) => ({
-        name: supplier.name,
-        category: supplier.category || '',
-        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
-        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
-        contact: supplier.contact_name || '',
-        next_evaluation_date: formatDate(supplier.next_evaluation_date),
-      }));
       const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
-      await exportToPdf(`fournisseurs-${new Date().toISOString().slice(0, 10)}.pdf`, 'Évaluation fournisseurs', columns, rows, {
+      await exportToPdf(`fournisseurs-${new Date().toISOString().slice(0, 10)}.pdf`, 'Évaluation fournisseurs', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -386,24 +400,8 @@ export default function Suppliers() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'name', label: 'Nom' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'criticality', label: 'Criticité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'contact', label: 'Contact' },
-        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
-      ];
-      const rows = source.map((supplier) => ({
-        name: supplier.name,
-        category: supplier.category || '',
-        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
-        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
-        contact: supplier.contact_name || '',
-        next_evaluation_date: formatDate(supplier.next_evaluation_date),
-      }));
       const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
-      await exportToXlsx(`fournisseurs-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Évaluation fournisseurs', columns, rows, {
+      await exportToXlsx(`fournisseurs-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Évaluation fournisseurs', buildExportColumns(), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -419,24 +417,8 @@ export default function Suppliers() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'name', label: 'Nom' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'criticality', label: 'Criticité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'contact', label: 'Contact' },
-        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
-      ];
-      const rows = source.map((supplier) => ({
-        name: supplier.name,
-        category: supplier.category || '',
-        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
-        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
-        contact: supplier.contact_name || '',
-        next_evaluation_date: formatDate(supplier.next_evaluation_date),
-      }));
       const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
-      await exportToWord(`fournisseurs-${new Date().toISOString().slice(0, 10)}.docx`, 'Évaluation fournisseurs', columns, rows, {
+      await exportToWord(`fournisseurs-${new Date().toISOString().slice(0, 10)}.docx`, 'Évaluation fournisseurs', buildExportColumns(), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -453,24 +435,8 @@ export default function Suppliers() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'name', label: 'Nom' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'criticality', label: 'Criticité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'contact', label: 'Contact' },
-        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
-      ];
-      const rows = source.map((supplier) => ({
-        name: supplier.name,
-        category: supplier.category || '',
-        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
-        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
-        contact: supplier.contact_name || '',
-        next_evaluation_date: formatDate(supplier.next_evaluation_date),
-      }));
       const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
-      await exportToDrive('FOURN', 'Évaluation fournisseurs', columns, rows, {
+      await exportToDrive('FOURN', 'Évaluation fournisseurs', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });

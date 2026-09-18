@@ -515,33 +515,63 @@ export default function Risks() {
     navigate(`/risks/${risk.id}`);
   }
 
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.12 : undefined },
+      { key: 'type', label: 'Type', width: forPdf ? 0.06 : undefined },
+      { key: 'category', label: 'Catégorie', width: forPdf ? 0.08 : undefined },
+      { key: 'description', label: 'Description', width: forPdf ? 0.14 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.07 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.07 : undefined },
+      { key: 'likelihood', label: 'Probabilité', width: forPdf ? 0.05 : undefined },
+      { key: 'impact', label: 'Impact', width: forPdf ? 0.05 : undefined },
+      { key: 'score', label: 'Score', width: forPdf ? 0.05 : undefined },
+      { key: 'current_controls', label: 'Maîtrises actuelles', width: forPdf ? 0.1 : undefined },
+      { key: 'treatment_plan', label: 'Plan de traitement', width: forPdf ? 0.1 : undefined },
+      { key: 'residual_likelihood', label: 'Probabilité résiduelle', width: forPdf ? 0.06 : undefined },
+      { key: 'residual_impact', label: 'Impact résiduel', width: forPdf ? 0.06 : undefined },
+      { key: 'residual_score', label: 'Score résiduel', width: forPdf ? 0.06 : undefined },
+      { key: 'owner', label: 'Responsable', width: forPdf ? 0.08 : undefined },
+      { key: 'review_date', label: 'Revue', width: forPdf ? 0.07 : undefined },
+      { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.06 : undefined },
+      { key: 'folder', label: 'Dossier', width: forPdf ? 0.06 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((risk) => ({
+      title: risk.title,
+      type: RISK_TYPE_LABELS[risk.type] || risk.type,
+      category: risk.category || '',
+      description: risk.description || '',
+      status: RISK_STATUS_LABELS[risk.status] || risk.status,
+      service: risk.service?.name || '',
+      likelihood: risk.likelihood ?? '',
+      impact: risk.impact ?? '',
+      score: risk.risk_score ?? '',
+      current_controls: risk.current_controls || '',
+      treatment_plan: risk.treatment_plan || '',
+      residual_likelihood: risk.residual_likelihood ?? '',
+      residual_impact: risk.residual_impact ?? '',
+      residual_score: risk.residual_score ?? '',
+      owner: risk.owner_user?.full_name || '',
+      review_date: formatDate(risk.review_date),
+      linked_capa: risk.linked_capa?.number || '',
+      folder: risk.folder?.name || '',
+    }));
+  }
+
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? risks.filter((risk) => scopeIds.includes(risk.id)) : risks;
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre', width: 0.3 },
-        { key: 'type', label: 'Type', width: 0.14 },
-        { key: 'status', label: 'Statut', width: 0.14 },
-        { key: 'score', label: 'Score', width: 0.1 },
-        { key: 'owner', label: 'Responsable', width: 0.16 },
-        { key: 'review_date', label: 'Revue', width: 0.16 },
-      ];
-      const rows = source.map((risk) => ({
-        title: risk.title,
-        type: RISK_TYPE_LABELS[risk.type] || risk.type,
-        status: RISK_STATUS_LABELS[risk.status] || risk.status,
-        score: risk.risk_score ?? '',
-        owner: risk.owner_user?.full_name || '',
-        review_date: formatDate(risk.review_date),
-      }));
       const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
       if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
       if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
-      await exportToPdf(`risques-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des risques', columns, rows, {
+      await exportToPdf(`risques-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des risques', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -557,28 +587,12 @@ export default function Risks() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Statut' },
-        { key: 'score', label: 'Score' },
-        { key: 'owner', label: 'Responsable' },
-        { key: 'review_date', label: 'Revue' },
-      ];
-      const rows = source.map((risk) => ({
-        title: risk.title,
-        type: RISK_TYPE_LABELS[risk.type] || risk.type,
-        status: RISK_STATUS_LABELS[risk.status] || risk.status,
-        score: risk.risk_score ?? '',
-        owner: risk.owner_user?.full_name || '',
-        review_date: formatDate(risk.review_date),
-      }));
       const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
       if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
       if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
-      await exportToXlsx(`risques-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Registre des risques', columns, rows, {
+      await exportToXlsx(`risques-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Registre des risques', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -594,28 +608,12 @@ export default function Risks() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Statut' },
-        { key: 'score', label: 'Score' },
-        { key: 'owner', label: 'Responsable' },
-        { key: 'review_date', label: 'Revue' },
-      ];
-      const rows = source.map((risk) => ({
-        title: risk.title,
-        type: RISK_TYPE_LABELS[risk.type] || risk.type,
-        status: RISK_STATUS_LABELS[risk.status] || risk.status,
-        score: risk.risk_score ?? '',
-        owner: risk.owner_user?.full_name || '',
-        review_date: formatDate(risk.review_date),
-      }));
       const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
       if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
       if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
-      await exportToWord(`risques-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre des risques', columns, rows, {
+      await exportToWord(`risques-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre des risques', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -632,28 +630,12 @@ export default function Risks() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Statut' },
-        { key: 'score', label: 'Score' },
-        { key: 'owner', label: 'Responsable' },
-        { key: 'review_date', label: 'Revue' },
-      ];
-      const rows = source.map((risk) => ({
-        title: risk.title,
-        type: RISK_TYPE_LABELS[risk.type] || risk.type,
-        status: RISK_STATUS_LABELS[risk.status] || risk.status,
-        score: risk.risk_score ?? '',
-        owner: risk.owner_user?.full_name || '',
-        review_date: formatDate(risk.review_date),
-      }));
       const countLabel = `${source.length} risque${source.length > 1 ? 's' : ''}`;
       const filterParts = [];
       if (typeFilter) filterParts.push(`Type : ${RISK_TYPE_LABELS[typeFilter] || typeFilter}`);
       if (statusFilter) filterParts.push(`Statut : ${RISK_STATUS_LABELS[statusFilter] || statusFilter}`);
       if (serviceFilter) filterParts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
-      await exportToDrive('RISQUE', 'Registre des risques', columns, rows, {
+      await exportToDrive('RISQUE', 'Registre des risques', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterParts].join(' · '),
         generatedBy: currentUser?.full_name,
       });

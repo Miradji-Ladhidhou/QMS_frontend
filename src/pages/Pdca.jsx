@@ -355,14 +355,26 @@ export default function Pdca() {
 
   // Mêmes cinq formats qu'ailleurs (Capas.jsx, Complaints.jsx...) — entièrement générés côté
   // client depuis projects déjà chargé, aucune route backend dédiée.
+  // plan_content/do_content/check_content/act_content : le contenu même du cycle PDCA
+  // (les 4 phases), jusqu'ici absent de tout export malgré une largeur de colonne calculée
+  // uniquement pour le PDF (forPdf) — Excel/Word/CSV n'ont pas cette contrainte de largeur
+  // imprimée, donc `width` reste undefined pour eux (voir listReportXlsx.js/listReportWord.js,
+  // qui l'ignorent de toute façon).
   function buildExportColumns({ forPdf } = {}) {
     return [
-      { key: 'title', label: 'Titre', width: forPdf ? 0.24 : undefined },
-      { key: 'status', label: 'Statut', width: forPdf ? 0.12 : undefined },
-      { key: 'service', label: 'Service', width: forPdf ? 0.16 : undefined },
-      { key: 'owner', label: 'Responsable', width: forPdf ? 0.16 : undefined },
-      { key: 'target_date', label: 'Date cible', width: forPdf ? 0.12 : undefined },
-      { key: 'description', label: 'Description', width: forPdf ? 0.2 : undefined },
+      { key: 'title', label: 'Titre', width: forPdf ? 0.16 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.12 : undefined },
+      { key: 'owner', label: 'Responsable', width: forPdf ? 0.12 : undefined },
+      { key: 'target_date', label: 'Date cible', width: forPdf ? 0.1 : undefined },
+      { key: 'closed_at', label: 'Date de clôture', width: forPdf ? 0.1 : undefined },
+      { key: 'description', label: 'Description', width: forPdf ? 0.14 : undefined },
+      { key: 'plan_content', label: 'Plan', width: forPdf ? 0.14 : undefined },
+      { key: 'do_content', label: 'Do', width: forPdf ? 0.14 : undefined },
+      { key: 'check_content', label: 'Check', width: forPdf ? 0.14 : undefined },
+      { key: 'act_content', label: 'Act', width: forPdf ? 0.14 : undefined },
+      { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.12 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.12 : undefined },
     ];
   }
 
@@ -373,7 +385,14 @@ export default function Pdca() {
       service: pdca.service?.name || '',
       owner: pdca.owner_user?.full_name || '',
       target_date: formatDate(pdca.target_date),
+      closed_at: formatDate(pdca.closed_at),
       description: pdca.description || '',
+      plan_content: pdca.plan_content || '',
+      do_content: pdca.do_content || '',
+      check_content: pdca.check_content || '',
+      act_content: pdca.act_content || '',
+      linked_capa: pdca.linked_capa?.number || '',
+      category: pdca.category?.name || '',
     }));
   }
 

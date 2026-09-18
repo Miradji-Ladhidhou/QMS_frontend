@@ -364,7 +364,9 @@ export default function Employees() {
       { key: 'full_name', label: 'Nom complet', width: forPdf ? 0.28 : undefined },
       { key: 'job_title', label: 'Fonction', width: forPdf ? 0.24 : undefined },
       { key: 'email', label: 'Email', width: forPdf ? 0.26 : undefined },
-      { key: 'status', label: 'Statut', width: forPdf ? 0.12 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
+      { key: 'training_exempt', label: 'Dispensé de formation', width: forPdf ? 0.12 : undefined },
+      { key: 'training_exempt_reason', label: 'Motif de dispense', width: forPdf ? 0.14 : undefined },
       { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
     ];
   }
@@ -375,6 +377,8 @@ export default function Employees() {
       job_title: employee.job_title || '',
       email: employee.email || '',
       status: employee.is_active ? 'Actif' : 'Inactif',
+      training_exempt: employee.training_exempt ? 'Oui' : 'Non',
+      training_exempt_reason: employee.training_exempt_reason || '',
       category: employee.category?.name || '',
     }));
   }
@@ -433,7 +437,7 @@ export default function Employees() {
     setExportError('');
     setDriveSuccess('');
     try {
-      await exportToDrive('PERSONNEL', 'Personnel', buildExportColumns(), buildExportRows(employees), {
+      await exportToDrive('PERSONNEL', 'Personnel', buildExportColumns({ forPdf: true }), buildExportRows(employees), {
         subtitle: exportSubtitle(employees),
         generatedBy: currentUser?.full_name,
       });

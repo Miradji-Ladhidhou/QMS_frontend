@@ -310,25 +310,39 @@ export default function Haccp() {
     return new Date(dateStr).toLocaleDateString('fr-FR');
   }
 
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.18 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.12 : undefined },
+      { key: 'product_description', label: 'Description du produit', width: forPdf ? 0.18 : undefined },
+      { key: 'scope', label: 'Périmètre', width: forPdf ? 0.16 : undefined },
+      { key: 'team', label: 'Équipe HACCP', width: forPdf ? 0.16 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
+      { key: 'created_at', label: 'Créé le', width: forPdf ? 0.1 : undefined },
+    ];
+  }
+
+  function buildExportRows(source) {
+    return source.map((plan) => ({
+      title: plan.title,
+      status: PLAN_STATUS_LABELS[plan.status] || plan.status,
+      service: plan.service?.name || '',
+      product_description: plan.product_description || '',
+      scope: plan.scope || '',
+      team: plan.team || '',
+      category: plan.category?.name || '',
+      created_at: formatDate(plan.created_at),
+    }));
+  }
+
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? plans.filter((plan) => scopeIds.includes(plan.id)) : plans;
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre', width: 0.32 },
-        { key: 'status', label: 'Statut', width: 0.16 },
-        { key: 'service', label: 'Service', width: 0.24 },
-        { key: 'created_at', label: 'Créé le', width: 0.28 },
-      ];
-      const rows = source.map((plan) => ({
-        title: plan.title,
-        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
-        service: plan.service?.name || '',
-        created_at: formatDate(plan.created_at),
-      }));
       const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
-      await exportToPdf(`haccp-${new Date().toISOString().slice(0, 10)}.pdf`, 'Plans HACCP', columns, rows, {
+      await exportToPdf(`haccp-${new Date().toISOString().slice(0, 10)}.pdf`, 'Plans HACCP', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -344,20 +358,8 @@ export default function Haccp() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'created_at', label: 'Créé le' },
-      ];
-      const rows = source.map((plan) => ({
-        title: plan.title,
-        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
-        service: plan.service?.name || '',
-        created_at: formatDate(plan.created_at),
-      }));
       const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
-      await exportToXlsx(`haccp-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Plans HACCP', columns, rows, {
+      await exportToXlsx(`haccp-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Plans HACCP', buildExportColumns(), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -373,20 +375,8 @@ export default function Haccp() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'created_at', label: 'Créé le' },
-      ];
-      const rows = source.map((plan) => ({
-        title: plan.title,
-        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
-        service: plan.service?.name || '',
-        created_at: formatDate(plan.created_at),
-      }));
       const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
-      await exportToWord(`haccp-${new Date().toISOString().slice(0, 10)}.docx`, 'Plans HACCP', columns, rows, {
+      await exportToWord(`haccp-${new Date().toISOString().slice(0, 10)}.docx`, 'Plans HACCP', buildExportColumns(), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });
@@ -403,20 +393,8 @@ export default function Haccp() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'created_at', label: 'Créé le' },
-      ];
-      const rows = source.map((plan) => ({
-        title: plan.title,
-        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
-        service: plan.service?.name || '',
-        created_at: formatDate(plan.created_at),
-      }));
       const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
-      await exportToDrive('HACCP', 'Plans HACCP', columns, rows, {
+      await exportToDrive('HACCP', 'Plans HACCP', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
         generatedBy: currentUser?.full_name,
       });

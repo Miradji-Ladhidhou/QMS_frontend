@@ -459,15 +459,45 @@ export default function Accidents() {
     return parts.join(' · ');
   }
 
+  // width uniquement pour le PDF (forPdf) — Excel/Word/CSV n'ont pas cette contrainte de
+  // largeur imprimée (voir listReportXlsx.js/listReportWord.js, qui l'ignorent de toute façon).
+  function buildExportColumns({ forPdf } = {}) {
+    return [
+      { key: 'title', label: 'Titre', width: forPdf ? 0.16 : undefined },
+      { key: 'occurred_at', label: 'Date', width: forPdf ? 0.08 : undefined },
+      { key: 'location', label: 'Lieu', width: forPdf ? 0.1 : undefined },
+      { key: 'severity', label: 'Gravité', width: forPdf ? 0.1 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
+      { key: 'person', label: 'Personne', width: forPdf ? 0.12 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.12 : undefined },
+      { key: 'with_lost_time', label: 'Arrêt de travail', width: forPdf ? 0.12 : undefined },
+      { key: 'description', label: 'Description', width: forPdf ? 0.16 : undefined },
+      { key: 'immediate_cause', label: 'Cause immédiate', width: forPdf ? 0.14 : undefined },
+      { key: 'immediate_actions', label: 'Actions immédiates', width: forPdf ? 0.14 : undefined },
+      { key: 'root_cause', label: 'Cause racine', width: forPdf ? 0.14 : undefined },
+      { key: 'closed_at', label: 'Date de clôture', width: forPdf ? 0.1 : undefined },
+      { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.1 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
+    ];
+  }
+
   function buildExportRows(source) {
     return source.map((accident) => ({
       title: accident.title,
       occurred_at: formatDate(accident.occurred_at),
+      location: accident.location || '',
       severity: ACCIDENT_SEVERITY_LABELS[accident.severity] || accident.severity,
       status: ACCIDENT_STATUS_LABELS[accident.status] || accident.status,
       person: injuredPersonName(accident) || '',
       service: accident.service?.name || '',
       with_lost_time: accident.with_lost_time ? `Oui (${accident.lost_days ?? '—'} j)` : 'Non',
+      description: accident.description || '',
+      immediate_cause: accident.immediate_cause || '',
+      immediate_actions: accident.immediate_actions || '',
+      root_cause: accident.root_cause || '',
+      closed_at: formatDate(accident.closed_at),
+      linked_capa: accident.linked_capa?.number || '',
+      category: accident.category?.name || '',
     }));
   }
 
@@ -485,16 +515,8 @@ export default function Accidents() {
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre', width: 0.26 },
-        { key: 'occurred_at', label: 'Date', width: 0.12 },
-        { key: 'severity', label: 'Gravité', width: 0.14 },
-        { key: 'status', label: 'Statut', width: 0.14 },
-        { key: 'person', label: 'Personne', width: 0.16 },
-        { key: 'service', label: 'Service', width: 0.18 },
-      ];
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToPdf(`accidents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des accidents du travail', columns, buildExportRows(source), {
+      await exportToPdf(`accidents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des accidents du travail', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -510,16 +532,8 @@ export default function Accidents() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'occurred_at', label: 'Date' },
-        { key: 'severity', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'person', label: 'Personne' },
-        { key: 'service', label: 'Service' },
-      ];
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToXlsx(`accidents-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Registre des accidents du travail', columns, buildExportRows(source), {
+      await exportToXlsx(`accidents-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Registre des accidents du travail', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -535,16 +549,8 @@ export default function Accidents() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'occurred_at', label: 'Date' },
-        { key: 'severity', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'person', label: 'Personne' },
-        { key: 'service', label: 'Service' },
-      ];
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToWord(`accidents-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre des accidents du travail', columns, buildExportRows(source), {
+      await exportToWord(`accidents-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre des accidents du travail', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -561,16 +567,8 @@ export default function Accidents() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'occurred_at', label: 'Date' },
-        { key: 'severity', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'person', label: 'Personne' },
-        { key: 'service', label: 'Service' },
-      ];
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToDrive('ACCIDENT', 'Registre des accidents du travail', columns, buildExportRows(source), {
+      await exportToDrive('ACCIDENT', 'Registre des accidents du travail', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });

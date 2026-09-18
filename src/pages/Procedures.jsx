@@ -439,12 +439,16 @@ export default function Procedures() {
     return [
       { key: 'number', label: 'Numéro' },
       { key: 'title', label: 'Titre' },
+      { key: 'process', label: 'Processus' },
       { key: 'status', label: 'Statut' },
       { key: 'current_version', label: 'Version courante' },
       { key: 'validated_at', label: 'Date de validation' },
       { key: 'next_review_date', label: 'Date de prochaine révision' },
       { key: 'author', label: 'Auteur' },
       { key: 'validator', label: 'Validateur' },
+      { key: 'obsolete_reason', label: 'Motif de mise à obsolète' },
+      { key: 'obsoleted_at', label: 'Mise à obsolète le' },
+      { key: 'category', label: 'Dossier' },
     ];
   }
 
@@ -452,12 +456,16 @@ export default function Procedures() {
     return procedures.map((procedure) => ({
       number: procedure.number,
       title: procedure.title,
+      process: procedure.process || '',
       status: STATUS_LABELS[procedure.status] || procedure.status,
       current_version: procedure.current_version?.version || '',
       validated_at: formatDate(procedure.current_version?.validated_at),
       next_review_date: formatDate(procedure.next_review_date),
       author: procedure.current_version?.author?.full_name || '',
       validator: procedure.current_version?.validator?.full_name || '',
+      obsolete_reason: procedure.obsolete_reason || '',
+      obsoleted_at: formatDate(procedure.obsoleted_at),
+      category: procedure.category?.name || '',
     }));
   }
 

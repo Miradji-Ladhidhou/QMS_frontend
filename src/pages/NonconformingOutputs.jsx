@@ -346,23 +346,37 @@ export default function NonconformingOutputs() {
   // côté client depuis outputs déjà chargé, aucune route backend dédiée.
   function buildExportColumns({ forPdf } = {}) {
     return [
-      { key: 'title', label: 'Titre', width: forPdf ? 0.26 : undefined },
-      { key: 'detected_at', label: 'Date de détection', width: forPdf ? 0.14 : undefined },
-      { key: 'status', label: 'Statut', width: forPdf ? 0.14 : undefined },
-      { key: 'disposition', label: 'Traitement', width: forPdf ? 0.16 : undefined },
-      { key: 'service', label: 'Service', width: forPdf ? 0.14 : undefined },
-      { key: 'customer_informed', label: 'Client informé', width: forPdf ? 0.16 : undefined },
+      { key: 'title', label: 'Titre', width: forPdf ? 0.12 : undefined },
+      { key: 'description', label: 'Description', width: forPdf ? 0.16 : undefined },
+      { key: 'detected_at', label: 'Date de détection', width: forPdf ? 0.08 : undefined },
+      { key: 'status', label: 'Statut', width: forPdf ? 0.08 : undefined },
+      { key: 'disposition', label: 'Traitement', width: forPdf ? 0.1 : undefined },
+      { key: 'action_taken', label: 'Action réalisée', width: forPdf ? 0.14 : undefined },
+      { key: 'concession_reference', label: 'Référence de dérogation', width: forPdf ? 0.1 : undefined },
+      { key: 'service', label: 'Service', width: forPdf ? 0.08 : undefined },
+      { key: 'customer_informed', label: 'Client informé', width: forPdf ? 0.08 : undefined },
+      { key: 'decider', label: 'Décidé par', width: forPdf ? 0.08 : undefined },
+      { key: 'closed_at', label: 'Clôturée le', width: forPdf ? 0.08 : undefined },
+      { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.08 : undefined },
+      { key: 'category', label: 'Dossier', width: forPdf ? 0.08 : undefined },
     ];
   }
 
   function buildExportRows(source) {
     return source.map((output) => ({
       title: output.title,
+      description: output.description || '',
       detected_at: formatDate(output.detected_at),
       status: NONCONFORMING_OUTPUT_STATUS_LABELS[output.status] || output.status,
       disposition: NONCONFORMING_OUTPUT_DISPOSITION_LABELS[output.disposition] || output.disposition,
+      action_taken: output.action_taken || '',
+      concession_reference: output.concession_reference || '',
       service: output.service?.name || '',
       customer_informed: output.customer_informed ? 'Oui' : 'Non',
+      decider: output.decider?.full_name || '',
+      closed_at: formatDate(output.closed_at),
+      linked_capa: output.linked_capa?.number || '',
+      category: output.category?.name || '',
     }));
   }
 
@@ -436,7 +450,7 @@ export default function NonconformingOutputs() {
     setExportError('');
     setDriveSuccess('');
     try {
-      await exportToDrive('NC', 'Non-conformités produit/service', buildExportColumns(), buildExportRows(source), {
+      await exportToDrive('NC', 'Non-conformités produit/service', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: exportSubtitle(source),
         generatedBy: currentUser?.full_name,
       });

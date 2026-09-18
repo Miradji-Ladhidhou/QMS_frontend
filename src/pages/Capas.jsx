@@ -852,32 +852,61 @@ export default function Capas() {
     [sortedCapas, currentFolderId]
   );
 
-  // Volontairement plus détaillé que columns dans handleExportPdf/handleExportXlsx (15 champs
-  // contre 6) : le CSV/Excel se prête mieux à un export complet consultable dans un tableur,
-  // alors que le PDF reste un résumé pensé pour être lisible imprimé — divergence déjà présente
-  // avant le passage au backend, conservée telle quelle plutôt qu'unifiée sur le plus court.
+  // Mêmes colonnes pour PDF/Excel/Word (avant : 6 champs identiques dans les 3, malgré un
+  // commentaire prétendant Excel plus détaillé — jamais vrai) : le contenu ISO d'une CAPA
+  // (cause racine, actions, efficacité) doit être consultable dans les 3 formats, pas
+  // seulement dans l'app. severity n'apparaît pas : champ historique désormais toujours égal à
+  // priority (voir handleSubmit plus haut), l'inclure doublonnerait Gravité pour rien.
+  function buildCapaExportColumns() {
+    return [
+      { key: 'number', label: 'Numéro' },
+      { key: 'title', label: 'Objet' },
+      { key: 'description', label: 'Description' },
+      { key: 'origin', label: 'Origine' },
+      { key: 'priority', label: 'Gravité' },
+      { key: 'status', label: 'Statut' },
+      { key: 'service', label: 'Service' },
+      { key: 'due_date', label: 'Échéance' },
+      { key: 'assigned', label: 'Responsable' },
+      { key: 'root_cause', label: 'Cause racine' },
+      { key: 'corrective_action', label: 'Action corrective' },
+      { key: 'preventive_action', label: 'Action préventive' },
+      { key: 'effectiveness', label: 'Efficacité vérifiée' },
+      { key: 'effectiveness_notes', label: "Notes d'efficacité" },
+      { key: 'comment', label: 'Commentaire' },
+      { key: 'closed_at', label: 'Date de clôture' },
+      { key: 'category', label: 'Dossier' },
+    ];
+  }
+
+  function buildCapaExportRows(source) {
+    return source.map((capa) => ({
+      number: capa.number,
+      title: capa.title,
+      description: capa.description || '',
+      origin: capa.origin || '',
+      priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
+      status: CAPA_STATUS_LABELS[capa.status] || capa.status,
+      service: capa.service?.name || '',
+      due_date: formatDate(capa.due_date),
+      assigned: capa.assigned?.full_name || '',
+      root_cause: capa.root_cause || '',
+      corrective_action: capa.corrective_action || '',
+      preventive_action: capa.preventive_action || '',
+      effectiveness: CAPA_EFFECTIVENESS_LABELS[capa.effectiveness_verified] || '',
+      effectiveness_notes: capa.effectiveness_notes || '',
+      comment: capa.comment || '',
+      closed_at: formatDate(capa.closed_at),
+      category: capa.category?.name || '',
+    }));
+  }
+
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
     setExportingPdf(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro', width: 0.11 },
-        { key: 'title', label: 'Objet', width: 0.28 },
-        { key: 'priority', label: 'Gravité', width: 0.11 },
-        { key: 'status', label: 'Statut', width: 0.13 },
-        { key: 'due_date', label: 'Échéance', width: 0.13 },
-        { key: 'assigned', label: 'Responsable', width: 0.24 },
-      ];
-      const rows = source.map((capa) => ({
-        number: capa.number,
-        title: capa.title,
-        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
-        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
-        due_date: formatDate(capa.due_date),
-        assigned: capa.assigned?.full_name || '',
-      }));
-      await exportToPdf(`capa-${new Date().toISOString().slice(0, 10)}.pdf`, 'CAPA', columns, rows, {
+      await exportToPdf(`capa-${new Date().toISOString().slice(0, 10)}.pdf`, 'CAPA', buildCapaExportColumns(), buildCapaExportRows(source), {
         subtitle: `${source.length} CAPA`,
         generatedBy: currentUser?.full_name,
       });
@@ -893,23 +922,7 @@ export default function Capas() {
     setExportingXlsx(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro' },
-        { key: 'title', label: 'Objet' },
-        { key: 'priority', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'due_date', label: 'Échéance' },
-        { key: 'assigned', label: 'Responsable' },
-      ];
-      const rows = source.map((capa) => ({
-        number: capa.number,
-        title: capa.title,
-        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
-        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
-        due_date: formatDate(capa.due_date),
-        assigned: capa.assigned?.full_name || '',
-      }));
-      await exportToXlsx(`capa-${new Date().toISOString().slice(0, 10)}.xlsx`, 'CAPA', columns, rows, {
+      await exportToXlsx(`capa-${new Date().toISOString().slice(0, 10)}.xlsx`, 'CAPA', buildCapaExportColumns(), buildCapaExportRows(source), {
         subtitle: `${source.length} CAPA`,
         generatedBy: currentUser?.full_name,
       });
@@ -925,23 +938,7 @@ export default function Capas() {
     setExportingWord(true);
     setExportPdfError('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro' },
-        { key: 'title', label: 'Objet' },
-        { key: 'priority', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'due_date', label: 'Échéance' },
-        { key: 'assigned', label: 'Responsable' },
-      ];
-      const rows = source.map((capa) => ({
-        number: capa.number,
-        title: capa.title,
-        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
-        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
-        due_date: formatDate(capa.due_date),
-        assigned: capa.assigned?.full_name || '',
-      }));
-      await exportToWord(`capa-${new Date().toISOString().slice(0, 10)}.docx`, 'CAPA', columns, rows, {
+      await exportToWord(`capa-${new Date().toISOString().slice(0, 10)}.docx`, 'CAPA', buildCapaExportColumns(), buildCapaExportRows(source), {
         subtitle: `${source.length} CAPA`,
         generatedBy: currentUser?.full_name,
       });
