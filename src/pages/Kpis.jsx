@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowLeft,
   ArrowRight,
   BarChart3,
@@ -2731,7 +2732,7 @@ function KpiCard({
   const averageValue =
     recentRecords.length > 0 ? Number((recentRecords.reduce((sum, r) => sum + r.value, 0) / recentRecords.length).toFixed(2)) : null;
   const status = getKpiStatus(averageValue, kpi.target, targetDirection);
-  const StatusIcon = status === 'good' ? CheckCircle2 : status === 'bad' ? AlertCircle : null;
+  const StatusIcon = status === 'good' ? CheckCircle2 : status === 'warning' ? AlertTriangle : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
   const hasEnoughForChart = chartData.length >= 2;
   const isImportBased = kpi.calculation_type === 'import';
@@ -2994,18 +2995,24 @@ function KpiCard({
         {averageValue === null ? (
           <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         ) : showMultiSeries ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+          <div className="flex w-full flex-col gap-2">
             {averagesByLabel.map(({ label, color, average, status: seriesStatus }) => {
-              const SeriesStatusIcon = seriesStatus === 'good' ? CheckCircle2 : seriesStatus === 'bad' ? AlertCircle : null;
+              const SeriesStatusIcon =
+                seriesStatus === 'good' ? CheckCircle2 : seriesStatus === 'warning' ? AlertTriangle : seriesStatus === 'bad' ? AlertCircle : null;
               return (
-                <div key={label} className="flex items-center gap-1.5">
+                <div key={label} className="flex flex-wrap items-center gap-2">
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                   <span className="whitespace-nowrap text-xs text-slate-500">{label}</span>
                   <span className="whitespace-nowrap text-sm font-semibold text-slate-900">
                     {average !== null ? `${average} ${kpi.unit || ''}` : '—'}
                   </span>
                   {SeriesStatusIcon && (
-                    <SeriesStatusIcon size={14} className={KPI_STATUS_STYLES[seriesStatus]} aria-label={KPI_STATUS_LABELS[seriesStatus]} />
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${KPI_STATUS_BADGE_STYLES[seriesStatus]}`}
+                    >
+                      <SeriesStatusIcon size={12} />
+                      {KPI_STATUS_LABELS[seriesStatus]}
+                    </span>
                   )}
                 </div>
               );
