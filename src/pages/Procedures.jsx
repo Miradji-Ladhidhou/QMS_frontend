@@ -452,8 +452,8 @@ export default function Procedures() {
     ];
   }
 
-  function buildExportRows() {
-    return procedures.map((procedure) => ({
+  function buildExportRows(source) {
+    return source.map((procedure) => ({
       number: procedure.number,
       title: procedure.title,
       process: procedure.process || '',
@@ -469,7 +469,8 @@ export default function Procedures() {
     }));
   }
 
-  async function handleExportPdf() {
+  async function handleExportPdf(scopeIds) {
+    const source = scopeIds ? procedures.filter((procedure) => scopeIds.includes(procedure.id)) : procedures;
     setExportingPdf(true);
     setExportError('');
     try {
@@ -477,8 +478,8 @@ export default function Procedures() {
         `procedures-${new Date().toISOString().slice(0, 10)}.pdf`,
         'Procédures',
         buildExportColumns(),
-        buildExportRows(),
-        { subtitle: `${procedures.length} procédures`, generatedBy: currentUser?.full_name }
+        buildExportRows(source),
+        { subtitle: `${source.length} procédures`, generatedBy: currentUser?.full_name }
       );
     } catch {
       setExportError('Impossible de générer le PDF.');
@@ -487,7 +488,8 @@ export default function Procedures() {
     }
   }
 
-  async function handleExportXlsx() {
+  async function handleExportXlsx(scopeIds) {
+    const source = scopeIds ? procedures.filter((procedure) => scopeIds.includes(procedure.id)) : procedures;
     setExportingXlsx(true);
     setExportError('');
     try {
@@ -495,8 +497,8 @@ export default function Procedures() {
         `procedures-${new Date().toISOString().slice(0, 10)}.xlsx`,
         'Procédures',
         buildExportColumns(),
-        buildExportRows(),
-        { subtitle: `${procedures.length} procédures`, generatedBy: currentUser?.full_name }
+        buildExportRows(source),
+        { subtitle: `${source.length} procédures`, generatedBy: currentUser?.full_name }
       );
     } catch {
       setExportError("Impossible de générer le fichier Excel.");
@@ -505,7 +507,8 @@ export default function Procedures() {
     }
   }
 
-  async function handleExportWord() {
+  async function handleExportWord(scopeIds) {
+    const source = scopeIds ? procedures.filter((procedure) => scopeIds.includes(procedure.id)) : procedures;
     setExportingWord(true);
     setExportError('');
     try {
@@ -513,8 +516,8 @@ export default function Procedures() {
         `procedures-${new Date().toISOString().slice(0, 10)}.docx`,
         'Procédures',
         buildExportColumns(),
-        buildExportRows(),
-        { subtitle: `${procedures.length} procédures`, generatedBy: currentUser?.full_name }
+        buildExportRows(source),
+        { subtitle: `${source.length} procédures`, generatedBy: currentUser?.full_name }
       );
     } catch {
       setExportError('Impossible de générer le document Word.');
@@ -523,13 +526,14 @@ export default function Procedures() {
     }
   }
 
-  async function handleExportDrive() {
+  async function handleExportDrive(scopeIds) {
+    const source = scopeIds ? procedures.filter((procedure) => scopeIds.includes(procedure.id)) : procedures;
     setExportingDrive(true);
     setExportError('');
     setDriveSuccess('');
     try {
-      await exportToDrive('Procédures', 'Procédures', buildExportColumns(), buildExportRows(), {
-        subtitle: `${procedures.length} procédures`,
+      await exportToDrive('Procédures', 'Procédures', buildExportColumns(), buildExportRows(source), {
+        subtitle: `${source.length} procédures`,
         generatedBy: currentUser?.full_name,
       });
       setDriveSuccess('Enregistré sur le Drive partagé.');
@@ -638,6 +642,14 @@ export default function Procedures() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
+          onExportPdf={() => handleExportPdf(selectedIds)}
+          exportingPdf={exportingPdf}
+          onExportXlsx={() => handleExportXlsx(selectedIds)}
+          exportingXlsx={exportingXlsx}
+          onExportWord={() => handleExportWord(selectedIds)}
+          exportingWord={exportingWord}
+          onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive(selectedIds) : undefined}
+          exportingDrive={exportingDrive}
           onDelete={handleBulkDelete}
           onClear={() => setSelectedIds([])}
         />

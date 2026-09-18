@@ -3830,6 +3830,8 @@ export default function Kpis() {
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
   const [generatingReportXlsx, setGeneratingReportXlsx] = useState(false);
+  const [exportingSelectionPdf, setExportingSelectionPdf] = useState(false);
+  const [exportingSelectionXlsx, setExportingSelectionXlsx] = useState(false);
   // Dans l'URL (?folder=...), jamais un simple useState : sinon ouvrir des dossiers imbriqués
   // ne crée aucune entrée d'historique et le retour natif du navigateur/téléphone saute par-
   // dessus toute la navigation (voir lib/useFolderNavigation.js, même raisonnement — Kpis.jsx
@@ -4115,6 +4117,41 @@ export default function Kpis() {
     }
   }
 
+  // Contrairement à handleGenerateReport/handleGenerateReportXlsx (toujours tout le tenant, par
+  // choix explicite), ces deux-là exportent uniquement les KPI cochés dans la barre de
+  // sélection — ?ids= sur GET /kpis/report (voir kpis.js).
+  async function handleExportSelectionPdf() {
+    const tab = openBlankTab();
+    setError('');
+    setExportingSelectionPdf(true);
+    try {
+      const response = await api.get('/kpis/report', { params: { ids: selectedIds.join(',') }, responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      if (tab) tab.location.href = url;
+    } catch {
+      tab?.close();
+      setError('Impossible de générer le rapport.');
+    } finally {
+      setExportingSelectionPdf(false);
+    }
+  }
+
+  async function handleExportSelectionXlsx() {
+    setError('');
+    setExportingSelectionXlsx(true);
+    try {
+      await getXlsxDownload(
+        '/kpis/report',
+        { format: 'xlsx', ids: selectedIds.join(',') },
+        `rapport-kpis-${new Date().toISOString().slice(0, 10)}.xlsx`
+      );
+    } catch {
+      setError('Impossible de générer le rapport.');
+    } finally {
+      setExportingSelectionXlsx(false);
+    }
+  }
+
   const { sorted: sortedKpis, sortKey, direction, setSortKey, toggleSort } = useSort(
     kpis,
     getKpiSortValue,
@@ -4219,6 +4256,10 @@ export default function Kpis() {
               count={selectedIds.length}
               onMove={() => setIsBulkMoveModalOpen(true)}
               onCompare={selectedIds.length >= 2 ? () => setCompareOpen(true) : undefined}
+              onExportPdf={handleExportSelectionPdf}
+              exportingPdf={exportingSelectionPdf}
+              onExportXlsx={handleExportSelectionXlsx}
+              exportingXlsx={exportingSelectionXlsx}
               onDelete={handleBulkDelete}
               onClear={() => setSelectedIds([])}
             />
