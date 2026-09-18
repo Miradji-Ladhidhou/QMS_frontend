@@ -4097,18 +4097,15 @@ export default function Kpis() {
 
   // Même schéma que le certificat de signature (DocumentDetail.jsx) : ouvre le PDF dans un
   // nouvel onglet plutôt qu'un téléchargement forcé, pour permettre un aperçu avant impression.
-  // folder_id = exactement le dossier actuellement affiché (racine ou sous-dossier) : le PDF
-  // doit toujours correspondre à ce que l'utilisateur regarde à l'écran, jamais à tout le
-  // tenant en vrac si un dossier est ouvert — voir GET /kpis/report côté backend.
+  // Toujours TOUT le tenant, organisé par dossier (voir GET /kpis/report côté backend) — pas
+  // limité au dossier actuellement affiché à l'écran : un rapport d'audit doit couvrir
+  // l'ensemble des KPI, jamais juste ce qui est ouvert au moment du clic.
   async function handleGenerateReport() {
     const tab = openBlankTab();
     setError('');
     setGeneratingReport(true);
     try {
-      const response = await api.get('/kpis/report', {
-        params: { folder_id: currentFolderId || 'root' },
-        responseType: 'blob',
-      });
+      const response = await api.get('/kpis/report', { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       if (tab) tab.location.href = url;
     } catch {
@@ -4119,18 +4116,15 @@ export default function Kpis() {
     }
   }
 
-  // Même filtrage par dossier que handleGenerateReport, format Excel côté backend (?format=xlsx,
-  // voir GET /kpis/report) : un classeur avec l'historique complet des relevés (pas seulement
-  // la fenêtre récente affichée sur le PDF), pour qui veut filtrer/trier les données brutes.
+  // Même portée que handleGenerateReport (tout le tenant, organisé par dossier), format Excel
+  // côté backend (?format=xlsx, voir GET /kpis/report) : un classeur avec l'historique complet
+  // des relevés (pas seulement la fenêtre récente affichée sur le PDF), pour qui veut
+  // filtrer/trier les données brutes.
   async function handleGenerateReportXlsx() {
     setError('');
     setGeneratingReportXlsx(true);
     try {
-      await getXlsxDownload(
-        '/kpis/report',
-        { folder_id: currentFolderId || 'root', format: 'xlsx' },
-        `rapport-kpis-${new Date().toISOString().slice(0, 10)}.xlsx`
-      );
+      await getXlsxDownload('/kpis/report', { format: 'xlsx' }, `rapport-kpis-${new Date().toISOString().slice(0, 10)}.xlsx`);
     } catch {
       setError('Impossible de générer le rapport.');
     } finally {
