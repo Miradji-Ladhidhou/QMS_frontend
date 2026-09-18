@@ -2701,12 +2701,26 @@ function KpiCard({
   });
   const chartData = Array.from(chartDataByPeriod.values());
 
+  const targetDirection = kpi.target_direction || 'min';
+  // Statut par série (moyenne des KPI_RECENT_WINDOW dernières périodes DE CETTE SÉRIE, pas de
+  // tout le KPI) comparée à l'unique target/target_direction du KPI — il n'y a qu'un seul
+  // objectif par KPI, jamais un par série, mais chaque série peut l'atteindre ou non
+  // indépendamment des autres. `average` (affiché à côté) reste la moyenne SUR TOUTE LA VIE de
+  // la série, volontairement distincte de celle utilisée ici pour le statut — même principe que
+  // averageValue/status plus bas (moyenne récente) vs. l'historique complet du graphique.
   const averagesByLabel = orderedLabels.map((label, i) => {
-    const values = records.filter((r) => labelForRecord(r) === label).map((r) => r.value);
+    const seriesRecords = records.filter((r) => labelForRecord(r) === label);
+    const values = seriesRecords.map((r) => r.value);
+    const recentSeriesRecords = [...seriesRecords].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
+    const recentAverage =
+      recentSeriesRecords.length > 0
+        ? Number((recentSeriesRecords.reduce((sum, r) => sum + r.value, 0) / recentSeriesRecords.length).toFixed(2))
+        : null;
     return {
       label,
       color: SERIES_COLORS[i % SERIES_COLORS.length],
       average: values.length > 0 ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)) : null,
+      status: getKpiStatus(recentAverage, kpi.target, targetDirection),
     };
   });
   // La valeur mise en avant sur la carte est la moyenne des KPI_RECENT_WINDOW dernières
@@ -2716,7 +2730,6 @@ function KpiCard({
   const recentRecords = [...records].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
   const averageValue =
     recentRecords.length > 0 ? Number((recentRecords.reduce((sum, r) => sum + r.value, 0) / recentRecords.length).toFixed(2)) : null;
-  const targetDirection = kpi.target_direction || 'min';
   const status = getKpiStatus(averageValue, kpi.target, targetDirection);
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
@@ -2982,15 +2995,21 @@ function KpiCard({
           <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         ) : showMultiSeries ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
-            {averagesByLabel.map(({ label, color, average }) => (
-              <div key={label} className="flex items-center gap-1.5">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
-                <span className="whitespace-nowrap text-xs text-slate-500">{label}</span>
-                <span className="whitespace-nowrap text-sm font-semibold text-slate-900">
-                  {average !== null ? `${average} ${kpi.unit || ''}` : '—'}
-                </span>
-              </div>
-            ))}
+            {averagesByLabel.map(({ label, color, average, status: seriesStatus }) => {
+              const SeriesStatusIcon = seriesStatus === 'good' ? CheckCircle2 : seriesStatus === 'bad' ? AlertCircle : null;
+              return (
+                <div key={label} className="flex items-center gap-1.5">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+                  <span className="whitespace-nowrap text-xs text-slate-500">{label}</span>
+                  <span className="whitespace-nowrap text-sm font-semibold text-slate-900">
+                    {average !== null ? `${average} ${kpi.unit || ''}` : '—'}
+                  </span>
+                  {SeriesStatusIcon && (
+                    <SeriesStatusIcon size={14} className={KPI_STATUS_STYLES[seriesStatus]} aria-label={KPI_STATUS_LABELS[seriesStatus]} />
+                  )}
+                </div>
+              );
+            })}
             <span className="whitespace-nowrap text-xs text-slate-400">(moyennes)</span>
           </div>
         ) : (
