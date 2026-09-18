@@ -45,7 +45,7 @@ import {
 import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
-import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
+import { getKpiStatus, KPI_STATUS_BADGE_STYLES, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportTableCsv, exportToWord, getXlsxDownload } from '../lib/pdfExport.js';
 import ExportMenu from '../components/ExportMenu.jsx';
@@ -2812,6 +2812,14 @@ function KpiCard({
               </p>
             )}
             <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {!showMultiSeries && StatusIcon && (
+                <span
+                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${KPI_STATUS_BADGE_STYLES[status]}`}
+                >
+                  <StatusIcon size={11} />
+                  {KPI_STATUS_LABELS[status]}
+                </span>
+              )}
               {kpi.frequency && (
                 <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
                   {FREQUENCY_LABELS[kpi.frequency] || kpi.frequency}
