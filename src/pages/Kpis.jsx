@@ -79,6 +79,27 @@ const SERIES_COLORS = ['#1F3864', '#E69F00', '#009E73', '#CC79A7', '#0072B2', '#
 // moment.
 const KPI_RECENT_WINDOW = 6;
 
+// Unités les plus utilisées parmi les ~130 modèles de KPI prêts à l'emploi
+// (backend/src/services/moduleKpiSources.js) — "jours" et "%" en tête, puis le nom de
+// l'élément compté (CAPA, réclamations...). Suggestions via <datalist> : le champ reste un
+// simple texte libre, jamais une liste fermée — une unité absente d'ici doit rester saisissable.
+const COMMON_KPI_UNITS = [
+  'jours',
+  '%',
+  'heures',
+  'minutes',
+  'CAPA',
+  'non-conformités',
+  'réclamations',
+  'risques',
+  'fournisseurs',
+  'documents',
+  'procédures',
+  'actions',
+  '/5',
+  'points',
+];
+
 const KPI_SORT_OPTIONS = [
   { key: 'latest_date', label: 'dernière valeur' },
   { key: 'name', label: 'nom' },
@@ -470,11 +491,17 @@ function KpiFormModal({ kpi, folderId, categories, users, onClose, onSaved }) {
             <label className="mb-1 block text-sm font-medium text-slate-700">Unité</label>
             <input
               type="text"
-              placeholder="%, h, nb..."
+              list="kpi-unit-suggestions"
+              placeholder="jours, %, heures..."
               value={form.unit}
               onChange={(e) => updateField('unit', e.target.value)}
               className={inputClassName('unit')}
             />
+            <datalist id="kpi-unit-suggestions">
+              {COMMON_KPI_UNITS.map((unit) => (
+                <option key={unit} value={unit} />
+              ))}
+            </datalist>
             {fieldErrors.unit && <p className="mt-1 text-xs text-red-600">{fieldErrors.unit}</p>}
           </div>
 
@@ -498,13 +525,11 @@ function KpiFormModal({ kpi, folderId, categories, users, onClose, onSaved }) {
                 onChange={(e) => updateField('target_direction', e.target.value)}
                 className={inputClassName('target_direction')}
               >
-                <option value="min">Au moins (min)</option>
-                <option value="max">Au maximum (max)</option>
+                <option value="min">Plus haut, mieux c'est</option>
+                <option value="max">Plus bas, mieux c'est</option>
               </select>
               <p className="mt-1 text-xs text-slate-400">
-                {form.target_direction === 'max'
-                  ? "Plus la valeur est basse, mieux c'est (ex : taux de retour)."
-                  : "Plus la valeur est haute, mieux c'est (ex : taux de service)."}
+                {form.target_direction === 'max' ? 'Ex : taux de retour.' : 'Ex : taux de service.'}
               </p>
               {fieldErrors.target_direction && (
                 <p className="mt-1 text-xs text-red-600">{fieldErrors.target_direction}</p>
@@ -584,10 +609,36 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
   const [showConflictAction, setShowConflictAction] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
+  // Plage horaire (début/fin) plutôt que saisir directement le nombre d'heures — utile pour
+  // un KPI de type "temps de réponse/traitement" où on connaît les deux horodatages mais pas
+  // la durée elle-même. Simple aide à la saisie : seule la valeur calculée (value, en heures)
+  // est enregistrée, la plage elle-même n'est jamais persistée (pas de colonnes dédiées sur
+  // kpi_records) — en édition, le début/fin repartent donc vides plutôt que reconstitués.
+  // Proposé uniquement quand l'unité du KPI est "heures".
+  const isHoursUnit = (kpi.unit || '').trim().toLowerCase() === 'heures';
+  const [entryMode, setEntryMode] = useState('direct');
+  const [rangeStart, setRangeStart] = useState('');
+  const [rangeEnd, setRangeEnd] = useState('');
+  const rangeDiffHours =
+    rangeStart && rangeEnd ? (new Date(rangeEnd).getTime() - new Date(rangeStart).getTime()) / (1000 * 60 * 60) : null;
+
+  useEffect(() => {
+    if (entryMode === 'range' && rangeDiffHours !== null && rangeDiffHours >= 0) {
+      setValue(rangeDiffHours.toFixed(2));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entryMode, rangeDiffHours]);
+
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
     setShowConflictAction(false);
+
+    if (entryMode === 'range' && (rangeDiffHours === null || rangeDiffHours < 0)) {
+      setError(rangeDiffHours === null ? 'Choisis un début et une fin pour calculer la durée.' : 'La fin doit être après le début.');
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
@@ -691,15 +742,72 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Valeur {kpi.unit ? `(${kpi.unit})` : ''}</label>
-            <input
-              type="number"
-              step="any"
-              required
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-sm font-medium text-slate-700">Valeur {kpi.unit ? `(${kpi.unit})` : ''}</label>
+              {isHoursUnit && (
+                <div className="flex overflow-hidden rounded-md border border-slate-300 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode('direct')}
+                    className={`px-2 py-1 font-medium transition-colors ${
+                      entryMode === 'direct' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Saisie directe
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEntryMode('range')}
+                    className={`px-2 py-1 font-medium transition-colors ${
+                      entryMode === 'range' ? 'bg-primary text-white' : 'text-slate-600 hover:bg-slate-50'
+                    }`}
+                  >
+                    Plage horaire
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {isHoursUnit && entryMode === 'range' ? (
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-500">Début</label>
+                    <input
+                      type="datetime-local"
+                      value={rangeStart}
+                      onChange={(e) => setRangeStart(e.target.value)}
+                      className="w-full rounded-md border border-slate-300 px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs text-slate-500">Fin</label>
+                    <input
+                      type="datetime-local"
+                      value={rangeEnd}
+                      onChange={(e) => setRangeEnd(e.target.value)}
+                      className="w-full rounded-md border border-slate-300 px-2 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                    />
+                  </div>
+                </div>
+                <p className={`text-xs ${rangeDiffHours !== null && rangeDiffHours < 0 ? 'text-red-600' : 'text-slate-500'}`}>
+                  {rangeDiffHours === null
+                    ? 'Choisis un début et une fin pour calculer la durée.'
+                    : rangeDiffHours < 0
+                      ? 'La fin doit être après le début.'
+                      : `Durée calculée : ${rangeDiffHours.toFixed(2)} heures`}
+                </p>
+              </div>
+            ) : (
+              <input
+                type="number"
+                step="any"
+                required
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            )}
           </div>
 
           <div>
