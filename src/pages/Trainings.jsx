@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_EFFECTIVENESS_STYLES } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -1100,7 +1100,6 @@ export default function Trainings() {
   const [editingTraining, setEditingTraining] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -1293,38 +1292,6 @@ export default function Trainings() {
     }
   }
 
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const columns = [
-        { key: 'training', label: 'Formation' },
-        { key: 'type', label: 'Type' },
-        { key: 'person', label: 'Personne' },
-        { key: 'status', label: 'Statut personnel' },
-        { key: 'completed_at', label: 'Date de réalisation' },
-      ];
-      const rows = source.flatMap((training) =>
-        training.records.map((record) => ({
-          training: training.title,
-          type: training.type || '',
-          person: personName(record),
-          status: record.employee_id ? 'Sans compte' : 'Compte',
-          completed_at: formatDate(record.completed_at),
-        }))
-      );
-      await exportTableCsv(`formations-${new Date().toISOString().slice(0, 10)}.csv`, 'Formations', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle: `${rows.length} réalisation${rows.length > 1 ? 's' : ''}`,
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? trainings.filter((training) => scopeIds.includes(training.id)) : trainings;
     setExportingPdf(true);
@@ -1494,8 +1461,6 @@ export default function Trainings() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={!hasAnyRecord}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -1583,8 +1548,6 @@ export default function Trainings() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

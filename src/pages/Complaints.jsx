@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -280,7 +280,6 @@ export default function Complaints() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -378,41 +377,6 @@ export default function Complaints() {
   function handleCreated(complaint) {
     setIsModalOpen(false);
     navigate(`/complaints/${complaint.id}`);
-  }
-
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? complaints.filter((complaint) => scopeIds.includes(complaint.id)) : complaints;
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const columns = [
-        { key: 'customer_name', label: 'Client' },
-        { key: 'description', label: 'Description' },
-        { key: 'severity', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'received_date', label: 'Date de réception' },
-        { key: 'due_date', label: 'Échéance de réponse' },
-        { key: 'assigned', label: 'Assigné' },
-      ];
-      const rows = source.map((complaint) => ({
-        customer_name: complaint.customer_name,
-        description: complaint.description || '',
-        severity: CAPA_PRIORITY_LABELS[complaint.severity] || complaint.severity,
-        status: COMPLAINT_STATUS_LABELS[complaint.status] || complaint.status,
-        received_date: formatDate(complaint.received_date),
-        due_date: formatDate(complaint.due_date),
-        assigned: complaint.assigned?.full_name || '',
-      }));
-      const countLabel = `${source.length} réclamation${source.length > 1 ? 's' : ''}`;
-      await exportTableCsv(`reclamations-${new Date().toISOString().slice(0, 10)}.csv`, 'Réclamations clients', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle: statusFilter ? `${countLabel} · Statut : ${COMPLAINT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -556,8 +520,6 @@ export default function Complaints() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={complaints.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -629,8 +591,6 @@ export default function Complaints() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

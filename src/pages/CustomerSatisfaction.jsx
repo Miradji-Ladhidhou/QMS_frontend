@@ -7,7 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { SATISFACTION_METHOD_LABELS } from '../lib/customerSatisfactionStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SatisfactionMethodBadge from '../components/SatisfactionMethodBadge.jsx';
@@ -233,7 +233,6 @@ export default function CustomerSatisfaction() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -380,25 +379,6 @@ export default function CustomerSatisfaction() {
     return methodFilter ? `${countLabel} · Méthode : ${SATISFACTION_METHOD_LABELS[methodFilter] || methodFilter}` : countLabel;
   }
 
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? surveys.filter((survey) => scopeIds.includes(survey.id)) : surveys;
-    setExportingCsv(true);
-    setExportError('');
-    try {
-      await exportTableCsv(
-        `satisfaction-client-${new Date().toISOString().slice(0, 10)}.csv`,
-        'Satisfaction client',
-        buildExportColumns(),
-        buildExportRows(source),
-        { generatedBy: currentUser?.full_name, subtitle: exportSubtitle(source) }
-      );
-    } catch {
-      setExportError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? surveys.filter((survey) => scopeIds.includes(survey.id)) : surveys;
     setExportingPdf(true);
@@ -481,8 +461,6 @@ export default function CustomerSatisfaction() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={surveys.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -572,8 +550,6 @@ export default function CustomerSatisfaction() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

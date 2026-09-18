@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -300,7 +300,6 @@ export default function Procedures() {
   const [statusFilter, setStatusFilter] = useState('');
   const [processFilter, setProcessFilter] = useState('');
   const [search, setSearch] = useState('');
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -462,24 +461,6 @@ export default function Procedures() {
     }));
   }
 
-  async function handleExportCsv() {
-    setExportingCsv(true);
-    setExportError('');
-    try {
-      await exportTableCsv(
-        `procedures-${new Date().toISOString().slice(0, 10)}.csv`,
-        'Procédures',
-        buildExportColumns(),
-        buildExportRows(),
-        { generatedBy: currentUser?.full_name, subtitle: `${procedures.length} procédures` }
-      );
-    } catch {
-      setExportError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportPdf() {
     setExportingPdf(true);
     setExportError('');
@@ -558,8 +539,6 @@ export default function Procedures() {
         <div className="flex flex-wrap gap-2">
           <ExportMenu
             disabled={procedures.length === 0}
-            onExportCsv={handleExportCsv}
-            exportingCsv={exportingCsv}
             onExportPdf={handleExportPdf}
             exportingPdf={exportingPdf}
             onExportXlsx={handleExportXlsx}

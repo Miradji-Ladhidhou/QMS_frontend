@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -938,7 +938,6 @@ export default function Planning() {
   const [error, setError] = useState('');
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
   const [editingTaskId, setEditingTaskId] = useState(null);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -1217,24 +1216,8 @@ export default function Planning() {
     return parts;
   }
 
-  async function handleExportCsv(scopeIds) {
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const { columns, rows, subtitle } = buildTablePayload(scopeIds);
-      await exportTableCsv(`planning-${new Date().toISOString().slice(0, 10)}.csv`, 'Planning', columns, rows, {
-        subtitle,
-        generatedBy: currentUser?.full_name,
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
-  // Partagé par l'export CSV, PDF, Excel et Word — mêmes colonnes/lignes, seul le format de
-  // sortie change (voir exportTableCsv/exportToPdf/exportToXlsx/exportToWord, pdfExport.js).
+  // Partagé par l'export PDF, Excel et Word — mêmes colonnes/lignes, seul le format de
+  // sortie change (voir exportToPdf/exportToXlsx/exportToWord, pdfExport.js).
   function buildTablePayload(scopeIds) {
     const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
     const columns = [
@@ -1323,8 +1306,6 @@ export default function Planning() {
         <div className="flex flex-wrap gap-2">
           <ExportMenu
             disabled={filteredItems.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -1540,8 +1521,6 @@ export default function Planning() {
       <BulkSelectionBar
         count={selectedTaskIds.length}
         onMove={canManage ? () => setIsBulkMoveModalOpen(true) : undefined}
-        onExportCsv={() => handleExportCsv(selectedTaskIds)}
-        exportingCsv={exportingCsv}
         onExportPdf={() => handleExportPdf(selectedTaskIds)}
         exportingPdf={exportingPdf}
         onExportXlsx={() => handleExportXlsx(selectedTaskIds)}

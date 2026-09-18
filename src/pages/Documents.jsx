@@ -7,7 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { STATUS_LABELS } from '../lib/documentStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import StatusBadge from '../components/StatusBadge.jsx';
 import SearchSnippet from '../components/SearchSnippet.jsx';
@@ -423,7 +423,6 @@ export default function Documents() {
   const [statusFilter, setStatusFilter] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -630,48 +629,6 @@ export default function Documents() {
     return [...docs].sort((a, b) => String(a.number ?? '').localeCompare(String(b.number ?? ''), 'fr', { numeric: true }));
   }
 
-  async function handleExportCsv(scopeIds) {
-    const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
-    const source = sortByNumber(scoped);
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const columns = [
-        { key: 'number', label: 'Numéro' },
-        { key: 'title', label: 'Titre' },
-        { key: 'description', label: 'Description' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'version', label: 'Version' },
-        { key: 'status', label: 'Statut' },
-        { key: 'review_date', label: 'Prochaine révision' },
-        { key: 'created_at', label: 'Créé le' },
-        { key: 'latest_version_comment', label: 'Commentaire dernière version' },
-      ];
-      const rows = source.map((doc) => ({
-        number: doc.number,
-        title: doc.title,
-        description: doc.description || '',
-        category: doc.category?.name || '',
-        version: doc.version,
-        status: STATUS_LABELS[doc.status] || doc.status,
-        review_date: formatDate(doc.review_date),
-        created_at: formatDate(doc.created_at),
-        latest_version_comment: doc.latest_version_comment || '',
-      }));
-      const countLabel = `${source.length} document${source.length > 1 ? 's' : ''}`;
-      const filterParts = [];
-      if (statusFilter) filterParts.push(`Statut : ${STATUS_LABELS[statusFilter] || statusFilter}`);
-      await exportTableCsv(`documents-${new Date().toISOString().slice(0, 10)}.csv`, 'Documents', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle: [countLabel, ...filterParts].join(' · '),
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportPdf(scopeIds) {
     const scoped = scopeIds ? filteredDocuments.filter((doc) => scopeIds.includes(doc.id)) : filteredDocuments;
     const source = sortByNumber(scoped);
@@ -841,8 +798,6 @@ export default function Documents() {
         <div className="flex flex-wrap gap-2">
           <ExportMenu
             disabled={filteredDocuments.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -949,8 +904,6 @@ export default function Documents() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

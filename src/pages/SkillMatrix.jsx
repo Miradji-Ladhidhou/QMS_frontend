@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Check, EyeOff, Minus, RefreshCw, X as XIcon } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
+import { exportToWord } from '../lib/pdfExport.js';
 import { TRAINING_STATUS_LABELS } from '../lib/trainingStatus.js';
 import { useSort } from '../lib/useSort.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -46,7 +46,6 @@ export default function SkillMatrix() {
   const [matrix, setMatrix] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
   const [exportError, setExportError] = useState('');
@@ -106,22 +105,6 @@ export default function SkillMatrix() {
     return { columns, rows, subtitle: `${people.length} personne${people.length > 1 ? 's' : ''}` };
   }
 
-  async function handleExportCsv() {
-    setExportError('');
-    setExportingCsv(true);
-    try {
-      const { columns, rows, subtitle } = buildMatrixExportPayload();
-      await exportTableCsv(`matrice-competences-${new Date().toISOString().slice(0, 10)}.csv`, 'Matrice des compétences', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle,
-      });
-    } catch {
-      setExportError('Impossible d\'exporter la matrice en CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportWord() {
     setExportError('');
     setExportingWord(true);
@@ -170,8 +153,6 @@ export default function SkillMatrix() {
         <div className="flex flex-wrap gap-2">
           <ExportMenu
             disabled={people.length === 0}
-            onExportCsv={handleExportCsv}
-            exportingCsv={exportingCsv}
             onExportPdf={handleExportPdf}
             exportingPdf={exportingPdf}
             onExportWord={handleExportWord}

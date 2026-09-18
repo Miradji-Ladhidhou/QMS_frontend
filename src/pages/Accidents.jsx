@@ -8,7 +8,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { ACCIDENT_STATUS_LABELS, ACCIDENT_SEVERITY_LABELS } from '../lib/accidentStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AccidentStatusBadge from '../components/AccidentStatusBadge.jsx';
@@ -345,7 +345,6 @@ export default function Accidents() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -481,32 +480,6 @@ export default function Accidents() {
     return parts;
   }
 
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? accidents.filter((accident) => scopeIds.includes(accident.id)) : accidents;
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'occurred_at', label: "Date de l'accident" },
-        { key: 'severity', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'person', label: 'Personne concernée' },
-        { key: 'service', label: 'Service' },
-        { key: 'with_lost_time', label: 'Arrêt de travail' },
-      ];
-      const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportTableCsv(`accidents-${new Date().toISOString().slice(0, 10)}.csv`, 'Registre des accidents du travail', columns, buildExportRows(source), {
-        generatedBy: currentUser?.full_name,
-        subtitle: [countLabel, ...filterSummary()].join(' · '),
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? accidents.filter((accident) => scopeIds.includes(accident.id)) : accidents;
     setExportingPdf(true);
@@ -616,8 +589,6 @@ export default function Accidents() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={accidents.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -729,8 +700,6 @@ export default function Accidents() {
       <BulkSelectionBar
         count={selectedIds.length}
         onMove={canManage ? () => setIsBulkMoveModalOpen(true) : undefined}
-        onExportCsv={() => handleExportCsv(selectedIds)}
-        exportingCsv={exportingCsv}
         onExportPdf={() => handleExportPdf(selectedIds)}
         exportingPdf={exportingPdf}
         onExportXlsx={() => handleExportXlsx(selectedIds)}

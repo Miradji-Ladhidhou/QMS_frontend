@@ -16,7 +16,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { PLAN_STATUS_LABELS } from '../lib/haccpStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
@@ -210,7 +210,6 @@ export default function Haccp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -309,37 +308,6 @@ export default function Haccp() {
   function formatDate(dateStr) {
     if (!dateStr) return '—';
     return new Date(dateStr).toLocaleDateString('fr-FR');
-  }
-
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? plans.filter((plan) => scopeIds.includes(plan.id)) : plans;
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'product_description', label: 'Produit' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'created_at', label: 'Créé le' },
-      ];
-      const rows = source.map((plan) => ({
-        title: plan.title,
-        product_description: plan.product_description || '',
-        status: PLAN_STATUS_LABELS[plan.status] || plan.status,
-        service: plan.service?.name || '',
-        created_at: formatDate(plan.created_at),
-      }));
-      const countLabel = `${source.length} plan${source.length > 1 ? 's' : ''}`;
-      await exportTableCsv(`haccp-${new Date().toISOString().slice(0, 10)}.csv`, 'Plans HACCP', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle: statusFilter ? `${countLabel} · Statut : ${PLAN_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -487,8 +455,6 @@ export default function Haccp() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={plans.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -576,8 +542,6 @@ export default function Haccp() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

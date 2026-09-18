@@ -6,7 +6,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useSort } from '../lib/useSort.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import FolderTile from '../components/FolderTile.jsx';
 import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
 import FolderPickerModal from '../components/FolderPickerModal.jsx';
@@ -250,7 +250,6 @@ export default function Employees() {
   const [editing, setEditing] = useState(null);
   const [togglingId, setTogglingId] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -384,21 +383,6 @@ export default function Employees() {
     return `${source.length} personne${source.length > 1 ? 's' : ''}`;
   }
 
-  async function handleExportCsv() {
-    setExportingCsv(true);
-    setExportError('');
-    try {
-      await exportTableCsv(`personnel-${new Date().toISOString().slice(0, 10)}.csv`, 'Personnel', buildExportColumns(), buildExportRows(employees), {
-        generatedBy: currentUser?.full_name,
-        subtitle: exportSubtitle(employees),
-      });
-    } catch {
-      setExportError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportPdf() {
     setExportingPdf(true);
     setExportError('');
@@ -468,8 +452,6 @@ export default function Employees() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={employees.length === 0}
-            onExportCsv={handleExportCsv}
-            exportingCsv={exportingCsv}
             onExportPdf={handleExportPdf}
             exportingPdf={exportingPdf}
             onExportXlsx={handleExportXlsx}

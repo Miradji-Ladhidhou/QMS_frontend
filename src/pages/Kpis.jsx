@@ -2788,15 +2788,6 @@ function KpiCard({
     return { columns, rows, subtitle: `${sortedRecords.length} valeur${sortedRecords.length > 1 ? 's' : ''}` };
   }
 
-  async function handleExportDataCsv() {
-    setExportMenuOpen(false);
-    const { columns, rows, subtitle } = buildDataExportPayload();
-    await exportTableCsv(`${sanitizeFilename(kpi.name)}-valeurs.csv`, kpi.name, columns, rows, {
-      generatedBy: currentUser?.full_name,
-      subtitle,
-    });
-  }
-
   async function handleExportDataWord() {
     setExportMenuOpen(false);
     const { columns, rows, subtitle } = buildDataExportPayload();
@@ -2877,14 +2868,6 @@ function KpiCard({
                   >
                     <ImageIcon size={14} />
                     Exporter le graphique (PNG)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleExportDataCsv}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
-                  >
-                    <FileText size={14} />
-                    Exporter les données (CSV)
                   </button>
                   <button
                     type="button"

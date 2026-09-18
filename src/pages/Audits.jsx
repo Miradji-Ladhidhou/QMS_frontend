@@ -8,7 +8,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import AuditStatusBadge from '../components/AuditStatusBadge.jsx';
@@ -242,7 +242,6 @@ export default function Audits() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -338,41 +337,6 @@ export default function Audits() {
   function handleCreated(audit) {
     setIsModalOpen(false);
     navigate(`/audits/${audit.id}`);
-  }
-
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? audits.filter((audit) => scopeIds.includes(audit.id)) : audits;
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'type', label: 'Type' },
-        { key: 'status', label: 'Statut' },
-        { key: 'service', label: 'Service' },
-        { key: 'auditor', label: 'Auditeur' },
-        { key: 'planned_date', label: 'Date planifiée' },
-        { key: 'completed_date', label: 'Date réalisée' },
-      ];
-      const rows = source.map((audit) => ({
-        title: audit.title,
-        type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
-        status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
-        service: audit.service?.name || '',
-        auditor: audit.lead?.full_name || '',
-        planned_date: formatDate(audit.planned_date),
-        completed_date: formatDate(audit.completed_date),
-      }));
-      const countLabel = `${source.length} audit${source.length > 1 ? 's' : ''}`;
-      await exportTableCsv(`audits-${new Date().toISOString().slice(0, 10)}.csv`, 'Audits internes', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle: statusFilter ? `${countLabel} · Statut : ${AUDIT_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -516,8 +480,6 @@ export default function Audits() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={audits.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -587,8 +549,6 @@ export default function Audits() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

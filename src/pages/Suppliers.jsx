@@ -8,7 +8,7 @@ import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SUPPLIER_STATUS_LABELS } from '../lib/supplierStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import SupplierStatusBadge from '../components/SupplierStatusBadge.jsx';
@@ -249,7 +249,6 @@ export default function Suppliers() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -347,39 +346,6 @@ export default function Suppliers() {
   function handleCreated(supplier) {
     setIsModalOpen(false);
     navigate(`/suppliers/${supplier.id}`);
-  }
-
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? suppliers.filter((supplier) => scopeIds.includes(supplier.id)) : suppliers;
-    setExportingCsv(true);
-    setExportPdfError('');
-    try {
-      const columns = [
-        { key: 'name', label: 'Nom' },
-        { key: 'category', label: 'Catégorie' },
-        { key: 'criticality', label: 'Criticité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'contact', label: 'Contact' },
-        { key: 'next_evaluation_date', label: 'Prochaine éval.' },
-      ];
-      const rows = source.map((supplier) => ({
-        name: supplier.name,
-        category: supplier.category || '',
-        criticality: CAPA_PRIORITY_LABELS[supplier.criticality] || supplier.criticality,
-        status: SUPPLIER_STATUS_LABELS[supplier.status] || supplier.status,
-        contact: supplier.contact_name || '',
-        next_evaluation_date: formatDate(supplier.next_evaluation_date),
-      }));
-      const countLabel = `${source.length} fournisseur${source.length > 1 ? 's' : ''}`;
-      await exportTableCsv(`fournisseurs-${new Date().toISOString().slice(0, 10)}.csv`, 'Évaluation fournisseurs', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle: statusFilter ? `${countLabel} · Statut : ${SUPPLIER_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel,
-      });
-    } catch {
-      setExportPdfError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
   }
 
   async function handleExportPdf(scopeIds) {
@@ -523,8 +489,6 @@ export default function Suppliers() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={suppliers.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -598,8 +562,6 @@ export default function Suppliers() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

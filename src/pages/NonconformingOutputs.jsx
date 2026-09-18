@@ -7,7 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { NONCONFORMING_OUTPUT_STATUS_LABELS, NONCONFORMING_OUTPUT_DISPOSITION_LABELS } from '../lib/nonconformingOutputStatus.js';
-import { exportTableCsv, exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
+import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import NonconformingOutputStatusBadge from '../components/NonconformingOutputStatusBadge.jsx';
@@ -232,7 +232,6 @@ export default function NonconformingOutputs() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -374,25 +373,6 @@ export default function NonconformingOutputs() {
       : countLabel;
   }
 
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
-    setExportingCsv(true);
-    setExportError('');
-    try {
-      await exportTableCsv(
-        `non-conformites-${new Date().toISOString().slice(0, 10)}.csv`,
-        'Non-conformités produit/service',
-        buildExportColumns(),
-        buildExportRows(source),
-        { generatedBy: currentUser?.full_name, subtitle: exportSubtitle(source) }
-      );
-    } catch {
-      setExportError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
     setExportingPdf(true);
@@ -475,8 +455,6 @@ export default function NonconformingOutputs() {
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={outputs.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -559,8 +537,6 @@ export default function NonconformingOutputs() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportPdf={() => handleExportPdf(selectedIds)}
           exportingPdf={exportingPdf}
           onExportXlsx={() => handleExportXlsx(selectedIds)}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
+import { exportToWord } from '../lib/pdfExport.js';
 import { QQOQCCP_STATUS_LABELS } from '../lib/qqoqccpStatus.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
@@ -134,7 +134,6 @@ export default function Qqoqccp() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
@@ -228,31 +227,6 @@ export default function Qqoqccp() {
     navigate(`/qqoqccp/${analysis.id}`);
   }
 
-  async function handleExportCsv(scopeIds) {
-    const source = scopeIds ? analyses.filter((analysis) => scopeIds.includes(analysis.id)) : analyses;
-    setExportingCsv(true);
-    try {
-      const columns = [
-        { key: 'title', label: 'Titre' },
-        { key: 'status', label: 'Statut' },
-        { key: 'created_at', label: 'Créée le' },
-      ];
-      const rows = source.map((analysis) => ({
-        title: analysis.title,
-        status: QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
-        created_at: formatDate(analysis.created_at),
-      }));
-      await exportTableCsv(`qqoqccp-${new Date().toISOString().slice(0, 10)}.csv`, 'QQOQCCP', columns, rows, {
-        generatedBy: currentUser?.full_name,
-        subtitle: `${source.length} analyse${source.length > 1 ? 's' : ''}`,
-      });
-    } catch {
-      setError('Impossible de générer le CSV.');
-    } finally {
-      setExportingCsv(false);
-    }
-  }
-
   async function handleExportWord(scopeIds) {
     const source = scopeIds ? analyses.filter((analysis) => scopeIds.includes(analysis.id)) : analyses;
     setExportingWord(true);
@@ -285,8 +259,6 @@ export default function Qqoqccp() {
         <div className="flex flex-wrap gap-2">
           <ExportMenu
             disabled={analyses.length === 0}
-            onExportCsv={() => handleExportCsv()}
-            exportingCsv={exportingCsv}
             onExportWord={() => handleExportWord()}
             exportingWord={exportingWord}
           />
@@ -339,8 +311,6 @@ export default function Qqoqccp() {
         <BulkSelectionBar
           count={selectedIds.length}
           onMove={() => setIsBulkMoveModalOpen(true)}
-          onExportCsv={() => handleExportCsv(selectedIds)}
-          exportingCsv={exportingCsv}
           onExportWord={() => handleExportWord(selectedIds)}
           exportingWord={exportingWord}
           onDelete={handleBulkDelete}
