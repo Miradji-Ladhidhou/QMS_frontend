@@ -47,7 +47,8 @@ import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { getKpiStatus, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
-import { exportTableCsv, exportToWord } from '../lib/pdfExport.js';
+import { exportTableCsv, exportToWord, getXlsxDownload } from '../lib/pdfExport.js';
+import ExportMenu from '../components/ExportMenu.jsx';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
@@ -3703,6 +3704,7 @@ export default function Kpis() {
   const [proofModal, setProofModal] = useState(null); // { kpi, record } — preuve derrière un point du graphique
   const [openMenuId, setOpenMenuId] = useState(null);
   const [generatingReport, setGeneratingReport] = useState(false);
+  const [generatingReportXlsx, setGeneratingReportXlsx] = useState(false);
   // Dans l'URL (?folder=...), jamais un simple useState : sinon ouvrir des dossiers imbriqués
   // ne crée aucune entrée d'historique et le retour natif du navigateur/téléphone saute par-
   // dessus toute la navigation (voir lib/useFolderNavigation.js, même raisonnement — Kpis.jsx
@@ -3975,6 +3977,25 @@ export default function Kpis() {
     }
   }
 
+  // Même filtrage par dossier que handleGenerateReport, format Excel côté backend (?format=xlsx,
+  // voir GET /kpis/report) : un classeur avec l'historique complet des relevés (pas seulement
+  // la fenêtre récente affichée sur le PDF), pour qui veut filtrer/trier les données brutes.
+  async function handleGenerateReportXlsx() {
+    setError('');
+    setGeneratingReportXlsx(true);
+    try {
+      await getXlsxDownload(
+        '/kpis/report',
+        { folder_id: currentFolderId || 'root', format: 'xlsx' },
+        `rapport-kpis-${new Date().toISOString().slice(0, 10)}.xlsx`
+      );
+    } catch {
+      setError('Impossible de générer le rapport.');
+    } finally {
+      setGeneratingReportXlsx(false);
+    }
+  }
+
   const { sorted: sortedKpis, sortKey, direction, setSortKey, toggleSort } = useSort(
     kpis,
     getKpiSortValue,
@@ -3987,15 +4008,13 @@ export default function Kpis() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">KPIs</h1>
         <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={handleGenerateReport}
-            disabled={generatingReport || kpis.length === 0}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:flex-none"
-          >
-            <FileText size={18} />
-            {generatingReport ? 'Génération...' : 'Générer rapport PDF'}
-          </button>
+          <ExportMenu
+            disabled={kpis.length === 0}
+            onExportPdf={handleGenerateReport}
+            exportingPdf={generatingReport}
+            onExportXlsx={handleGenerateReportXlsx}
+            exportingXlsx={generatingReportXlsx}
+          />
           {currentUser?.role === 'admin' && (
             <button
               type="button"

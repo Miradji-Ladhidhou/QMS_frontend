@@ -97,6 +97,18 @@ export async function getPdfDownload(url, filename) {
   triggerBlobDownload(new Blob([response.data], { type: 'application/pdf' }), filename);
 }
 
+// GET pour un classeur Excel construit par un rapport dédié côté serveur (ex. GET
+// /kpis/report?format=xlsx) — pas de body à poster, contrairement à exportToXlsx qui envoie
+// columns/rows pour le générateur générique de listes (routes/reports.js). `params` porte les
+// mêmes filtres que l'appel PDF équivalent (ex. folder_id), plus format=xlsx.
+export async function getXlsxDownload(url, params, filename) {
+  const response = await api.get(url, { params, responseType: 'blob' });
+  triggerBlobDownload(
+    new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }),
+    filename
+  );
+}
+
 // Même PDF que getPdfDownload (un enregistrement déjà identifié par son id, ex. GET
 // /capas/:id/pdf), mais déposé sur le Drive du tenant comme un vrai document plutôt que
 // téléchargé — voir uploadPdfAsDocument ci-dessus.
