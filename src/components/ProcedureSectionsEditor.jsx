@@ -307,7 +307,7 @@ export default function ProcedureSectionsEditor({ template, content, onChange })
                 <button
                   type="button"
                   onClick={() => regenerateSommaire(sectionIndex)}
-                  title="Remplace la liste ci-dessous par les titres de section actuels — n'écrase rien d'autre"
+                  title="Remplace la liste ci-dessous par les titres de section et sous-titres actuels — n'écrase rien d'autre"
                   className="flex shrink-0 items-center gap-1 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
                 >
                   <RefreshCw size={12} />

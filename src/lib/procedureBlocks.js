@@ -25,9 +25,22 @@ export function textToParagraphBlocks(text) {
 
 // Le sommaire est un bloc de contenu comme un autre (voir le plan de refonte : une section
 // key === 'sommaire', un bloc liste_puces) — jamais un mécanisme séparé. Ce helper calcule les
-// libellés à y proposer, à partir des AUTRES sections (jamais la sommaire elle-même).
+// libellés à y proposer, à partir des AUTRES sections (jamais la sommaire elle-même) : le titre
+// de chaque section, suivi de ses éventuels blocs "+ Sous-titre" préfixés "– " pour rester
+// visuellement des sous-éléments même dans une liste à puces plate (ni le PDF ni le Word ne
+// savent nester des puces — voir procedurePdf.js/procedureWord.js#bulletParagraphs). Les autres
+// types de bloc (paragraphe, liste à puces, tableau...) ne sont pas des titres, jamais repris ici.
 export function buildSommaireItems(sections) {
-  return (sections || []).filter((s) => s.key !== 'sommaire').map((s) => s.label);
+  const items = [];
+  for (const section of sections || []) {
+    if (section.key === 'sommaire') continue;
+    items.push(section.label);
+    for (const block of section.blocks || []) {
+      const text = block.type === 'sous_titre' ? block.text?.trim() : '';
+      if (text) items.push(`– ${text}`);
+    }
+  }
+  return items;
 }
 
 // Ajoute une section "sommaire" en tête si aucune n'existe déjà — jamais si elle existe déjà
