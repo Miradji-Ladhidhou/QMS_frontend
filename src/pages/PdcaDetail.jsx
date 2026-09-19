@@ -6,14 +6,18 @@ import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { PDCA_PHASES, PDCA_STATUS_LABELS } from '../lib/pdcaStatus.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
+import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { buildExportColumns, buildExportRows } from '../lib/pdcaExport.js';
 import PdcaStatusBadge from '../components/PdcaStatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
@@ -522,6 +526,7 @@ export default function PdcaDetail() {
   const navigate = useNavigate();
   const goBack = useSmartBack('/pdca');
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [pdca, setPdca] = useState(null);
   const users = useUsers();
@@ -529,6 +534,11 @@ export default function PdcaDetail() {
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
   const [drafts, setDrafts] = useState({ plan: '', do: '', check: '', act: '' });
@@ -610,6 +620,63 @@ export default function PdcaDetail() {
     }
   }
 
+  // Fiche imprimable dédiée (pdcaPdf.js) pour le PDF, comme CapaDetail.jsx — Excel/Word
+  // réutilisent au contraire le même export générique en colonnes/lignes que la liste
+  // (Pdca.jsx), réduit à ce seul projet (voir lib/pdcaExport.js).
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setError('');
+    try {
+      await getPdfDownload(`/pdca/${id}/pdf`, `pdca-${pdca.id}.pdf`);
+    } catch {
+      setError('Impossible d’exporter ce projet PDCA en PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx() {
+    setExportingXlsx(true);
+    setError('');
+    try {
+      await exportToXlsx(`pdca-${pdca.id}.xlsx`, 'PDCA — Amélioration continue', buildExportColumns(), buildExportRows([pdca]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setError('Impossible de générer le fichier Excel.');
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setExportingWord(true);
+    setError('');
+    try {
+      await exportToWord(`pdca-${pdca.id}.docx`, 'PDCA — Amélioration continue', buildExportColumns(), buildExportRows([pdca]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive() {
+    setExportingDrive(true);
+    setError('');
+    setDriveSuccess('');
+    try {
+      await getPdfAndSaveToDrive(`/pdca/${id}/pdf`, 'PDCA', pdca.title);
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   async function handleDelete() {
     if (!window.confirm(`Supprimer définitivement "${pdca.title}" ?`)) return;
     try {
@@ -644,6 +711,16 @@ export default function PdcaDetail() {
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{pdca.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
           <PdcaStatusBadge status={pdca.status} />
+          <ExportMenu
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           {canEdit && (
             <button type="button" onClick={() => setIsEditModalOpen(true)} aria-label="Modifier" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary">
               <Pencil size={16} />
@@ -659,6 +736,9 @@ export default function PdcaDetail() {
       <PageGuide id="pdcaDetail" />
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {driveSuccess && (
+        <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
         <div>

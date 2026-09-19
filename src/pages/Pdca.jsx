@@ -8,6 +8,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { PDCA_STATUS_LABELS } from '../lib/pdcaStatus.js';
+import { buildExportColumns, buildExportRows } from '../lib/pdcaExport.js';
 import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { useSort } from '../lib/useSort.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
@@ -360,42 +361,6 @@ export default function Pdca() {
   // uniquement pour le PDF (forPdf) — Excel/Word/CSV n'ont pas cette contrainte de largeur
   // imprimée, donc `width` reste undefined pour eux (voir listReportXlsx.js/listReportWord.js,
   // qui l'ignorent de toute façon).
-  function buildExportColumns({ forPdf } = {}) {
-    return [
-      { key: 'title', label: 'Titre', width: forPdf ? 0.16 : undefined },
-      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
-      { key: 'service', label: 'Service', width: forPdf ? 0.12 : undefined },
-      { key: 'owner', label: 'Responsable', width: forPdf ? 0.12 : undefined },
-      { key: 'target_date', label: 'Date cible', width: forPdf ? 0.1 : undefined },
-      { key: 'closed_at', label: 'Date de clôture', width: forPdf ? 0.1 : undefined },
-      { key: 'description', label: 'Description', width: forPdf ? 0.14 : undefined },
-      { key: 'plan_content', label: 'Plan', width: forPdf ? 0.14 : undefined },
-      { key: 'do_content', label: 'Do', width: forPdf ? 0.14 : undefined },
-      { key: 'check_content', label: 'Check', width: forPdf ? 0.14 : undefined },
-      { key: 'act_content', label: 'Act', width: forPdf ? 0.14 : undefined },
-      { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.12 : undefined },
-      { key: 'category', label: 'Dossier', width: forPdf ? 0.12 : undefined },
-    ];
-  }
-
-  function buildExportRows(source) {
-    return source.map((pdca) => ({
-      title: pdca.title,
-      status: PDCA_STATUS_LABELS[pdca.status] || pdca.status,
-      service: pdca.service?.name || '',
-      owner: pdca.owner_user?.full_name || '',
-      target_date: formatDate(pdca.target_date),
-      closed_at: formatDate(pdca.closed_at),
-      description: pdca.description || '',
-      plan_content: pdca.plan_content || '',
-      do_content: pdca.do_content || '',
-      check_content: pdca.check_content || '',
-      act_content: pdca.act_content || '',
-      linked_capa: pdca.linked_capa?.number || '',
-      category: pdca.category?.name || '',
-    }));
-  }
-
   function exportSubtitle(source) {
     const countLabel = `${source.length} projet${source.length > 1 ? 's' : ''} PDCA`;
     return statusFilter ? `${countLabel} · Statut : ${PDCA_STATUS_LABELS[statusFilter] || statusFilter}` : countLabel;
