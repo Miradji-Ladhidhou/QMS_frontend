@@ -3,9 +3,10 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Lock, Plus, Save, Send, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { CAPA_EFFECTIVENESS_LABELS } from '../lib/capaStatus.js';
+import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useUsers } from '../lib/useUsers.js';
 import { useTenant } from '../lib/useTenant.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
@@ -34,10 +35,28 @@ function selectValueToEffectiveness(value) {
   return null;
 }
 
-const TREATMENT_FIELDS = ['service_id', 'category_id', 'description', 'root_cause', 'corrective_action', 'preventive_action', 'comment'];
+const TREATMENT_FIELDS = [
+  'title',
+  'origin',
+  'priority',
+  'due_date',
+  'assigned_to',
+  'service_id',
+  'category_id',
+  'description',
+  'root_cause',
+  'corrective_action',
+  'preventive_action',
+  'comment',
+];
 
 function buildTreatmentForm(capa) {
   return {
+    title: capa.title || '',
+    origin: capa.origin || '',
+    priority: capa.priority || 'medium',
+    due_date: capa.due_date || '',
+    assigned_to: capa.assigned_to || '',
     service_id: capa.service_id || '',
     category_id: capa.category_id || '',
     category_name: capa.category?.name || '',
@@ -204,6 +223,7 @@ export default function CapaDetail() {
   const goBack = useSmartBack('/capas');
   const currentUser = useCurrentUser();
   const tenant = useTenant();
+  const users = useUsers();
   const canManage = isManagerRole(currentUser?.role);
   const [capa, setCapa] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -288,6 +308,10 @@ export default function CapaDetail() {
       for (const field of TREATMENT_FIELDS) {
         payload[field] = treatmentForm[field] || null;
       }
+      // severity est un champ hérité, toujours recopié depuis priority (voir Capas.jsx#handleSubmit
+      // à la création) — sans ce miroir, modifier la priorité ici désynchroniserait severity, qui
+      // resterait figé sur sa valeur de création.
+      payload.severity = payload.priority;
       if (isPrivate) {
         payload.category_id = await resolvePersonalCategoryId('capa');
       }
@@ -631,6 +655,75 @@ export default function CapaDetail() {
         )}
 
         <div className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Objet</label>
+            <input
+              type="text"
+              required
+              value={treatmentForm.title}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, title: e.target.value }))}
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Origine</label>
+            <input
+              type="text"
+              placeholder="Audit, réclamation client, non-conformité..."
+              value={treatmentForm.origin}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, origin: e.target.value }))}
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Gravité</label>
+              <select
+                value={treatmentForm.priority}
+                onChange={(e) => setTreatmentForm((prev) => ({ ...prev, priority: e.target.value }))}
+                disabled={!canManage}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+              >
+                {Object.entries(CAPA_PRIORITY_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Échéance</label>
+              <input
+                type="date"
+                value={treatmentForm.due_date}
+                onChange={(e) => setTreatmentForm((prev) => ({ ...prev, due_date: e.target.value }))}
+                disabled={!canManage}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Responsable assigné</label>
+            <select
+              value={treatmentForm.assigned_to}
+              onChange={(e) => setTreatmentForm((prev) => ({ ...prev, assigned_to: e.target.value }))}
+              disabled={!canManage}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            >
+              <option value="">Non assigné</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service</label>
             <select
