@@ -6,15 +6,19 @@ import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
+import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { buildExportColumns, buildExportRows } from '../lib/complaintExport.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
@@ -498,6 +502,7 @@ export default function ComplaintDetail() {
   const navigate = useNavigate();
   const goBack = useSmartBack('/complaints');
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [complaint, setComplaint] = useState(null);
   const users = useUsers();
@@ -507,6 +512,11 @@ export default function ComplaintDetail() {
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
 
   async function loadComplaint() {
     setLoading(true);
@@ -541,6 +551,63 @@ export default function ComplaintDetail() {
       // "Clôturée" sans satisfaction client renseignée) — message générique remplacé par celui
       // du serveur pour que l'utilisateur comprenne pourquoi.
       setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
+    }
+  }
+
+  // Fiche imprimable dédiée (complaintPdf.js) pour le PDF, comme CapaDetail.jsx/PdcaDetail.jsx —
+  // Excel/Word réutilisent au contraire le même export générique en colonnes/lignes que la
+  // liste (Complaints.jsx), réduit à cette seule réclamation (voir lib/complaintExport.js).
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setError('');
+    try {
+      await getPdfDownload(`/complaints/${id}/pdf`, `reclamation-${complaint.id}.pdf`);
+    } catch {
+      setError('Impossible d’exporter cette réclamation en PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx() {
+    setExportingXlsx(true);
+    setError('');
+    try {
+      await exportToXlsx(`reclamation-${complaint.id}.xlsx`, 'Réclamations clients', buildExportColumns(), buildExportRows([complaint]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setError('Impossible de générer le fichier Excel.');
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setExportingWord(true);
+    setError('');
+    try {
+      await exportToWord(`reclamation-${complaint.id}.docx`, 'Réclamations clients', buildExportColumns(), buildExportRows([complaint]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive() {
+    setExportingDrive(true);
+    setError('');
+    setDriveSuccess('');
+    try {
+      await getPdfAndSaveToDrive(`/complaints/${id}/pdf`, 'RECLAM', complaint.customer_name);
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
     }
   }
 
@@ -595,6 +662,16 @@ export default function ComplaintDetail() {
             <ComplaintStatusBadge status={complaint.status} />
           )}
           {!canManage && <span className="text-xs text-slate-400">Lecture seule</span>}
+          <ExportMenu
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           {canManage && (
             <>
               <button
@@ -621,6 +698,9 @@ export default function ComplaintDetail() {
       <PageGuide id="complaintDetail" />
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {driveSuccess && (
+        <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
         <div>
