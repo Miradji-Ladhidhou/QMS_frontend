@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, Download, FileCheck, Loader2, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
+import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, FileCheck, Loader2, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
+import { getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { buildExportColumns, buildExportRows } from '../lib/qqoqccpExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import PageGuide from '../components/PageGuide.jsx';
 
@@ -323,10 +327,15 @@ export default function QqoqccpDetail() {
   const navigate = useNavigate();
   const goBack = useSmartBack('/qqoqccp');
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const [analysis, setAnalysis] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
   const [form, setForm] = useState({});
   // Par champ : undefined (rien à signaler) | 'saving' | 'saved' | 'error'
@@ -641,6 +650,52 @@ export default function QqoqccpDetail() {
     }
   }
 
+  // Contrairement au PDF (fiche imprimable dédiée, GET /qqoqccp/:id/pdf), Excel/Word
+  // réutilisent le même export générique en colonnes/lignes que la liste (Qqoqccp.jsx), réduit
+  // à cette seule analyse (voir lib/qqoqccpExport.js) — analysis est déjà le détail complet
+  // (GET /qqoqccp/:id), pas besoin du ?full=true nécessaire côté liste.
+  async function handleExportXlsx() {
+    setExportError('');
+    setExportingXlsx(true);
+    try {
+      await exportToXlsx(`qqoqccp-${analysis.id}.xlsx`, 'QQOQCCP', buildExportColumns(), buildExportRows([analysis]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError('Impossible de générer le fichier Excel.');
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setExportError('');
+    setExportingWord(true);
+    try {
+      await exportToWord(`qqoqccp-${analysis.id}.docx`, 'QQOQCCP', buildExportColumns(), buildExportRows([analysis]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive() {
+    setExportError('');
+    setDriveSuccess('');
+    setExportingDrive(true);
+    try {
+      await getPdfAndSaveToDrive(`/qqoqccp/${id}/pdf`, 'QQOQCCP', analysis.title);
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
+
   const suggestedActions = analysis.ai_suggested_actions?.suggested_actions || [];
   const rootCauses = analysis.ai_suggested_actions?.root_causes || [];
   const overallPriority = analysis.ai_suggested_actions?.overall_priority;
@@ -666,15 +721,16 @@ export default function QqoqccpDetail() {
         <div className="flex flex-wrap items-center gap-2">
           {!canEditAnalysis && <span className="text-xs text-slate-400">Lecture seule</span>}
           <QqoqccpStatusBadge status={analysis.status} />
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={exportingPdf}
-            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Exporter PDF
-          </button>
+          <ExportMenu
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           {isManagerRole(currentUser?.role) && (
             <>
               <ShareRecordPanel resourceType="qqoqccp" resourceId={analysis.id} />
@@ -693,6 +749,7 @@ export default function QqoqccpDetail() {
       </div>
       <PageGuide id="qqoqccpDetail" />
       {exportError && <p className="mt-2 text-sm text-red-600">{exportError}</p>}
+      {driveSuccess && <p className="mt-2 text-sm text-emerald-700">{driveSuccess}</p>}
       {deleteError && <p className="mt-2 text-sm text-red-600">{deleteError}</p>}
 
       <div className="mt-4 space-y-4">
