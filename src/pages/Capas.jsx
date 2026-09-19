@@ -15,7 +15,8 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
-import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
+import { CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
+import { buildCapaExportColumns, buildCapaExportRows } from '../lib/capaExport.js';
 import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -857,50 +858,6 @@ export default function Capas() {
   // (cause racine, actions, efficacité) doit être consultable dans les 3 formats, pas
   // seulement dans l'app. severity n'apparaît pas : champ historique désormais toujours égal à
   // priority (voir handleSubmit plus haut), l'inclure doublonnerait Gravité pour rien.
-  function buildCapaExportColumns() {
-    return [
-      { key: 'number', label: 'Numéro' },
-      { key: 'title', label: 'Objet' },
-      { key: 'description', label: 'Description' },
-      { key: 'origin', label: 'Origine' },
-      { key: 'priority', label: 'Gravité' },
-      { key: 'status', label: 'Statut' },
-      { key: 'service', label: 'Service' },
-      { key: 'due_date', label: 'Échéance' },
-      { key: 'assigned', label: 'Responsable' },
-      { key: 'root_cause', label: 'Cause racine' },
-      { key: 'corrective_action', label: 'Action corrective' },
-      { key: 'preventive_action', label: 'Action préventive' },
-      { key: 'effectiveness', label: 'Efficacité vérifiée' },
-      { key: 'effectiveness_notes', label: "Notes d'efficacité" },
-      { key: 'comment', label: 'Commentaire' },
-      { key: 'closed_at', label: 'Date de clôture' },
-      { key: 'category', label: 'Dossier' },
-    ];
-  }
-
-  function buildCapaExportRows(source) {
-    return source.map((capa) => ({
-      number: capa.number,
-      title: capa.title,
-      description: capa.description || '',
-      origin: capa.origin || '',
-      priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
-      status: CAPA_STATUS_LABELS[capa.status] || capa.status,
-      service: capa.service?.name || '',
-      due_date: formatDate(capa.due_date),
-      assigned: capa.assigned?.full_name || '',
-      root_cause: capa.root_cause || '',
-      corrective_action: capa.corrective_action || '',
-      preventive_action: capa.preventive_action || '',
-      effectiveness: CAPA_EFFECTIVENESS_LABELS[capa.effectiveness_verified] || '',
-      effectiveness_notes: capa.effectiveness_notes || '',
-      comment: capa.comment || '',
-      closed_at: formatDate(capa.closed_at),
-      category: capa.category?.name || '',
-    }));
-  }
-
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? capas.filter((capa) => scopeIds.includes(capa.id)) : sortedCapas;
     setExportingPdf(true);
@@ -955,23 +912,10 @@ export default function Capas() {
     setExportPdfError('');
     setDriveSuccess('');
     try {
-      const columns = [
-        { key: 'number', label: 'Numéro' },
-        { key: 'title', label: 'Objet' },
-        { key: 'priority', label: 'Gravité' },
-        { key: 'status', label: 'Statut' },
-        { key: 'due_date', label: 'Échéance' },
-        { key: 'assigned', label: 'Responsable' },
-      ];
-      const rows = source.map((capa) => ({
-        number: capa.number,
-        title: capa.title,
-        priority: CAPA_PRIORITY_LABELS[capa.priority] || capa.priority,
-        status: CAPA_STATUS_LABELS[capa.status] || capa.status,
-        due_date: formatDate(capa.due_date),
-        assigned: capa.assigned?.full_name || '',
-      }));
-      await exportToDrive('CAPA', 'CAPA', columns, rows, { subtitle: `${source.length} CAPA`, generatedBy: currentUser?.full_name });
+      await exportToDrive('CAPA', 'CAPA', buildCapaExportColumns(), buildCapaExportRows(source), {
+        subtitle: `${source.length} CAPA`,
+        generatedBy: currentUser?.full_name,
+      });
       setDriveSuccess('Enregistré sur le Drive partagé.');
     } catch (err) {
       setExportPdfError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");

@@ -8,7 +8,8 @@ import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
-import { getPdfDownload, getPdfAndSaveToDrive } from '../lib/pdfExport.js';
+import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { buildCapaExportColumns, buildCapaExportRows } from '../lib/capaExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -206,6 +207,8 @@ export default function CapaDetail() {
   const canManage = isManagerRole(currentUser?.role);
   const [capa, setCapa] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
@@ -426,6 +429,37 @@ export default function CapaDetail() {
     }
   }
 
+  // Fiche imprimable dédiée (capaPdf.js, voir handleExportPdf/handleExportDrive ci-dessus/
+  // dessous) pour le PDF — Excel/Word réutilisent au contraire le même export générique en
+  // colonnes/lignes que la liste (Capas.jsx), réduit à cette seule CAPA (voir lib/capaExport.js).
+  async function handleExportXlsx() {
+    setExportingXlsx(true);
+    setExportError('');
+    try {
+      await exportToXlsx(`${capa.number || capa.id}.xlsx`, 'CAPA', buildCapaExportColumns(), buildCapaExportRows([capa]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError("Impossible de générer le fichier Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setExportingWord(true);
+    setExportError('');
+    try {
+      await exportToWord(`${capa.number || capa.id}.docx`, 'CAPA', buildCapaExportColumns(), buildCapaExportRows([capa]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setExportError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
   async function handleExportDrive() {
     setExportingDrive(true);
     setExportError('');
@@ -468,6 +502,10 @@ export default function CapaDetail() {
           <ExportMenu
             onExportPdf={handleExportPdf}
             exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
             onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
             exportingDrive={exportingDrive}
           />
