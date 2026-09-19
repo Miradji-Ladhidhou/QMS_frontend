@@ -1221,17 +1221,22 @@ export default function Planning() {
   function buildTablePayload(scopeIds) {
     const source = scopeIds ? filteredItems.filter((item) => scopeIds.includes(item.id)) : filteredItems;
     const columns = [
-      { key: 'date', label: 'Date', width: 0.13 },
-      { key: 'type', label: 'Type', width: 0.17 },
-      { key: 'title', label: 'Titre', width: 0.4 },
-      { key: 'overdue', label: 'En retard', width: 0.13 },
-      { key: 'link', label: 'Lien', width: 0.17 },
+      { key: 'date', label: 'Date', width: 0.11 },
+      { key: 'type', label: 'Type', width: 0.13 },
+      { key: 'title', label: 'Titre', width: 0.28 },
+      { key: 'overdue', label: 'En retard', width: 0.1 },
+      { key: 'checklist', label: 'Checklist', width: 0.25 },
+      { key: 'link', label: 'Lien', width: 0.13 },
     ];
     const rows = source.map((item) => ({
       date: item.date,
       type: TYPE_CONFIG[item.type].label,
       title: item.title,
       overdue: item.is_overdue ? 'Oui' : 'Non',
+      // Une tâche seulement (checklist n'existe pas sur les autres types d'élément du
+      // planning) — chaque étape préfixée ☑/☐ pour que l'état coché reste visible même dans
+      // un tableur/document sans mise en forme conditionnelle.
+      checklist: (item.checklist || []).map((entry) => `${entry.done ? '☑' : '☐'} ${entry.text}`).join(' | '),
       link: item.link || '',
     }));
     const countLabel = `${source.length} élément${source.length > 1 ? 's' : ''}`;
