@@ -51,6 +51,19 @@ function draftsFromPdca(pdca) {
   };
 }
 
+// Échéance propre à chaque phase (distincte de target_date, l'échéance globale du projet déjà
+// affichée plus haut) — voir backend/scripts/add-pdca-phase-due-dates.sql, consommée par le
+// planning (Planning.jsx) pour situer la phase en cours sur le calendrier, pas seulement le
+// projet dans son ensemble.
+function dueDraftsFromPdca(pdca) {
+  return {
+    plan: pdca.plan_due_date || '',
+    do: pdca.do_due_date || '',
+    check: pdca.check_due_date || '',
+    act: pdca.act_due_date || '',
+  };
+}
+
 function EditPdcaModal({ pdca, users, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: pdca.title,
@@ -429,7 +442,29 @@ function CreatePdcaCapaModal({ pdcaId, pdca, users, services, priorityDelays, on
 // l'avance), passée/clôturée (contenu en lecture seule, modifiable via le crayon — correction
 // d'une coquille sans repasser par l'avancement séquentiel) et courante (zone de saisie ouverte
 // en permanence + bouton d'avancement).
-function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftChange, canEdit, isEditing, onStartEdit, onCancelEdit, onSave, saving, onAdvance, advancing, isLastPhase, onGenerate, generating }) {
+function PhaseCard({
+  phase,
+  label,
+  state,
+  content,
+  completedAt,
+  dueDate,
+  dueDraft,
+  onDueDraftChange,
+  draft,
+  onDraftChange,
+  canEdit,
+  isEditing,
+  onStartEdit,
+  onCancelEdit,
+  onSave,
+  saving,
+  onAdvance,
+  advancing,
+  isLastPhase,
+  onGenerate,
+  generating,
+}) {
   if (state === 'future') {
     return (
       <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 opacity-60 sm:p-5">
@@ -452,6 +487,15 @@ function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftCh
               Terminé le {formatDate(completedAt)}
             </span>
           )}
+          {!completedAt && dueDate && !(showEditor && canEdit) && (
+            <span
+              className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                dueDate < new Date().toISOString().slice(0, 10) ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+              }`}
+            >
+              Échéance {formatDate(dueDate)}
+            </span>
+          )}
           {state === 'current' && (
             <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">En cours</span>
           )}
@@ -472,6 +516,17 @@ function PhaseCard({ phase, label, state, content, completedAt, draft, onDraftCh
             placeholder={`Documentez l'étape ${label}...`}
             className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
           />
+          {!completedAt && (
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-500">Échéance de cette étape (optionnel)</label>
+              <input
+                type="date"
+                value={dueDraft}
+                onChange={(e) => onDueDraftChange(e.target.value)}
+                className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+          )}
           <div className="flex flex-wrap items-center gap-2">
             {state === 'current' && onGenerate && (
               <button
@@ -542,6 +597,7 @@ export default function PdcaDetail() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
   const [drafts, setDrafts] = useState({ plan: '', do: '', check: '', act: '' });
+  const [dueDrafts, setDueDrafts] = useState({ plan: '', do: '', check: '', act: '' });
   const [editingPhase, setEditingPhase] = useState(null);
   const [savingPhase, setSavingPhase] = useState(null);
   const [advancing, setAdvancing] = useState(false);
@@ -554,6 +610,7 @@ export default function PdcaDetail() {
       const { data } = await api.get(`/pdca/${id}`);
       setPdca(data);
       setDrafts(draftsFromPdca(data));
+      setDueDrafts(dueDraftsFromPdca(data));
     } catch {
       setError('Impossible de charger ce projet PDCA.');
     } finally {
@@ -578,9 +635,13 @@ export default function PdcaDetail() {
     setError('');
     setSavingPhase(phase);
     try {
-      const { data } = await api.patch(`/pdca/${id}`, { [`${phase}_content`]: drafts[phase] });
+      const { data } = await api.patch(`/pdca/${id}`, {
+        [`${phase}_content`]: drafts[phase],
+        [`${phase}_due_date`]: dueDrafts[phase] || null,
+      });
       setPdca(data);
       setDrafts(draftsFromPdca(data));
+      setDueDrafts(dueDraftsFromPdca(data));
       setEditingPhase(null);
     } catch (err) {
       setError(err.response?.data?.error || `Impossible d'enregistrer l'étape ${phase}.`);
@@ -596,10 +657,14 @@ export default function PdcaDetail() {
       // La phase courante doit être sauvegardée avant l'avancement : le backend refuse de faire
       // progresser un projet dont la phase quittée n'est pas documentée (voir POST
       // /pdca/:id/advance dans pdca.js).
-      await api.patch(`/pdca/${id}`, { [`${pdca.status}_content`]: drafts[pdca.status] });
+      await api.patch(`/pdca/${id}`, {
+        [`${pdca.status}_content`]: drafts[pdca.status],
+        [`${pdca.status}_due_date`]: dueDrafts[pdca.status] || null,
+      });
       const { data } = await api.post(`/pdca/${id}/advance`, {});
       setPdca(data);
       setDrafts(draftsFromPdca(data));
+      setDueDrafts(dueDraftsFromPdca(data));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de faire avancer ce projet PDCA.");
     } finally {
@@ -779,6 +844,9 @@ export default function PdcaDetail() {
               state={state}
               content={pdca[`${phase}_content`]}
               completedAt={pdca[`${phase}_completed_at`]}
+              dueDate={pdca[`${phase}_due_date`]}
+              dueDraft={dueDrafts[phase]}
+              onDueDraftChange={(value) => setDueDrafts((prev) => ({ ...prev, [phase]: value }))}
               draft={drafts[phase]}
               onDraftChange={(value) => setDrafts((prev) => ({ ...prev, [phase]: value }))}
               canEdit={canEdit}
@@ -787,6 +855,7 @@ export default function PdcaDetail() {
               onCancelEdit={() => {
                 setEditingPhase(null);
                 setDrafts((prev) => ({ ...prev, [phase]: pdca[`${phase}_content`] || '' }));
+                setDueDrafts((prev) => ({ ...prev, [phase]: pdca[`${phase}_due_date`] || '' }));
               }}
               onSave={() => handleSavePhase(phase)}
               saving={savingPhase === phase}
