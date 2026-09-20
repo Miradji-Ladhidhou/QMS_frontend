@@ -411,6 +411,7 @@ export const PAGE_GUIDES = {
           <strong>valide et signe</strong> à l'écran : la revue est alors verrouillée (seul le suivi des actions reste modifiable) et{' '}
           <strong>Envoyer le compte rendu</strong> transmet le PDF signé. « Rouvrir » efface la validation. Les entrées couvrent aussi la
           satisfaction client, les fournisseurs, les sorties non conformes, les accidents, les compétences et la politique qualité.
+          Un KPI à plusieurs courbes est détaillé <strong>courbe par courbe</strong> (valeur, unité, objectif et sens propres) : il compte comme « hors objectif » dès qu'une courbe rate son objectif, jamais sur une moyenne des courbes.
         </p>
       </>
     ),

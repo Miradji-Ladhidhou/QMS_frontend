@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { ArrowLeft, ClipboardCheck, Mail, Minus, Pencil, Plus, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingDown, TrendingUp, Unlock, X } from 'lucide-react';
+import { AlertCircle, ArrowLeft, CheckCircle2, ClipboardCheck, Mail, Minus, Pencil, Plus, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingDown, TrendingUp, Unlock, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -96,6 +96,33 @@ function TrendIcon({ trend }) {
   return null;
 }
 
+// Une courbe (ou un KPI à une seule courbe) : valeur moyenne de la période dans SON unité, son objectif
+// avec son propre sens (≥ plancher, ≤ plafond), la tendance et le verdict. `meets_target` est absent des
+// revues créées avant qu'il existe : aucun verdict n'est alors affiché.
+function KpiTrendRow({ name, item }) {
+  const unit = item.unit ? ` ${item.unit}` : '';
+  const hasTarget = item.target !== null && item.target !== undefined;
+  return (
+    <li className="flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        <p className="break-words">{name}</p>
+        {hasTarget && (
+          <p className="text-xs text-slate-500">
+            Objectif {item.target_direction === 'max' ? '≤' : '≥'} {item.target}
+            {unit}
+          </p>
+        )}
+      </div>
+      <span className="flex shrink-0 items-center gap-1 font-medium">
+        {item.current_avg !== null && item.current_avg !== undefined ? `${item.current_avg.toFixed(1)}${unit}` : '—'}
+        <TrendIcon trend={item.trend} />
+        {item.meets_target === true && <CheckCircle2 size={14} className="text-emerald-600" aria-label="Objectif atteint" />}
+        {item.meets_target === false && <AlertCircle size={14} className="text-red-600" aria-label="Objectif non atteint" />}
+      </span>
+    </li>
+  );
+}
+
 // Panneau "données d'entrée" (§9.3.2) : figé à la création de la revue (ou lors d'une
 // actualisation explicite tant qu'elle est en brouillon), jamais recalculé après clôture — voir
 // input_snapshot dans schema.sql. Toujours rendu, avec un repli si aucune donnée n'est
@@ -149,12 +176,21 @@ function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
           ) : (
             <ul className="mt-1 space-y-1">
               {inputSnapshot.kpi_trend.map((kpi) => (
-                <li key={kpi.id} className="flex items-center justify-between gap-2 text-sm text-slate-700">
-                  <span className="min-w-0 truncate">{kpi.name}</span>
-                  <span className="flex shrink-0 items-center gap-1 font-medium">
-                    {kpi.current_avg !== null ? `${kpi.current_avg.toFixed(1)}${kpi.unit ? ` ${kpi.unit}` : ''}` : '—'}
-                    <TrendIcon trend={kpi.trend} />
-                  </span>
+                <li key={kpi.id} className="text-sm text-slate-700">
+                  {Array.isArray(kpi.series) && kpi.series.length > 0 ? (
+                    <>
+                      <p className="break-words font-medium">{kpi.name}</p>
+                      <ul className="mt-0.5 space-y-1 border-l-2 border-slate-200 pl-2.5">
+                        {kpi.series.map((item) => (
+                          <KpiTrendRow key={item.label} name={item.label} item={item} />
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <ul>
+                      <KpiTrendRow name={kpi.name} item={kpi} />
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
