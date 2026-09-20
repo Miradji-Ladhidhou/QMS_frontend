@@ -157,6 +157,21 @@ export const PAGE_GUIDES = {
         réduire, éviter ou transférer — puis suivre le plan d'action.
       </p>
     ),
+    more: (
+      <>
+        <p>
+          <strong>Seuil d'acceptabilité :</strong> au-dessus du score fixé par l'admin, le risque est <strong>inacceptable</strong> — il est
+          signalé, et une CAPA liée est exigée avant de le passer traité, accepté ou clôturé. « Voir ceux à traiter » filtre ceux qui n'ont pas
+          encore de CAPA.
+        </p>
+        <p>
+          <strong>À revoir</strong> ouvre les risques dont la revue est dépassée, proche (90 jours) ou jamais planifiée : cochez ceux que vous
+          avez revus, ajustez la cotation si besoin, choisissez la prochaine revue, et validez tout d'un coup. Le bandeau{' '}
+          <strong>KPI hors objectif</strong> propose de créer un risque pour un indicateur qui n'atteint pas son objectif ; le risque créé
+          reste rattaché à ce KPI.
+        </p>
+      </>
+    ),
     example:
       "risque « départ du seul soudeur qualifié » : gravité 4 × probabilité 3 = criticité 12 → action : former un second soudeur d'ici juin.",
   },
@@ -321,6 +336,20 @@ export const PAGE_GUIDES = {
         Renseignez <strong>gravité</strong> et <strong>probabilité</strong> : la criticité se calcule toute seule.
         Choisissez ensuite le traitement (accepter / réduire / éviter / transférer) et suivez le plan.
       </p>
+    ),
+    more: (
+      <>
+        <p>
+          <strong>Évolution de la cotation :</strong> chaque changement de cotation, de résiduel ou de statut (et chaque revue) est
+          conservé avec sa date, son auteur et son motif ; la courbe montre l'avant / après traitement face au{' '}
+          <strong>seuil d'acceptabilité</strong>. Le champ « Motif du changement » de la modification explique pourquoi la cotation bouge.
+        </p>
+        <p>
+          <strong>Marquer revu</strong> enregistre que vous avez réexaminé le risque (même inchangé) et fixe la prochaine revue ; le
+          responsable reçoit un rappel 7 jours avant, le jour même, puis chaque semaine de retard. <strong>Éléments liés</strong> rattache
+          un audit, un fournisseur, un KPI ou une procédure. <strong>Exporter</strong> produit la fiche du risque en PDF ou Word.
+        </p>
+      </>
     ),
     example: "gravité 4, probabilité 2 → criticité 8 → traitement « réduire » → action « doubler le stock de sécurité ».",
   },

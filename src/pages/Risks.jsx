@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderCog, FolderInput, FolderPlus, Plus, Sparkles, X } from 'lucide-react';
+import { ClipboardList, FolderCog, FolderInput, FolderPlus, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -34,6 +34,11 @@ import SortSelect from '../components/SortSelect.jsx';
 import AiRiskSuggestion from '../components/AiRiskSuggestion.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import RiskThresholdBanner from '../components/risks/RiskThresholdBanner.jsx';
+import RiskKpiSuggestions from '../components/risks/RiskKpiSuggestions.jsx';
+import RiskReviewModal from '../components/risks/RiskReviewModal.jsx';
+import { riskDraftFromKpi } from '../lib/riskKpiSuggestion.js';
+import { daysUntil } from '../lib/riskReview.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const RISK_RESOURCE_TYPE = 'risk';
@@ -119,12 +124,12 @@ function RiskMatrix({ risks }) {
   );
 }
 
-function NewRiskModal({ users, services, onClose, onCreated }) {
+function NewRiskModal({ users, services, initial, kpiId, onClose, onCreated }) {
   const [form, setForm] = useState({
-    title: '',
+    title: initial?.title || '',
     type: 'risk',
-    category: '',
-    description: '',
+    category: initial?.category || '',
+    description: initial?.description || '',
     service_id: '',
     owner: '',
     likelihood: '3',
@@ -179,6 +184,11 @@ function NewRiskModal({ users, services, onClose, onCreated }) {
       setError(err.response?.data?.error || 'Impossible de créer le risque.');
       setSubmitting(false);
       return;
+    }
+    // Risque proposé depuis un KPI hors objectif : on le rattache à ce KPI (il quitte alors les suggestions).
+    // Un échec du lien n'annule pas le risque, déjà créé : il peut être ajouté à la main depuis sa fiche.
+    if (kpiId) {
+      await api.post(`/risks/${response.data.id}/links`, { kind: 'kpi', ref_id: kpiId }).catch(() => {});
     }
     setSubmitting(false);
     onCreated(response.data);
@@ -422,6 +432,11 @@ export default function Risks() {
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingRisk, setMovingRisk] = useState(null);
+  const [isReviewOpen, setIsReviewOpen] = useState(false);
+  const [kpiSuggestion, setKpiSuggestion] = useState(null);
+  const [onlyNeedsCapa, setOnlyNeedsCapa] = useState(false);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [insightsKey, setInsightsKey] = useState(0);
   const {
     currentFolderId,
     navigateToFolder,
@@ -491,6 +506,15 @@ export default function Risks() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [typeFilter, statusFilter, serviceFilter]);
 
+  // Nombre de risques à revoir (bouton « À revoir ») : rechargé après chaque revue ou création.
+  useEffect(() => {
+    if (!canManage) return;
+    api
+      .get('/risks/review-queue')
+      .then(({ data }) => setReviewCount(data.items.length))
+      .catch(() => setReviewCount(0));
+  }, [canManage, insightsKey]);
+
   const { sorted: sortedRisks, sortKey, direction, setSortKey, toggleSort } = useSort(
     risks,
     getRiskSortValue,
@@ -506,12 +530,14 @@ export default function Risks() {
   // façon déjà chargée pour la matrice. "Sans dossier" (racine) = category_id null, même
   // convention que folder_id sur les KPI.
   const currentFolderRisks = useMemo(
-    () => sortedRisks.filter((risk) => (risk.category_id || null) === currentFolderId),
-    [sortedRisks, currentFolderId]
+    () => sortedRisks.filter((risk) => (risk.category_id || null) === currentFolderId && (!onlyNeedsCapa || risk.needs_capa)),
+    [sortedRisks, currentFolderId, onlyNeedsCapa]
   );
 
   function handleCreated(risk) {
     setIsModalOpen(false);
+    setKpiSuggestion(null);
+    setInsightsKey((key) => key + 1);
     navigate(`/risks/${risk.id}`);
   }
 
@@ -666,6 +692,17 @@ export default function Risks() {
           {canManage && (
             <button
               type="button"
+              onClick={() => setIsReviewOpen(true)}
+              className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <ClipboardList size={18} />
+              À revoir
+              {reviewCount > 0 && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">{reviewCount}</span>}
+            </button>
+          )}
+          {canManage && (
+            <button
+              type="button"
               onClick={() => setIsAnalyzeModalOpen(true)}
               className="flex items-center justify-center gap-2 rounded-md border border-purple-300 px-4 py-2.5 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50"
             >
@@ -686,6 +723,15 @@ export default function Risks() {
         </div>
       </div>
       <PageGuide id="risks" />
+      <RiskThresholdBanner
+        risks={risks}
+        isAdmin={currentUser?.role === 'admin'}
+        refreshKey={insightsKey}
+        onlyNeedsCapa={onlyNeedsCapa}
+        onToggleFilter={() => setOnlyNeedsCapa((value) => !value)}
+        onChanged={loadData}
+      />
+      {canManage && <RiskKpiSuggestions refreshKey={insightsKey} onCreate={setKpiSuggestion} />}
 
       {error && (
         <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
@@ -838,27 +884,37 @@ export default function Risks() {
                   onClick={() => navigate(`/risks/${risk.id}`)}
                   className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
                     {canManage && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(risk.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleSelect(risk.id)}
-                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
+                      <label className="-m-3 flex shrink-0 cursor-pointer items-center justify-center p-3 sm:-m-1 sm:p-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(risk.id)}
+                          onChange={() => toggleSelect(risk.id)}
+                          aria-label={`Sélectionner ${risk.title}`}
+                          className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary sm:h-4 sm:w-4"
+                        />
+                      </label>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900">{risk.title}</p>
-                      <p className="truncate text-sm text-slate-500">
+                      <p className="line-clamp-2 break-words font-medium text-slate-900">{risk.title}</p>
+                      <p className="break-words text-sm text-slate-500">
                         {RISK_TYPE_LABELS[risk.type]}
                         {risk.owner_user ? ` · ${risk.owner_user.full_name}` : ''}
                         {risk.review_date ? ` · Revue le ${formatDate(risk.review_date)}` : ''}
                       </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <RiskScoreBadge score={risk.risk_score} />
-                      <RiskStatusBadge status={risk.status} />
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <RiskScoreBadge score={risk.risk_score} />
+                        {risk.residual_score !== null && risk.residual_score !== undefined && (
+                          <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Résiduel {risk.residual_score}</span>
+                        )}
+                        <RiskStatusBadge status={risk.status} />
+                        {risk.is_unacceptable && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Inacceptable</span>}
+                        {risk.needs_capa && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Sans CAPA</span>}
+                        {risk.review_date && !['accepted', 'closed'].includes(risk.status) && daysUntil(risk.review_date) < 0 && (
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">Revue dépassée</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {canManage && (
@@ -869,7 +925,7 @@ export default function Risks() {
                           e.stopPropagation();
                           setMovingRisk(risk);
                         }}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 sm:min-h-0 sm:px-2"
                       >
                         <FolderInput size={12} />
                         Déplacer
@@ -883,12 +939,27 @@ export default function Risks() {
         </>
       )}
 
-      {isModalOpen && (
+      {(isModalOpen || kpiSuggestion) && (
         <NewRiskModal
           users={users}
           services={services}
-          onClose={() => setIsModalOpen(false)}
+          initial={kpiSuggestion ? riskDraftFromKpi(kpiSuggestion) : undefined}
+          kpiId={kpiSuggestion?.kpi_id}
+          onClose={() => {
+            setIsModalOpen(false);
+            setKpiSuggestion(null);
+          }}
           onCreated={handleCreated}
+        />
+      )}
+
+      {isReviewOpen && (
+        <RiskReviewModal
+          onClose={() => setIsReviewOpen(false)}
+          onReviewed={() => {
+            setInsightsKey((key) => key + 1);
+            loadData();
+          }}
         />
       )}
 

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { ArrowLeft, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, CalendarCheck, ClipboardCheck, Pencil, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
+import { getPdfDownload, getWordDownload } from '../lib/pdfExport.js';
+import { describeReviewDate, daysUntil } from '../lib/riskReview.js';
 import {
   RISK_TYPE_LABELS,
   RISK_STATUS_LABELS,
@@ -21,6 +23,10 @@ import AiRiskTreatmentSuggestion from '../components/AiRiskTreatmentSuggestion.j
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
+import RiskHistoryCard from '../components/risks/RiskHistoryCard.jsx';
+import RiskLinksCard from '../components/risks/RiskLinksCard.jsx';
+import RiskMarkReviewedModal from '../components/risks/RiskMarkReviewedModal.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -79,6 +85,7 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
     review_date: risk.review_date || '',
     category_id: risk.category_id || '',
     category_name: risk.folder?.name || '',
+    change_reason: '',
   });
   const [isPrivate, setIsPrivate] = useState(Boolean(risk.is_private_to_me));
   const [error, setError] = useState('');
@@ -118,6 +125,7 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
         impact: Number(form.impact),
         residual_likelihood: form.residual_likelihood ? Number(form.residual_likelihood) : null,
         residual_impact: form.residual_impact ? Number(form.residual_impact) : null,
+        change_reason: form.change_reason.trim() || undefined,
       });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier ce risque.');
@@ -346,6 +354,19 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
               onChange={(e) => updateField('review_date', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Motif du changement (facultatif)</label>
+            <input
+              type="text"
+              maxLength={500}
+              placeholder="Ex : second fournisseur qualifié"
+              value={form.change_reason}
+              onChange={(e) => updateField('change_reason', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-slate-400">Inscrit dans l'historique de cotation si la cotation, le résiduel ou le statut change.</p>
           </div>
 
           <CategoryVisibilityField
@@ -607,6 +628,36 @@ export default function RiskDetail() {
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [exporting, setExporting] = useState({ pdf: false, word: false });
+  const [historyKey, setHistoryKey] = useState(0);
+  const [linksKey, setLinksKey] = useState(0);
+
+  // Recharge la fiche sans écran de chargement (après une CAPA, une revue…) : les indicateurs calculés par le
+  // serveur (inacceptable, sans CAPA) et l'historique restent ainsi à jour.
+  async function refreshRisk() {
+    try {
+      const { data } = await api.get(`/risks/${id}`);
+      setRisk(data);
+      setHistoryKey((key) => key + 1);
+    } catch {
+      /* la fiche déjà affichée reste valable */
+    }
+  }
+
+  async function handleExport(format) {
+    setExporting((prev) => ({ ...prev, [format]: true }));
+    setError('');
+    const baseName = `risque-${risk.title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 50)}`;
+    try {
+      if (format === 'pdf') await getPdfDownload(`/risks/${id}/pdf`, `${baseName}.pdf`);
+      else await getWordDownload(`/risks/${id}/word`, `${baseName}.docx`);
+    } catch {
+      setError(`Impossible de générer la fiche ${format === 'pdf' ? 'PDF' : 'Word'}.`);
+    } finally {
+      setExporting((prev) => ({ ...prev, [format]: false }));
+    }
+  }
 
   async function loadRisk() {
     setLoading(true);
@@ -636,6 +687,7 @@ export default function RiskDetail() {
     try {
       const { data } = await api.patch(`/risks/${id}`, { status });
       setRisk((prev) => ({ ...prev, ...data }));
+      setHistoryKey((key) => key + 1);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
@@ -666,21 +718,27 @@ export default function RiskDetail() {
       <button
         type="button"
         onClick={goBack}
-        className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="-ml-1 mb-2 flex min-h-[40px] items-center gap-1 px-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />
         Retour
       </button>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{risk.title}</h1>
+        <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{risk.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportMenu
+            onExportPdf={() => handleExport('pdf')}
+            exportingPdf={exporting.pdf}
+            onExportWord={() => handleExport('word')}
+            exportingWord={exporting.word}
+          />
           <span className="text-xs text-slate-500">{RISK_TYPE_LABELS[risk.type]}</span>
           {canManage ? (
             <select
               value={risk.status}
               onChange={handleStatusChange}
-              className="rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              className="min-h-[40px] rounded-md border border-slate-300 px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:min-h-0 sm:text-sm"
             >
               {Object.entries(RISK_STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -697,7 +755,7 @@ export default function RiskDetail() {
                 type="button"
                 onClick={() => setIsEditModalOpen(true)}
                 aria-label="Modifier"
-                className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-primary sm:p-2"
               >
                 <Pencil size={16} />
               </button>
@@ -705,7 +763,7 @@ export default function RiskDetail() {
                 type="button"
                 onClick={handleDelete}
                 aria-label="Supprimer"
-                className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-red-600 sm:p-2"
               >
                 <Trash2 size={16} />
               </button>
@@ -716,6 +774,18 @@ export default function RiskDetail() {
       <PageGuide id="riskDetail" />
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+      {risk.is_unacceptable && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <p className="min-w-0">
+            <strong>Risque inacceptable</strong> : le score {risk.residual_score !== null ? 'résiduel' : 'brut'} ({risk.current_score}) atteint le seuil de {risk.unacceptable_score}.
+            {risk.needs_capa
+              ? ' Aucune CAPA n’est liée : créez-en une pour porter le traitement — elle est exigée avant de passer ce risque traité, accepté ou clôturé.'
+              : ' Une CAPA est liée pour le traiter.'}
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
         <div>
@@ -733,6 +803,27 @@ export default function RiskDetail() {
         <div>
           <p className="text-xs text-slate-500">Prochaine revue</p>
           <p className="text-sm font-medium text-slate-800">{formatDate(risk.review_date)}</p>
+          {risk.review_date && !['accepted', 'closed'].includes(risk.status) && daysUntil(risk.review_date) <= 30 && (
+            <p className={`text-xs ${daysUntil(risk.review_date) < 0 ? 'font-medium text-red-600' : 'text-amber-700'}`}>{describeReviewDate(risk.review_date)}</p>
+          )}
+        </div>
+        <div className="col-span-2 sm:col-span-4">
+          <p className="text-xs text-slate-500">Dernière revue</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            <p className="text-sm font-medium text-slate-800">
+              {risk.last_reviewed_at ? new Date(risk.last_reviewed_at).toLocaleDateString('fr-FR') : 'Jamais revu'}
+            </p>
+            {canManage && (
+              <button
+                type="button"
+                onClick={() => setIsReviewModalOpen(true)}
+                className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:min-h-0"
+              >
+                <CalendarCheck size={14} />
+                Marquer revu
+              </button>
+            )}
+          </div>
         </div>
         {risk.description && (
           <div className="col-span-2 sm:col-span-4">
@@ -792,6 +883,21 @@ export default function RiskDetail() {
         )}
       </div>
 
+      <RiskLinksCard riskId={id} canManage={canManage} refreshKey={linksKey} onChanged={() => setLinksKey((key) => key + 1)} />
+      <RiskHistoryCard riskId={id} threshold={risk.unacceptable_score} refreshKey={historyKey} />
+
+      {isReviewModalOpen && (
+        <RiskMarkReviewedModal
+          risk={risk}
+          onClose={() => setIsReviewModalOpen(false)}
+          onReviewed={(data) => {
+            setRisk((prev) => ({ ...prev, ...data }));
+            setHistoryKey((key) => key + 1);
+            setIsReviewModalOpen(false);
+          }}
+        />
+      )}
+
       {isEditModalOpen && (
         <EditRiskModal
           risk={risk}
@@ -800,6 +906,7 @@ export default function RiskDetail() {
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setRisk((prev) => ({ ...prev, ...data }));
+            setHistoryKey((key) => key + 1);
             setIsEditModalOpen(false);
           }}
         />
@@ -814,8 +921,9 @@ export default function RiskDetail() {
           priorityDelays={priorityDelays}
           onClose={() => setIsCapaModalOpen(false)}
           onCreated={(capa) => {
-            setRisk((prev) => ({ ...prev, linked_capa: capa }));
+            setRisk((prev) => ({ ...prev, linked_capa: capa, needs_capa: false }));
             setIsCapaModalOpen(false);
+            refreshRisk();
           }}
         />
       )}
