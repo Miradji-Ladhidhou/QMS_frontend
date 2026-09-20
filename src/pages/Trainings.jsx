@@ -82,6 +82,32 @@ function selectValueToEffectiveness(value) {
   return null;
 }
 
+// Regroupe les réalisations d'une formation par session (voir routes/trainings.js — chaque
+// réalisation créée depuis cette évolution appartient toujours à une session ; les
+// réalisations créées avant restent à null, groupe "sans session" toujours affiché en dernier,
+// jamais masqué, puisque c'est justement ce qu'il reste à organiser). Trié par date
+// décroissante, comme l'était déjà la liste plate.
+function groupRecordsBySession(records) {
+  const bySessionId = new Map();
+  const orphans = [];
+  for (const record of records) {
+    if (!record.session) {
+      orphans.push(record);
+      continue;
+    }
+    const key = record.session.id;
+    if (!bySessionId.has(key)) {
+      bySessionId.set(key, { sessionId: key, sessionDate: record.session.session_date, records: [] });
+    }
+    bySessionId.get(key).records.push(record);
+  }
+  const sessions = [...bySessionId.values()].sort((a, b) => (a.sessionDate < b.sessionDate ? 1 : -1));
+  if (orphans.length > 0) {
+    sessions.push({ sessionId: null, sessionDate: null, records: orphans });
+  }
+  return sessions;
+}
+
 // next_due_date est calculé et stocké côté serveur à chaque réalisation (voir POST
 // /:id/records, addMonths(completed_at, frequency_months)) — même champ que celui utilisé par
 // la Matrice des compétences, pour ne jamais afficher une notion de "retard" différente de la
@@ -644,12 +670,29 @@ function personName(record) {
   return record.user?.full_name || record.employee?.full_name || 'Personne inconnue';
 }
 
+// Sentinelle pour distinguer "garder la session actuelle" (valeur = son id, ou '' si aucune)
+// de "créer une nouvelle session" dans le <select> ci-dessous — jamais confondue avec un vrai
+// id de session (uuid).
+const NEW_SESSION_VALUE = '__new__';
+
 function EditRecordModal({ training, record, onClose, onUpdated }) {
   const [completedAt, setCompletedAt] = useState(record.completed_at);
   const [evaluationResult, setEvaluationResult] = useState(effectivenessToSelectValue(record.evaluation_result));
   const [evaluationNotes, setEvaluationNotes] = useState(record.evaluation_notes || '');
+  const [sessionChoice, setSessionChoice] = useState(record.session?.id || '');
+  const [newSessionDate, setNewSessionDate] = useState(record.completed_at);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Sessions existantes de CETTE formation, dérivées des réalisations déjà chargées (voir
+  // GET /trainings — pas besoin d'un appel réseau dédié) — dédupliquées et triées par date.
+  const availableSessions = useMemo(() => {
+    const bySessionId = new Map();
+    for (const r of training.records || []) {
+      if (r.session) bySessionId.set(r.session.id, r.session);
+    }
+    return [...bySessionId.values()].sort((a, b) => (a.session_date < b.session_date ? 1 : -1));
+  }, [training.records]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -664,14 +707,22 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
 
     setSubmitting(true);
 
+    const payload = {
+      completed_at: completedAt,
+      evaluation_result: selectValueToEffectiveness(evaluationResult),
+      evaluation_notes: evaluationNotes || null,
+    };
+    if (sessionChoice === NEW_SESSION_VALUE) {
+      payload.new_session_date = newSessionDate;
+    } else if (sessionChoice !== (record.session?.id || '')) {
+      // '' (Sans session) ou l'id d'une session existante différente de l'actuelle.
+      payload.session_id = sessionChoice || null;
+    }
+
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence.
     let data;
     try {
-      ({ data } = await api.patch(`/trainings/${training.id}/records/${record.id}`, {
-        completed_at: completedAt,
-        evaluation_result: selectValueToEffectiveness(evaluationResult),
-        evaluation_notes: evaluationNotes || null,
-      }));
+      ({ data } = await api.patch(`/trainings/${training.id}/records/${record.id}`, payload));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier cette réalisation.');
       setSubmitting(false);
@@ -709,6 +760,32 @@ function EditRecordModal({ training, record, onClose, onUpdated }) {
               onChange={(e) => setCompletedAt(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Session</label>
+            <select
+              value={sessionChoice}
+              onChange={(e) => setSessionChoice(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Sans session</option>
+              {availableSessions.map((session) => (
+                <option key={session.id} value={session.id}>
+                  Session du {formatDate(session.session_date)}
+                </option>
+              ))}
+              <option value={NEW_SESSION_VALUE}>+ Nouvelle session</option>
+            </select>
+            {sessionChoice === NEW_SESSION_VALUE && (
+              <input
+                type="date"
+                required
+                value={newSessionDate}
+                onChange={(e) => setNewSessionDate(e.target.value)}
+                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            )}
           </div>
 
           <div>
@@ -1628,6 +1705,8 @@ export default function Trainings() {
               {currentFolderTrainings.map((training) => {
                   const isExpanded = expandedId === training.id;
                   const overdueCount = countOverdueRecords(training, today);
+                  const sessionGroups = groupRecordsBySession(training.records);
+                  const sessionCount = sessionGroups.filter((group) => group.sessionId !== null).length;
 
                   return (
                     <div
@@ -1713,7 +1792,8 @@ export default function Trainings() {
                         disabled={training.records.length === 0}
                         className="mt-1 flex items-center gap-1 text-sm text-slate-600 hover:text-primary disabled:cursor-default disabled:hover:text-slate-600"
                       >
-                        {training.records.length} réalisation{training.records.length > 1 ? 's' : ''}
+                        {sessionCount} session{sessionCount > 1 ? 's' : ''} · {training.records.length} réalisation
+                        {training.records.length > 1 ? 's' : ''}
                         {training.records.length > 0 && (isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />)}
                       </button>
                       {!isExpanded && training.records.length > 0 && (
@@ -1723,64 +1803,79 @@ export default function Trainings() {
                       )}
 
                       {isExpanded && (
-                        <ul className="mt-2 space-y-2 border-t border-slate-100 pt-2">
-                          {training.records.map((record) => (
-                            <li key={record.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                              <span className="text-slate-700">
-                                {personName(record)}
-                                {record.employee_id && (
-                                  <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
-                                    Sans compte
-                                  </span>
-                                )}
+                        <div className="mt-2 space-y-3 border-t border-slate-100 pt-2">
+                          {sessionGroups.map((group) => (
+                            <div key={group.sessionId || 'none'}>
+                              <p
+                                className={`mb-1.5 text-xs font-medium ${
+                                  group.sessionId === null ? 'text-amber-600' : 'text-slate-500'
+                                }`}
+                              >
+                                {group.sessionId === null ? 'Sans session' : `Session du ${formatDate(group.sessionDate)}`}
                                 {' — '}
-                                {formatDate(record.completed_at)}
-                                {record.evaluation_result !== null && (
-                                  <span
-                                    className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${CAPA_EFFECTIVENESS_STYLES[record.evaluation_result]}`}
-                                  >
-                                    {CAPA_EFFECTIVENESS_LABELS[record.evaluation_result]}
-                                  </span>
-                                )}
-                              </span>
-                              <div className="flex shrink-0 items-center gap-2">
-                                <button
-                                  type="button"
-                                  onClick={() => handleDownloadCertificate(training, record)}
-                                  disabled={certificateDownloadingId === record.id}
-                                  className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                                >
-                                  {certificateDownloadingId === record.id ? (
-                                    <Loader2 size={13} className="animate-spin" />
-                                  ) : (
-                                    <Award size={13} />
-                                  )}
-                                  Certificat
-                                </button>
-                                {canManage && (
-                                  <>
-                                    <button
-                                      type="button"
-                                      onClick={() => setEditingRecord({ training, record })}
-                                      aria-label="Modifier la réalisation"
-                                      className="p-1 text-slate-400 hover:text-primary"
-                                    >
-                                      <Pencil size={14} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleDeleteRecord(training, record)}
-                                      aria-label="Supprimer la réalisation"
-                                      className="p-1 text-slate-400 hover:text-red-600"
-                                    >
-                                      <Trash2 size={14} />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            </li>
+                                {group.records.length} réalisation{group.records.length > 1 ? 's' : ''}
+                              </p>
+                              <ul className="space-y-2">
+                                {group.records.map((record) => (
+                                  <li key={record.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                                    <span className="text-slate-700">
+                                      {personName(record)}
+                                      {record.employee_id && (
+                                        <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                                          Sans compte
+                                        </span>
+                                      )}
+                                      {' — '}
+                                      {formatDate(record.completed_at)}
+                                      {record.evaluation_result !== null && (
+                                        <span
+                                          className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${CAPA_EFFECTIVENESS_STYLES[record.evaluation_result]}`}
+                                        >
+                                          {CAPA_EFFECTIVENESS_LABELS[record.evaluation_result]}
+                                        </span>
+                                      )}
+                                    </span>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleDownloadCertificate(training, record)}
+                                        disabled={certificateDownloadingId === record.id}
+                                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                                      >
+                                        {certificateDownloadingId === record.id ? (
+                                          <Loader2 size={13} className="animate-spin" />
+                                        ) : (
+                                          <Award size={13} />
+                                        )}
+                                        Certificat
+                                      </button>
+                                      {canManage && (
+                                        <>
+                                          <button
+                                            type="button"
+                                            onClick={() => setEditingRecord({ training, record })}
+                                            aria-label="Modifier la réalisation"
+                                            className="p-1 text-slate-400 hover:text-primary"
+                                          >
+                                            <Pencil size={14} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteRecord(training, record)}
+                                            aria-label="Supprimer la réalisation"
+                                            className="p-1 text-slate-400 hover:text-red-600"
+                                          >
+                                            <Trash2 size={14} />
+                                          </button>
+                                        </>
+                                      )}
+                                    </div>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           ))}
-                        </ul>
+                        </div>
                       )}
 
                       <div className="mt-4 flex flex-col gap-2 sm:flex-row">
