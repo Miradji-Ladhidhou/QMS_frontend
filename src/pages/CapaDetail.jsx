@@ -1023,7 +1023,7 @@ export default function CapaDetail() {
           renderItem={(procedure) => (
             <span className="flex min-w-0 items-center gap-2">
               <span className="shrink-0 font-medium text-slate-800">{procedure.number}</span>
-              <span className="truncate text-slate-600">{procedure.title}</span>
+              <span className="min-w-0 truncate text-slate-600">{procedure.title}</span>
             </span>
           )}
           onClose={() => setIsLinkProcedureModalOpen(false)}

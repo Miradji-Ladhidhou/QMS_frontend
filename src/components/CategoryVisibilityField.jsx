@@ -77,7 +77,7 @@ export default function CategoryVisibilityField({
             className="mt-2 flex w-full items-center gap-2 rounded-md border border-slate-300 px-3 py-2.5 text-left text-base text-slate-700 hover:bg-slate-50 disabled:bg-slate-50 disabled:text-slate-500"
           >
             <Folder size={16} className="shrink-0 text-primary" />
-            <span className="truncate">{categoryName || 'Aucun dossier'}</span>
+            <span className="min-w-0 truncate">{categoryName || 'Aucun dossier'}</span>
           </button>
           {pickerOpen && (
             <FolderPickerModal

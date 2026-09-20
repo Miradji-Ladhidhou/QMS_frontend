@@ -595,7 +595,7 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-slate-900">{item.title}</p>
-        <div className="mt-0.5 flex items-center gap-2">
+        <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
           <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${config.className}`}>
             {config.label}
           </span>

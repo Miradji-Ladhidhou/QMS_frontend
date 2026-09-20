@@ -1064,7 +1064,7 @@ export default function ProcedureDetail() {
           renderItem={(capa) => (
             <span className="flex min-w-0 items-center gap-2">
               <span className="shrink-0 font-medium text-slate-800">{capa.number}</span>
-              <span className="truncate text-slate-600">{capa.title}</span>
+              <span className="min-w-0 truncate text-slate-600">{capa.title}</span>
             </span>
           )}
           onClose={() => setIsLinkCapaModalOpen(false)}
@@ -1078,7 +1078,7 @@ export default function ProcedureDetail() {
           fetchUrl="/audits"
           excludeIds={linkedAudits.map((auditItem) => auditItem.id)}
           getSearchText={(auditItem) => auditItem.title}
-          renderItem={(auditItem) => <span className="truncate text-slate-800">{auditItem.title}</span>}
+          renderItem={(auditItem) => <span className="min-w-0 truncate text-slate-800">{auditItem.title}</span>}
           onClose={() => setIsLinkAuditModalOpen(false)}
           onSelect={handleLinkAudit}
         />

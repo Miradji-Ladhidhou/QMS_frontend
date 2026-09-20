@@ -44,7 +44,10 @@ export default function ExportMenu({
       {open && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
-          <div className="absolute left-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg sm:left-auto sm:right-0">
+          {/* max-w garde le menu dans l'écran même quand ce bouton n'est pas collé au bord
+              gauche (ex. plusieurs boutons sur une même ligne qui passe à la ligne en mobile) :
+              w-56 (224px) peut dépasser un viewport de 320-360px selon où le bouton atterrit. */}
+          <div className="absolute left-0 top-full z-20 mt-1 w-56 max-w-[calc(100vw-2rem)] overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg sm:left-auto sm:right-0">
             {onExportCsv && (
               <button
                 type="button"
