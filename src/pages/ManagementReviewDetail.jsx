@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { ArrowLeft, ClipboardCheck, Minus, Pencil, Plus, RefreshCw, Sparkles, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Mail, Minus, Pencil, Plus, RefreshCw, ShieldCheck, Sparkles, Trash2, TrendingDown, TrendingUp, Unlock, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -22,6 +22,8 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import PreviousReviewBlock from '../components/managementReview/PreviousReviewBlock.jsx';
 import ReviewActionCard from '../components/managementReview/ReviewActionCard.jsx';
 import ReviewAiDraftModal from '../components/managementReview/ReviewAiDraftModal.jsx';
+import ReviewValidateModal from '../components/managementReview/ReviewValidateModal.jsx';
+import ReviewMailingModal from '../components/managementReview/ReviewMailingModal.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -98,6 +100,15 @@ function TrendIcon({ trend }) {
 // actualisation explicite tant qu'elle est en brouillon), jamais recalculé après clôture — voir
 // input_snapshot dans schema.sql. Toujours rendu, avec un repli si aucune donnée n'est
 // disponible (revue ancienne, ou créée sans période).
+function InputCard({ title, children }) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+      {children}
+    </div>
+  );
+}
+
 function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
   if (!inputSnapshot) {
     return (
@@ -194,6 +205,82 @@ function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
             ))}
           </div>
         </div>
+
+        {/* Éléments d'entrée complémentaires (§9.3.2) : absents des revues créées avant leur ajout. */}
+        {inputSnapshot.satisfaction_period && (
+          <InputCard title="Satisfaction client">
+            {inputSnapshot.satisfaction_period.count === 0 ? (
+              <p className="mt-1 text-sm text-slate-400">Aucune enquête sur la période.</p>
+            ) : (
+              <>
+                <p className="mt-1 text-sm text-slate-700">
+                  <span className="text-lg font-semibold text-slate-900">{inputSnapshot.satisfaction_period.average_score}/5</span> · {inputSnapshot.satisfaction_period.count} enquête(s)
+                </p>
+                <p className="mt-1 text-xs text-slate-500">{inputSnapshot.satisfaction_period.satisfied_rate} % de clients satisfaits (note ≥ 4)</p>
+              </>
+            )}
+          </InputCard>
+        )}
+        {inputSnapshot.suppliers_period && (
+          <InputCard title="Performance des fournisseurs">
+            <p className="mt-1 text-sm text-slate-700">
+              <span className="text-lg font-semibold text-slate-900">{inputSnapshot.suppliers_period.active}</span> actif(s) ·{' '}
+              {inputSnapshot.suppliers_period.evaluations} évaluation(s)
+              {inputSnapshot.suppliers_period.average_score !== null && <> · note moyenne {inputSnapshot.suppliers_period.average_score}/5</>}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Sous surveillance : {inputSnapshot.suppliers_period.under_watch} · À remplacer : {inputSnapshot.suppliers_period.to_replace} · Évaluations en retard :{' '}
+              {inputSnapshot.suppliers_period.overdue_evaluations}
+            </p>
+          </InputCard>
+        )}
+        {inputSnapshot.nonconforming_period && (
+          <InputCard title="Sorties non conformes">
+            <p className="mt-1 text-sm text-slate-700">
+              <span className="text-lg font-semibold text-slate-900">{inputSnapshot.nonconforming_period.detected}</span> détectée(s) —{' '}
+              <span className="font-medium">{inputSnapshot.nonconforming_period.still_open}</span> encore ouverte(s)
+            </p>
+          </InputCard>
+        )}
+        {inputSnapshot.accidents_period && (
+          <InputCard title="Accidents">
+            <p className="mt-1 text-sm text-slate-700">
+              <span className="text-lg font-semibold text-slate-900">{inputSnapshot.accidents_period.count}</span> sur la période ·{' '}
+              {inputSnapshot.accidents_period.with_lost_time} avec arrêt ({inputSnapshot.accidents_period.lost_days} j perdus)
+            </p>
+            <p className="mt-1 text-xs text-slate-500">{inputSnapshot.accidents_period.still_open} non clôturé(s)</p>
+          </InputCard>
+        )}
+        {inputSnapshot.competences && (
+          <InputCard title="Compétences et formations">
+            <p className="mt-1 text-sm text-slate-700">
+              <span className="text-lg font-semibold text-slate-900">
+                {inputSnapshot.competences.compliance_rate === null ? '—' : `${inputSnapshot.competences.compliance_rate} %`}
+              </span>{' '}
+              de formations à jour ({inputSnapshot.competences.to_renew} à renouveler, {inputSnapshot.competences.expired} échue(s))
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              {inputSnapshot.competences.auditors.designated
+                ? `Auditeurs internes : ${inputSnapshot.competences.auditors.qualified} qualifié(s), ${inputSnapshot.competences.auditors.to_recycle} à recycler, ${inputSnapshot.competences.auditors.not_qualified} non qualifié(s)`
+                : "Auditeurs internes : aucune formation qualifiante désignée"}
+            </p>
+          </InputCard>
+        )}
+        {inputSnapshot.quality_policy && (
+          <InputCard title="Politique qualité">
+            {inputSnapshot.quality_policy.defined ? (
+              <p className="mt-1 text-sm text-slate-700">
+                Version du {formatDate(inputSnapshot.quality_policy.last_updated)} — lue par{' '}
+                <span className="font-medium">
+                  {inputSnapshot.quality_policy.acknowledged}/{inputSnapshot.quality_policy.users}
+                </span>{' '}
+                utilisateur(s)
+              </p>
+            ) : (
+              <p className="mt-1 text-sm text-slate-400">Aucune politique qualité publiée.</p>
+            )}
+          </InputCard>
+        )}
       </div>
     </div>
   );
@@ -599,6 +686,10 @@ export default function ManagementReviewDetail() {
   const [exportingDrive, setExportingDrive] = useState(false);
   const [exportError, setExportError] = useState('');
   const [isAiDraftOpen, setIsAiDraftOpen] = useState(false);
+  const [isValidateOpen, setIsValidateOpen] = useState(false);
+  const [mailingKind, setMailingKind] = useState(null); // 'convocation' | 'minutes' | null
+  const [signaturePreview, setSignaturePreview] = useState(null);
+  const [reopening, setReopening] = useState(false);
   const [applyingPrevious, setApplyingPrevious] = useState(false);
   const users = useUsers();
   const [services, setServices] = useState([]);
@@ -626,6 +717,18 @@ export default function ManagementReviewDetail() {
     }
   }
 
+  // Aperçu de la signature de validation (jamais embarquée dans le détail de la revue).
+  useEffect(() => {
+    if (!review?.is_validated) {
+      setSignaturePreview(null);
+      return;
+    }
+    api
+      .get(`/management-reviews/${id}/validation-signature`)
+      .then(({ data }) => setSignaturePreview(data?.image || null))
+      .catch(() => setSignaturePreview(null));
+  }, [id, review?.is_validated]);
+
   useEffect(() => {
     loadReview();
     api
@@ -635,6 +738,30 @@ export default function ManagementReviewDetail() {
     api.get('/capas/priority-delays').then(({ data }) => setPriorityDelays(data)).catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  function handleValidated(data, signature) {
+    setReview((prev) => ({ ...prev, validated_by: data.validated_by, validated_at: data.validated_at, is_validated: true, validator: { id: data.validated_by, full_name: currentUser?.full_name } }));
+    setSignaturePreview(signature);
+    setIsValidateOpen(false);
+  }
+
+  async function handleReopen() {
+    if (!window.confirm('Rouvrir cette revue ? La validation et la signature de la direction seront effacées : il faudra la valider de nouveau.')) return;
+    setReopening(true);
+    setError('');
+    try {
+      await api.post(`/management-reviews/${id}/reopen`);
+      setReview((prev) => ({ ...prev, validated_by: null, validated_at: null, is_validated: false, validator: null }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de rouvrir la revue.');
+    } finally {
+      setReopening(false);
+    }
+  }
+
+  function handleMailingSent(mailing) {
+    if (mailing) setReview((prev) => ({ ...prev, mailings: [{ ...mailing, sender: { full_name: currentUser?.full_name } }, ...(prev.mailings || [])] }));
+  }
 
   async function handleStatusChange(event) {
     const status = event.target.value;
@@ -794,7 +921,7 @@ export default function ManagementReviewDetail() {
             onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
             exportingDrive={exportingDrive}
           />
-          {canManage ? (
+          {canManage && !review.is_validated ? (
             <select
               value={review.status}
               onChange={handleStatusChange}
@@ -809,7 +936,13 @@ export default function ManagementReviewDetail() {
           ) : (
             <ReviewStatusBadge status={review.status} />
           )}
-          {canManage && (
+          {review.is_validated && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              <ShieldCheck size={12} />
+              Validée
+            </span>
+          )}
+          {canManage && !review.is_validated && (
             <>
               <button
                 type="button"
@@ -833,6 +966,65 @@ export default function ManagementReviewDetail() {
       </div>
       <PageGuide id="managementReviewDetail" />
       {exportError && <p className="mt-2 text-xs text-red-600">{exportError}</p>}
+
+      {canManage && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {review.status === 'draft' && (
+            <button
+              type="button"
+              onClick={() => setMailingKind('convocation')}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Mail size={15} />
+              Convoquer
+            </button>
+          )}
+          {review.is_validated && (
+            <button
+              type="button"
+              onClick={() => setMailingKind('minutes')}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              <Mail size={15} />
+              Envoyer le compte rendu
+            </button>
+          )}
+          {currentUser?.role === 'admin' && review.status === 'completed' && !review.is_validated && (
+            <button
+              type="button"
+              onClick={() => setIsValidateOpen(true)}
+              className="flex items-center gap-1.5 rounded-md bg-emerald-600 px-3 py-2 text-sm font-medium text-white hover:bg-emerald-700"
+            >
+              <ShieldCheck size={15} />
+              Valider et signer
+            </button>
+          )}
+          {currentUser?.role === 'admin' && review.is_validated && (
+            <button
+              type="button"
+              onClick={handleReopen}
+              disabled={reopening}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              <Unlock size={15} />
+              {reopening ? 'Réouverture...' : 'Rouvrir'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {review.is_validated && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-3 sm:p-4">
+          <ShieldCheck size={20} className="shrink-0 text-emerald-600" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-medium text-emerald-900">
+              Validée et signée par {review.validator?.full_name || 'la direction'} le {formatDateTime(review.validated_at)}
+            </p>
+            <p className="text-xs text-emerald-800">La revue est verrouillée : seul le suivi des actions reste modifiable.</p>
+          </div>
+          {signaturePreview && <img src={signaturePreview} alt="Signature de la direction" className="h-12 max-w-[10rem] rounded border border-emerald-200 bg-white p-1 object-contain" />}
+        </div>
+      )}
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
@@ -864,11 +1056,11 @@ export default function ManagementReviewDetail() {
 
       {review.previous_review && (
         <div className="mt-4">
-          <PreviousReviewBlock previousReview={review.previous_review} canApply={canManage} onApply={handleApplyPrevious} applying={applyingPrevious} />
+          <PreviousReviewBlock previousReview={review.previous_review} canApply={canManage && !review.is_validated} onApply={handleApplyPrevious} applying={applyingPrevious} />
         </div>
       )}
 
-      {canManage && (
+      {canManage && !review.is_validated && (
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50/50 p-3 sm:p-4">
           <p className="min-w-0 text-sm text-slate-700">
             <span className="font-medium text-slate-900">Brouillon IA :</span> conclusions, opportunités d'amélioration et décisions proposées d'après les données d'entrée.
@@ -897,7 +1089,7 @@ export default function ManagementReviewDetail() {
 
       <div className="mt-6 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Actions décidées ({review.actions.length})</h2>
-        {canManage && (
+        {canManage && !review.is_validated && (
           <button
             type="button"
             onClick={() => setIsActionModalOpen(true)}
@@ -919,6 +1111,7 @@ export default function ManagementReviewDetail() {
               action={action}
               users={users}
               canManage={canManage}
+              locked={review.is_validated}
               onPatch={handlePatchAction}
               onDelete={handleDeleteAction}
               onCreateCapa={setCapaModalAction}
@@ -926,6 +1119,34 @@ export default function ManagementReviewDetail() {
           ))}
         </div>
       )}
+
+      {canManage && (review.mailings || []).length > 0 && (
+        <div className="mt-6">
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Envois ({review.mailings.length})</h2>
+          <ul className="mt-2 space-y-2">
+            {review.mailings.map((mailing) => {
+              const sent = mailing.recipients.filter((recipient) => recipient.status === 'sent').length;
+              return (
+                <li key={mailing.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="font-medium text-slate-800">{mailing.kind === 'convocation' ? 'Convocation' : 'Compte rendu'}</p>
+                    <p className="text-xs text-slate-500">
+                      {formatDateTime(mailing.sent_at)}
+                      {mailing.sender?.full_name ? ` · ${mailing.sender.full_name}` : ''}
+                    </p>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {sent}/{mailing.recipients.length} envoyé(s) : {mailing.recipients.map((recipient) => recipient.name || recipient.email).join(', ')}
+                  </p>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
+
+      {isValidateOpen && <ReviewValidateModal review={review} onClose={() => setIsValidateOpen(false)} onValidated={handleValidated} />}
+      {mailingKind && <ReviewMailingModal review={review} kind={mailingKind} onClose={() => setMailingKind(null)} onSent={handleMailingSent} />}
 
       {isEditModalOpen && (
         <EditReviewModal

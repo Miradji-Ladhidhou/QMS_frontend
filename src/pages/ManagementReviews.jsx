@@ -23,6 +23,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ReviewScheduleBanner from '../components/managementReview/ReviewScheduleBanner.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const REVIEW_RESOURCE_TYPE = 'management_review';
@@ -422,6 +423,7 @@ export default function ManagementReviews() {
         </div>
       </div>
       <PageGuide id="management-reviews" />
+      <ReviewScheduleBanner isAdmin={currentUser?.role === 'admin'} refreshKey={reviews.length} />
 
       <div className="mt-4">
         <SortSelect

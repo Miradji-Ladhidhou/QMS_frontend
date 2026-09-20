@@ -7,7 +7,9 @@ const FIELD_CLASS =
 
 // Une action décidée : description, responsable, échéance, statut (modifiables par admin/manager, enregistrés
 // dès le changement), CAPA liée. Les autres rôles voient les mêmes informations en lecture seule.
-export default function ReviewActionCard({ action, users, canManage, onPatch, onDelete, onCreateCapa }) {
+// locked : revue validée et signée — le texte de l'action ne se supprime plus, mais son suivi (responsable, échéance,
+// statut) reste modifiable.
+export default function ReviewActionCard({ action, users, canManage, locked = false, onPatch, onDelete, onCreateCapa }) {
   const status = action.effective_status || action.status;
 
   return (
@@ -22,7 +24,7 @@ export default function ReviewActionCard({ action, users, canManage, onPatch, on
             </span>
           )}
         </p>
-        {canManage && (
+        {canManage && !locked && (
           <button type="button" onClick={() => onDelete(action)} aria-label="Supprimer l'action" className="shrink-0 p-1 text-slate-400 hover:text-red-600">
             <Trash2 size={14} />
           </button>

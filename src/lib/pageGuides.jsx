@@ -173,10 +173,16 @@ export const PAGE_GUIDES = {
   'management-reviews': {
     title: 'Préparer et acter la revue de direction',
     body: (
-      <p>
-        Rassembler les <strong>entrées</strong> (indicateurs, résultats d'audit, réclamations, actions en cours…) et
-        enregistrer les <strong>décisions et actions</strong> qui en sortent.
-      </p>
+      <>
+        <p>
+          Rassembler les <strong>entrées</strong> (indicateurs, résultats d'audit, réclamations, actions en cours…) et
+          enregistrer les <strong>décisions et actions</strong> qui en sortent.
+        </p>
+        <p>
+          Définissez la <strong>fréquence</strong> des revues (bandeau ci-dessous, admin) : le planning vous rappelle « revue à programmer »
+          quand la prochaine est attendue et qu'aucune n'est prévue.
+        </p>
+      </>
     ),
     example:
       "revue annuelle : on présente les KPI, les audits et les réclamations de l'année → décision « investir dans une 2ᵉ ligne de conditionnement », action confiée au responsable production.",
@@ -375,6 +381,12 @@ export const PAGE_GUIDES = {
           <strong>actions de la revue précédente</strong> et leur état : « Reporter dans le suivi écrit » remplit la rubrique exigée à la
           clôture. Le bouton <strong>Générer un brouillon</strong> propose conclusions, opportunités et décisions d'après les chiffres de la
           période (vous relisez avant d'appliquer). <strong>Exporter</strong> produit le compte rendu en PDF, Word, Excel ou sur le Drive.
+        </p>
+        <p>
+          <strong>Convoquer</strong> envoie l'ordre du jour et une invitation calendrier ; une fois la revue clôturée, l'admin{' '}
+          <strong>valide et signe</strong> à l'écran : la revue est alors verrouillée (seul le suivi des actions reste modifiable) et{' '}
+          <strong>Envoyer le compte rendu</strong> transmet le PDF signé. « Rouvrir » efface la validation. Les entrées couvrent aussi la
+          satisfaction client, les fournisseurs, les sorties non conformes, les accidents, les compétences et la politique qualité.
         </p>
       </>
     ),

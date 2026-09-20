@@ -65,6 +65,9 @@ const TYPE_CONFIG = {
   pdca: { label: 'PDCA', icon: RefreshCw, className: 'bg-fuchsia-100 text-fuchsia-700', dot: 'bg-fuchsia-500' },
   // Action décidée en revue de direction (voir fetchReviewActionItems, services/planningItems.js) : sans cette
   // entrée, TYPE_CONFIG[item.type] vaudrait undefined et ferait planter toute la page (voir le bug PDCA ci-dessus).
+  // Revue de direction programmée (brouillon daté) et rappel « à programmer » (voir fetchManagementReviewItems).
+  management_review: { label: 'Revue de direction', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
+  management_review_due: { label: 'Revue à programmer', icon: Users, className: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
   review_action: { label: 'Revue de direction', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
 };
 
