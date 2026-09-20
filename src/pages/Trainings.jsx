@@ -12,6 +12,7 @@ import {
   FolderInput,
   FolderPlus,
   Grid3x3,
+  History,
   Loader2,
   Pencil,
   Plus,
@@ -55,6 +56,8 @@ import PageGuide from '../components/PageGuide.jsx';
 import QuizEditorModal from '../components/trainingQuiz/QuizEditorModal.jsx';
 import SendQuizModal from '../components/trainingQuiz/SendQuizModal.jsx';
 import InstructorSignatureField from '../components/trainingQuiz/InstructorSignatureField.jsx';
+import QuizHistoryModal from '../components/trainingQuiz/QuizHistoryModal.jsx';
+import { describeAttemptsSummary, summarizeAttempts } from '../lib/quizAttempts.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const TRAINING_RESOURCE_TYPE = 'training';
@@ -712,7 +715,7 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated, onS
 
 // Statut du dernier lien de QCM envoyé pour une réalisation : réussi/non réussi avec la note, en
 // attente (avec l'échéance), ou expiré sans avoir été passé.
-function QuizAttemptBadge({ attempt }) {
+function QuizAttemptBadge({ attempt, attempts = [] }) {
   if (!attempt) return null;
   let label;
   let className;
@@ -726,7 +729,18 @@ function QuizAttemptBadge({ attempt }) {
     label = 'QCM : lien expiré';
     className = 'bg-amber-100 text-amber-700';
   }
-  return <span className={`ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium ${className}`}>{label}</span>;
+  // Nombre d'essais réellement passés (échecs + réussites) pour cette session.
+  const summary = summarizeAttempts(attempts);
+  return (
+    <>
+      <span className={`ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium ${className}`}>{label}</span>
+      {summary.total > 0 && (
+        <span className="ml-1.5 inline-block rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+          {describeAttemptsSummary(summary)}
+        </span>
+      )}
+    </>
+  );
 }
 
 function personName(record) {
@@ -1246,6 +1260,7 @@ export default function Trainings() {
   const [sendQuizTarget, setSendQuizTarget] = useState(null);
   const [attemptsByTraining, setAttemptsByTraining] = useState({});
   const [quizWordDownloadingId, setQuizWordDownloadingId] = useState(null);
+  const [quizHistoryTarget, setQuizHistoryTarget] = useState(null); // { training, record, sessionLabel }
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -1829,8 +1844,11 @@ export default function Trainings() {
                   const sessionCount = sessionGroups.filter((group) => group.sessionId !== null).length;
                   // Passage de QCM le plus récent par réalisation (l'API les renvoie du plus récent au plus ancien).
                   const latestAttemptByRecord = new Map();
+                  // Tous les passages de chaque réalisation (session) : nombre d'essais, échecs, réussites.
+                  const attemptsByRecord = new Map();
                   for (const attempt of attemptsByTraining[training.id] || []) {
                     if (!latestAttemptByRecord.has(attempt.record_id)) latestAttemptByRecord.set(attempt.record_id, attempt);
+                    attemptsByRecord.set(attempt.record_id, [...(attemptsByRecord.get(attempt.record_id) || []), attempt]);
                   }
 
                   return (
@@ -1973,9 +1991,25 @@ export default function Trainings() {
                                           {CAPA_EFFECTIVENESS_LABELS[record.evaluation_result]}
                                         </span>
                                       )}
-                                      {canManage && <QuizAttemptBadge attempt={latestAttemptByRecord.get(record.id)} />}
+                                      {canManage && <QuizAttemptBadge attempt={latestAttemptByRecord.get(record.id)} attempts={attemptsByRecord.get(record.id) || []} />}
                                     </span>
-                                    <div className="flex shrink-0 items-center gap-2">
+                                    <div className="flex max-w-full flex-wrap items-center gap-2">
+                                      {canManage && (attemptsByRecord.get(record.id) || []).length > 0 && (
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            setQuizHistoryTarget({
+                                              training,
+                                              record,
+                                              sessionLabel: group.sessionId === null ? 'Sans session' : `Session du ${formatDate(group.sessionDate)}`,
+                                            })
+                                          }
+                                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                                        >
+                                          <History size={13} />
+                                          Essais ({summarizeAttempts(attemptsByRecord.get(record.id)).total})
+                                        </button>
+                                      )}
                                       {canManage && latestAttemptByRecord.get(record.id)?.completed_at && (
                                         <button
                                           type="button"
@@ -2105,6 +2139,18 @@ export default function Trainings() {
           hasSummary={Boolean(sendQuizTarget.training.summary)}
           onClose={() => setSendQuizTarget(null)}
           onSent={() => loadQuizAttempts(sendQuizTarget.training.id)}
+        />
+      )}
+
+      {quizHistoryTarget && (
+        <QuizHistoryModal
+          training={quizHistoryTarget.training}
+          personLabel={personName(quizHistoryTarget.record)}
+          sessionLabel={quizHistoryTarget.sessionLabel}
+          attempts={(attemptsByTraining[quizHistoryTarget.training.id] || []).filter((attempt) => attempt.record_id === quizHistoryTarget.record.id)}
+          downloadingId={quizWordDownloadingId}
+          onDownload={(attempt) => handleDownloadQuizWord(quizHistoryTarget.training, attempt, quizHistoryTarget.record)}
+          onClose={() => setQuizHistoryTarget(null)}
         />
       )}
 

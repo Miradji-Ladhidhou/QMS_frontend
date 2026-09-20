@@ -311,6 +311,7 @@ export default function PublicQuiz() {
       <div className="flex flex-col items-center py-2 text-center">
         {passed ? <CheckCircle2 size={44} className="text-emerald-600" /> : <XCircle size={44} className="text-red-600" />}
         <h1 className="mt-3 text-xl font-semibold text-slate-900">{passed ? 'QCM réussi' : 'QCM non réussi'}</h1>
+        {result.attempt_number > 0 && <p className="text-sm text-slate-500">Essai n°{result.attempt_number}</p>}
         <p className="mt-1 text-3xl font-semibold text-slate-900">{result.score_percent} %</p>
         <p className="text-sm text-slate-500">
           {result.correct_count} / {result.total_count} bonnes réponses · seuil de réussite {result.pass_threshold} %
