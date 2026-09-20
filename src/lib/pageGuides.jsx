@@ -55,11 +55,19 @@ export const PAGE_GUIDES = {
   trainings: {
     title: 'Formations et compétences du personnel',
     body: (
-      <p>
-        Le catalogue des formations et qui les a suivies. La <strong>matrice</strong> croise le personnel et les
-        formations obligatoires par poste pour repérer les <strong>manques</strong> et les{' '}
-        <strong>recyclages en retard</strong>.
-      </p>
+      <>
+        <p>
+          Le catalogue des formations et qui les a suivies. La <strong>matrice</strong> croise le personnel et les
+          formations obligatoires par poste pour repérer les <strong>manques</strong> et les{' '}
+          <strong>recyclages en retard</strong>.
+        </p>
+        <p>
+          Chaque « Enregistrer » crée une <strong>session</strong> (une date, un groupe de personnes formées ensemble) :
+          la carte affiche « X sessions · Y réalisations ». Pour <strong>ranger une réalisation existante</strong>{' '}
+          (« Sans session »), dépliez la carte, cliquez sur le crayon de la réalisation puis choisissez sa{' '}
+          <strong>Session</strong>, ou « + Nouvelle session » pour en créer une à une autre date.
+        </p>
+      </>
     ),
     example:
       "formation « Habilitation électrique B1V », recyclage tous les 3 ans, obligatoire pour les électriciens → la matrice montre que 2 électriciens sur 5 sont en retard.",
