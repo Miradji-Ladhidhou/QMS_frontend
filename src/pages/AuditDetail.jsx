@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -15,6 +15,9 @@ import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import AuditorQualification from '../components/AuditorQualification.jsx';
+import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
+import { qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -33,7 +36,7 @@ function getDelayDays(priority, priorityDelays) {
   return priorityDelays?.[priority] ?? null;
 }
 
-function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
+function EditAuditModal({ audit, users, services, qualifications, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: audit.title,
     audit_type: audit.audit_type,
@@ -184,9 +187,11 @@ function EditAuditModal({ audit, users, services, onClose, onUpdated }) {
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.full_name}
+                    {qualifications.trainings.length > 0 ? qualificationOptionSuffix(qualificationOf(qualifications.byUser, user.id).status) : ''}
                   </option>
                 ))}
               </select>
+              <AuditorQualification userId={form.lead_auditor} qualifications={qualifications} detailed />
             </div>
           </div>
 
@@ -242,6 +247,7 @@ export default function AuditDetail() {
   const canManage = isManagerRole(currentUser?.role);
   const [audit, setAudit] = useState(null);
   const users = useUsers();
+  const qualifications = useAuditorQualifications();
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -393,6 +399,28 @@ export default function AuditDetail() {
       </div>
       <PageGuide id="auditDetail" />
 
+      {audit.lead_auditor && !qualifications.loading && qualifications.trainings.length > 0 && qualificationOf(qualifications.byUser, audit.lead_auditor).status !== 'qualified' && (
+        <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div className="min-w-0">
+            <p className="font-medium">
+              {audit.lead?.full_name} n'est pas qualifié(e) comme auditeur interne
+              {qualificationOf(qualifications.byUser, audit.lead_auditor).status === 'expired' ? " (recyclage à effectuer)" : ''}.
+            </p>
+            <p className="mt-0.5 text-xs">
+              La norme (ISO 9001 §9.2) demande des auditeurs compétents. Vous pouvez tout de même planifier cet audit ; la qualification est un
+              repère, pas un blocage.{' '}
+              <Link
+                to={`/trainings?training=${qualificationOf(qualifications.byUser, audit.lead_auditor).training_id || qualifications.trainings[0].id}`}
+                className="font-medium underline"
+              >
+                Voir la formation
+              </Link>
+            </p>
+          </div>
+        </div>
+      )}
+
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
@@ -411,6 +439,7 @@ export default function AuditDetail() {
         <div>
           <p className="text-xs text-slate-500">Auditeur</p>
           <p className="text-sm font-medium text-slate-800">{audit.lead?.full_name || 'À désigner'}</p>
+          <AuditorQualification userId={audit.lead_auditor} qualifications={qualifications} detailed />
         </div>
         {audit.scope && (
           <div className="col-span-2 sm:col-span-4">
@@ -491,6 +520,7 @@ export default function AuditDetail() {
           audit={audit}
           users={users}
           services={services}
+          qualifications={qualifications}
           onClose={() => setIsEditModalOpen(false)}
           onUpdated={(data) => {
             setAudit((prev) => ({ ...prev, ...data }));

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   Award,
+  BadgeCheck,
   ChevronDown,
   ChevronUp,
   ClipboardList,
@@ -58,6 +59,7 @@ import SendQuizModal from '../components/trainingQuiz/SendQuizModal.jsx';
 import InstructorSignatureField from '../components/trainingQuiz/InstructorSignatureField.jsx';
 import QuizHistoryModal from '../components/trainingQuiz/QuizHistoryModal.jsx';
 import { describeAttemptsSummary, summarizeAttempts } from '../lib/quizAttempts.js';
+import { summarizeTrainingQualification } from '../lib/auditorQualification.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const TRAINING_RESOURCE_TYPE = 'training';
@@ -321,6 +323,7 @@ function NewTrainingModal({ users, employees, onClose, onCreated }) {
     duration: '',
     description: '',
     summary: '',
+    qualifies_internal_auditor: false,
     category_id: '',
     category_name: '',
   });
@@ -360,6 +363,7 @@ function NewTrainingModal({ users, employees, onClose, onCreated }) {
       duration: form.duration || undefined,
       description: form.description || undefined,
       summary: form.summary || undefined,
+      qualifies_internal_auditor: form.qualifies_internal_auditor,
       category_id: categoryId,
       required_job_titles: requiredJobTitles,
     };
@@ -482,6 +486,22 @@ function NewTrainingModal({ users, employees, onClose, onCreated }) {
             <p className="mt-1 text-xs text-slate-400">Facultatif — affiché avant le QCM, jamais dans l'export des réalisations.</p>
           </div>
 
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 p-3">
+            <input
+              type="checkbox"
+              checked={form.qualifies_internal_auditor}
+              onChange={(e) => updateField('qualifies_internal_auditor', e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+            <span className="min-w-0 text-sm">
+              <span className="block font-medium text-slate-800">Formation qualifiante pour les auditeurs internes</span>
+              <span className="block text-xs text-slate-500">
+                La page Audits signale si l'auditeur désigné est qualifié (formation suivie, recyclage à jour, QCM réussi). Une seule formation
+                valide suffit.
+              </span>
+            </span>
+          </label>
+
           <JobTitleRequirementsField
             availableJobTitles={availableJobTitles}
             selected={requiredJobTitles}
@@ -522,6 +542,7 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated, onS
     duration: training.duration || '',
     description: training.description || '',
     summary: training.summary || '',
+    qualifies_internal_auditor: Boolean(training.qualifies_internal_auditor),
     category_id: training.category_id || '',
     category_name: training.category?.name || '',
   });
@@ -565,6 +586,7 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated, onS
         duration: form.duration || null,
         description: form.description || null,
         summary: form.summary || null,
+        qualifies_internal_auditor: form.qualifies_internal_auditor,
         category_id: categoryId,
         required_job_titles: requiredJobTitles,
       }));
@@ -683,6 +705,22 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated, onS
             <p className="mt-1 text-xs text-slate-400">Facultatif — affiché avant le QCM, jamais dans l'export des réalisations.</p>
           </div>
 
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-md border border-slate-200 p-3">
+            <input
+              type="checkbox"
+              checked={form.qualifies_internal_auditor}
+              onChange={(e) => updateField('qualifies_internal_auditor', e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+            />
+            <span className="min-w-0 text-sm">
+              <span className="block font-medium text-slate-800">Formation qualifiante pour les auditeurs internes</span>
+              <span className="block text-xs text-slate-500">
+                La page Audits signale si l'auditeur désigné est qualifié (formation suivie, recyclage à jour, QCM réussi). Une seule formation
+                valide suffit.
+              </span>
+            </span>
+          </label>
+
           <JobTitleRequirementsField
             availableJobTitles={availableJobTitles}
             selected={requiredJobTitles}
@@ -740,6 +778,28 @@ function QuizAttemptBadge({ attempt, attempts = [] }) {
         </span>
       )}
     </>
+  );
+}
+
+// Bandeau d'une formation qui qualifie les auditeurs internes : bilan des personnes formées et lien
+// vers la page Audits (là où la qualification est utilisée pour choisir un auditeur).
+function AuditorTrainingBadge({ training }) {
+  const { qualified, expired, failed } = summarizeTrainingQualification(training);
+  const parts = [];
+  if (qualified) parts.push(`${qualified} qualifié${qualified > 1 ? 's' : ''}`);
+  if (expired) parts.push(`${expired} à recycler`);
+  if (failed) parts.push(`${failed} non qualifié${failed > 1 ? 's' : ''}`);
+  return (
+    <div className="mt-2 rounded-md border border-primary/20 bg-primary-50 px-2.5 py-2 text-xs text-slate-700">
+      <p className="flex items-center gap-1.5 font-medium text-primary">
+        <BadgeCheck size={13} />
+        Qualifie les auditeurs internes
+      </p>
+      <p className="mt-0.5">{parts.length > 0 ? `Auditeurs : ${parts.join(' · ')}.` : "Aucun auditeur formé pour l'instant."}</p>
+      <Link to="/audits" className="mt-0.5 inline-block font-medium text-primary hover:underline">
+        Voir les audits →
+      </Link>
+    </div>
   );
 }
 
@@ -1261,6 +1321,10 @@ export default function Trainings() {
   const [attemptsByTraining, setAttemptsByTraining] = useState({});
   const [quizWordDownloadingId, setQuizWordDownloadingId] = useState(null);
   const [quizHistoryTarget, setQuizHistoryTarget] = useState(null); // { training, record, sessionLabel }
+  // Lien profond ?training=<id> (depuis la page Audits) : ouvre le dossier de la formation, déplie sa carte et la met en évidence.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const focusTrainingId = searchParams.get('training');
+  const [highlightId, setHighlightId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -1345,6 +1409,45 @@ export default function Trainings() {
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (!focusTrainingId || loading) return undefined;
+    const target = trainings.find((item) => item.id === focusTrainingId);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('training');
+        if (target) {
+          if (target.category_id) next.set('folder', target.category_id);
+          else next.delete('folder');
+        }
+        return next;
+      },
+      { replace: true }
+    );
+    if (!target) return undefined;
+    setExpandedId(target.id);
+    setHighlightId(target.id);
+    if (canManage && target.quiz) loadQuizAttempts(target.id);
+    // La carte n'existe dans la page qu'une fois le dossier ouvert et sa liste affichée : on réessaie
+    // quelques instants avant d'abandonner le défilement.
+    let attempts = 0;
+    const scrollTimer = setInterval(() => {
+      attempts += 1;
+      const card = document.getElementById(`training-${target.id}`);
+      if (card) {
+        card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        clearInterval(scrollTimer);
+      } else if (attempts >= 20) {
+        clearInterval(scrollTimer);
+      }
+    }, 200);
+    setTimeout(() => setHighlightId(null), 4500);
+    // Pas de nettoyage des minuteurs ici : retirer ?training= de l'adresse (ci-dessus) relance cet
+    // effet, et son nettoyage annulerait aussitôt le défilement avant qu'il n'ait eu lieu.
+    return undefined;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusTrainingId, loading]);
 
   function handleTrainingCreated(newTraining) {
     setTrainings((prev) => [...prev, { ...newTraining, records: [] }]);
@@ -1854,9 +1957,10 @@ export default function Trainings() {
                   return (
                     <div
                       key={training.id}
-                      className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm sm:p-5 ${
+                      id={`training-${training.id}`}
+                      className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow sm:p-5 ${
                         overdueCount > 0 ? 'border-red-300' : 'border-slate-200'
-                      }`}
+                      } ${highlightId === training.id ? 'ring-2 ring-primary' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2">
@@ -1905,6 +2009,7 @@ export default function Trainings() {
                       {training.description && (
                         <p className="mt-1 line-clamp-2 text-xs text-slate-400">{training.description}</p>
                       )}
+                      {training.qualifies_internal_auditor && <AuditorTrainingBadge training={training} />}
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {overdueCount > 0 && (

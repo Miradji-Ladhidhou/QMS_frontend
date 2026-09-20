@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { FolderCog, FolderInput, FolderPlus, GraduationCap, Plus, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -25,6 +25,9 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import AuditorQualification from '../components/AuditorQualification.jsx';
+import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
+import { QUALIFICATION_LABELS, qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const AUDIT_RESOURCE_TYPE = 'audit';
@@ -50,7 +53,7 @@ function getAuditSortValue(audit, key) {
   return audit[key];
 }
 
-function NewAuditModal({ users, services, onClose, onCreated }) {
+function NewAuditModal({ users, services, qualifications, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
     audit_type: 'process',
@@ -201,9 +204,11 @@ function NewAuditModal({ users, services, onClose, onCreated }) {
                 {users.map((user) => (
                   <option key={user.id} value={user.id}>
                     {user.full_name}
+                    {qualifications.trainings.length > 0 ? qualificationOptionSuffix(qualificationOf(qualifications.byUser, user.id).status) : ''}
                   </option>
                 ))}
               </select>
+              <AuditorQualification userId={form.lead_auditor} qualifications={qualifications} detailed />
             </div>
           </div>
 
@@ -237,6 +242,7 @@ export default function Audits() {
   const canManage = isManagerRole(currentUser?.role);
   const [audits, setAudits] = useState([]);
   const users = useUsers();
+  const qualifications = useAuditorQualifications();
   const [services, setServices] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -349,6 +355,7 @@ export default function Audits() {
       { key: 'scope', label: 'Périmètre', width: forPdf ? 0.16 : undefined },
       { key: 'service', label: 'Service', width: forPdf ? 0.1 : undefined },
       { key: 'auditor', label: 'Auditeur', width: forPdf ? 0.1 : undefined },
+      { key: 'auditor_qualification', label: 'Qualification auditeur', width: forPdf ? 0.1 : undefined },
       { key: 'planned_date', label: 'Date planifiée', width: forPdf ? 0.1 : undefined },
       { key: 'completed_date', label: 'Date réalisée', width: forPdf ? 0.1 : undefined },
       { key: 'conclusion', label: 'Conclusion', width: forPdf ? 0.16 : undefined },
@@ -364,6 +371,7 @@ export default function Audits() {
       scope: audit.scope || '',
       service: audit.service?.name || '',
       auditor: audit.lead?.full_name || '',
+      auditor_qualification: audit.lead_auditor && qualifications.trainings.length > 0 ? QUALIFICATION_LABELS[qualificationOf(qualifications.byUser, audit.lead_auditor).status] : '',
       planned_date: formatDate(audit.planned_date),
       completed_date: formatDate(audit.completed_date),
       conclusion: audit.conclusion || '',
@@ -470,6 +478,32 @@ export default function Audits() {
         </div>
       </div>
       <PageGuide id="audits" />
+
+      {!qualifications.loading && (
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">
+          <GraduationCap size={16} className="shrink-0 text-primary" />
+          {qualifications.trainings.length > 0 ? (
+            <>
+              <span>Qualification des auditeurs :</span>
+              {qualifications.trainings.map((training, index) => (
+                <span key={training.id}>
+                  <Link to={`/trainings?training=${training.id}`} className="font-medium text-primary hover:underline">
+                    {training.title}
+                  </Link>
+                  {index < qualifications.trainings.length - 1 ? ',' : ''}
+                </span>
+              ))}
+            </>
+          ) : (
+            <>
+              <span>Aucune formation d'auditeur interne désignée.</span>
+              <Link to="/trainings" className="font-medium text-primary hover:underline">
+                Désigner une formation
+              </Link>
+            </>
+          )}
+        </div>
+      )}
 
       <div className="mt-4 flex flex-wrap gap-2">
         <select
@@ -608,6 +642,11 @@ export default function Audits() {
                       {audit.service ? ` · ${audit.service.name}` : ''}
                       {audit.lead ? ` · ${audit.lead.full_name}` : ''}
                     </p>
+                    {audit.lead_auditor && (
+                      <div className="mt-1">
+                        <AuditorQualification userId={audit.lead_auditor} qualifications={qualifications} />
+                      </div>
+                    )}
                     {canManage && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <button
@@ -636,6 +675,7 @@ export default function Audits() {
         <NewAuditModal
           users={users}
           services={services}
+          qualifications={qualifications}
           onClose={() => setIsModalOpen(false)}
           onCreated={handleCreated}
         />

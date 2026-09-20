@@ -73,7 +73,8 @@ export const PAGE_GUIDES = {
           il sert pour toutes les sessions et se modifie quand la procédure évolue. Dans une session, « Envoyer le QCM » envoie à
           chaque personne un lien par email <strong>valable 48 h</strong> (pour un salarié sans compte, saisissez son email à
           l'envoi). Elle saisit son email, lit le résumé, répond au QCM, et la réalisation passe automatiquement à{' '}
-          <strong>réussie ou non</strong>. Le bouton « QCM Word » exporte le détail (questions, réponses, taux de réussite) à
+          <strong>réussie ou non</strong>. Une formation cochée « qualifiante pour les auditeurs internes » alimente la page{' '}
+          <strong>Audits</strong> (qualification de l'auditeur désigné). Le bouton « QCM Word » exporte le détail (questions, réponses, taux de réussite) à
           conserver pour les audits : il reprend l'<strong>objet et le contenu</strong> de la formation, l'
           <strong>historique des essais</strong> de la personne pour la session (échecs et réussites, aussi visibles avec le bouton
           « Essais »), porte la{' '}
@@ -120,10 +121,18 @@ export const PAGE_GUIDES = {
   audits: {
     title: 'Programmer et mener les audits internes',
     body: (
-      <p>
-        Planifier les audits, les conduire, consigner les <strong>constats</strong> (points forts, écarts,
-        non-conformités) et les transformer en actions.
-      </p>
+      <>
+        <p>
+          Planifier les audits, les conduire, consigner les <strong>constats</strong> (points forts, écarts,
+          non-conformités) et les transformer en actions.
+        </p>
+        <p>
+          <strong>Auditeurs qualifiés :</strong> dans « Formations », cochez « Formation qualifiante pour les auditeurs internes » sur votre
+          formation d'audit interne (avec son QCM). Chaque auditeur est alors signalé <strong>qualifié</strong>, <strong>à recycler</strong> ou{' '}
+          <strong>non qualifié</strong> selon sa formation et son QCM — un repère (ISO 9001 §9.2), jamais un blocage. Cliquez sur la
+          formation pour la retrouver dans la page Formations.
+        </p>
+      </>
     ),
     example:
       "audit du processus Achats le 12 mars → point fort « fournisseurs bien suivis », écart « 2 commandes sans bon signé » → une CAPA est ouverte sur l'écart.",
