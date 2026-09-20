@@ -129,6 +129,16 @@ export async function postForWordDownload(url, body, filename) {
   );
 }
 
+// GET pour un .docx dédié déjà identifié par son id (ex. compte rendu de QCM d'une personne,
+// GET /trainings/:id/quiz/attempts/:attemptId/word).
+export async function getWordDownload(url, filename) {
+  const response = await api.get(url, { responseType: 'blob' });
+  triggerBlobDownload(
+    new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' }),
+    filename
+  );
+}
+
 // Même principe qu'exportToXlsx, mais produit un tableau Word (voir services/listReportWord.js)
 // — réutilise les mêmes columns/rows que les exports PDF/Excel de la page appelante.
 export async function exportToWord(filename, title, columns, rows, options = {}) {

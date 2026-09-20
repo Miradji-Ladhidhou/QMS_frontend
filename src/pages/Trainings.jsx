@@ -4,8 +4,10 @@ import {
   Award,
   ChevronDown,
   ChevronUp,
+  ClipboardList,
   Download,
   FileSignature,
+  FileText,
   FolderCog,
   FolderInput,
   FolderPlus,
@@ -13,6 +15,7 @@ import {
   Loader2,
   Pencil,
   Plus,
+  Send,
   Trash2,
   UserCheck,
   UserX,
@@ -20,7 +23,15 @@ import {
 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
-import { exportToPdf, exportToXlsx, exportToWord, exportToDrive, postForPdfDownload, getPdfDownload } from '../lib/pdfExport.js';
+import {
+  exportToPdf,
+  exportToXlsx,
+  exportToWord,
+  exportToDrive,
+  postForPdfDownload,
+  getPdfDownload,
+  getWordDownload,
+} from '../lib/pdfExport.js';
 import { CAPA_EFFECTIVENESS_LABELS, CAPA_EFFECTIVENESS_STYLES } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -41,6 +52,8 @@ import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import NewFolderModal from '../components/NewFolderModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import QuizEditorModal from '../components/trainingQuiz/QuizEditorModal.jsx';
+import SendQuizModal from '../components/trainingQuiz/SendQuizModal.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const TRAINING_RESOURCE_TYPE = 'training';
@@ -303,6 +316,7 @@ function NewTrainingModal({ users, employees, onClose, onCreated }) {
     instructor: '',
     duration: '',
     description: '',
+    summary: '',
     category_id: '',
     category_name: '',
   });
@@ -341,6 +355,7 @@ function NewTrainingModal({ users, employees, onClose, onCreated }) {
       instructor: form.instructor || undefined,
       duration: form.duration || undefined,
       description: form.description || undefined,
+      summary: form.summary || undefined,
       category_id: categoryId,
       required_job_titles: requiredJobTitles,
     };
@@ -451,6 +466,18 @@ function NewTrainingModal({ users, employees, onClose, onCreated }) {
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Résumé de la formation</label>
+            <AutoTextarea
+              rows={4}
+              placeholder="Points clés à retenir. Ce texte est lu par chaque personne avant de répondre au QCM (lien envoyé par email)."
+              value={form.summary}
+              onChange={(e) => updateField('summary', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-slate-400">Facultatif — affiché avant le QCM, jamais dans l'export des réalisations.</p>
+          </div>
+
           <JobTitleRequirementsField
             availableJobTitles={availableJobTitles}
             selected={requiredJobTitles}
@@ -490,6 +517,7 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated }) {
     instructor: training.instructor || '',
     duration: training.duration || '',
     description: training.description || '',
+    summary: training.summary || '',
     category_id: training.category_id || '',
     category_name: training.category?.name || '',
   });
@@ -532,6 +560,7 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated }) {
         instructor: form.instructor || null,
         duration: form.duration || null,
         description: form.description || null,
+        summary: form.summary || null,
         category_id: categoryId,
         required_job_titles: requiredJobTitles,
       }));
@@ -636,6 +665,18 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated }) {
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Résumé de la formation</label>
+            <AutoTextarea
+              rows={4}
+              placeholder="Points clés à retenir. Ce texte est lu par chaque personne avant de répondre au QCM (lien envoyé par email)."
+              value={form.summary}
+              onChange={(e) => updateField('summary', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-slate-400">Facultatif — affiché avant le QCM, jamais dans l'export des réalisations.</p>
+          </div>
+
           <JobTitleRequirementsField
             availableJobTitles={availableJobTitles}
             selected={requiredJobTitles}
@@ -664,6 +705,25 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated }) {
       </div>
     </div>
   );
+}
+
+// Statut du dernier lien de QCM envoyé pour une réalisation : réussi/non réussi avec la note, en
+// attente (avec l'échéance), ou expiré sans avoir été passé.
+function QuizAttemptBadge({ attempt }) {
+  if (!attempt) return null;
+  let label;
+  let className;
+  if (attempt.completed_at) {
+    label = `QCM ${attempt.score_percent} % — ${attempt.passed ? 'réussi' : 'non réussi'}`;
+    className = attempt.passed ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700';
+  } else if (new Date(attempt.expires_at) > new Date()) {
+    label = `QCM envoyé — expire le ${new Date(attempt.expires_at).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}`;
+    className = 'bg-sky-100 text-sky-700';
+  } else {
+    label = 'QCM : lien expiré';
+    className = 'bg-amber-100 text-amber-700';
+  }
+  return <span className={`ml-1.5 inline-block rounded-full px-1.5 py-0.5 text-[11px] font-medium ${className}`}>{label}</span>;
 }
 
 function personName(record) {
@@ -1177,6 +1237,12 @@ export default function Trainings() {
   const [editingTraining, setEditingTraining] = useState(null);
   const [editingRecord, setEditingRecord] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
+  // QCM : éditeur ouvert sur une formation, envoi de liens pour un groupe (session) de réalisations,
+  // passages déjà envoyés/terminés par formation (chargés à l'ouverture de la carte, admin/manager).
+  const [quizEditorTraining, setQuizEditorTraining] = useState(null);
+  const [sendQuizTarget, setSendQuizTarget] = useState(null);
+  const [attemptsByTraining, setAttemptsByTraining] = useState({});
+  const [quizWordDownloadingId, setQuizWordDownloadingId] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -1317,6 +1383,42 @@ export default function Trainings() {
     } finally {
       setCertificateDownloadingId(null);
     }
+  }
+
+  async function loadQuizAttempts(trainingId) {
+    try {
+      const { data } = await api.get(`/trainings/${trainingId}/quiz/attempts`);
+      setAttemptsByTraining((prev) => ({ ...prev, [trainingId]: data }));
+    } catch {
+      // Les badges de QCM sont un complément : un échec ne doit pas bloquer la carte.
+    }
+  }
+
+  function handleToggleExpand(training) {
+    const opening = expandedId !== training.id;
+    setExpandedId(opening ? training.id : null);
+    if (opening && canManage && training.quiz && attemptsByTraining[training.id] === undefined) {
+      loadQuizAttempts(training.id);
+    }
+  }
+
+  async function handleDownloadQuizWord(training, attempt, record) {
+    setQuizWordDownloadingId(attempt.id);
+    try {
+      await getWordDownload(
+        `/trainings/${training.id}/quiz/attempts/${attempt.id}/word`,
+        `qcm-${training.title.toLowerCase().replace(/\s+/g, '-')}-${personName(record).toLowerCase().replace(/\s+/g, '-')}.docx`
+      );
+    } catch {
+      setError("Impossible de générer l'export Word du QCM.");
+    } finally {
+      setQuizWordDownloadingId(null);
+    }
+  }
+
+  function handleQuizSaved(training, quizInfo) {
+    setTrainings((prev) => prev.map((item) => (item.id === training.id ? { ...item, quiz: quizInfo } : item)));
+    setQuizEditorTraining(null);
   }
 
   function handleTrainingUpdated(updated) {
@@ -1707,6 +1809,11 @@ export default function Trainings() {
                   const overdueCount = countOverdueRecords(training, today);
                   const sessionGroups = groupRecordsBySession(training.records);
                   const sessionCount = sessionGroups.filter((group) => group.sessionId !== null).length;
+                  // Passage de QCM le plus récent par réalisation (l'API les renvoie du plus récent au plus ancien).
+                  const latestAttemptByRecord = new Map();
+                  for (const attempt of attemptsByTraining[training.id] || []) {
+                    if (!latestAttemptByRecord.has(attempt.record_id)) latestAttemptByRecord.set(attempt.record_id, attempt);
+                  }
 
                   return (
                     <div
@@ -1788,7 +1895,7 @@ export default function Trainings() {
 
                       <button
                         type="button"
-                        onClick={() => setExpandedId(isExpanded ? null : training.id)}
+                        onClick={() => handleToggleExpand(training)}
                         disabled={training.records.length === 0}
                         className="mt-1 flex items-center gap-1 text-sm text-slate-600 hover:text-primary disabled:cursor-default disabled:hover:text-slate-600"
                       >
@@ -1806,15 +1913,29 @@ export default function Trainings() {
                         <div className="mt-2 space-y-3 border-t border-slate-100 pt-2">
                           {sessionGroups.map((group) => (
                             <div key={group.sessionId || 'none'}>
-                              <p
-                                className={`mb-1.5 text-xs font-medium ${
-                                  group.sessionId === null ? 'text-amber-600' : 'text-slate-500'
-                                }`}
-                              >
-                                {group.sessionId === null ? 'Sans session' : `Session du ${formatDate(group.sessionDate)}`}
-                                {' — '}
-                                {group.records.length} réalisation{group.records.length > 1 ? 's' : ''}
-                              </p>
+                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                                <p className={`text-xs font-medium ${group.sessionId === null ? 'text-amber-600' : 'text-slate-500'}`}>
+                                  {group.sessionId === null ? 'Sans session' : `Session du ${formatDate(group.sessionDate)}`}
+                                  {' — '}
+                                  {group.records.length} réalisation{group.records.length > 1 ? 's' : ''}
+                                </p>
+                                {canManage && training.quiz && (
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setSendQuizTarget({
+                                        training,
+                                        records: group.records,
+                                        sessionLabel: group.sessionId === null ? 'Sans session' : `Session du ${formatDate(group.sessionDate)}`,
+                                      })
+                                    }
+                                    className="flex items-center gap-1.5 rounded-md border border-primary/40 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary-50"
+                                  >
+                                    <Send size={12} />
+                                    Envoyer le QCM
+                                  </button>
+                                )}
+                              </div>
                               <ul className="space-y-2">
                                 {group.records.map((record) => (
                                   <li key={record.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -1834,8 +1955,24 @@ export default function Trainings() {
                                           {CAPA_EFFECTIVENESS_LABELS[record.evaluation_result]}
                                         </span>
                                       )}
+                                      {canManage && <QuizAttemptBadge attempt={latestAttemptByRecord.get(record.id)} />}
                                     </span>
                                     <div className="flex shrink-0 items-center gap-2">
+                                      {canManage && latestAttemptByRecord.get(record.id)?.completed_at && (
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDownloadQuizWord(training, latestAttemptByRecord.get(record.id), record)}
+                                          disabled={quizWordDownloadingId === latestAttemptByRecord.get(record.id).id}
+                                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                                        >
+                                          {quizWordDownloadingId === latestAttemptByRecord.get(record.id).id ? (
+                                            <Loader2 size={13} className="animate-spin" />
+                                          ) : (
+                                            <FileText size={13} />
+                                          )}
+                                          QCM Word
+                                        </button>
+                                      )}
                                       <button
                                         type="button"
                                         onClick={() => handleDownloadCertificate(training, record)}
@@ -1895,6 +2032,16 @@ export default function Trainings() {
                           <FileSignature size={16} />
                           Fiche de participation
                         </button>
+                        {canManage && (
+                          <button
+                            type="button"
+                            onClick={() => setQuizEditorTraining(training)}
+                            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                          >
+                            <ClipboardList size={16} />
+                            {training.quiz ? `QCM (${training.quiz.question_count})` : 'Créer le QCM'}
+                          </button>
+                        )}
                       </div>
                     </div>
                   );
@@ -1920,6 +2067,26 @@ export default function Trainings() {
           employees={employees}
           onClose={() => setRecordingTraining(null)}
           onRecorded={handleRecordCreated}
+        />
+      )}
+
+      {quizEditorTraining && (
+        <QuizEditorModal
+          training={quizEditorTraining}
+          onClose={() => setQuizEditorTraining(null)}
+          onSaved={(quizInfo) => handleQuizSaved(quizEditorTraining, quizInfo)}
+        />
+      )}
+
+      {sendQuizTarget && (
+        <SendQuizModal
+          training={sendQuizTarget.training}
+          sessionLabel={sendQuizTarget.sessionLabel}
+          records={sendQuizTarget.records}
+          employees={employees}
+          hasSummary={Boolean(sendQuizTarget.training.summary)}
+          onClose={() => setSendQuizTarget(null)}
+          onSent={() => loadQuizAttempts(sendQuizTarget.training.id)}
         />
       )}
 

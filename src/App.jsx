@@ -39,6 +39,7 @@ const CapaDetail = lazy(() => import('./pages/CapaDetail.jsx'));
 // "Personnel" en "Ressources humaines", voir Layout.jsx), et lazy-importées depuis ce
 // fichier-là. /trainings/matrix reste une route séparée, inchangée.
 const HumanResources = lazy(() => import('./pages/HumanResources.jsx'));
+const PublicQuiz = lazy(() => import('./pages/PublicQuiz.jsx'));
 const SkillMatrix = lazy(() => import('./pages/SkillMatrix.jsx'));
 const Kpis = lazy(() => import('./pages/Kpis.jsx'));
 const QqoqccpDetail = lazy(() => import('./pages/QqoqccpDetail.jsx'));
@@ -131,6 +132,9 @@ export default function App() {
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/legal/cgu" element={<LegalTerms />} />
                     <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
+                    {/* Lien de QCM reçu par email : ouvert sans compte, mais disponible aussi quand la
+                        personne est déjà connectée (même page, jamais redirigée vers le tableau de bord). */}
+                    <Route path="/quiz/:token" element={<PublicQuiz />} />
                     <Route path="/super-admin" element={<SuperAdmin />} />
                     <Route path="/" element={<Layout />}>
                       <Route index element={<Dashboard />} />
@@ -190,6 +194,7 @@ export default function App() {
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/legal/cgu" element={<LegalTerms />} />
             <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
+            <Route path="/quiz/:token" element={<PublicQuiz />} />
             <Route path="/" element={<Landing />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

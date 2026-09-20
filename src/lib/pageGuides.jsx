@@ -67,6 +67,15 @@ export const PAGE_GUIDES = {
           (« Sans session »), dépliez la carte, cliquez sur le crayon de la réalisation puis choisissez sa{' '}
           <strong>Session</strong>, ou « + Nouvelle session » pour en créer une à une autre date.
         </p>
+        <p>
+          <strong>Résumé et QCM :</strong> saisissez un <strong>résumé</strong> dans « Modifier la formation », puis créez le{' '}
+          <strong>QCM</strong> (questions, réponses, bonnes réponses, seuil de réussite) avec le bouton « Créer le QCM » de la carte :
+          il sert pour toutes les sessions et se modifie quand la procédure évolue. Dans une session, « Envoyer le QCM » envoie à
+          chaque personne un lien par email <strong>valable 48 h</strong> (pour un salarié sans compte, saisissez son email à
+          l'envoi). Elle saisit son email, lit le résumé, répond au QCM, et la réalisation passe automatiquement à{' '}
+          <strong>réussie ou non</strong>. Le bouton « QCM Word » exporte le détail (questions, réponses, taux de réussite) à
+          conserver pour les audits.
+        </p>
       </>
     ),
     example:
