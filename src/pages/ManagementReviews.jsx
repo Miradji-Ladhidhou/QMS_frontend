@@ -442,7 +442,7 @@ export default function ManagementReviews() {
           <button
             type="button"
             onClick={() => setIsManageCategoriesOpen(true)}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             <FolderCog size={16} />
             Gérer les dossiers
@@ -534,16 +534,18 @@ export default function ManagementReviews() {
                   className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
                 >
                   {canManage && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(review.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleSelect(review.id)}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
+                    <label className="-m-3 flex shrink-0 cursor-pointer items-center justify-center p-3 sm:-m-1 sm:p-1" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(review.id)}
+                        onChange={() => toggleSelect(review.id)}
+                        aria-label={`Sélectionner ${review.title}`}
+                        className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary sm:h-4 sm:w-4"
+                      />
+                    </label>
                   )}
                   <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-slate-900">{review.title}</p>
+                    <p className="line-clamp-2 break-words font-medium text-slate-900">{review.title}</p>
                     <p className="text-sm text-slate-500">{formatDate(review.review_date)}</p>
                     {canManage && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -553,7 +555,7 @@ export default function ManagementReviews() {
                             e.stopPropagation();
                             setMovingReview(review);
                           }}
-                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                          className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 sm:min-h-0 sm:px-2"
                         >
                           <FolderInput size={12} />
                           Déplacer

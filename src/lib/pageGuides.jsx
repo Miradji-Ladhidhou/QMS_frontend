@@ -61,6 +61,10 @@ export const PAGE_GUIDES = {
           formations obligatoires par poste pour repérer les <strong>manques</strong> et les{' '}
           <strong>recyclages en retard</strong>.
         </p>
+      </>
+    ),
+    more: (
+      <>
         <p>
           Chaque « Enregistrer » crée une <strong>session</strong> (une date, un groupe de personnes formées ensemble) :
           la carte affiche « X sessions · Y réalisations ». Pour <strong>ranger une réalisation existante</strong>{' '}
@@ -94,6 +98,10 @@ export const PAGE_GUIDES = {
           Un KPI est une valeur suivie dans le temps, comparée à un <strong>objectif</strong>. Alimentation au choix :
           saisie manuelle, import Excel, ou <strong>calcul automatique</strong> depuis un autre module.
         </p>
+      </>
+    ),
+    more: (
+      <>
         <p>
           Un KPI peut porter plusieurs <strong>séries</strong> (courbes) : menu ⋮ de la carte → « Séries (courbes) ». À
           partir de <strong>deux séries</strong>, choisissez pour chacune : garder l'<strong>unité</strong>, l'
@@ -126,6 +134,10 @@ export const PAGE_GUIDES = {
           Planifier les audits, les conduire, consigner les <strong>constats</strong> (points forts, écarts,
           non-conformités) et les transformer en actions.
         </p>
+      </>
+    ),
+    more: (
+      <>
         <p>
           <strong>Auditeurs qualifiés :</strong> dans « Formations », cochez « Formation qualifiante pour les auditeurs internes » sur votre
           formation d'audit interne (avec son QCM). Chaque auditeur est alors signalé <strong>qualifié</strong>, <strong>à recycler</strong> ou{' '}
@@ -178,6 +190,10 @@ export const PAGE_GUIDES = {
           Rassembler les <strong>entrées</strong> (indicateurs, résultats d'audit, réclamations, actions en cours…) et
           enregistrer les <strong>décisions et actions</strong> qui en sortent.
         </p>
+      </>
+    ),
+    more: (
+      <>
         <p>
           Définissez la <strong>fréquence</strong> des revues (bandeau ci-dessous, admin) : le planning vous rappelle « revue à programmer »
           quand la prochaine est attendue et qu'aucune n'est prévue.
@@ -316,6 +332,10 @@ export const PAGE_GUIDES = {
           <strong>Planifié → En cours → Terminé.</strong> Consignez chaque <strong>constat</strong> avec son type ; un
           constat de type non-conformité peut être transformé en CAPA depuis la fiche.
         </p>
+      </>
+    ),
+    more: (
+      <>
         <p>
           <strong>Check-list (QCM) :</strong> préparez les questions de l'audit — saisies une à une, collées en liste, ou{' '}
           <strong>générées par l'IA</strong> d'après le périmètre de l'audit (vous relisez et corrigez avant d'ajouter). Pendant l'audit,
@@ -375,6 +395,10 @@ export const PAGE_GUIDES = {
           Passez en revue les <strong>entrées</strong> requises, puis enregistrez les <strong>décisions</strong> et les{' '}
           <strong>actions</strong> avec leurs responsables et leurs échéances.
         </p>
+      </>
+    ),
+    more: (
+      <>
         <p>
           Chaque action a un <strong>responsable</strong>, une <strong>échéance</strong> (elle apparaît alors dans le planning) et un{' '}
           <strong>statut</strong> ; une action dont la CAPA liée est clôturée est comptée réalisée. La revue reprend seule les{' '}

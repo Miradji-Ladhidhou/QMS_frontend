@@ -61,17 +61,23 @@ export default function ReviewScheduleBanner({ isAdmin, refreshKey }) {
 
   return (
     <div className={`mt-3 rounded-lg border px-3 py-2.5 text-sm ${tone}`}>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <CalendarClock size={16} className="shrink-0" />
-        <span className="min-w-0 flex-1">
-          {message}
-          {schedule.frequency_months && schedule.status !== 'no_review' ? ` (tous les ${schedule.frequency_months} mois)` : ''}
-        </span>
-        {isAdmin && !editing && (
-          <button type="button" onClick={() => setEditing(true)} className="shrink-0 text-xs font-medium underline">
-            {schedule.frequency_months ? 'Modifier la fréquence' : 'Définir la fréquence'}
-          </button>
-        )}
+      <div className="flex items-start gap-2.5">
+        <CalendarClock size={16} className="mt-0.5 shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-col gap-x-3 sm:flex-row sm:items-center">
+          <span className="min-w-0 flex-1">
+            {message}
+            {schedule.frequency_months && schedule.status !== 'no_review' ? ` (tous les ${schedule.frequency_months} mois)` : ''}
+          </span>
+          {isAdmin && !editing && (
+            <button
+              type="button"
+              onClick={() => setEditing(true)}
+              className="-ml-1 flex min-h-[40px] shrink-0 items-center self-start px-1 text-xs font-medium underline sm:min-h-0 sm:self-auto"
+            >
+              {schedule.frequency_months ? 'Modifier la fréquence' : 'Définir la fréquence'}
+            </button>
+          )}
+        </div>
       </div>
       {isAdmin && editing && (
         <form onSubmit={save} className="mt-2 flex flex-wrap items-center gap-2">
@@ -84,14 +90,14 @@ export default function ReviewScheduleBanner({ isAdmin, refreshKey }) {
             placeholder="12"
             value={months}
             onChange={(e) => setMonths(e.target.value)}
-            className="w-20 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
+            className="w-20 rounded-md border border-slate-300 bg-white px-2 py-2 text-base text-slate-900 focus:outline-none focus:ring-2 focus:ring-primary"
           />
           <span className="text-xs">mois</span>
-          <button type="submit" disabled={saving} className="flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-60">
+          <button type="submit" disabled={saving} className="flex min-h-[40px] items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-60">
             <Save size={12} />
             Enregistrer
           </button>
-          <button type="button" onClick={() => setEditing(false)} className="text-xs underline">
+          <button type="button" onClick={() => setEditing(false)} className="min-h-[40px] px-2 text-xs underline">
             Annuler
           </button>
           <span className="w-full text-xs opacity-70">Laissez vide pour désactiver le rappel. Le rappel apparaît aussi dans le planning.</span>

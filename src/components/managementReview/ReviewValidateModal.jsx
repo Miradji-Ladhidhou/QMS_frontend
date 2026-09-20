@@ -36,7 +36,7 @@ export default function ReviewValidateModal({ review, onClose, onValidated }) {
             </h2>
             <p className="break-words text-sm text-slate-500">{review.title}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="shrink-0 p-1 text-slate-500 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="Fermer" className="-m-2 shrink-0 p-2.5 text-slate-500 hover:text-slate-700">
             <X size={20} />
           </button>
         </div>

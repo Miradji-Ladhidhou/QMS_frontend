@@ -3,7 +3,7 @@ import { ClipboardCheck, Sparkles, Trash2 } from 'lucide-react';
 import { ACTION_STATUS_LABELS, ACTION_STATUS_OPTIONS, ACTION_STATUS_STYLES } from '../../lib/managementReviewActions.js';
 
 const FIELD_CLASS =
-  'w-full rounded-md border border-slate-300 px-2.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
+  'w-full rounded-md border border-slate-300 px-2.5 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:py-2 sm:text-sm';
 
 // Une action décidée : description, responsable, échéance, statut (modifiables par admin/manager, enregistrés
 // dès le changement), CAPA liée. Les autres rôles voient les mêmes informations en lecture seule.
@@ -25,7 +25,7 @@ export default function ReviewActionCard({ action, users, canManage, locked = fa
           )}
         </p>
         {canManage && !locked && (
-          <button type="button" onClick={() => onDelete(action)} aria-label="Supprimer l'action" className="shrink-0 p-1 text-slate-400 hover:text-red-600">
+          <button type="button" onClick={() => onDelete(action)} aria-label="Supprimer l'action" className="-m-2 shrink-0 p-3 text-slate-400 hover:text-red-600">
             <Trash2 size={14} />
           </button>
         )}
@@ -75,7 +75,7 @@ export default function ReviewActionCard({ action, users, canManage, locked = fa
       {action.linked_capa ? (
         <Link
           to={`/capas/${action.linked_capa.id}`}
-          className="mt-3 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
+          className="mt-3 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 min-h-[40px] px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
         >
           <ClipboardCheck size={14} />
           Voir la CAPA liée — {action.linked_capa.number}
@@ -85,7 +85,7 @@ export default function ReviewActionCard({ action, users, canManage, locked = fa
           <button
             type="button"
             onClick={() => onCreateCapa(action)}
-            className="mt-3 inline-flex items-center gap-2 rounded-md border border-primary px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"
+            className="mt-3 inline-flex items-center gap-2 rounded-md border border-primary min-h-[40px] px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"
           >
             <ClipboardCheck size={14} />
             Créer une CAPA

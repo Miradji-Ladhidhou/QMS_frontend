@@ -13,7 +13,7 @@ export default function FolderBreadcrumb({ breadcrumb, onNavigate, rootLabel }) 
       <button
         type="button"
         onClick={() => onNavigate(null)}
-        className={`rounded px-1 hover:text-primary hover:underline ${
+        className={`inline-flex min-h-[40px] items-center rounded px-1 hover:text-primary hover:underline sm:min-h-0 ${
           breadcrumb.length === 0 ? 'font-medium text-slate-900' : ''
         }`}
       >
@@ -25,7 +25,7 @@ export default function FolderBreadcrumb({ breadcrumb, onNavigate, rootLabel }) 
           <button
             type="button"
             onClick={() => onNavigate(folder.id)}
-            className={`rounded px-1 hover:text-primary hover:underline ${
+            className={`inline-flex min-h-[40px] items-center rounded px-1 hover:text-primary hover:underline sm:min-h-0 ${
               i === breadcrumb.length - 1 ? 'font-medium text-slate-900' : ''
             }`}
           >

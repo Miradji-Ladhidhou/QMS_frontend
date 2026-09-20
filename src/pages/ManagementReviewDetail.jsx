@@ -133,7 +133,7 @@ function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
             type="button"
             onClick={onRefresh}
             disabled={refreshing}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
           >
             <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
             {refreshing ? 'Actualisation...' : "Actualiser les données d'entrée"}
@@ -141,7 +141,7 @@ function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
         )}
       </div>
 
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div className="rounded-md border border-slate-200 bg-white px-3 py-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">KPI suivis</p>
           {inputSnapshot.kpi_trend.length === 0 ? (
@@ -150,7 +150,7 @@ function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
             <ul className="mt-1 space-y-1">
               {inputSnapshot.kpi_trend.map((kpi) => (
                 <li key={kpi.id} className="flex items-center justify-between gap-2 text-sm text-slate-700">
-                  <span className="truncate">{kpi.name}</span>
+                  <span className="min-w-0 truncate">{kpi.name}</span>
                   <span className="flex shrink-0 items-center gap-1 font-medium">
                     {kpi.current_avg !== null ? `${kpi.current_avg.toFixed(1)}${kpi.unit ? ` ${kpi.unit}` : ''}` : '—'}
                     <TrendIcon trend={kpi.trend} />
@@ -345,7 +345,7 @@ function EditReviewModal({ review, onClose, onUpdated }) {
       <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Modifier la revue</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="Fermer" className="-m-2 p-2.5 text-slate-500 hover:text-slate-700">
             <X size={20} />
           </button>
         </div>
@@ -531,7 +531,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
       <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">Créer une CAPA depuis cette action</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="Fermer" className="-m-2 p-2.5 text-slate-500 hover:text-slate-700">
             <X size={20} />
           </button>
         </div>
@@ -902,14 +902,14 @@ export default function ManagementReviewDetail() {
       <button
         type="button"
         onClick={goBack}
-        className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700"
+        className="-ml-1 mb-2 flex min-h-[40px] items-center gap-1 px-1 text-sm font-medium text-slate-500 hover:text-slate-700"
       >
         <ArrowLeft size={16} />
         Retour
       </button>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{review.title}</h1>
+        <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{review.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
           <ExportMenu
             onExportPdf={handleExportPdf}
@@ -925,7 +925,7 @@ export default function ManagementReviewDetail() {
             <select
               value={review.status}
               onChange={handleStatusChange}
-              className="rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              className="min-h-[40px] rounded-md border border-slate-300 px-2 py-1 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:min-h-0"
             >
               {Object.entries(REVIEW_STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
@@ -948,7 +948,7 @@ export default function ManagementReviewDetail() {
                 type="button"
                 onClick={() => setIsEditModalOpen(true)}
                 aria-label="Modifier"
-                className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-primary sm:p-2"
               >
                 <Pencil size={16} />
               </button>
@@ -956,7 +956,7 @@ export default function ManagementReviewDetail() {
                 type="button"
                 onClick={handleDeleteReview}
                 aria-label="Supprimer"
-                className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600"
+                className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-red-600 sm:p-2"
               >
                 <Trash2 size={16} />
               </button>
@@ -1093,7 +1093,7 @@ export default function ManagementReviewDetail() {
           <button
             type="button"
             onClick={() => setIsActionModalOpen(true)}
-            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="flex min-h-[40px] items-center gap-2 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             <Plus size={16} />
             Ajouter une action
@@ -1168,7 +1168,7 @@ export default function ManagementReviewDetail() {
                 type="button"
                 onClick={() => setIsActionModalOpen(false)}
                 aria-label="Fermer"
-                className="p-1 text-slate-500 hover:text-slate-700"
+                className="-m-2 p-2.5 text-slate-500 hover:text-slate-700"
               >
                 <X size={20} />
               </button>

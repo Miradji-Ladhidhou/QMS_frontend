@@ -30,7 +30,7 @@ export default function PreviousReviewBlock({ previousReview, canApply, onApply,
             type="button"
             onClick={onApply}
             disabled={applying}
-            className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            className="min-h-[40px] rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
           >
             {applying ? 'Enregistrement...' : 'Reporter dans le suivi écrit'}
           </button>
