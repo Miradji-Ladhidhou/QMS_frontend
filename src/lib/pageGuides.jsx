@@ -78,7 +78,7 @@ export const PAGE_GUIDES = {
           chaque personne un lien par email <strong>valable 48 h</strong> (pour un salarié sans compte, saisissez son email à
           l'envoi). Elle saisit son email, lit le résumé, répond au QCM, et la réalisation passe automatiquement à{' '}
           <strong>réussie ou non</strong>. Une formation cochée « qualifiante pour les auditeurs internes » alimente la page{' '}
-          <strong>Audits</strong> (qualification de l'auditeur désigné). Le bouton « QCM Word » exporte le détail (questions, réponses, taux de réussite) à
+          <strong>Audits</strong> (qualification de l'auditeur désigné). Les boutons « QCM Word » et « QCM PDF » exportent le détail (questions, réponses, taux de réussite) à
           conserver pour les audits : il reprend l'<strong>objet et le contenu</strong> de la formation, l'
           <strong>historique des essais</strong> de la personne pour la session (échecs et réussites, aussi visibles avec le bouton
           « Essais »), porte la{' '}

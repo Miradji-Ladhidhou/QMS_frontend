@@ -8,7 +8,6 @@ import {
   ClipboardList,
   Download,
   FileSignature,
-  FileText,
   FolderCog,
   FolderInput,
   FolderPlus,
@@ -58,7 +57,7 @@ import QuizEditorModal from '../components/trainingQuiz/QuizEditorModal.jsx';
 import SendQuizModal from '../components/trainingQuiz/SendQuizModal.jsx';
 import InstructorSignatureField from '../components/trainingQuiz/InstructorSignatureField.jsx';
 import QuizHistoryModal from '../components/trainingQuiz/QuizHistoryModal.jsx';
-import { describeAttemptsSummary, summarizeAttempts } from '../lib/quizAttempts.js';
+import QuizDownloadButtons from '../components/trainingQuiz/QuizDownloadButtons.jsx';import { describeAttemptsSummary, summarizeAttempts } from '../lib/quizAttempts.js';
 import { summarizeTrainingQualification } from '../lib/auditorQualification.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -1319,7 +1318,7 @@ export default function Trainings() {
   const [quizEditorTraining, setQuizEditorTraining] = useState(null);
   const [sendQuizTarget, setSendQuizTarget] = useState(null);
   const [attemptsByTraining, setAttemptsByTraining] = useState({});
-  const [quizWordDownloadingId, setQuizWordDownloadingId] = useState(null);
+  const [quizDownloading, setQuizDownloading] = useState(null); // { id, format } de l'export de QCM en cours
   const [quizHistoryTarget, setQuizHistoryTarget] = useState(null); // { training, record, sessionLabel }
   // Lien profond ?training=<id> (depuis la page Audits) : ouvre le dossier de la formation, déplie sa carte et la met en évidence.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -1538,17 +1537,19 @@ export default function Trainings() {
     }
   }
 
-  async function handleDownloadQuizWord(training, attempt, record) {
-    setQuizWordDownloadingId(attempt.id);
+  async function handleDownloadQuiz(training, attempt, record, format) {
+    setQuizDownloading({ id: attempt.id, format });
+    const baseName = `qcm-${training.title.toLowerCase().replace(/\s+/g, '-')}-${personName(record).toLowerCase().replace(/\s+/g, '-')}`;
     try {
-      await getWordDownload(
-        `/trainings/${training.id}/quiz/attempts/${attempt.id}/word`,
-        `qcm-${training.title.toLowerCase().replace(/\s+/g, '-')}-${personName(record).toLowerCase().replace(/\s+/g, '-')}.docx`
-      );
+      if (format === 'pdf') {
+        await getPdfDownload(`/trainings/${training.id}/quiz/attempts/${attempt.id}/pdf`, `${baseName}.pdf`);
+      } else {
+        await getWordDownload(`/trainings/${training.id}/quiz/attempts/${attempt.id}/word`, `${baseName}.docx`);
+      }
     } catch {
-      setError("Impossible de générer l'export Word du QCM.");
+      setError(`Impossible de générer l'export ${format === 'pdf' ? 'PDF' : 'Word'} du QCM.`);
     } finally {
-      setQuizWordDownloadingId(null);
+      setQuizDownloading(null);
     }
   }
 
@@ -2116,19 +2117,11 @@ export default function Trainings() {
                                         </button>
                                       )}
                                       {canManage && latestAttemptByRecord.get(record.id)?.completed_at && (
-                                        <button
-                                          type="button"
-                                          onClick={() => handleDownloadQuizWord(training, latestAttemptByRecord.get(record.id), record)}
-                                          disabled={quizWordDownloadingId === latestAttemptByRecord.get(record.id).id}
-                                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                                        >
-                                          {quizWordDownloadingId === latestAttemptByRecord.get(record.id).id ? (
-                                            <Loader2 size={13} className="animate-spin" />
-                                          ) : (
-                                            <FileText size={13} />
-                                          )}
-                                          QCM Word
-                                        </button>
+                                        <QuizDownloadButtons
+                                          attempt={latestAttemptByRecord.get(record.id)}
+                                          downloading={quizDownloading}
+                                          onDownload={(attempt, format) => handleDownloadQuiz(training, attempt, record, format)}
+                                        />
                                       )}
                                       <button
                                         type="button"
@@ -2253,8 +2246,8 @@ export default function Trainings() {
           personLabel={personName(quizHistoryTarget.record)}
           sessionLabel={quizHistoryTarget.sessionLabel}
           attempts={(attemptsByTraining[quizHistoryTarget.training.id] || []).filter((attempt) => attempt.record_id === quizHistoryTarget.record.id)}
-          downloadingId={quizWordDownloadingId}
-          onDownload={(attempt) => handleDownloadQuizWord(quizHistoryTarget.training, attempt, quizHistoryTarget.record)}
+          downloading={quizDownloading}
+          onDownload={(attempt, format) => handleDownloadQuiz(quizHistoryTarget.training, attempt, quizHistoryTarget.record, format)}
           onClose={() => setQuizHistoryTarget(null)}
         />
       )}

@@ -1,4 +1,5 @@
-import { FileText, Loader2, X } from 'lucide-react';
+import { X } from 'lucide-react';
+import QuizDownloadButtons from './QuizDownloadButtons.jsx';
 import { attemptStatus, describeAttemptsSummary, numberAttempts, summarizeAttempts } from '../../lib/quizAttempts.js';
 
 const TONE_CLASSES = {
@@ -13,8 +14,8 @@ function formatDateTime(value) {
 }
 
 // Historique de TOUS les passages de QCM d'une personne pour une session : échecs, réussites et
-// liens jamais utilisés, avec un export Word par essai passé (chaque Word reprend l'historique complet).
-export default function QuizHistoryModal({ training, personLabel, sessionLabel, attempts, downloadingId, onDownload, onClose }) {
+// liens jamais utilisés, avec un export Word et PDF par essai passé (chaque export reprend l'historique complet).
+export default function QuizHistoryModal({ training, personLabel, sessionLabel, attempts, downloading, onDownload, onClose }) {
   const history = numberAttempts(attempts).reverse(); // du plus récent au plus ancien
   const summary = summarizeAttempts(attempts);
 
@@ -76,15 +77,9 @@ export default function QuizHistoryModal({ training, personLabel, sessionLabel, 
                   )}
                 </dl>
                 {attempt.completed_at && (
-                  <button
-                    type="button"
-                    onClick={() => onDownload(attempt)}
-                    disabled={downloadingId === attempt.id}
-                    className="mt-2 flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    {downloadingId === attempt.id ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                    QCM Word
-                  </button>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <QuizDownloadButtons attempt={attempt} downloading={downloading} onDownload={onDownload} />
+                  </div>
                 )}
               </li>
             );
