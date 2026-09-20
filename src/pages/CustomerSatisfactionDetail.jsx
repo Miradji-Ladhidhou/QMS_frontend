@@ -6,13 +6,17 @@ import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useTenant } from '../lib/useTenant.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { SATISFACTION_METHOD_LABELS } from '../lib/customerSatisfactionStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
+import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { buildExportColumns, buildExportRows } from '../lib/customerSatisfactionExport.js';
 import SatisfactionMethodBadge from '../components/SatisfactionMethodBadge.jsx';
 import SatisfactionScoreBadge from '../components/SatisfactionScoreBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 
 function formatDate(dateStr) {
@@ -373,6 +377,7 @@ export default function CustomerSatisfactionDetail() {
   const navigate = useNavigate();
   const goBack = useSmartBack('/customer-satisfaction');
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [survey, setSurvey] = useState(null);
   const users = useUsers();
@@ -381,6 +386,11 @@ export default function CustomerSatisfactionDetail() {
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [driveSuccess, setDriveSuccess] = useState('');
 
   async function loadSurvey() {
     setLoading(true);
@@ -402,6 +412,64 @@ export default function CustomerSatisfactionDetail() {
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Fiche imprimable dédiée (customerSatisfactionPdf.js) pour le PDF, comme les autres fiches
+  // de cette convention — Excel/Word réutilisent le même export générique en colonnes/lignes
+  // que la liste (CustomerSatisfaction.jsx), réduit à cette seule enquête (voir
+  // lib/customerSatisfactionExport.js).
+  async function handleExportPdf() {
+    setExportingPdf(true);
+    setError('');
+    try {
+      await getPdfDownload(`/customer-satisfaction/${id}/pdf`, `satisfaction-${survey.id}.pdf`);
+    } catch {
+      setError('Impossible d’exporter cette enquête en PDF.');
+    } finally {
+      setExportingPdf(false);
+    }
+  }
+
+  async function handleExportXlsx() {
+    setExportingXlsx(true);
+    setError('');
+    try {
+      await exportToXlsx(`satisfaction-${survey.id}.xlsx`, 'Satisfaction client', buildExportColumns(), buildExportRows([survey]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setError('Impossible de générer le fichier Excel.');
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setExportingWord(true);
+    setError('');
+    try {
+      await exportToWord(`satisfaction-${survey.id}.docx`, 'Satisfaction client', buildExportColumns(), buildExportRows([survey]), {
+        generatedBy: currentUser?.full_name,
+      });
+    } catch {
+      setError('Impossible de générer le document Word.');
+    } finally {
+      setExportingWord(false);
+    }
+  }
+
+  async function handleExportDrive() {
+    setExportingDrive(true);
+    setError('');
+    setDriveSuccess('');
+    try {
+      await getPdfAndSaveToDrive(`/customer-satisfaction/${id}/pdf`, 'SATISF', survey.customer_name);
+      setDriveSuccess('Enregistré sur le Drive partagé.');
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
+    }
+  }
 
   async function handleDelete() {
     if (!window.confirm(`Supprimer définitivement l'enquête de "${survey.customer_name}" ?`)) return;
@@ -439,6 +507,16 @@ export default function CustomerSatisfactionDetail() {
         <div className="flex flex-wrap items-center gap-2">
           <SatisfactionMethodBadge method={survey.method} />
           <SatisfactionScoreBadge score={survey.score} />
+          <ExportMenu
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           {canManage && (
             <>
               <button
@@ -464,6 +542,9 @@ export default function CustomerSatisfactionDetail() {
       <PageGuide id="customerSatisfactionDetail" />
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+      {driveSuccess && (
+        <p className="mt-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
+      )}
 
       <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
         <div>
