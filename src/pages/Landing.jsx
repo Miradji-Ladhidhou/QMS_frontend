@@ -113,17 +113,14 @@ export default function Landing() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Inscription publique retirée (accès sur invitation uniquement, voir
+                SuperAdmin.jsx#CreateTenantModal) : plus qu'un seul bouton, promu en style
+                principal puisque c'est désormais la seule action de cet en-tête. */}
             <Link
               to="/login"
-              className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-primary sm:px-4"
-            >
-              Se connecter
-            </Link>
-            <Link
-              to="/register"
               className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:px-4"
             >
-              Créer un compte
+              Se connecter
             </Link>
           </div>
         </div>
@@ -143,18 +140,14 @@ export default function Landing() {
               tableurs éparpillés ni relances par email.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Link
-                to="/register"
-                className="flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-              >
-                Créer un compte gratuit
-                <ArrowRight size={16} />
-              </Link>
+              {/* Même raisonnement que l'en-tête : plus qu'un seul bouton, promu en style
+                  principal (inscription publique retirée). */}
               <Link
                 to="/login"
-                className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                className="flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700"
               >
                 Se connecter
+                <ArrowRight size={16} />
               </Link>
             </div>
           </div>
@@ -200,14 +193,14 @@ export default function Landing() {
               <h2 className="text-xl font-semibold text-white sm:text-2xl">Prêt à faire le tri dans votre qualité ?</h2>
               <p className="mt-2 flex items-center gap-1.5 text-sm text-white/80">
                 <CheckCircle2 size={16} />
-                Aucune carte bancaire requise pour commencer.
+                Accès sur invitation — contactez-nous pour créer votre compte.
               </p>
             </div>
             <Link
-              to="/register"
+              to="/login"
               className="flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-white px-5 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary-50"
             >
-              Créer un compte gratuit
+              Se connecter
               <ArrowRight size={16} />
             </Link>
           </div>

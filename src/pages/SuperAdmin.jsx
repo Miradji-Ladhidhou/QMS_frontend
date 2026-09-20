@@ -316,9 +316,15 @@ function ConfirmTypedModal({ title, message, expectedText, onConfirm, onClose })
   );
 }
 
+// Seul point d'entrée restant pour créer un compte QMS SaaS (l'inscription publique /register
+// a été retirée) : ce formulaire crée toujours le tenant ET son administrateur ensemble, en un
+// seul appel (POST /super-admin/tenants avec admin: {...}) — jamais un tenant orphelin depuis
+// cet écran, l'ajout d'utilisateurs supplémentaires reste le rôle d'InviteUserForm ci-dessous.
 function CreateTenantModal({ onClose, onCreated }) {
   const [name, setName] = useState('');
   const [plan, setPlan] = useState('free');
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminFullName, setAdminFullName] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -331,7 +337,11 @@ function CreateTenantModal({ onClose, onCreated }) {
     // référence — un bug du handler parent ne doit jamais se faire passer pour un échec de l'appel API.
     let data;
     try {
-      ({ data } = await api.post('/super-admin/tenants', { name, plan }));
+      ({ data } = await api.post('/super-admin/tenants', {
+        name,
+        plan,
+        admin: { email: adminEmail, full_name: adminFullName },
+      }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de créer ce tenant.');
       setSaving(false);
@@ -368,6 +378,32 @@ function CreateTenantModal({ onClose, onCreated }) {
               </option>
             ))}
           </select>
+        </div>
+        <div className="border-t border-slate-200 pt-3">
+          <p className="mb-2 text-xs font-medium text-slate-600">Administrateur du tenant</p>
+          <div className="space-y-3">
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Nom complet</label>
+              <input
+                type="text"
+                required
+                value={adminFullName}
+                onChange={(event) => setAdminFullName(event.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+              <input
+                type="email"
+                required
+                value={adminEmail}
+                onChange={(event) => setAdminEmail(event.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
+              />
+            </div>
+            <p className="text-xs text-slate-500">Un email d'invitation sera envoyé à cette adresse pour définir le mot de passe.</p>
+          </div>
         </div>
         <button
           type="submit"
