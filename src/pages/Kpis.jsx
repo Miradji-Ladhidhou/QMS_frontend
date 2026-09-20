@@ -46,6 +46,14 @@ import {
 import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
+import {
+  EMPTY_SERIES_SETTINGS_FORM,
+  formatTarget,
+  resolveSeriesSettings,
+  seriesSettingsPayload,
+  seriesSettingsToForm,
+  validateSeriesSettingsForm,
+} from '../lib/kpiSeriesSettings.js';
 import { getKpiStatus, KPI_STATUS_BADGE_STYLES, KPI_STATUS_LABELS, KPI_STATUS_STYLES } from '../lib/kpiStatus.js';
 import { exportToCsv } from '../lib/csvExport.js';
 import { exportTableCsv, exportToWord, getXlsxDownload } from '../lib/pdfExport.js';
@@ -616,7 +624,12 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
   // est enregistrée, la plage elle-même n'est jamais persistée (pas de colonnes dédiées sur
   // kpi_records) — en édition, le début/fin repartent donc vides plutôt que reconstitués.
   // Proposé uniquement quand l'unité du KPI est "heures".
-  const isHoursUnit = (kpi.unit || '').trim().toLowerCase() === 'heures';
+  // Unité de la série choisie quand le KPI en porte plusieurs (chacune peut avoir la sienne, voir
+  // lib/kpiSeriesSettings.js) ; celle du KPI sinon.
+  const allConfigs = kpi.calculation_configs || [];
+  const valueUnit =
+    configId && allConfigs.length > 1 ? resolveSeriesSettings(kpi, allConfigs.find((c) => c.id === configId)).unit : kpi.unit || '';
+  const isHoursUnit = valueUnit.trim().toLowerCase() === 'heures';
   const [entryMode, setEntryMode] = useState('direct');
   const [rangeStart, setRangeStart] = useState('');
   const [rangeEnd, setRangeEnd] = useState('');
@@ -744,7 +757,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
 
           <div>
             <div className="mb-1 flex items-center justify-between">
-              <label className="block text-sm font-medium text-slate-700">Valeur {kpi.unit ? `(${kpi.unit})` : ''}</label>
+              <label className="block text-sm font-medium text-slate-700">Valeur {valueUnit ? `(${valueUnit})` : ''}</label>
               {isHoursUnit && (
                 <div className="flex overflow-hidden rounded-md border border-slate-300 text-xs">
                   <button
@@ -854,6 +867,10 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   const seriesConfigs = kpi.calculation_configs || [];
   const showSeriesColumn = seriesConfigs.length > 1;
   const labelByConfigId = Object.fromEntries(seriesConfigs.map((c) => [c.id, c.label]));
+  const configById = new Map(seriesConfigs.map((c) => [c.id, c]));
+  // Unité de la série du relevé quand le KPI en a plusieurs, celle du KPI sinon.
+  const unitForRecord = (record) =>
+    record.config_id && showSeriesColumn ? resolveSeriesSettings(kpi, configById.get(record.config_id)).unit : kpi.unit || '';
   const { sorted: records, sortKey, direction, toggleSort } = useSort(
     kpi.records,
     getRecordSortValue,
@@ -889,7 +906,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
                 </td>
               )}
               <td className="py-2 pr-3 whitespace-nowrap font-medium text-slate-800">
-                {record.value} {kpi.unit || ''}
+                {record.value} {unitForRecord(record)}
               </td>
               {isImportBased && (
                 <td className="py-2 pr-3">
@@ -1887,6 +1904,7 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
   const [series, setSeries] = useState([]);
   const [editingId, setEditingId] = useState(null); // null = liste, 'new' = création, sinon id édité
   const [form, setForm] = useState(EMPTY_CONFIG_FORM);
+  const [settingsForm, setSettingsForm] = useState(EMPTY_SERIES_SETTINGS_FORM);
   const [error, setError] = useState('');
   const [warning, setWarning] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -1909,6 +1927,7 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
   function startCreate() {
     setEditingId('new');
     setForm(EMPTY_CONFIG_FORM);
+    setSettingsForm(EMPTY_SERIES_SETTINGS_FORM);
     setError('');
     setWarning('');
   }
@@ -1916,14 +1935,26 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
   function startEdit(s) {
     setEditingId(s.id);
     setForm(configToForm(s));
+    setSettingsForm(seriesSettingsToForm(s));
     setError('');
     setWarning('');
   }
+
+  // Choix « global / propre » : seulement à partir de deux séries (voir ManualSeriesManagerModal).
+  const seriesCountAfterSave = editingId === 'new' ? series.length + 1 : series.length;
+  const showSettings = seriesCountAfterSave >= 2;
 
   async function handleSubmit(event) {
     event.preventDefault();
     setError('');
     setWarning('');
+
+    const settingsError = showSettings ? validateSeriesSettingsForm(settingsForm) : '';
+    if (settingsError) {
+      setError(settingsError);
+      return;
+    }
+
     setSubmitting(true);
 
     const payload = {
@@ -1934,6 +1965,7 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
       filter_logic: form.filter_logic,
       group_by_column: form.group_by_column || null,
       period_column: form.period_column || null,
+      ...(showSettings ? seriesSettingsPayload(settingsForm) : {}),
     };
 
     // onSaved() volontairement hors du try : voir KpiFormModal pour l'incident de référence —
@@ -2014,6 +2046,8 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
 
             <CalculationConfigFields form={form} onChange={setForm} columns={null} sampleRows={null} />
 
+            {showSettings && <SeriesSettingsFields kpi={kpi} value={settingsForm} onChange={setSettingsForm} />}
+
             {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
             {warning && (
               <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-700">{warning}</p>
@@ -2046,6 +2080,7 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
                             ? ` — ${describeFiltersShort(s.filters, s.filter_logic)}`
                             : ''}
                         </p>
+                        {series.length >= 2 && <p className="mt-0.5 break-words text-xs text-slate-500">{seriesSettingsSummary(kpi, s)}</p>}
                       </div>
                       {canManage && (
                         <div className="flex shrink-0 gap-1">
@@ -2091,6 +2126,116 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
   );
 }
 
+// Paramétrage d'une série (courbe) : unité, objectif cible et sens de l'objectif. À partir de
+// deux séries, chacune doit être soit « globale » (elle reprend ceux du KPI), soit « propre » (ses
+// trois valeurs, requises ensemble) — le mode global est présélectionné, jamais un état vide.
+// value/onChange : voir lib/kpiSeriesSettings.js (EMPTY_SERIES_SETTINGS_FORM).
+function SeriesSettingsFields({ kpi, value, onChange }) {
+  const globalSettings = resolveSeriesSettings(kpi, null);
+  const globalTarget = formatTarget(globalSettings);
+  const update = (patch) => onChange({ ...value, ...patch });
+  const inputClass =
+    'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
+
+  return (
+    <fieldset className="space-y-2">
+      <legend className="mb-1 text-sm font-medium text-slate-700">Unité et objectif de cette série</legend>
+
+      <label
+        className={`flex cursor-pointer items-start gap-2.5 rounded-md border p-3 ${
+          value.mode === 'global' ? 'border-primary bg-primary-50' : 'border-slate-200 hover:bg-slate-50'
+        }`}
+      >
+        <input
+          type="radio"
+          name="series-settings-mode"
+          checked={value.mode === 'global'}
+          onChange={() => update({ mode: 'global' })}
+          className="mt-0.5 h-4 w-4 shrink-0 text-primary focus:ring-primary"
+        />
+        <span className="min-w-0 text-sm">
+          <span className="block font-medium text-slate-800">Comme le KPI (global)</span>
+          <span className="block break-words text-xs text-slate-500">
+            Unité : {globalSettings.unit || 'non définie'} · Objectif : {globalTarget || 'non défini'}
+          </span>
+        </span>
+      </label>
+
+      <label
+        className={`flex cursor-pointer items-start gap-2.5 rounded-md border p-3 ${
+          value.mode === 'custom' ? 'border-primary bg-primary-50' : 'border-slate-200 hover:bg-slate-50'
+        }`}
+      >
+        <input
+          type="radio"
+          name="series-settings-mode"
+          checked={value.mode === 'custom'}
+          onChange={() => update({ mode: 'custom' })}
+          className="mt-0.5 h-4 w-4 shrink-0 text-primary focus:ring-primary"
+        />
+        <span className="min-w-0 text-sm">
+          <span className="block font-medium text-slate-800">Propre à cette série</span>
+          <span className="block text-xs text-slate-500">
+            Utile quand elle ne se mesure pas comme les autres (ex : un délai en heures à côté d'un taux en %).
+          </span>
+        </span>
+      </label>
+
+      {value.mode === 'custom' && (
+        <div className="space-y-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Unité de mesure</label>
+            <input
+              type="text"
+              list="kpi-series-unit-suggestions"
+              required
+              placeholder="jours, %, heures..."
+              value={value.unit}
+              onChange={(e) => update({ unit: e.target.value })}
+              className={inputClass}
+            />
+            <datalist id="kpi-series-unit-suggestions">
+              {COMMON_KPI_UNITS.map((unit) => (
+                <option key={unit} value={unit} />
+              ))}
+            </datalist>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Objectif cible</label>
+            <input
+              type="number"
+              step="any"
+              required
+              inputMode="decimal"
+              value={value.target}
+              onChange={(e) => update({ target: e.target.value })}
+              className={inputClass}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Sens de l'objectif</label>
+            <select value={value.direction} onChange={(e) => update({ direction: e.target.value })} className={inputClass}>
+              <option value="min">Plus haut, mieux c'est (≥)</option>
+              <option value="max">Plus bas, mieux c'est (≤)</option>
+            </select>
+            <p className="mt-1 text-xs text-slate-400">
+              {value.direction === 'max' ? 'Ex : taux de retour, délai.' : 'Ex : taux de service, taux de conformité.'}
+            </p>
+          </div>
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+// Résumé d'une série dans la liste des modales de séries : « Unité et objectif du KPI » ou les
+// siens (« heures · ≤ 24 heures »).
+function seriesSettingsSummary(kpi, config) {
+  const settings = resolveSeriesSettings(kpi, config);
+  if (!settings.custom) return 'Comme le KPI';
+  return [settings.unit, formatTarget(settings)].filter(Boolean).join(' · ');
+}
+
 // Calqué sur SeriesManagerModal (séries de calcul, KPI import) mais bien plus simple : une
 // série manuelle n'est qu'un label (calc_type fixé à 'manual' côté serveur), pas de recette de
 // calcul à construire — voir POST /kpis/:id/series et RecordModal, qui liste ces séries dans
@@ -2098,8 +2243,9 @@ function SeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
 function ManualSeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
   const [loading, setLoading] = useState(true);
   const [series, setSeries] = useState([]);
-  const [creating, setCreating] = useState(false);
+  const [editingId, setEditingId] = useState(null); // null = liste, 'new' = création, sinon id édité
   const [label, setLabel] = useState('');
+  const [settingsForm, setSettingsForm] = useState(EMPTY_SERIES_SETTINGS_FORM);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -2118,21 +2264,51 @@ function ManualSeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kpi.id]);
 
-  async function handleCreate(event) {
+  function startCreate() {
+    setEditingId('new');
+    setLabel('');
+    setSettingsForm(EMPTY_SERIES_SETTINGS_FORM);
+    setError('');
+  }
+
+  function startEdit(s) {
+    setEditingId(s.id);
+    setLabel(s.label);
+    setSettingsForm(seriesSettingsToForm(s));
+    setError('');
+  }
+
+  // Le choix « global / propre » n'a de sens qu'avec au moins deux séries : en créer une quand
+  // il y en a déjà une, ou en modifier une parmi plusieurs. Avec une seule série, l'unité et
+  // l'objectif du KPI suffisent (et sont ceux affichés).
+  const seriesCountAfterSave = editingId === 'new' ? series.length + 1 : series.length;
+  const showSettings = seriesCountAfterSave >= 2;
+
+  async function handleSubmit(event) {
     event.preventDefault();
     setError('');
-    setSubmitting(true);
 
+    const settingsError = showSettings ? validateSeriesSettingsForm(settingsForm) : '';
+    if (settingsError) {
+      setError(settingsError);
+      return;
+    }
+
+    setSubmitting(true);
+    const payload = { label, calc_type: 'manual', ...(showSettings ? seriesSettingsPayload(settingsForm) : {}) };
     try {
-      await api.post(`/kpis/${kpi.id}/series`, { label, calc_type: 'manual' });
+      if (editingId === 'new') {
+        await api.post(`/kpis/${kpi.id}/series`, payload);
+      } else {
+        await api.patch(`/kpis/${kpi.id}/series/${editingId}`, payload);
+      }
     } catch (err) {
-      setError(err.response?.data?.error || "Impossible de créer cette série.");
+      setError(err.response?.data?.error || "Impossible d'enregistrer cette série.");
       setSubmitting(false);
       return;
     }
     setSubmitting(false);
-    setLabel('');
-    setCreating(false);
+    setEditingId(null);
     onSaved();
     loadSeries();
   }
@@ -2156,12 +2332,16 @@ function ManualSeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
     loadSeries();
   }
 
+  const isFormView = editingId !== null;
+
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-semibold text-slate-900">Séries (courbes)</h2>
+            <h2 className="text-lg font-semibold text-slate-900">
+              {isFormView ? (editingId === 'new' ? 'Nouvelle série' : 'Modifier la série') : 'Séries (courbes)'}
+            </h2>
             <p className="text-sm text-slate-500">{kpi.name}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -2175,6 +2355,44 @@ function ManualSeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
               <div key={key} className="h-14 animate-pulse rounded-md bg-slate-100" />
             ))}
           </div>
+        ) : isFormView ? (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <button type="button" onClick={() => setEditingId(null)} className="text-xs font-medium text-primary hover:underline">
+              ← Retour à la liste
+            </button>
+
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Nom de la série</label>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder="Ex : Ligne A"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+
+            {showSettings ? (
+              <SeriesSettingsFields kpi={kpi} value={settingsForm} onChange={setSettingsForm} />
+            ) : (
+              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                Avec une seule série, l'unité et l'objectif du KPI s'appliquent. Dès la deuxième série, vous choisirez pour chacune
+                de garder ceux du KPI ou de définir les siens.
+              </p>
+            )}
+
+            {error && <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+            <button
+              type="submit"
+              disabled={submitting}
+              className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+            >
+              {submitting ? 'Enregistrement...' : 'Enregistrer la série'}
+            </button>
+          </form>
         ) : (
           <div>
             {series.length === 0 ? (
@@ -2186,17 +2404,30 @@ function ManualSeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
               <div className="mb-4 space-y-2">
                 {series.map((s) => (
                   <div key={s.id} className="flex items-center justify-between gap-2 rounded-md border border-slate-200 p-3">
-                    <p className="min-w-0 break-words text-sm font-medium text-slate-800">{s.label}</p>
+                    <div className="min-w-0">
+                      <p className="break-words text-sm font-medium text-slate-800">{s.label}</p>
+                      {series.length >= 2 && <p className="mt-0.5 break-words text-xs text-slate-500">{seriesSettingsSummary(kpi, s)}</p>}
+                    </div>
                     {canManage && (
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(s)}
-                        disabled={deletingId === s.id}
-                        aria-label="Supprimer"
-                        className="shrink-0 rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+                      <div className="flex shrink-0 gap-1">
+                        <button
+                          type="button"
+                          onClick={() => startEdit(s)}
+                          aria-label="Modifier"
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(s)}
+                          disabled={deletingId === s.id}
+                          aria-label="Supprimer"
+                          className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -2205,35 +2436,14 @@ function ManualSeriesManagerModal({ kpi, canManage, onClose, onSaved }) {
 
             {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-            {creating ? (
-              <form onSubmit={handleCreate} className="flex items-center gap-2">
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="Ex : Ligne A"
-                  value={label}
-                  onChange={(e) => setLabel(e.target.value)}
-                  className="min-w-0 flex-1 rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-                />
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="shrink-0 rounded-md bg-primary px-3 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-                >
-                  {submitting ? '...' : 'Ajouter'}
-                </button>
-              </form>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setCreating(true)}
-                className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
-              >
-                <Plus size={16} />
-                Nouvelle série
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={startCreate}
+              className="flex w-full items-center justify-center gap-2 rounded-md border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <Plus size={16} />
+              Nouvelle série
+            </button>
           </div>
         )}
       </div>
@@ -2704,12 +2914,19 @@ function KpiCard({
 
   const targetDirection = kpi.target_direction || 'min';
   // Statut par série (moyenne des KPI_RECENT_WINDOW dernières périodes DE CETTE SÉRIE, pas de
-  // tout le KPI) comparée à l'unique target/target_direction du KPI — il n'y a qu'un seul
-  // objectif par KPI, jamais un par série, mais chaque série peut l'atteindre ou non
-  // indépendamment des autres. `average` (affiché à côté) reste la moyenne SUR TOUTE LA VIE de
-  // la série, volontairement distincte de celle utilisée ici pour le statut — même principe que
-  // averageValue/status plus bas (moyenne récente) vs. l'historique complet du graphique.
+  // tout le KPI) comparée à l'objectif de cette série : le sien si elle est paramétrée à part
+  // (unité + cible + sens, voir lib/kpiSeriesSettings.js), sinon celui du KPI. `average`
+  // (affiché à côté) reste la moyenne SUR TOUTE LA VIE de la série, volontairement distincte de
+  // celle utilisée ici pour le statut — même principe que averageValue/status plus bas (moyenne
+  // récente) vs. l'historique complet du graphique. Mono-série : toujours les valeurs du KPI.
+  const settingsByLabel = new Map(
+    orderedLabels.map((label) => [
+      label,
+      resolveSeriesSettings(kpi, showMultiSeries ? seriesConfigs.find((c) => c.label === label) : null),
+    ])
+  );
   const averagesByLabel = orderedLabels.map((label, i) => {
+    const settings = settingsByLabel.get(label);
     const seriesRecords = records.filter((r) => labelForRecord(r) === label);
     const values = seriesRecords.map((r) => r.value);
     const recentSeriesRecords = [...seriesRecords].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
@@ -2721,9 +2938,13 @@ function KpiCard({
       label,
       color: SERIES_COLORS[i % SERIES_COLORS.length],
       average: values.length > 0 ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)) : null,
-      status: getKpiStatus(recentAverage, kpi.target, targetDirection),
+      settings,
+      status: getKpiStatus(recentAverage, settings.target, settings.direction),
     };
   });
+  // Chaque série a son objectif : celui du KPI (série globale) ne concerne plus le KPI que si au
+  // moins une série le suit — sinon on n'affiche pas un objectif qui ne s'applique à aucune.
+  const someSeriesFollowsKpi = !showMultiSeries || averagesByLabel.some(({ settings }) => !settings.custom);
   // La valeur mise en avant sur la carte est la moyenne des KPI_RECENT_WINDOW dernières
   // périodes enregistrées (jamais la dernière valeur seule, qui peut être un pic isolé, ni
   // toute la vie du KPI, qui dilue une mauvaise tendance récente derrière un vieil historique
@@ -2811,7 +3032,7 @@ function KpiCard({
           )}
           <div className="min-w-0">
             <p className="break-words font-medium text-slate-900">{kpi.name}</p>
-            {hasTarget && (
+            {hasTarget && someSeriesFollowsKpi && (
               <p className="text-sm text-slate-500">
                 Objectif : {targetDirection === 'max' ? '≤' : '≥'} {kpi.target} {kpi.unit || ''}
               </p>
@@ -2979,7 +3200,7 @@ function KpiCard({
           <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         ) : showMultiSeries ? (
           <div className="flex w-full flex-col gap-2">
-            {averagesByLabel.map(({ label, color, average, status: seriesStatus }) => {
+            {averagesByLabel.map(({ label, color, average, settings, status: seriesStatus }) => {
               const SeriesStatusIcon =
                 seriesStatus === 'good' ? CheckCircle2 : seriesStatus === 'warning' ? AlertTriangle : seriesStatus === 'bad' ? AlertCircle : null;
               return (
@@ -2987,8 +3208,11 @@ function KpiCard({
                   <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
                   <span className="whitespace-nowrap text-xs text-slate-500">{label}</span>
                   <span className="whitespace-nowrap text-sm font-semibold text-slate-900">
-                    {average !== null ? `${average} ${kpi.unit || ''}` : '—'}
+                    {average !== null ? `${average} ${settings.unit}` : '—'}
                   </span>
+                  {settings.custom && (
+                    <span className="whitespace-nowrap text-xs text-slate-500">Objectif : {formatTarget(settings)}</span>
+                  )}
                   {SeriesStatusIcon && (
                     <span
                       className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${KPI_STATUS_BADGE_STYLES[seriesStatus]}`}
@@ -3090,11 +3314,11 @@ function KpiCard({
                     />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
                     <Tooltip
-                      formatter={(val, name) => [`${val} ${kpi.unit || ''}`, name]}
+                      formatter={(val, name) => [`${val} ${settingsByLabel.get(name)?.unit ?? kpi.unit ?? ''}`, name]}
                       labelFormatter={(label) => formatDate(label)}
                       contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
                     />
-                    {hasTarget && (
+                    {hasTarget && someSeriesFollowsKpi && (
                       <ReferenceLine
                         y={kpi.target}
                         stroke={MUTED_COLOR}
@@ -3102,6 +3326,19 @@ function KpiCard({
                         label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
                       />
                     )}
+                    {/* Une ligne d'objectif par série paramétrée à part, à la couleur de la série. */}
+                    {averagesByLabel
+                      .filter(({ settings }) => settings.custom && settings.target !== null)
+                      .map(({ label, color, settings }) => (
+                        <ReferenceLine
+                          key={`target-${label}`}
+                          y={settings.target}
+                          stroke={color}
+                          strokeDasharray="4 4"
+                          strokeOpacity={0.7}
+                          label={{ value: `Objectif ${label}`, position: 'insideBottomRight', fontSize: 10, fill: color }}
+                        />
+                      ))}
                     {orderedLabels.map((label, i) => {
                       const color = SERIES_COLORS[i % SERIES_COLORS.length];
                       return (

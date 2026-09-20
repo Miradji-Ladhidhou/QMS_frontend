@@ -75,10 +75,19 @@ export const PAGE_GUIDES = {
   kpis: {
     title: 'Piloter par les indicateurs',
     body: (
-      <p>
-        Un KPI est une valeur suivie dans le temps, comparée à un <strong>objectif</strong>. Alimentation au choix :
-        saisie manuelle, import Excel, ou <strong>calcul automatique</strong> depuis un autre module.
-      </p>
+      <>
+        <p>
+          Un KPI est une valeur suivie dans le temps, comparée à un <strong>objectif</strong>. Alimentation au choix :
+          saisie manuelle, import Excel, ou <strong>calcul automatique</strong> depuis un autre module.
+        </p>
+        <p>
+          Un KPI peut porter plusieurs <strong>séries</strong> (courbes) : menu ⋮ de la carte → « Séries (courbes) ». À
+          partir de <strong>deux séries</strong>, choisissez pour chacune : garder l'<strong>unité</strong>, l'
+          <strong>objectif cible</strong> et le <strong>sens de l'objectif</strong> du KPI (<strong>global</strong>), ou
+          les définir à part (<strong>propre à la série</strong>) si elle ne se mesure pas comme les autres. Chaque série
+          est alors comparée à son propre objectif.
+        </p>
+      </>
     ),
     example:
       "« Taux de livraison à l'heure », objectif ≥ 95 %, relevé chaque mois → la courbe affiche 92 % en mars, sous l'objectif, on creuse.",
