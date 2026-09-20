@@ -29,6 +29,7 @@ import {
   ShieldAlert,
   Trash2,
   Truck,
+  Users,
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -62,6 +63,9 @@ const TYPE_CONFIG = {
   risk: { label: 'Risque', icon: ShieldAlert, className: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
   supplier: { label: 'Fournisseur', icon: Truck, className: 'bg-teal-100 text-teal-700', dot: 'bg-teal-500' },
   pdca: { label: 'PDCA', icon: RefreshCw, className: 'bg-fuchsia-100 text-fuchsia-700', dot: 'bg-fuchsia-500' },
+  // Action décidée en revue de direction (voir fetchReviewActionItems, services/planningItems.js) : sans cette
+  // entrée, TYPE_CONFIG[item.type] vaudrait undefined et ferait planter toute la page (voir le bug PDCA ci-dessus).
+  review_action: { label: 'Revue de direction', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
 };
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];

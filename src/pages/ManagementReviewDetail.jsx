@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { ArrowLeft, ClipboardCheck, Minus, Pencil, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
+import { ArrowLeft, ClipboardCheck, Minus, Pencil, Plus, RefreshCw, Sparkles, Trash2, TrendingDown, TrendingUp, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
+import { useTenant } from '../lib/useTenant.js';
+import { getPdfDownload, getPdfAndSaveToDrive, getWordDownload, getXlsxDownload } from '../lib/pdfExport.js';
+import { ACTION_STATUS_OPTIONS, buildPreviousActionsText } from '../lib/managementReviewActions.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { REVIEW_STATUS_LABELS } from '../lib/managementReviewStatus.js';
@@ -15,6 +18,10 @@ import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
+import PreviousReviewBlock from '../components/managementReview/PreviousReviewBlock.jsx';
+import ReviewActionCard from '../components/managementReview/ReviewActionCard.jsx';
+import ReviewAiDraftModal from '../components/managementReview/ReviewAiDraftModal.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -583,8 +590,16 @@ export default function ManagementReviewDetail() {
   const navigate = useNavigate();
   const goBack = useSmartBack('/management-reviews');
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [review, setReview] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const [isAiDraftOpen, setIsAiDraftOpen] = useState(false);
+  const [applyingPrevious, setApplyingPrevious] = useState(false);
   const users = useUsers();
   const [services, setServices] = useState([]);
   const [priorityDelays, setPriorityDelays] = useState(null);
@@ -592,7 +607,7 @@ export default function ManagementReviewDetail() {
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
-  const [actionDescription, setActionDescription] = useState('');
+  const [actionForm, setActionForm] = useState({ description: '', owner: '', due_date: '', status: 'open' });
   const [actionError, setActionError] = useState('');
   const [submittingAction, setSubmittingAction] = useState(false);
   const [capaModalAction, setCapaModalAction] = useState(null);
@@ -659,16 +674,73 @@ export default function ManagementReviewDetail() {
     setActionError('');
     setSubmittingAction(true);
     try {
-      const { data } = await api.post(`/management-reviews/${id}/actions`, { description: actionDescription });
+      const { data } = await api.post(`/management-reviews/${id}/actions`, {
+        description: actionForm.description,
+        owner: actionForm.owner || undefined,
+        due_date: actionForm.due_date || undefined,
+        status: actionForm.status,
+      });
       setReview((prev) => ({ ...prev, actions: [...prev.actions, data] }));
       setIsActionModalOpen(false);
-      setActionDescription('');
+      setActionForm({ description: '', owner: '', due_date: '', status: 'open' });
     } catch (err) {
       setActionError(err.response?.data?.error || "Impossible d'ajouter cette action.");
     } finally {
       setSubmittingAction(false);
     }
   }
+
+  // Responsable, échéance ou statut modifiés depuis la carte : enregistré immédiatement.
+  async function handlePatchAction(actionId, patch) {
+    setError('');
+    try {
+      const { data } = await api.patch(`/management-reviews/${id}/actions/${actionId}`, patch);
+      setReview((prev) => ({ ...prev, actions: prev.actions.map((a) => (a.id === actionId ? data : a)) }));
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'enregistrer la modification de l'action.");
+    }
+  }
+
+  // Reporte l'état des actions de la revue précédente dans la rubrique écrite (exigée à la clôture, §9.3.2 a).
+  async function handleApplyPrevious() {
+    if (review.previous_actions_status && !window.confirm('Remplacer le suivi déjà saisi par l\'état actuel des actions de la revue précédente ?')) return;
+    setApplyingPrevious(true);
+    setError('');
+    try {
+      const { data } = await api.patch(`/management-reviews/${id}`, { previous_actions_status: buildPreviousActionsText(review.previous_review) });
+      setReview((prev) => ({ ...prev, ...data }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de reporter le suivi des actions.');
+    } finally {
+      setApplyingPrevious(false);
+    }
+  }
+
+  function handleAiApplied({ updated, createdActions }) {
+    setReview((prev) => ({ ...prev, ...(updated || {}), actions: [...prev.actions, ...createdActions] }));
+    setIsAiDraftOpen(false);
+  }
+
+  // Trois exports DÉDIÉS générés côté serveur (services/managementReviewPdf.js, ...Word.js, ...Xlsx.js) : le
+  // compte rendu de la revue, pas le tableau générique de la liste.
+  const exportFilename = (extension) => `revue-de-direction-${review.title.toLowerCase().replace(/\s+/g, '-')}.${extension}`;
+
+  async function runExport(setBusy, action, failureMessage) {
+    setBusy(true);
+    setExportError('');
+    try {
+      await action();
+    } catch (err) {
+      setExportError(err.response?.data?.error || failureMessage);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const handleExportPdf = () => runExport(setExportingPdf, () => getPdfDownload(`/management-reviews/${id}/pdf`, exportFilename('pdf')), "Impossible d'exporter cette revue en PDF.");
+  const handleExportXlsx = () => runExport(setExportingXlsx, () => getXlsxDownload(`/management-reviews/${id}/xlsx`, {}, exportFilename('xlsx')), 'Impossible de générer le fichier Excel.');
+  const handleExportWord = () => runExport(setExportingWord, () => getWordDownload(`/management-reviews/${id}/word`, exportFilename('docx')), 'Impossible de générer le document Word.');
+  const handleExportDrive = () => runExport(setExportingDrive, () => getPdfAndSaveToDrive(`/management-reviews/${id}/pdf`, 'REVDIR', review.title), "Impossible d'enregistrer sur le Drive.");
 
   async function handleDeleteAction(action) {
     if (!window.confirm('Supprimer cette action ?')) return;
@@ -712,6 +784,16 @@ export default function ManagementReviewDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{review.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportMenu
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           {canManage ? (
             <select
               value={review.status}
@@ -750,6 +832,7 @@ export default function ManagementReviewDetail() {
         </div>
       </div>
       <PageGuide id="managementReviewDetail" />
+      {exportError && <p className="mt-2 text-xs text-red-600">{exportError}</p>}
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
@@ -776,6 +859,28 @@ export default function ManagementReviewDetail() {
       {review.snapshot && (
         <div className="mt-4">
           <SnapshotBlock snapshot={review.snapshot} />
+        </div>
+      )}
+
+      {review.previous_review && (
+        <div className="mt-4">
+          <PreviousReviewBlock previousReview={review.previous_review} canApply={canManage} onApply={handleApplyPrevious} applying={applyingPrevious} />
+        </div>
+      )}
+
+      {canManage && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50/50 p-3 sm:p-4">
+          <p className="min-w-0 text-sm text-slate-700">
+            <span className="font-medium text-slate-900">Brouillon IA :</span> conclusions, opportunités d'amélioration et décisions proposées d'après les données d'entrée.
+          </p>
+          <button
+            type="button"
+            onClick={() => setIsAiDraftOpen(true)}
+            className="flex shrink-0 items-center gap-1.5 rounded-md border border-violet-300 bg-white px-3 py-2 text-sm font-medium text-violet-700 hover:bg-violet-50"
+          >
+            <Sparkles size={15} />
+            Générer un brouillon
+          </button>
         </div>
       )}
 
@@ -809,42 +914,15 @@ export default function ManagementReviewDetail() {
       ) : (
         <div className="mt-3 space-y-2">
           {review.actions.map((action) => (
-            <div key={action.id} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <p className="text-sm text-slate-700">{action.description}</p>
-                {canManage && (
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteAction(action)}
-                    aria-label="Supprimer l'action"
-                    className="shrink-0 p-1 text-slate-400 hover:text-red-600"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                )}
-              </div>
-
-              {action.linked_capa ? (
-                <Link
-                  to={`/capas/${action.linked_capa.id}`}
-                  className="mt-3 inline-flex items-center gap-2 rounded-md border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100"
-                >
-                  <ClipboardCheck size={14} />
-                  Voir la CAPA liée — {action.linked_capa.number}
-                </Link>
-              ) : (
-                canManage && (
-                  <button
-                    type="button"
-                    onClick={() => setCapaModalAction(action)}
-                    className="mt-3 inline-flex items-center gap-2 rounded-md border border-primary px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"
-                  >
-                    <ClipboardCheck size={14} />
-                    Créer une CAPA
-                  </button>
-                )
-              )}
-            </div>
+            <ReviewActionCard
+              key={action.id}
+              action={action}
+              users={users}
+              canManage={canManage}
+              onPatch={handlePatchAction}
+              onDelete={handleDeleteAction}
+              onCreateCapa={setCapaModalAction}
+            />
           ))}
         </div>
       )}
@@ -885,11 +963,52 @@ export default function ManagementReviewDetail() {
                 <AutoTextarea
                   rows={3}
                   required
-                  value={actionDescription}
-                  onChange={(e) => setActionDescription(e.target.value)}
+                  value={actionForm.description}
+                  onChange={(e) => setActionForm((prev) => ({ ...prev, description: e.target.value }))}
                   className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                 />
               </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Responsable</label>
+                <select
+                  value={actionForm.owner}
+                  onChange={(e) => setActionForm((prev) => ({ ...prev, owner: e.target.value }))}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                >
+                  <option value="">Non assigné</option>
+                  {users.map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.full_name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Échéance</label>
+                  <input
+                    type="date"
+                    value={actionForm.due_date}
+                    onChange={(e) => setActionForm((prev) => ({ ...prev, due_date: e.target.value }))}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Statut</label>
+                  <select
+                    value={actionForm.status}
+                    onChange={(e) => setActionForm((prev) => ({ ...prev, status: e.target.value }))}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  >
+                    {ACTION_STATUS_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <p className="text-xs text-slate-400">Avec une échéance, l'action apparaît dans le planning de son responsable.</p>
               <button
                 type="submit"
                 disabled={submittingAction}
@@ -901,6 +1020,8 @@ export default function ManagementReviewDetail() {
           </div>
         </div>
       )}
+
+      {isAiDraftOpen && <ReviewAiDraftModal reviewId={id} review={review} onClose={() => setIsAiDraftOpen(false)} onApplied={handleAiApplied} />}
 
       {capaModalAction && (
         <CreateCapaFromActionModal

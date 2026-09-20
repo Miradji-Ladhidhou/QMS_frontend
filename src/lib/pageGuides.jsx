@@ -364,10 +364,19 @@ export const PAGE_GUIDES = {
   managementReviewDetail: {
     title: 'Contenu de la revue de direction',
     body: (
-      <p>
-        Passez en revue les <strong>entrées</strong> requises, puis enregistrez les <strong>décisions</strong> et les{' '}
-        <strong>actions</strong> avec leurs responsables et leurs échéances.
-      </p>
+      <>
+        <p>
+          Passez en revue les <strong>entrées</strong> requises, puis enregistrez les <strong>décisions</strong> et les{' '}
+          <strong>actions</strong> avec leurs responsables et leurs échéances.
+        </p>
+        <p>
+          Chaque action a un <strong>responsable</strong>, une <strong>échéance</strong> (elle apparaît alors dans le planning) et un{' '}
+          <strong>statut</strong> ; une action dont la CAPA liée est clôturée est comptée réalisée. La revue reprend seule les{' '}
+          <strong>actions de la revue précédente</strong> et leur état : « Reporter dans le suivi écrit » remplit la rubrique exigée à la
+          clôture. Le bouton <strong>Générer un brouillon</strong> propose conclusions, opportunités et décisions d'après les chiffres de la
+          période (vous relisez avant d'appliquer). <strong>Exporter</strong> produit le compte rendu en PDF, Word, Excel ou sur le Drive.
+        </p>
+      </>
     ),
     example: "entrée « 12 réclamations cette année, +30 % » → décision « renforcer le contrôle réception » → action pour le responsable qualité, échéance fin de trimestre.",
   },
