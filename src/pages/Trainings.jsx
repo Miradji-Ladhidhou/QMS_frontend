@@ -54,6 +54,7 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import QuizEditorModal from '../components/trainingQuiz/QuizEditorModal.jsx';
 import SendQuizModal from '../components/trainingQuiz/SendQuizModal.jsx';
+import InstructorSignatureField from '../components/trainingQuiz/InstructorSignatureField.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const TRAINING_RESOURCE_TYPE = 'training';
@@ -508,7 +509,7 @@ function NewTrainingModal({ users, employees, onClose, onCreated }) {
   );
 }
 
-function EditTrainingModal({ training, users, employees, onClose, onUpdated }) {
+function EditTrainingModal({ training, users, employees, onClose, onUpdated, onSignatureChanged }) {
   const [form, setForm] = useState({
     title: training.title,
     type: training.type || '',
@@ -653,6 +654,8 @@ function EditTrainingModal({ training, users, employees, onClose, onUpdated }) {
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
+
+          <InstructorSignatureField training={training} onChanged={onSignatureChanged} />
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Objet / contenu de la formation</label>
@@ -1394,11 +1397,26 @@ export default function Trainings() {
     }
   }
 
+  // Relit les réalisations de cette formation : une personne peut avoir passé son QCM depuis
+  // l'ouverture de la page (la réalisation passe alors à réussie/non réussie côté serveur).
+  async function refreshTrainingRecords(trainingId) {
+    try {
+      const { data } = await api.get('/trainings');
+      const fresh = data.find((item) => item.id === trainingId);
+      if (fresh) setTrainings((prev) => prev.map((item) => (item.id === trainingId ? { ...item, records: fresh.records } : item)));
+    } catch {
+      // Simple rafraîchissement : les données déjà affichées restent valables.
+    }
+  }
+
   function handleToggleExpand(training) {
     const opening = expandedId !== training.id;
     setExpandedId(opening ? training.id : null);
-    if (opening && canManage && training.quiz && attemptsByTraining[training.id] === undefined) {
+    // À chaque ouverture (pas seulement la première) : les résultats arrivent sans action de
+    // l'administrateur, il ne doit pas lire un état périmé.
+    if (opening && canManage && training.quiz) {
       loadQuizAttempts(training.id);
+      refreshTrainingRecords(training.id);
     }
   }
 
@@ -2115,6 +2133,9 @@ export default function Trainings() {
           employees={employees}
           onClose={() => setEditingTraining(null)}
           onUpdated={handleTrainingUpdated}
+          onSignatureChanged={(hasSignature) =>
+            setTrainings((prev) => prev.map((item) => (item.id === editingTraining.id ? { ...item, has_instructor_signature: hasSignature } : item)))
+          }
         />
       )}
 

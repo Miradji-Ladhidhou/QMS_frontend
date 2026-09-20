@@ -74,7 +74,9 @@ export const PAGE_GUIDES = {
           chaque personne un lien par email <strong>valable 48 h</strong> (pour un salarié sans compte, saisissez son email à
           l'envoi). Elle saisit son email, lit le résumé, répond au QCM, et la réalisation passe automatiquement à{' '}
           <strong>réussie ou non</strong>. Le bouton « QCM Word » exporte le détail (questions, réponses, taux de réussite) à
-          conserver pour les audits.
+          conserver pour les audits : il reprend l'<strong>objet et le contenu</strong> de la formation, porte la{' '}
+          <strong>signature du salarié</strong> (dessinée à l'écran avant de valider) et, si le QCM est réussi, la{' '}
+          <strong>signature électronique du formateur</strong> — à enregistrer une fois dans « Modifier la formation ».
         </p>
       </>
     ),

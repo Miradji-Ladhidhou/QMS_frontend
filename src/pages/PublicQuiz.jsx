@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { AlertCircle, CheckCircle2, Clock, Lock, XCircle } from 'lucide-react';
 import { publicApi } from '../lib/publicApi.js';
 import AppLogo from '../components/AppLogo.jsx';
+import SignaturePad from '../components/SignaturePad.jsx';
 
 const INPUT_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-3 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -66,8 +67,25 @@ export default function PublicQuiz() {
   const [content, setContent] = useState(null);
   const [answers, setAnswers] = useState({});
   const [result, setResult] = useState(null);
+  const [signature, setSignature] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  // Le jeton est dans l'adresse : ni indexation par un moteur de recherche, ni transmission dans
+  // l'en-tête Referer si la personne suit un lien sortant.
+  useEffect(() => {
+    const tags = [
+      ['robots', 'noindex, nofollow'],
+      ['referrer', 'no-referrer'],
+    ].map(([name, content]) => {
+      const tag = document.createElement('meta');
+      tag.name = name;
+      tag.content = content;
+      document.head.appendChild(tag);
+      return tag;
+    });
+    return () => tags.forEach((tag) => tag.remove());
+  }, []);
 
   useEffect(() => {
     publicApi
@@ -118,6 +136,7 @@ export default function PublicQuiz() {
   const questions = content?.questions || [];
   const answeredCount = useMemo(() => questions.filter((question) => (answers[question.id] || []).length > 0).length, [questions, answers]);
   const allAnswered = questions.length > 0 && answeredCount === questions.length;
+  const canSubmit = allAnswered && Boolean(signature);
 
   function selectOption(question, optionId) {
     setAnswers((prev) => {
@@ -128,12 +147,12 @@ export default function PublicQuiz() {
   }
 
   async function handleSubmit() {
-    if (!allAnswered) return;
+    if (!canSubmit) return;
     if (!window.confirm('Valider vos réponses ? Vous ne pourrez plus les modifier.')) return;
     setError('');
     setBusy(true);
     try {
-      const { data } = await publicApi.post(`/quiz/${token}/submit`, { email, answers });
+      const { data } = await publicApi.post(`/quiz/${token}/submit`, { email, answers, signature });
       setResult(data);
       setPhase('result');
     } catch (err) {
@@ -257,19 +276,28 @@ export default function PublicQuiz() {
           ))}
         </div>
 
+        <div className="mt-5 rounded-lg border border-slate-200 p-4">
+          <p className="text-sm font-semibold text-slate-800">Votre signature</p>
+          <p className="mb-2 mt-0.5 text-xs text-slate-500">
+            En signant, je certifie avoir répondu personnellement à ce QCM. Elle figurera sur le compte rendu conservé par votre entreprise.
+          </p>
+          <SignaturePad onChange={setSignature} disabled={busy} />
+        </div>
+
         {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
         <div className="sticky bottom-0 -mx-5 mt-5 border-t border-slate-100 bg-white px-5 pb-1 pt-3 sm:-mx-7 sm:px-7">
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={!allAnswered || busy}
+            disabled={!canSubmit || busy}
             className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-50"
           >
             {busy ? 'Envoi...' : 'Valider mes réponses'}
           </button>
           <p className="mt-1.5 text-center text-xs text-slate-400">
             {answeredCount} / {questions.length} question{questions.length > 1 ? 's' : ''} répondue{answeredCount > 1 ? 's' : ''}
+            {allAnswered && !signature && ' · signature manquante'}
           </p>
         </div>
       </Shell>
