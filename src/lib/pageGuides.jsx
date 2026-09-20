@@ -305,10 +305,19 @@ export const PAGE_GUIDES = {
   auditDetail: {
     title: "Déroulé d'un audit",
     body: (
-      <p>
-        <strong>Planifié → En cours → Terminé.</strong> Consignez chaque <strong>constat</strong> avec son type ; un
-        constat de type non-conformité peut être transformé en CAPA depuis la fiche.
-      </p>
+      <>
+        <p>
+          <strong>Planifié → En cours → Terminé.</strong> Consignez chaque <strong>constat</strong> avec son type ; un
+          constat de type non-conformité peut être transformé en CAPA depuis la fiche.
+        </p>
+        <p>
+          <strong>Check-list (QCM) :</strong> préparez les questions de l'audit — saisies une à une, collées en liste, ou{' '}
+          <strong>générées par l'IA</strong> d'après le périmètre de l'audit (vous relisez et corrigez avant d'ajouter). Pendant l'audit,
+          répondez <strong>Conforme</strong>, <strong>Non conforme</strong> ou <strong>Sans objet</strong> avec une observation : le{' '}
+          <strong>taux de conformité</strong> se calcule tout seul. Le bouton <strong>Exporter</strong> produit la fiche PDF (avec la
+          qualification de l'auditeur), Excel, Word ou l'enregistre sur le Drive.
+        </p>
+      </>
     ),
     example: "constat « procédure d'achat non appliquée » classé « non-conformité mineure » → bouton « Créer une CAPA ».",
   },

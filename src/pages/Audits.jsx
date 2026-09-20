@@ -27,7 +27,8 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import AuditorQualification from '../components/AuditorQualification.jsx';
 import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
-import { QUALIFICATION_LABELS, qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
+import { qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
+import { buildAuditExportColumns, buildAuditExportRows } from '../lib/auditExport.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const AUDIT_RESOURCE_TYPE = 'audit';
@@ -345,39 +346,9 @@ export default function Audits() {
     navigate(`/audits/${audit.id}`);
   }
 
-  // width uniquement pour le PDF (forPdf) — Excel/Word/CSV n'ont pas cette contrainte de
-  // largeur imprimée (voir listReportXlsx.js/listReportWord.js, qui l'ignorent de toute façon).
-  function buildExportColumns({ forPdf } = {}) {
-    return [
-      { key: 'title', label: 'Titre', width: forPdf ? 0.2 : undefined },
-      { key: 'type', label: 'Type', width: forPdf ? 0.1 : undefined },
-      { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
-      { key: 'scope', label: 'Périmètre', width: forPdf ? 0.16 : undefined },
-      { key: 'service', label: 'Service', width: forPdf ? 0.1 : undefined },
-      { key: 'auditor', label: 'Auditeur', width: forPdf ? 0.1 : undefined },
-      { key: 'auditor_qualification', label: 'Qualification auditeur', width: forPdf ? 0.1 : undefined },
-      { key: 'planned_date', label: 'Date planifiée', width: forPdf ? 0.1 : undefined },
-      { key: 'completed_date', label: 'Date réalisée', width: forPdf ? 0.1 : undefined },
-      { key: 'conclusion', label: 'Conclusion', width: forPdf ? 0.16 : undefined },
-      { key: 'category', label: 'Dossier', width: forPdf ? 0.1 : undefined },
-    ];
-  }
-
-  function buildExportRows(source) {
-    return source.map((audit) => ({
-      title: audit.title,
-      type: AUDIT_TYPE_LABELS[audit.audit_type] || audit.audit_type,
-      status: AUDIT_STATUS_LABELS[audit.status] || audit.status,
-      scope: audit.scope || '',
-      service: audit.service?.name || '',
-      auditor: audit.lead?.full_name || '',
-      auditor_qualification: audit.lead_auditor && qualifications.trainings.length > 0 ? QUALIFICATION_LABELS[qualificationOf(qualifications.byUser, audit.lead_auditor).status] : '',
-      planned_date: formatDate(audit.planned_date),
-      completed_date: formatDate(audit.completed_date),
-      conclusion: audit.conclusion || '',
-      category: audit.category?.name || '',
-    }));
-  }
+  // Colonnes/lignes partagées avec la fiche d'un audit (lib/auditExport.js).
+  const buildExportColumns = buildAuditExportColumns;
+  const buildExportRows = (source) => buildAuditExportRows(source, qualifications);
 
   async function handleExportPdf(scopeIds) {
     const source = scopeIds ? audits.filter((audit) => scopeIds.includes(audit.id)) : audits;

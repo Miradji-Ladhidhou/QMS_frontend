@@ -4,6 +4,8 @@ import { useSmartBack } from '../lib/useSmartBack.js';
 import { AlertTriangle, ArrowLeft, ClipboardCheck, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
+import { useTenant } from '../lib/useTenant.js';
+import { getPdfDownload, getPdfAndSaveToDrive, getWordDownload, getXlsxDownload } from '../lib/pdfExport.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { AUDIT_STATUS_LABELS, AUDIT_TYPE_LABELS } from '../lib/auditStatus.js';
@@ -15,6 +17,8 @@ import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
+import AuditChecklist from '../components/AuditChecklist.jsx';
 import AuditorQualification from '../components/AuditorQualification.jsx';
 import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
 import { qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
@@ -244,8 +248,14 @@ export default function AuditDetail() {
   const navigate = useNavigate();
   const goBack = useSmartBack('/audits');
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [audit, setAudit] = useState(null);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportingDrive, setExportingDrive] = useState(false);
+  const [exportError, setExportError] = useState('');
   const users = useUsers();
   const qualifications = useAuditorQualifications();
   const [services, setServices] = useState([]);
@@ -269,6 +279,39 @@ export default function AuditDetail() {
       setError('Impossible de charger cet audit.');
     } finally {
       setLoading(false);
+    }
+  }
+
+  // Trois exports DÉDIÉS générés côté serveur (services/auditPdf.js, auditWord.js, auditXlsx.js) : la
+  // fiche complète — faits, qualification de l'auditeur, périmètre, conclusion, constats et check-list —
+  // plutôt que le tableau générique d'une ligne, illisible dès que la check-list est longue.
+  const exportFilename = (extension) => `audit-${audit.title.toLowerCase().replace(/\s+/g, '-')}.${extension}`;
+
+  async function runExport(setBusy, action, failureMessage) {
+    setBusy(true);
+    setExportError('');
+    try {
+      await action();
+    } catch {
+      setExportError(failureMessage);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const handleExportPdf = () => runExport(setExportingPdf, () => getPdfDownload(`/audits/${id}/pdf`, exportFilename('pdf')), "Impossible d'exporter cet audit en PDF.");
+  const handleExportXlsx = () => runExport(setExportingXlsx, () => getXlsxDownload(`/audits/${id}/xlsx`, {}, exportFilename('xlsx')), 'Impossible de générer le fichier Excel.');
+  const handleExportWord = () => runExport(setExportingWord, () => getWordDownload(`/audits/${id}/word`, exportFilename('docx')), 'Impossible de générer le document Word.');
+
+  async function handleExportDrive() {
+    setExportingDrive(true);
+    setExportError('');
+    try {
+      await getPdfAndSaveToDrive(`/audits/${id}/pdf`, 'AUDIT', audit.title);
+    } catch (err) {
+      setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
+    } finally {
+      setExportingDrive(false);
     }
   }
 
@@ -360,6 +403,16 @@ export default function AuditDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{audit.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportMenu
+            onExportPdf={handleExportPdf}
+            exportingPdf={exportingPdf}
+            onExportXlsx={handleExportXlsx}
+            exportingXlsx={exportingXlsx}
+            onExportWord={handleExportWord}
+            exportingWord={exportingWord}
+            onExportDrive={tenant?.storage_provider === 'google_drive' ? handleExportDrive : undefined}
+            exportingDrive={exportingDrive}
+          />
           {canManage ? (
             <select
               value={audit.status}
@@ -398,6 +451,7 @@ export default function AuditDetail() {
         </div>
       </div>
       <PageGuide id="auditDetail" />
+      {exportError && <p className="mt-2 text-xs text-red-600">{exportError}</p>}
 
       {audit.lead_auditor && !qualifications.loading && qualifications.trainings.length > 0 && qualificationOf(qualifications.byUser, audit.lead_auditor).status !== 'qualified' && (
         <div className="mt-3 flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
@@ -454,6 +508,8 @@ export default function AuditDetail() {
           </div>
         )}
       </div>
+
+      <AuditChecklist auditId={audit.id} canManage={canManage} />
 
       <div className="mt-6 flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Constats ({audit.findings.length})</h2>
