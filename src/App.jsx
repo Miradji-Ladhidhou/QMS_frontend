@@ -8,6 +8,7 @@ import { UsersProvider } from './lib/UsersProvider.jsx';
 import Layout from './components/Layout.jsx';
 import Landing from './pages/Landing.jsx';
 import Login from './pages/Login.jsx';
+import Register from './pages/Register.jsx';
 import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import LegalTerms from './pages/LegalTerms.jsx';
@@ -181,11 +182,10 @@ export default function App() {
         ) : (
           <Routes>
             <Route path="/login" element={<Login />} />
-            {/* Inscription publique retirée : la création de compte passe désormais par le
-                super admin (voir SuperAdmin.jsx#CreateTenantModal). Même cible que le
-                catch-all "*" ci-dessous et que la redirection déjà en place côté arbre
-                authentifié, pour un lien/bookmark existant vers /register. */}
-            <Route path="/register" element={<Navigate to="/" replace />} />
+            {/* Pas d'inscription en libre-service : la création de compte reste un geste du
+                super admin (voir SuperAdmin.jsx#CreateTenantModal) — cette page statique
+                explique la marche à suivre (email pré-rempli), même principe que TeamOff. */}
+            <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/legal/cgu" element={<LegalTerms />} />

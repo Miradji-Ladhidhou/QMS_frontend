@@ -113,14 +113,19 @@ export default function Landing() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Inscription publique retirée (accès sur invitation uniquement, voir
-                SuperAdmin.jsx#CreateTenantModal) : plus qu'un seul bouton, promu en style
-                principal puisque c'est désormais la seule action de cet en-tête. */}
             <Link
               to="/login"
-              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:px-4"
+              className="rounded-md px-3 py-2 text-sm font-medium text-slate-600 hover:text-primary sm:px-4"
             >
               Se connecter
+            </Link>
+            {/* Pas d'inscription en libre-service : /register est une page statique qui
+                explique comment demander l'accès (même principe que TeamOff). */}
+            <Link
+              to="/register"
+              className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:px-4"
+            >
+              Demander un accès
             </Link>
           </div>
         </div>
@@ -140,14 +145,18 @@ export default function Landing() {
               tableurs éparpillés ni relances par email.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              {/* Même raisonnement que l'en-tête : plus qu'un seul bouton, promu en style
-                  principal (inscription publique retirée). */}
               <Link
-                to="/login"
+                to="/register"
                 className="flex items-center justify-center gap-2 rounded-md bg-primary px-5 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700"
               >
-                Se connecter
+                Demander un accès
                 <ArrowRight size={16} />
+              </Link>
+              <Link
+                to="/login"
+                className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-5 py-3 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+              >
+                Se connecter
               </Link>
             </div>
           </div>
@@ -193,14 +202,14 @@ export default function Landing() {
               <h2 className="text-xl font-semibold text-white sm:text-2xl">Prêt à faire le tri dans votre qualité ?</h2>
               <p className="mt-2 flex items-center gap-1.5 text-sm text-white/80">
                 <CheckCircle2 size={16} />
-                Accès sur invitation — contactez-nous pour créer votre compte.
+                Accès sur demande — sans engagement.
               </p>
             </div>
             <Link
-              to="/login"
+              to="/register"
               className="flex items-center justify-center gap-2 whitespace-nowrap rounded-md bg-white px-5 py-3 text-sm font-medium text-primary transition-colors hover:bg-primary-50"
             >
-              Se connecter
+              Demander un accès
               <ArrowRight size={16} />
             </Link>
           </div>

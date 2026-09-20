@@ -112,6 +112,12 @@ export default function Login() {
           </button>
         </form>
 
+        <p className="mt-6 text-center text-sm text-slate-600">
+          Pas encore de compte ?{' '}
+          <Link to="/register" className="text-primary font-medium hover:underline">
+            Demander un accès
+          </Link>
+        </p>
       </div>
     </div>
   );
