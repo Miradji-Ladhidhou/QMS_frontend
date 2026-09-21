@@ -4,6 +4,8 @@ import { api } from '../lib/api.js';
 import { ASSIGNABLE_ROLES, ROLE_LABELS } from '../lib/roles.js';
 import { useSort } from '../lib/useSort.js';
 import SortSelect from './SortSelect.jsx';
+import JobTitleField, { JobTitleDatalist } from './JobTitleField.jsx';
+import { useJobTitles } from '../lib/useJobTitles.js';
 
 const USER_SORT_OPTIONS = [
   { key: 'full_name', label: 'nom' },
@@ -17,12 +19,13 @@ const USER_SORT_OPTIONS = [
 // cache partagé (utilisé en lecture seule par une vingtaine de menus déroulants "assigné à"
 // ailleurs dans l'appli) ne reste pas périmé après un invite/changement de rôle/suppression.
 export default function UserManager({ currentUser, isAdmin }) {
+  const { job_titles: knownJobTitles } = useJobTitles(isAdmin);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingId, setUpdatingId] = useState(null);
   const [isInviting, setIsInviting] = useState(false);
-  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'member' });
+  const [inviteForm, setInviteForm] = useState({ email: '', full_name: '', role: 'member', job_title: '' });
   const [inviteError, setInviteError] = useState('');
   const [inviteSuccess, setInviteSuccess] = useState('');
   const [submittingInvite, setSubmittingInvite] = useState(false);
@@ -79,7 +82,7 @@ export default function UserManager({ currentUser, isAdmin }) {
       setUsers((prev) => prev.map((item) => (item.id === user.id ? { ...item, ...data } : item)));
       window.dispatchEvent(new Event('users-updated'));
     } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de mettre à jour la fonction.');
+      setError(err.response?.data?.error || 'Impossible de mettre à jour le poste.');
     } finally {
       setUpdatingId(null);
     }
@@ -145,15 +148,15 @@ export default function UserManager({ currentUser, isAdmin }) {
     setSubmittingInvite(true);
 
     try {
-      const { data } = await api.post('/users/invite', inviteForm);
+      const { data } = await api.post('/users/invite', { ...inviteForm, job_title: inviteForm.job_title.trim() || undefined });
       setUsers((prev) =>
         [
           ...prev,
-          { id: data.id, full_name: data.full_name, role: data.role, email: data.email, is_active: true, invitation_pending: true },
+          { id: data.id, full_name: data.full_name, role: data.role, job_title: data.job_title, email: data.email, is_active: true, invitation_pending: true },
         ].sort((a, b) => a.full_name.localeCompare(b.full_name))
       );
       setInviteSuccess(`Invitation envoyée à ${data.email}.`);
-      setInviteForm({ email: '', full_name: '', role: 'member' });
+      setInviteForm({ email: '', full_name: '', role: 'member', job_title: '' });
       setIsInviting(false);
       window.dispatchEvent(new Event('users-updated'));
     } catch (err) {
@@ -171,6 +174,7 @@ export default function UserManager({ currentUser, isAdmin }) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+      <JobTitleDatalist id="user-job-titles" jobTitles={knownJobTitles} />
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Utilisateurs</h2>
         {isAdmin && !isInviting && (
@@ -232,6 +236,7 @@ export default function UserManager({ currentUser, isAdmin }) {
               </select>
             </div>
           </div>
+          <JobTitleField value={inviteForm.job_title} onChange={(value) => setInviteForm((prev) => ({ ...prev, job_title: value }))} />
           <div className="flex gap-2">
             <button
               type="submit"
@@ -307,9 +312,11 @@ export default function UserManager({ currentUser, isAdmin }) {
                       defaultValue={user.job_title || ''}
                       onBlur={(e) => handleJobTitleBlur(user, e.target.value)}
                       disabled={isBusy}
-                      placeholder="Fonction"
-                      title="Fonction (affichée sur la fiche de participation aux formations)"
-                      className="w-28 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
+                      list="user-job-titles"
+                      placeholder="Poste"
+                      title="Poste : détermine les formations obligatoires (Formations > Postes concernés) et figure sur la fiche de participation"
+                      aria-label={`Poste de ${user.full_name}`}
+                      className="w-36 rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:opacity-60"
                     />
                   )}
 

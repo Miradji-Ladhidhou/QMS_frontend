@@ -9,6 +9,7 @@ import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/pdfExport.js';
 import FolderTile from '../components/FolderTile.jsx';
 import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
+import JobTitleField from '../components/JobTitleField.jsx';
 import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import NewFolderModal from '../components/NewFolderModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
@@ -107,16 +108,7 @@ function EmployeeModal({ employee, onClose, onSaved }) {
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Fonction (optionnel)</label>
-            <input
-              type="text"
-              placeholder="Affichée sur la fiche de participation aux formations"
-              value={jobTitle}
-              onChange={(e) => setJobTitle(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
+          <JobTitleField value={jobTitle} onChange={setJobTitle} />
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Dossier</label>
@@ -362,7 +354,7 @@ export default function Employees() {
   function buildExportColumns({ forPdf } = {}) {
     return [
       { key: 'full_name', label: 'Nom complet', width: forPdf ? 0.28 : undefined },
-      { key: 'job_title', label: 'Fonction', width: forPdf ? 0.24 : undefined },
+      { key: 'job_title', label: 'Poste', width: forPdf ? 0.24 : undefined },
       { key: 'email', label: 'Email', width: forPdf ? 0.26 : undefined },
       { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
       { key: 'training_exempt', label: 'Dispensé de formation', width: forPdf ? 0.12 : undefined },
