@@ -9,6 +9,7 @@ const TOGGLE_LABELS = {
   email_task_due: 'Tâches à échéance',
   email_procedure_review: 'Procédures à réviser',
   email_risk_review: 'Risques à revoir',
+  email_supplier_alerts: 'Fournisseurs (évaluation à faire, certificat qui expire)',
   email_haccp_alerts: 'Alertes HACCP (relevés en retard, dérives, revue du plan)',
 };
 

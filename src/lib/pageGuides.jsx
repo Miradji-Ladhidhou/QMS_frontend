@@ -208,6 +208,20 @@ export const PAGE_GUIDES = {
         <strong>(re)qualification</strong>.
       </p>
     ),
+    more: (
+      <>
+        <p>
+          La <strong>synthèse</strong> en tête de page signale ce qui demande une action : évaluations en retard, fournisseurs jamais évalués (surtout
+          les critiques), surveillance qui dure depuis plus de 6 mois, certificats à renouveler. Chaque compteur filtre la liste ; le{' '}
+          <strong>classement</strong> range les fournisseurs par note.
+        </p>
+        <p>
+          La prochaine évaluation est <strong>datée automatiquement</strong> après chaque évaluation, selon la criticité (par exemple tous les 6 mois pour
+          un fournisseur critique), et le responsable du suivi est prévenu 30 jours avant, 7 jours avant, le jour même puis chaque semaine de retard. L'admin règle
+          le rythme, les <strong>seuils de décision</strong> et le <strong>poids des critères</strong> avec « Réglages ».
+        </p>
+      </>
+    ),
     example:
       "« Emballages Martin » évalué chaque année : qualité 18/20, délais 15/20, réactivité 16/20 → maintenu. Sous 12/20 → plan de progrès ou changement de fournisseur.",
   },
@@ -427,6 +441,20 @@ export const PAGE_GUIDES = {
         Notez le fournisseur sur les critères retenus : la <strong>note globale</strong> et le statut de qualification en
         découlent. Ré-évaluez à la fréquence définie.
       </p>
+    ),
+    more: (
+      <>
+        <p>
+          La <strong>note globale est pondérée</strong> : chaque critère compte selon son poids pour la criticité du fournisseur (réglages de l'admin), et
+          ces poids sont conservés avec l'évaluation. L'application <strong>propose la décision</strong> d'après des seuils ; s'en écarter en étant plus
+          indulgent exige un commentaire. « À remplacer » suspend automatiquement le fournisseur.
+        </p>
+        <p>
+          La <strong>courbe</strong> montre l'évolution des quatre critères et de la note globale face aux seuils. <strong>Certificats et pièces</strong> :
+          ajoutez un certificat ISO, un agrément sanitaire ou une assurance avec sa date d'expiration (fichier facultatif) — vous êtes prévenu avant
+          l'échéance. <strong>Exporter</strong> produit la fiche du fournisseur en PDF ou Word, pièce d'audit.
+        </p>
+      </>
     ),
     example: "qualité 16, délais 12, réactivité 14 → note globale 14/20 → statut « qualifié sous surveillance ».",
   },

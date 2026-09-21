@@ -4,11 +4,11 @@ import { ArrowDownAZ, ArrowUpAZ } from 'lucide-react';
 // n'ont pas de <thead> sur mobile ni desktop — un select "Trier par" + un bouton de sens.
 export default function SortSelect({ options, sortKey, direction, onChangeKey, onToggleDirection }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex max-w-full items-center gap-2">
       <select
         value={sortKey}
         onChange={(e) => onChangeKey(e.target.value)}
-        className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        className="min-w-0 rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
       >
         {options.map((opt) => (
           <option key={opt.key} value={opt.key}>
