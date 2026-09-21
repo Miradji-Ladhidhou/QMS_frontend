@@ -3710,208 +3710,6 @@ function MoveKpiModal({ kpi, onClose, onMoved }) {
   );
 }
 
-// Catalogue des métriques de module prêtes à l'emploi (§9.1), groupées par module dans des
-// sections pliantes. « Créer » crée un KPI ; cocher plusieurs métriques puis « Créer et
-// comparer » les crée toutes et ouvre le graphique combiné (une courbe / couleur chacune).
-function ModulePresetModal({ folderId, onClose, onCreated, onCompareCreated }) {
-  const [presets, setPresets] = useState(null);
-  const [error, setError] = useState('');
-  const [creatingId, setCreatingId] = useState(null);
-  const [openModule, setOpenModule] = useState(null); // un seul module déplié à la fois
-  const [selected, setSelected] = useState([]); // ids de presets cochés
-  const [bulkCreating, setBulkCreating] = useState(false);
-
-  useEffect(() => {
-    api
-      .get('/kpis/module-presets')
-      .then(({ data }) => setPresets(data))
-      .catch(() => setError('Impossible de charger le catalogue.'));
-  }, []);
-
-  function toggle(id) {
-    setSelected((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
-  }
-
-  async function handleCreate(preset) {
-    setCreatingId(preset.id);
-    setError('');
-    try {
-      await api.post('/kpis/from-module-preset', { preset_id: preset.id, folder_id: folderId || undefined });
-      onCreated();
-    } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de créer ce KPI.');
-      setCreatingId(null);
-    }
-  }
-
-  async function handleBulkCreateAndCompare() {
-    setBulkCreating(true);
-    setError('');
-    const createdKpis = [];
-    let failures = 0;
-    for (const presetId of selected) {
-      try {
-        const { data } = await api.post('/kpis/from-module-preset', {
-          preset_id: presetId,
-          folder_id: folderId || undefined,
-        });
-        createdKpis.push(data);
-      } catch {
-        failures += 1;
-      }
-    }
-    setBulkCreating(false);
-    if (createdKpis.length >= 2) {
-      onCompareCreated(createdKpis);
-    } else if (createdKpis.length === 1) {
-      onCreated();
-    } else {
-      setError('Aucun indicateur n’a pu être créé.');
-    }
-    if (failures > 0 && createdKpis.length > 0) {
-      setError(`${failures} indicateur(s) n’ont pas pu être créés — les autres sont prêts.`);
-    }
-  }
-
-  const grouped = (presets || []).reduce((acc, p) => {
-    (acc[p.module_label] ||= []).push(p);
-    return acc;
-  }, {});
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="flex max-h-[90vh] w-full flex-col overflow-hidden rounded-t-xl bg-white sm:max-w-2xl sm:rounded-xl">
-        <div className="overflow-y-auto overflow-x-hidden p-5 sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">KPI depuis un module</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
-            <X size={20} />
-          </button>
-        </div>
-
-        <p className="mb-4 text-sm text-slate-500">
-          Suivi automatique de l'efficacité, calculé depuis les données du module choisi (ISO 9001 §9.1). Recalculé chaque
-          nuit et via le bouton « Actualiser ». Coche plusieurs métriques pour les tracer sur un graphique commun.
-        </p>
-
-        {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-
-        {presets === null ? (
-          <div className="space-y-2">
-            {[0, 1, 2].map((k) => (
-              <div key={k} className="h-12 animate-pulse rounded-md bg-slate-100" />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {Object.entries(grouped).map(([moduleLabel, items]) => {
-              const isOpen = openModule === moduleLabel;
-              return (
-                <div key={moduleLabel} className="overflow-hidden rounded-md border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => setOpenModule(isOpen ? null : moduleLabel)}
-                    aria-expanded={isOpen}
-                    className="flex w-full items-center justify-between gap-2 bg-slate-50 px-3 py-2.5 text-left hover:bg-slate-100"
-                  >
-                    <span className="text-sm font-semibold text-slate-800">{moduleLabel}</span>
-                    <span className="flex items-center gap-2">
-                      <span className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-600">
-                        {items.length}
-                      </span>
-                      {isOpen ? (
-                        <ChevronDown size={16} className="text-slate-400" />
-                      ) : (
-                        <ChevronRight size={16} className="text-slate-400" />
-                      )}
-                    </span>
-                  </button>
-
-                  {isOpen && (
-                    <div className="space-y-2 p-2">
-                      {items.map((preset) => (
-                        <div
-                          key={preset.id}
-                          className="flex items-start gap-3 rounded-md border border-slate-200 p-3"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selected.includes(preset.id)}
-                            onChange={() => toggle(preset.id)}
-                            className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                            aria-label={`Sélectionner ${preset.label}`}
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-slate-800">
-                              {preset.label}
-                              {preset.unit ? (
-                                <span className="ml-1 font-normal text-slate-400">({preset.unit})</span>
-                              ) : null}
-                              {preset.snapshot ? (
-                                <span className="ml-1.5 rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
-                                  photo à date
-                                </span>
-                              ) : null}
-                            </p>
-                            <p className="mt-0.5 text-xs text-slate-500">{preset.description}</p>
-                            {preset.target != null ? (
-                              <p className="mt-0.5 text-xs text-slate-400">
-                                Objectif : {preset.target_direction === 'max' ? '≤' : '≥'} {preset.target}
-                                {preset.unit ? ` ${preset.unit}` : ''}
-                              </p>
-                            ) : null}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleCreate(preset)}
-                            disabled={creatingId !== null}
-                            className="shrink-0 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary-700 disabled:opacity-60"
-                          >
-                            {creatingId === preset.id ? 'Création...' : 'Créer'}
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
-        </div>
-
-        {selected.length > 0 && (
-          <div className="flex items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3">
-            <button
-              type="button"
-              onClick={() => setSelected([])}
-              className="text-xs font-medium text-slate-500 hover:text-slate-700"
-            >
-              {selected.length} sélectionné{selected.length > 1 ? 's' : ''} — effacer
-            </button>
-            <button
-              type="button"
-              onClick={handleBulkCreateAndCompare}
-              disabled={bulkCreating || selected.length < 2}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
-            >
-              {bulkCreating
-                ? 'Création...'
-                : selected.length < 2
-                  ? 'Coche au moins 2 métriques'
-                  : `Créer et comparer (${selected.length})`}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// Superpose plusieurs KPI sélectionnés sur un même graphique. Unités identiques → valeurs
-// réelles sur un axe commun ; unités hétérogènes → « Base 100 » (chaque courbe indexée à 100
-// sur son premier point) pour rester lisible sans double axe. Vue éphémère : rien n'est
-// enregistré.
 function CompareChartModal({ kpis, onClose }) {
   const series = kpis.slice(0, SERIES_COLORS.length).map((kpi, i) => {
     const byPeriod = new Map();
@@ -4085,10 +3883,8 @@ export default function Kpis() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [isBulkMoveModalOpen, setIsBulkMoveModalOpen] = useState(false);
   const [compareOpen, setCompareOpen] = useState(false);
-  const [directCompareKpis, setDirectCompareKpis] = useState(null); // KPI fraîchement créés à comparer
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [capaModal, setCapaModal] = useState(null); // le kpi pour lequel on crée une CAPA, ou null
-  const [modulePresetOpen, setModulePresetOpen] = useState(false);
   const [recomputingId, setRecomputingId] = useState(null);
 
   async function handleRecompute(kpi) {
@@ -4103,17 +3899,6 @@ export default function Kpis() {
     } finally {
       setRecomputingId(null);
     }
-  }
-
-  function handlePresetCreated() {
-    setModulePresetOpen(false);
-    loadKpis(currentFolderId);
-  }
-
-  function handlePresetCompareCreated(createdKpis) {
-    setModulePresetOpen(false);
-    setDirectCompareKpis(createdKpis);
-    loadKpis(currentFolderId);
   }
 
   function toggleSelect(id) {
@@ -4418,14 +4203,13 @@ export default function Kpis() {
             </button>
           )}
           {canManage && (
-            <button
-              type="button"
-              onClick={() => setModulePresetOpen(true)}
+            <Link
+              to="/kpis/modules"
               className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
             >
               <RefreshCw size={18} />
-              Depuis un module
-            </button>
+              Indicateurs des modules
+            </Link>
           )}
           <button
             type="button"
@@ -4646,25 +4430,6 @@ export default function Kpis() {
         />
       )}
 
-      {modulePresetOpen && (
-        <ModulePresetModal
-          folderId={currentFolderId}
-          onClose={() => setModulePresetOpen(false)}
-          onCreated={handlePresetCreated}
-          onCompareCreated={handlePresetCompareCreated}
-        />
-      )}
-
-      {compareOpen && selectedIds.length >= 2 && (
-        <CompareChartModal
-          kpis={kpis.filter((kpi) => selectedIds.includes(kpi.id))}
-          onClose={() => setCompareOpen(false)}
-        />
-      )}
-
-      {directCompareKpis && directCompareKpis.length >= 2 && (
-        <CompareChartModal kpis={directCompareKpis} onClose={() => setDirectCompareKpis(null)} />
-      )}
     </div>
   );
 }

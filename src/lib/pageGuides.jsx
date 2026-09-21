@@ -518,6 +518,33 @@ export const PAGE_GUIDES = {
     ),
     example: "vous rédigez les sections, vous envoyez en relecture au responsable qualité, il approuve, vous publiez.",
   },
+  moduleKpis: {
+    title: 'Les indicateurs qui comptent, calculés pour vous',
+    body: (
+      <p>
+        Pour chaque domaine du système qualité, quelques <strong>indicateurs essentiels</strong> calculés automatiquement depuis vos données :
+        valeur, état face à l'<strong>objectif</strong> (que vous pouvez modifier) et <strong>comparaison</strong> avec la période précédente,
+        l'an dernier ou la moyenne récente.
+      </p>
+    ),
+    more: (
+      <>
+        <p>
+          <strong>Suivre l'essentiel</strong> met en place d'un coup la trentaine d'indicateurs choisis ; « Suivre » ajoute un indicateur seul,
+          y compris parmi les <strong>autres indicateurs disponibles</strong> de chaque domaine. Un indicateur « à ce jour » (par exemple
+          les CAPA en retard) mesure l'état du moment : il construit son historique mois après mois, la comparaison apparaît donc au bout de
+          deux mois. Les indicateurs d'activité (CAPA clôturées, réclamations reçues) ont leur historique tout de suite.
+        </p>
+        <p>
+          <strong>Modifier l'objectif</strong> : choisissez le sens (« ne pas dépasser » ou « atteindre au moins ») et la valeur ; l'application
+          suggère un objectif réaliste d'après vos 6 dernières périodes, et permet de revenir à l'objectif par défaut. Coche jusqu'à 4
+          indicateurs puis « Comparer » pour les voir côte à côte, chacun avec son objectif. Ils sont aussi rangés dans le dossier
+          « Indicateurs des modules » de la page KPI.
+        </p>
+      </>
+    ),
+    example: "« CAPA clôturées dans les délais » : objectif ≥ 90 %, résultat 82 % ce mois-ci contre 76 % le mois dernier → à surveiller, en progrès.",
+  },
   haccpToday: {
     title: 'Saisir les relevés du jour',
     body: (

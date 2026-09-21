@@ -74,6 +74,7 @@ const NonconformingOutputDetail = lazy(() => import('./pages/NonconformingOutput
 const CustomerSatisfactionDetail = lazy(() => import('./pages/CustomerSatisfactionDetail.jsx'));
 const HaccpDetail = lazy(() => import('./pages/HaccpDetail.jsx'));
 const HaccpToday = lazy(() => import('./pages/HaccpToday.jsx'));
+const ModuleKpis = lazy(() => import('./pages/ModuleKpis.jsx'));
 const Suppliers = lazy(() => import('./pages/Suppliers.jsx'));
 const SupplierDetail = lazy(() => import('./pages/SupplierDetail.jsx'));
 const Settings = lazy(() => import('./pages/Settings.jsx'));
@@ -149,6 +150,7 @@ export default function App() {
                       <Route path="trainings" element={<HumanResources />} />
                       <Route path="trainings/matrix" element={<SkillMatrix />} />
                       <Route path="kpis" element={<Kpis />} />
+                      <Route path="kpis/modules" element={<ModuleKpis />} />
                       <Route path="qqoqccp" element={<ImprovementActions />} />
                       <Route path="qqoqccp/:id" element={<QqoqccpDetail />} />
                       <Route path="audits" element={<QmsOversight />} />
