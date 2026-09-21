@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { ArrowLeft, ClipboardCheck, Download, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
+import { getWordDownload } from '../lib/pdfExport.js';
+import { describeDue, formatInterval } from '../lib/haccpMonitoring.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -19,6 +21,13 @@ import AiCcpDefinitionSuggestion from '../components/AiCcpDefinitionSuggestion.j
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
+import CcpLimitsFields from '../components/haccp/CcpLimitsFields.jsx';
+import CcpMonitoringChart from '../components/haccp/CcpMonitoringChart.jsx';
+import CcpStatusChip from '../components/haccp/CcpStatusChip.jsx';
+import HaccpLinksCard from '../components/haccp/HaccpLinksCard.jsx';
+import HaccpReviewCard from '../components/haccp/HaccpReviewCard.jsx';
+import ReadingForm from '../components/haccp/ReadingForm.jsx';
 
 const FIELD_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -56,7 +65,7 @@ function ModalShell({ title, onClose, children, wide }) {
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+          <button type="button" onClick={onClose} aria-label="Fermer" className="-m-2 p-2.5 text-slate-500 hover:text-slate-700">
             <X size={20} />
           </button>
         </div>
@@ -74,6 +83,7 @@ function EditPlanModal({ plan, services, onClose, onUpdated }) {
     team: plan.team || '',
     service_id: plan.service_id || '',
     status: plan.status,
+    review_date: plan.review_date || '',
     category_id: plan.category_id || '',
     category_name: plan.category?.name || '',
   });
@@ -156,6 +166,11 @@ function EditPlanModal({ plan, services, onClose, onUpdated }) {
               ))}
             </select>
           </div>
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Prochaine revue du plan</label>
+          <input type="date" value={form.review_date} onChange={(e) => updateField('review_date', e.target.value)} className={FIELD_CLASS} />
+          <p className="mt-1 text-xs text-slate-400">Fixée à +12 mois à l'activation ; « Marquer revu » la met à jour.</p>
         </div>
         <CategoryVisibilityField
           baseUrl="/module-categories"
@@ -358,6 +373,10 @@ function CcpFormModal({ hazardId, hazard, ccp, users, onClose, onSaved }) {
     critical_limits: ccp?.critical_limits || '',
     monitoring_procedure: ccp?.monitoring_procedure || '',
     monitoring_frequency: ccp?.monitoring_frequency || '',
+    limit_min: ccp?.limit_min === null || ccp?.limit_min === undefined ? '' : String(ccp.limit_min),
+    limit_max: ccp?.limit_max === null || ccp?.limit_max === undefined ? '' : String(ccp.limit_max),
+    limit_unit: ccp?.limit_unit || '',
+    monitoring_interval_hours: ccp?.monitoring_interval_hours === null || ccp?.monitoring_interval_hours === undefined ? '' : String(Number(ccp.monitoring_interval_hours)),
     monitoring_responsible: ccp?.monitoring_responsible || '',
     corrective_action_procedure: ccp?.corrective_action_procedure || '',
     verification_procedure: ccp?.verification_procedure || '',
@@ -445,6 +464,7 @@ function CcpFormModal({ hazardId, hazard, ccp, users, onClose, onSaved }) {
             </select>
           </div>
         </div>
+        <CcpLimitsFields form={form} updateField={updateField} />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Actions correctives prévues</label>
           <AutoTextarea rows={2} value={form.corrective_action_procedure} onChange={(e) => updateField('corrective_action_procedure', e.target.value)} className={FIELD_CLASS} />
@@ -633,30 +653,30 @@ function CreateCapaFromLogModal({ log, ccp, users, services, priorityDelays, onC
 function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp, onEditCcp, onDeleteCcp }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{HAZARD_TYPE_LABELS[hazard.hazard_type]}</p>
-          <p className="mt-0.5 text-sm font-medium text-slate-800">{hazard.description}</p>
-          {hazard.existing_controls && <p className="mt-1 text-xs text-slate-500">Maîtrise actuelle : {hazard.existing_controls}</p>}
-          {hazard.is_significant && (
-            <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
-              Danger significatif
-            </p>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        <p className="min-w-0 truncate text-xs font-semibold uppercase tracking-wide text-slate-500">{HAZARD_TYPE_LABELS[hazard.hazard_type]}</p>
+        <div className="-my-2 flex shrink-0 items-center gap-1">
           <HazardScoreBadge score={hazard.risk_score} />
           {canManage && (
             <>
-              <button type="button" onClick={() => onEditHazard(hazard)} aria-label="Modifier" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary">
+              <button type="button" onClick={() => onEditHazard(hazard)} aria-label="Modifier" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-primary sm:p-1.5">
                 <Pencil size={14} />
               </button>
-              <button type="button" onClick={() => onDeleteHazard(hazard)} aria-label="Supprimer" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600">
+              <button type="button" onClick={() => onDeleteHazard(hazard)} aria-label="Supprimer" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-red-600 sm:p-1.5">
                 <Trash2 size={14} />
               </button>
             </>
           )}
         </div>
+      </div>
+      <div className="min-w-0">
+        <p className="mt-0.5 break-words text-sm font-medium text-slate-800">{hazard.description}</p>
+        {hazard.existing_controls && <p className="mt-1 break-words text-xs text-slate-500">Maîtrise actuelle : {hazard.existing_controls}</p>}
+        {hazard.is_significant && (
+          <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
+            Danger significatif
+          </p>
+        )}
       </div>
 
       {hazard.is_significant && (
@@ -669,21 +689,36 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
                 </p>
                 {canManage && (
                   <div className="flex shrink-0 items-center gap-2">
-                    <button type="button" onClick={() => onEditCcp(hazard.ccp, hazard)} aria-label="Modifier" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary">
+                    <button type="button" onClick={() => onEditCcp(hazard.ccp, hazard)} aria-label="Modifier" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-primary sm:p-1.5">
                       <Pencil size={14} />
                     </button>
-                    <button type="button" onClick={() => onDeleteCcp(hazard.ccp)} aria-label="Supprimer" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600">
+                    <button type="button" onClick={() => onDeleteCcp(hazard.ccp)} aria-label="Supprimer" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-red-600 sm:p-1.5">
                       <Trash2 size={14} />
                     </button>
                   </div>
                 )}
               </div>
-              <p className="mt-1 text-xs text-slate-500">Limites critiques : {hazard.ccp.critical_limits}</p>
-              <p className="text-xs text-slate-500">Surveillance : {hazard.ccp.monitoring_procedure}</p>
+              <p className="mt-1 text-xs text-slate-500">
+                Limites critiques : {hazard.ccp.critical_limits}
+                {hazard.ccp.limits_text ? ` (${hazard.ccp.limits_text})` : ''}
+              </p>
+              <p className="text-xs text-slate-500">
+                Surveillance : {hazard.ccp.monitoring_procedure}
+                {hazard.ccp.monitoring_interval_hours ? ` — rappel toutes les ${formatInterval(hazard.ccp.monitoring_interval_hours)}` : ''}
+              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                <CcpStatusChip ccp={hazard.ccp} />
+                {hazard.ccp.last_reading && (
+                  <span className="text-xs text-slate-500">
+                    Dernier relevé : <span className={hazard.ccp.last_reading.within_limits ? 'text-emerald-700' : 'font-medium text-red-700'}>{hazard.ccp.last_reading.recorded_value}</span>
+                  </span>
+                )}
+                {hazard.ccp.monitoring_state !== 'no_schedule' && <span className="text-xs text-slate-400">{describeDue(hazard.ccp)}</span>}
+              </div>
             </div>
           ) : (
             canManage && (
-              <button type="button" onClick={() => onAddCcp(hazard)} className="flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+              <button type="button" onClick={() => onAddCcp(hazard)} className="flex min-h-[40px] items-center gap-1 text-sm font-medium text-primary hover:underline sm:min-h-0">
                 <Plus size={14} />
                 Créer le point critique (CCP)
               </button>
@@ -695,19 +730,18 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
   );
 }
 
-function SurveillanceTab({ plan, users, services, priorityDelays, onCapaCreated }) {
+function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onCapaCreated, onReadingSaved }) {
+  const navigate = useNavigate();
   const allCcps = plan.steps.flatMap((step) =>
     step.hazards.filter((h) => h.ccp).map((h) => ({ ...h.ccp, hazardDescription: h.description, stepName: step.name }))
   );
   const [selectedCcpId, setSelectedCcpId] = useState(allCcps[0]?.id || '');
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
-  const [recordedValue, setRecordedValue] = useState('');
-  const [withinLimits, setWithinLimits] = useState(true);
-  const [correctiveActionTaken, setCorrectiveActionTaken] = useState('');
   const [error, setError] = useState('');
-  const [submitting, setSubmitting] = useState(false);
   const [capaLog, setCapaLog] = useState(null);
+  const [chartKey, setChartKey] = useState(0);
+  const [creatingRisk, setCreatingRisk] = useState(false);
 
   const selectedCcp = allCcps.find((c) => c.id === selectedCcpId);
 
@@ -729,24 +763,31 @@ function SurveillanceTab({ plan, users, services, priorityDelays, onCapaCreated 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCcpId]);
 
-  async function handleSubmitLog(event) {
-    event.preventDefault();
+  function handleReadingSaved(log) {
+    setLogs((prev) => [log, ...prev]);
+    setChartKey((key) => key + 1);
+    onReadingSaved();
+  }
+
+  // Des dérives qui reviennent : plus une affaire d'action immédiate mais de cause — on ouvre un risque (brouillon à
+  // coter) que la personne complète, la CAPA se crée depuis le relevé hors limites concerné.
+  async function handleCreateRisk() {
+    setCreatingRisk(true);
     setError('');
-    setSubmitting(true);
+    const label = selectedCcp.ccp_number ? `CCP ${selectedCcp.ccp_number}` : 'un point critique';
     try {
-      const { data } = await api.post(`/haccp/ccps/${selectedCcpId}/monitoring-logs`, {
-        recorded_value: recordedValue,
-        within_limits: withinLimits,
-        corrective_action_taken: correctiveActionTaken || undefined,
+      const { data } = await api.post('/risks', {
+        title: `Dérives répétées — ${label} (${plan.title})`,
+        description: `${selectedCcp.recent_deviations} relevés hors limites en 7 jours sur ${label} (« ${selectedCcp.hazardDescription} », étape « ${selectedCcp.stepName} »). Limites critiques : ${selectedCcp.critical_limits}. Cause à identifier et maîtrise à renforcer.`,
+        category: 'Sécurité alimentaire',
+        service_id: plan.service_id || undefined,
+        likelihood: 4,
+        impact: 4,
       });
-      setLogs((prev) => [data, ...prev]);
-      setRecordedValue('');
-      setWithinLimits(true);
-      setCorrectiveActionTaken('');
+      navigate(`/risks/${data.id}`);
     } catch (err) {
-      setError(err.response?.data?.error || "Impossible d'enregistrer ce relevé.");
-    } finally {
-      setSubmitting(false);
+      setError(err.response?.data?.error || 'Impossible de créer le risque.');
+      setCreatingRisk(false);
     }
   }
 
@@ -760,44 +801,53 @@ function SurveillanceTab({ plan, users, services, priorityDelays, onCapaCreated 
 
   return (
     <div className="mt-4">
-      <select value={selectedCcpId} onChange={(e) => setSelectedCcpId(e.target.value)} className={FIELD_CLASS}>
-        {allCcps.map((ccp) => (
-          <option key={ccp.id} value={ccp.id}>
-            {ccp.ccp_number ? `${ccp.ccp_number} — ` : ''}
-            {ccp.hazardDescription} ({ccp.stepName})
-          </option>
-        ))}
-      </select>
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <select value={selectedCcpId} onChange={(e) => setSelectedCcpId(e.target.value)} aria-label="Point critique" className={`${FIELD_CLASS} sm:flex-1`}>
+          {allCcps.map((ccp) => (
+            <option key={ccp.id} value={ccp.id}>
+              {ccp.ccp_number ? `${ccp.ccp_number} — ` : ''}
+              {ccp.hazardDescription} ({ccp.stepName})
+            </option>
+          ))}
+        </select>
+        <Link to="/haccp/today" className="flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+          <ClipboardList size={15} />
+          Relevés du jour
+        </Link>
+      </div>
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       {selectedCcp && (
-        <form onSubmit={handleSubmitLog} className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <p className="text-sm font-semibold text-slate-900">Nouveau relevé</p>
-          <p className="text-xs text-slate-500">Limites critiques : {selectedCcp.critical_limits}</p>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Valeur relevée</label>
-              <input type="text" required value={recordedValue} onChange={(e) => setRecordedValue(e.target.value)} className={FIELD_CLASS} />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Dans les limites ?</label>
-              <select value={withinLimits ? 'yes' : 'no'} onChange={(e) => setWithinLimits(e.target.value === 'yes')} className={FIELD_CLASS}>
-                <option value="yes">Oui</option>
-                <option value="no">Non — dérive</option>
-              </select>
-            </div>
+        <>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <CcpStatusChip ccp={selectedCcp} />
+            {selectedCcp.monitoring_state !== 'no_schedule' && <span className="text-xs text-slate-500">{describeDue(selectedCcp)}</span>}
+            {selectedCcp.monitoring_state === 'no_schedule' && <span className="text-xs text-slate-400">Aucun rappel : renseignez un intervalle dans le CCP.</span>}
           </div>
-          {!withinLimits && (
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective immédiate</label>
-              <AutoTextarea required rows={2} value={correctiveActionTaken} onChange={(e) => setCorrectiveActionTaken(e.target.value)} className={FIELD_CLASS} />
+
+          {selectedCcp.repeated_deviation && canManage && (
+            <div className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+              <p className="flex items-start gap-2">
+                <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+                <span>
+                  <strong>{selectedCcp.recent_deviations} relevés hors limites en 7 jours.</strong> Traitez la cause : créez une CAPA depuis le dernier relevé hors limites ci-dessous, ou ouvrez un risque.
+                </span>
+              </p>
+              <button type="button" onClick={handleCreateRisk} disabled={creatingRisk} className="mt-2 min-h-[40px] rounded-md border border-red-300 bg-white px-3 text-xs font-medium text-red-800 hover:bg-red-100 disabled:opacity-60">
+                {creatingRisk ? 'Création...' : 'Ouvrir un risque'}
+              </button>
             </div>
           )}
-          <button type="submit" disabled={submitting} className="w-full rounded-md bg-primary py-2.5 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60 sm:w-auto sm:px-6">
-            {submitting ? 'Enregistrement...' : 'Enregistrer le relevé'}
-          </button>
-        </form>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <p className="text-sm font-semibold text-slate-900">Nouveau relevé</p>
+            <p className="mb-3 text-xs text-slate-500">Limites critiques : {selectedCcp.limits_text || selectedCcp.critical_limits}</p>
+            <ReadingForm key={selectedCcp.id} ccp={{ ...selectedCcp, limits: selectedCcp.limit_min !== null || selectedCcp.limit_max !== null ? { min: selectedCcp.limit_min === null ? null : Number(selectedCcp.limit_min), max: selectedCcp.limit_max === null ? null : Number(selectedCcp.limit_max), unit: selectedCcp.limit_unit || '' } : null }} onSaved={handleReadingSaved} />
+          </div>
+
+          <CcpMonitoringChart ccp={selectedCcp} refreshKey={chartKey} showAlert={!canManage} />
+        </>
       )}
 
       <div className="mt-4 space-y-2">
@@ -809,8 +859,8 @@ function SurveillanceTab({ plan, users, services, priorityDelays, onCapaCreated 
           logs.map((log) => (
             <div key={log.id} className={`rounded-lg border p-3 ${log.within_limits ? 'border-slate-200 bg-white' : 'border-red-200 bg-red-50'}`}>
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-sm font-medium text-slate-900">
+                <div className="min-w-0">
+                  <p className="break-words text-sm font-medium text-slate-900">
                     {log.recorded_value}{' '}
                     <span className={log.within_limits ? 'text-emerald-700' : 'text-red-700'}>
                       {log.within_limits ? '· Conforme' : '· Hors limites'}
@@ -820,24 +870,26 @@ function SurveillanceTab({ plan, users, services, priorityDelays, onCapaCreated 
                     {formatDateTime(log.recorded_at)}
                     {log.recorded_by_user ? ` · ${log.recorded_by_user.full_name}` : ''}
                   </p>
-                  {log.corrective_action_taken && <p className="mt-1 text-xs text-slate-600">Action corrective : {log.corrective_action_taken}</p>}
+                  {log.corrective_action_taken && <p className="mt-1 break-words text-xs text-slate-600">Action corrective : {log.corrective_action_taken}</p>}
                 </div>
                 {!log.within_limits && (
                   <div>
                     {log.linked_capa ? (
-                      <Link to={`/capas/${log.linked_capa.id}`} className="inline-flex items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100">
+                      <Link to={`/capas/${log.linked_capa.id}`} className="inline-flex min-h-[40px] items-center gap-1 rounded-md border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 hover:bg-emerald-100 sm:min-h-0">
                         <ClipboardCheck size={14} />
                         CAPA {log.linked_capa.number}
                       </Link>
                     ) : (
-                      <button
-                        type="button"
-                        onClick={() => setCapaLog(log)}
-                        className="inline-flex items-center gap-1 rounded-md border border-primary px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"
-                      >
-                        <ClipboardCheck size={14} />
-                        Créer une CAPA
-                      </button>
+                      canManage && (
+                        <button
+                          type="button"
+                          onClick={() => setCapaLog(log)}
+                          className="inline-flex min-h-[40px] items-center gap-1 rounded-md border border-primary px-2.5 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 sm:min-h-0"
+                        >
+                          <ClipboardCheck size={14} />
+                          Créer une CAPA
+                        </button>
+                      )
                     )}
                   </div>
                 )}
@@ -881,6 +933,8 @@ export default function HaccpDetail() {
   const [activeTab, setActiveTab] = useState('analysis');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [linksKey, setLinksKey] = useState(0);
   const [stepModal, setStepModal] = useState(null); // { step } | { new: true } | null
   const [hazardModal, setHazardModal] = useState(null); // { stepId, hazard?, laterSteps }
   const [ccpModal, setCcpModal] = useState(null); // { hazardId, hazard, ccp? }
@@ -898,6 +952,17 @@ export default function HaccpDetail() {
     }
   }
 
+  // Recharge le plan sans écran de chargement (après un relevé, une CAPA…) : les états de surveillance des CCP
+  // restent ainsi à jour sans faire clignoter la page.
+  async function refreshPlan() {
+    try {
+      const { data } = await api.get(`/haccp/plans/${id}`);
+      setPlan(data);
+    } catch {
+      /* le plan déjà affiché reste valable */
+    }
+  }
+
   useEffect(() => {
     loadPlan();
     api.get('/services').then(({ data }) => setServices(data.filter((service) => service.is_active))).catch(() => {});
@@ -910,6 +975,7 @@ export default function HaccpDetail() {
     try {
       const { data } = await api.patch(`/haccp/plans/${id}`, { status });
       setPlan((prev) => ({ ...prev, ...data }));
+      refreshPlan();
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
     }
@@ -928,6 +994,18 @@ export default function HaccpDetail() {
       setError("Impossible d'exporter ce plan en PDF.");
     } finally {
       setExportingPdf(false);
+    }
+  }
+
+  async function handleExportWord() {
+    setError('');
+    setExportingWord(true);
+    try {
+      await getWordDownload(`/haccp/plans/${id}/word`, `haccp-${plan.title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 50)}.docx`);
+    } catch {
+      setError("Impossible d'exporter ce plan en Word.");
+    } finally {
+      setExportingWord(false);
     }
   }
 
@@ -981,16 +1059,16 @@ export default function HaccpDetail() {
 
   return (
     <div>
-      <button type="button" onClick={goBack} className="mb-3 flex items-center gap-1 text-sm font-medium text-slate-500 hover:text-slate-700">
+      <button type="button" onClick={goBack} className="-ml-1 mb-2 flex min-h-[40px] items-center gap-1 px-1 text-sm font-medium text-slate-500 hover:text-slate-700">
         <ArrowLeft size={16} />
         Retour
       </button>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{plan.title}</h1>
+        <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{plan.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
           {canManage ? (
-            <select value={plan.status} onChange={handleStatusChange} className="rounded-md border border-slate-300 px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+            <select value={plan.status} onChange={handleStatusChange} className="min-h-[40px] rounded-md border border-slate-300 px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:min-h-0 sm:text-sm">
               {Object.entries(PLAN_STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -1000,21 +1078,13 @@ export default function HaccpDetail() {
           ) : (
             <PlanStatusBadge status={plan.status} />
           )}
-          <button
-            type="button"
-            onClick={handleExportPdf}
-            disabled={exportingPdf}
-            className="flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-          >
-            {exportingPdf ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-            Exporter en PDF
-          </button>
+          <ExportMenu onExportPdf={handleExportPdf} exportingPdf={exportingPdf} onExportWord={handleExportWord} exportingWord={exportingWord} />
           {canManage && (
             <>
-              <button type="button" onClick={() => setIsEditModalOpen(true)} aria-label="Modifier" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary">
+              <button type="button" onClick={() => setIsEditModalOpen(true)} aria-label="Modifier" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-primary sm:p-2">
                 <Pencil size={16} />
               </button>
-              <button type="button" onClick={handleDelete} aria-label="Supprimer" className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600">
+              <button type="button" onClick={handleDelete} aria-label="Supprimer" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-red-600 sm:p-2">
                 <Trash2 size={16} />
               </button>
             </>
@@ -1044,11 +1114,14 @@ export default function HaccpDetail() {
         </div>
       </div>
 
+      <HaccpReviewCard plan={plan} canManage={canManage} onPlanChanged={(updated) => setPlan((prev) => ({ ...prev, ...updated }))} />
+      <HaccpLinksCard planId={plan.id} canManage={canManage} refreshKey={linksKey} />
+
       <div className="mt-5 flex gap-1 border-b border-slate-200">
         <button
           type="button"
           onClick={() => setActiveTab('analysis')}
-          className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+          className={`min-h-[44px] border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
             activeTab === 'analysis' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -1057,7 +1130,7 @@ export default function HaccpDetail() {
         <button
           type="button"
           onClick={() => setActiveTab('surveillance')}
-          className={`border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
+          className={`min-h-[44px] border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
             activeTab === 'surveillance' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
@@ -1082,10 +1155,10 @@ export default function HaccpDetail() {
                 </div>
                 {canManage && (
                   <div className="flex shrink-0 items-center gap-2">
-                    <button type="button" onClick={() => setStepModal({ step })} aria-label="Modifier l'étape" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary">
+                    <button type="button" onClick={() => setStepModal({ step })} aria-label="Modifier l'étape" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-primary sm:p-1.5">
                       <Pencil size={14} />
                     </button>
-                    <button type="button" onClick={() => handleDeleteStep(step)} aria-label="Supprimer l'étape" className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600">
+                    <button type="button" onClick={() => handleDeleteStep(step)} aria-label="Supprimer l'étape" className="rounded-md p-3 text-slate-500 hover:bg-slate-100 hover:text-red-600 sm:p-1.5">
                       <Trash2 size={14} />
                     </button>
                   </div>
@@ -1099,7 +1172,7 @@ export default function HaccpDetail() {
                     onClick={() =>
                       setHazardModal({ stepId: step.id, laterSteps: plan.steps.filter((s) => s.step_number > step.step_number) })
                     }
-                    className="flex items-center gap-1 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    className="flex min-h-[40px] items-center gap-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 sm:min-h-0 sm:px-2.5"
                   >
                     <Plus size={14} />
                     Ajouter un danger
@@ -1150,7 +1223,15 @@ export default function HaccpDetail() {
           )}
         </div>
       ) : (
-        <SurveillanceTab plan={plan} users={users} services={services} priorityDelays={priorityDelays} onCapaCreated={loadPlan} />
+        <SurveillanceTab
+          plan={plan}
+          users={users}
+          services={services}
+          priorityDelays={priorityDelays}
+          canManage={canManage}
+          onCapaCreated={refreshPlan}
+          onReadingSaved={refreshPlan}
+        />
       )}
 
       {isEditModalOpen && (

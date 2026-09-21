@@ -1548,6 +1548,7 @@ const JOB_LABELS = {
   driveTokenRefreshJob: 'Rafraîchissement des jetons Google Drive',
   dashboardSnapshotJob: 'Instantané quotidien du tableau de bord',
   moduleKpiJob: 'Recalcul quotidien des KPI de module',
+  haccpReminderJob: 'Rappels horaires des relevés HACCP en retard',
 };
 
 const JOB_STATUS_STYLES = {

@@ -495,6 +495,13 @@ export default function Dashboard() {
                 <Thermometer size={20} className="text-slate-300" />
                 <BigNumber value={stats.haccp.active_plans} suffix="plan(s) actif(s)" trend={stats.trends?.['haccp.active_plans']} />
               </div>
+              {(stats.haccp.overdue_ccps > 0 || stats.haccp.deviating_ccps > 0) && (
+                <p className="mt-2 text-xs font-medium text-red-700">
+                  {stats.haccp.overdue_ccps > 0 && `${stats.haccp.overdue_ccps} relevé(s) en retard`}
+                  {stats.haccp.overdue_ccps > 0 && stats.haccp.deviating_ccps > 0 && ' · '}
+                  {stats.haccp.deviating_ccps > 0 && `${stats.haccp.deviating_ccps} CCP en dérive`}
+                </p>
+              )}
             </WidgetCard>
           ))}
 

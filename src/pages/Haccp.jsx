@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
+  AlertTriangle,
   ClipboardCheck,
+  ClipboardList,
   FolderCog,
   FolderInput,
   FolderPlus,
@@ -33,6 +35,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import { daysUntil } from '../lib/riskReview.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const HACCP_RESOURCE_TYPE = 'haccp_plan';
@@ -205,6 +208,7 @@ export default function Haccp() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [plans, setPlans] = useState([]);
+  const [dueCounts, setDueCounts] = useState(null); // { total, overdue, due_soon, repeated_deviation } des relevés du jour
   const [services, setServices] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [loading, setLoading] = useState(true);
@@ -426,11 +430,27 @@ export default function Haccp() {
     }
   }
 
+  // Relevés en retard / dérives répétées : signalés en tête de page, avec le lien vers la saisie du jour.
+  useEffect(() => {
+    api
+      .get('/haccp/monitoring-due')
+      .then(({ data }) => setDueCounts(data.counts))
+      .catch(() => setDueCounts(null));
+  }, []);
+
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">HACCP</h1>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Link
+            to="/haccp/today"
+            className="flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+          >
+            <ClipboardList size={18} />
+            Relevés du jour
+            {dueCounts?.overdue > 0 && <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">{dueCounts.overdue}</span>}
+          </Link>
           <ExportMenu
             disabled={plans.length === 0}
             onExportPdf={() => handleExportPdf()}
@@ -465,6 +485,29 @@ export default function Haccp() {
         </div>
       </div>
       <PageGuide id="haccp" />
+
+      {dueCounts && (dueCounts.overdue > 0 || dueCounts.repeated_deviation > 0) && (
+        <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">
+          <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+          <div className="flex min-w-0 flex-1 flex-col gap-x-3 sm:flex-row sm:items-center">
+            <span className="min-w-0 flex-1">
+              {dueCounts.overdue > 0 && (
+                <>
+                  <strong>{dueCounts.overdue}</strong> relevé{dueCounts.overdue > 1 ? 's' : ''} en retard.{' '}
+                </>
+              )}
+              {dueCounts.repeated_deviation > 0 && (
+                <>
+                  <strong>{dueCounts.repeated_deviation}</strong> point{dueCounts.repeated_deviation > 1 ? 's' : ''} critique{dueCounts.repeated_deviation > 1 ? 's' : ''} en dérive répétée.
+                </>
+              )}
+            </span>
+            <Link to="/haccp/today" className="-ml-1 flex min-h-[40px] items-center self-start px-1 text-xs font-medium underline sm:min-h-0 sm:self-auto">
+              Saisir les relevés
+            </Link>
+          </div>
+        </div>
+      )}
 
       {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       {exportPdfError && (
@@ -585,25 +628,33 @@ export default function Haccp() {
                   onClick={() => navigate(`/haccp/${plan.id}`)}
                   className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
                 >
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
                     {canManage && (
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(plan.id)}
-                        onClick={(e) => e.stopPropagation()}
-                        onChange={() => toggleSelect(plan.id)}
-                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                      />
+                      <label className="-m-3 flex shrink-0 cursor-pointer items-center justify-center p-3 sm:-m-1 sm:p-1" onClick={(e) => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(plan.id)}
+                          onChange={() => toggleSelect(plan.id)}
+                          aria-label={`Sélectionner ${plan.title}`}
+                          className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary sm:h-4 sm:w-4"
+                        />
+                      </label>
                     )}
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium text-slate-900">{plan.title}</p>
-                      <p className="truncate text-sm text-slate-500">
+                      <p className="line-clamp-2 break-words font-medium text-slate-900">{plan.title}</p>
+                      <p className="line-clamp-2 break-words text-sm text-slate-500">
                         {plan.product_description ? plan.product_description : 'Aucun produit décrit'}
                         {plan.service ? ` · ${plan.service.name}` : ''}
                       </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <PlanStatusBadge status={plan.status} />
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <PlanStatusBadge status={plan.status} />
+                        {plan.status !== 'archived' && plan.review_date && daysUntil(plan.review_date) < 0 && (
+                          <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-600">Revue dépassée</span>
+                        )}
+                        {plan.status !== 'archived' && plan.review_date && daysUntil(plan.review_date) >= 0 && daysUntil(plan.review_date) <= 30 && (
+                          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Revue le {new Date(`${plan.review_date}T12:00:00`).toLocaleDateString('fr-FR')}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {canManage && (
@@ -614,7 +665,7 @@ export default function Haccp() {
                           e.stopPropagation();
                           setMovingPlan(plan);
                         }}
-                        className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50 sm:min-h-0 sm:px-2"
                       >
                         <FolderInput size={12} />
                         Déplacer

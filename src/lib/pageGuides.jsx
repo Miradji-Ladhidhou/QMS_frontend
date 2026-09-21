@@ -183,6 +183,20 @@ export const PAGE_GUIDES = {
         leurs limites, organiser la surveillance et les actions correctives. Pour l'agroalimentaire.
       </p>
     ),
+    more: (
+      <>
+        <p>
+          <strong>Relevés du jour</strong> est la liste de travail des opérateurs : les points critiques des plans actifs, le plus en retard d'abord,
+          avec la saisie du relevé et le verdict immédiat — pensée pour le téléphone. Chaque CCP peut avoir un <strong>rappel</strong> : son
+          responsable est prévenu (email et cloche) quand un relevé est en retard, entre 6 h et 20 h. Le bandeau rouge ci-dessus signale les relevés
+          en retard et les points critiques en <strong>dérive répétée</strong> (3 relevés hors limites en 7 jours).
+        </p>
+        <p>
+          Un plan devient <strong>actif</strong> quand chaque danger significatif a son CCP ; sa revue annuelle est alors programmée et une version du plan
+          est conservée. « Exporter l'analyse complète » produit le rapport d'audit en PDF ; le Word d'un plan s'exporte depuis sa fiche.
+        </p>
+      </>
+    ),
     example:
       "danger Listeria sur produits tranchés → CCP : chambre froide < 4 °C → relevé 2 fois par jour → au-dessus de 4 °C, le lot est mis en quarantaine.",
   },
@@ -476,6 +490,26 @@ export const PAGE_GUIDES = {
     ),
     example: "vous rédigez les sections, vous envoyez en relecture au responsable qualité, il approuve, vous publiez.",
   },
+  haccpToday: {
+    title: 'Saisir les relevés du jour',
+    body: (
+      <p>
+        Ouvrez un point critique, saisissez la <strong>valeur relevée</strong> : le verdict « dans / hors limites » s'affiche aussitôt et le serveur le
+        confirme. Hors limites, notez l'<strong>action corrective immédiate</strong> (obligatoire).
+      </p>
+    ),
+    more: (
+      <>
+        <p>
+          Les points critiques sont classés du plus en retard au moins urgent ; « Voir mes CCP » ne garde que ceux dont vous êtes le responsable de
+          surveillance. Un CCP sans limites chiffrées se relève avec « Conforme » / « Non conforme ». Après 3 relevés hors limites en 7 jours sur un même
+          CCP, le responsable et l'auteur du plan sont prévenus : c'est la cause qu'il faut traiter (CAPA ou risque), pas seulement l'incident.
+        </p>
+        <p>Pas de réseau en atelier ? Imprimez la <strong>fiche de relevés vierge</strong> depuis la page du plan (onglet Surveillance) et reportez les valeurs ensuite.</p>
+      </>
+    ),
+    example: "chambre froide n°2, limite ≤ 4 °C : vous saisissez 5,2 → « Hors limites » → action corrective : « lot mis en quarantaine, groupe froid signalé ».",
+  },
   haccpDetail: {
     title: "Plan HACCP d'un produit",
     body: (
@@ -483,6 +517,21 @@ export const PAGE_GUIDES = {
         Décrivez les <strong>dangers</strong>, les <strong>CCP</strong> et leurs limites critiques, puis les relevés de
         surveillance et les actions correctives en cas de dépassement.
       </p>
+    ),
+    more: (
+      <>
+        <p>
+          Renseignez les <strong>limites chiffrées</strong> du CCP (min, max, unité) : chaque relevé reçoit alors un verdict automatique, la courbe du
+          tableau de bord se trace et le serveur ne se fie jamais au verdict envoyé. L'<strong>intervalle de rappel</strong> prévient le responsable quand un
+          relevé est en retard. Trois relevés hors limites en 7 jours signalent une <strong>dérive répétée</strong> : ouvrez une CAPA ou un risque.
+        </p>
+        <p>
+          <strong>Revue du plan :</strong> la revue annuelle est programmée à l'activation (rappel 7 jours avant, le jour même, puis chaque semaine de
+          retard). « Marquer revu » conserve une <strong>version</strong> du plan ; « Versions » montre ce qui a changé, quand et par qui.{' '}
+          <strong>Éléments liés</strong> rattache fournisseurs, procédures et formations requises — l'application vérifie que les responsables de surveillance
+          sont formés. <strong>Exporter</strong> : PDF ou Word du plan ; fiche PDF de chaque point critique et fiche de relevés vierge à imprimer (onglet Surveillance).
+        </p>
+      </>
     ),
     example: "CCP « cuisson à cœur ≥ 72 °C » → relevé à chaque fournée → si 68 °C : recuisson et blocage du lot.",
   },
