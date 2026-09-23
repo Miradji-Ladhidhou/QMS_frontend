@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ChevronDown, GitCompareArrows, Loader2, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
@@ -41,10 +41,13 @@ export default function ModuleKpis() {
   const [enabling, setEnabling] = useState(false);
   const [compareIds, setCompareIds] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  const loadRequestRef = useRef(0);
 
   async function load() {
+    const requestId = ++loadRequestRef.current;
     try {
       const { data: overview } = await api.get('/kpis/module-overview');
+      if (requestId !== loadRequestRef.current) return;
       setData(overview);
       setError('');
       setOpenDomains((current) => {
@@ -53,7 +56,7 @@ export default function ModuleKpis() {
         return new Set(withIssues.length > 0 ? withIssues : [overview.domains[0]?.key]);
       });
     } catch {
-      setError('Impossible de charger les indicateurs.');
+      if (requestId === loadRequestRef.current) setError('Impossible de charger les indicateurs.');
     }
   }
 

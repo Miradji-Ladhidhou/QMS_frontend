@@ -25,6 +25,7 @@ import {
   Pencil,
   Plus,
   RefreshCw,
+  Search,
   Settings,
   Trash2,
   Upload,
@@ -123,6 +124,17 @@ function getKpiLatestDate(kpi) {
 function getKpiSortValue(kpi, key) {
   if (key === 'latest_date') return getKpiLatestDate(kpi);
   return kpi.name?.toLowerCase() || '';
+}
+
+function getKpiOverviewStatus(kpi) {
+  const recentRecords = [...(kpi.records || [])]
+    .sort((a, b) => (a.period_date < b.period_date ? -1 : 1))
+    .slice(-KPI_RECENT_WINDOW);
+  const averageValue =
+    recentRecords.length > 0
+      ? Number((recentRecords.reduce((sum, record) => sum + record.value, 0) / recentRecords.length).toFixed(2))
+      : null;
+  return getKpiStatus(averageValue, kpi.target, kpi.target_direction || 'min');
 }
 
 const FREQUENCY_LABELS = {
@@ -2871,6 +2883,7 @@ function KpiCard({
 }) {
   const currentUser = useCurrentUser();
   const [showHistory, setShowHistory] = useState(false);
+  const [showChart, setShowChart] = useState(false);
   const [showImports, setShowImports] = useState(false);
   const [imports, setImports] = useState(null);
   const [importsLoading, setImportsLoading] = useState(false);
@@ -2976,8 +2989,7 @@ function KpiCard({
     if (record) onViewProof(kpi, record);
   }
 
-  async function handleExportChartPng() {
-    setExportMenuOpen(false);
+  async function exportChartPng() {
     setExportError('');
     if (!chartRef.current) return;
 
@@ -2990,6 +3002,16 @@ function KpiCard({
     } catch {
       setExportError("Impossible d'exporter le graphique.");
     }
+  }
+
+  async function handleExportChartPng() {
+    setExportMenuOpen(false);
+    if (!showChart) {
+      setShowChart(true);
+      requestAnimationFrame(() => requestAnimationFrame(exportChartPng));
+      return;
+    }
+    await exportChartPng();
   }
 
   function buildDataExportPayload() {
@@ -3295,85 +3317,101 @@ function KpiCard({
         )}
       </div>
 
-      <div ref={chartRef} className="mt-4 bg-white">
-        {isCountGrouped ? (
-          <DistributionView kpi={kpi} />
-        ) : (
-          <div className="h-48 lg:h-56 2xl:h-64">
-            {hasEnoughForChart ? (
-              <>
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
-                    <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-                    <XAxis
-                      dataKey="period_date"
-                      tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
-                      axisLine={false}
-                      tickLine={false}
-                      tick={{ fill: MUTED_COLOR, fontSize: 11 }}
-                    />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
-                    <Tooltip
-                      formatter={(val, name) => [`${val} ${settingsByLabel.get(name)?.unit ?? kpi.unit ?? ''}`, name]}
-                      labelFormatter={(label) => formatDate(label)}
-                      contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
-                    />
-                    {hasTarget && someSeriesFollowsKpi && (
-                      <ReferenceLine
-                        y={kpi.target}
-                        stroke={MUTED_COLOR}
-                        strokeDasharray="4 4"
-                        label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
-                      />
-                    )}
-                    {/* Une ligne d'objectif par série paramétrée à part, à la couleur de la série. */}
-                    {averagesByLabel
-                      .filter(({ settings }) => settings.custom && settings.target !== null)
-                      .map(({ label, color, settings }) => (
-                        <ReferenceLine
-                          key={`target-${label}`}
-                          y={settings.target}
-                          stroke={color}
-                          strokeDasharray="4 4"
-                          strokeOpacity={0.7}
-                          label={{ value: `Objectif ${label}`, position: 'insideBottomRight', fontSize: 10, fill: color }}
-                        />
-                      ))}
-                    {orderedLabels.map((label, i) => {
-                      const color = SERIES_COLORS[i % SERIES_COLORS.length];
-                      return (
-                        <Line
-                          key={label}
-                          type="monotone"
-                          dataKey={label}
-                          name={label}
-                          stroke={color}
-                          strokeWidth={2}
-                          connectNulls={false}
-                          dot={({ key: _key, ...dotProps }) => (
-                            <SeriesDot
-                              key={`${label}-${dotProps.payload.period_date}`}
-                              {...dotProps}
-                              seriesLabel={label}
-                              color={color}
-                              clickable={isImportBased}
-                              onSelect={handleSeriesPointClick}
-                            />
-                          )}
-                          activeDot={{ r: 6 }}
-                        />
-                      );
-                    })}
-                    {showMultiSeries && <Legend wrapperStyle={{ fontSize: 11 }} />}
-                  </LineChart>
-                </ResponsiveContainer>
-                {isImportBased && (
-                  <p className="mt-1 text-center text-xs text-slate-400">Cliquez sur un point pour voir le détail</p>
-                )}
-              </>
+      <div className="mt-4 border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={() => setShowChart((prev) => !prev)}
+          aria-expanded={showChart}
+          aria-controls={`kpi-chart-${kpi.id}`}
+          className="flex min-h-[40px] items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+        >
+          {showChart ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+          <BarChart3 size={15} />
+          {showChart ? 'Masquer le graphique' : 'Voir le graphique'}
+          <span className="font-normal text-slate-400">({chartData.length} période{chartData.length > 1 ? 's' : ''})</span>
+        </button>
+
+        {showChart && (
+          <div id={`kpi-chart-${kpi.id}`} ref={chartRef} className="mt-3 bg-white">
+            {isCountGrouped ? (
+              <DistributionView kpi={kpi} />
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-slate-400">
-                Pas assez de données pour un graphique
+              <div className="h-48 lg:h-56 2xl:h-64">
+                {hasEnoughForChart ? (
+                  <>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+                        <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                        <XAxis
+                          dataKey="period_date"
+                          tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: MUTED_COLOR, fontSize: 11 }}
+                        />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
+                        <Tooltip
+                          formatter={(val, name) => [`${val} ${settingsByLabel.get(name)?.unit ?? kpi.unit ?? ''}`, name]}
+                          labelFormatter={(label) => formatDate(label)}
+                          contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+                        />
+                        {hasTarget && someSeriesFollowsKpi && (
+                          <ReferenceLine
+                            y={kpi.target}
+                            stroke={MUTED_COLOR}
+                            strokeDasharray="4 4"
+                            label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
+                          />
+                        )}
+                        {averagesByLabel
+                          .filter(({ settings }) => settings.custom && settings.target !== null)
+                          .map(({ label, color, settings }) => (
+                            <ReferenceLine
+                              key={`target-${label}`}
+                              y={settings.target}
+                              stroke={color}
+                              strokeDasharray="4 4"
+                              strokeOpacity={0.7}
+                              label={{ value: `Objectif ${label}`, position: 'insideBottomRight', fontSize: 10, fill: color }}
+                            />
+                          ))}
+                        {orderedLabels.map((label, i) => {
+                          const color = SERIES_COLORS[i % SERIES_COLORS.length];
+                          return (
+                            <Line
+                              key={label}
+                              type="monotone"
+                              dataKey={label}
+                              name={label}
+                              stroke={color}
+                              strokeWidth={2}
+                              connectNulls={false}
+                              dot={({ key: _key, ...dotProps }) => (
+                                <SeriesDot
+                                  key={`${label}-${dotProps.payload.period_date}`}
+                                  {...dotProps}
+                                  seriesLabel={label}
+                                  color={color}
+                                  clickable={isImportBased}
+                                  onSelect={handleSeriesPointClick}
+                                />
+                              )}
+                              activeDot={{ r: 6 }}
+                            />
+                          );
+                        })}
+                        {showMultiSeries && <Legend wrapperStyle={{ fontSize: 11 }} />}
+                      </LineChart>
+                    </ResponsiveContainer>
+                    {isImportBased && (
+                      <p className="mt-1 text-center text-xs text-slate-400">Cliquez sur un point pour voir le détail</p>
+                    )}
+                  </>
+                ) : (
+                  <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                    Pas assez de données pour un graphique
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -3876,6 +3914,7 @@ export default function Kpis() {
   const [breadcrumb, setBreadcrumb] = useState([]); // ancêtres du dossier courant, racine → courant
   const [folders, setFolders] = useState([]); // sous-dossiers directs du dossier courant
   const [foldersLoading, setFoldersLoading] = useState(true);
+  const folderRequestRef = useRef(0);
   const [folderModal, setFolderModal] = useState(null); // null fermé, 'new' création, objet dossier édition
   const [moveModal, setMoveModal] = useState(null); // le kpi en cours de déplacement, ou null
   const [categories, setCategories] = useState([]);
@@ -3886,6 +3925,8 @@ export default function Kpis() {
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [capaModal, setCapaModal] = useState(null); // le kpi pour lequel on crée une CAPA, ou null
   const [recomputingId, setRecomputingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
 
   async function handleRecompute(kpi) {
     setRecomputingId(kpi.id);
@@ -3928,48 +3969,50 @@ export default function Kpis() {
     }
   }
 
-  async function loadKpis(folderId) {
-    setLoading(true);
+  async function loadKpis(folderId, requestId = folderRequestRef.current) {
+    if (requestId === folderRequestRef.current) setLoading(true);
     setError('');
     try {
       const { data } = await api.get('/kpis', { params: { folder_id: folderId || 'root' } });
-      setKpis(data);
+      if (requestId === folderRequestRef.current) setKpis(data);
     } catch {
-      setError('Impossible de charger les KPIs.');
+      if (requestId === folderRequestRef.current) setError('Impossible de charger les KPIs.');
     } finally {
-      setLoading(false);
+      if (requestId === folderRequestRef.current) setLoading(false);
     }
   }
 
-  async function loadFolders(folderId) {
-    setFoldersLoading(true);
+  async function loadFolders(folderId, requestId = folderRequestRef.current) {
+    if (requestId === folderRequestRef.current) setFoldersLoading(true);
     try {
       const { data } = await api.get('/kpi-folders', { params: { parent_id: folderId || 'root' } });
-      setFolders(data);
+      if (requestId === folderRequestRef.current) setFolders(data);
     } catch {
-      setFolders([]);
+      if (requestId === folderRequestRef.current) setFolders([]);
     } finally {
-      setFoldersLoading(false);
+      if (requestId === folderRequestRef.current) setFoldersLoading(false);
     }
   }
 
-  async function loadBreadcrumb(folderId) {
+  async function loadBreadcrumb(folderId, requestId = folderRequestRef.current) {
     if (!folderId) {
-      setBreadcrumb([]);
+      if (requestId === folderRequestRef.current) setBreadcrumb([]);
       return;
     }
     try {
       const { data } = await api.get(`/kpi-folders/${folderId}/breadcrumb`);
-      setBreadcrumb(data);
+      if (requestId === folderRequestRef.current) setBreadcrumb(data);
     } catch {
-      setBreadcrumb([]);
+      if (requestId === folderRequestRef.current) setBreadcrumb([]);
     }
   }
 
   useEffect(() => {
-    loadKpis(currentFolderId);
-    loadFolders(currentFolderId);
-    loadBreadcrumb(currentFolderId);
+    const requestId = ++folderRequestRef.current;
+    setSelectedIds([]);
+    loadKpis(currentFolderId, requestId);
+    loadFolders(currentFolderId, requestId);
+    loadBreadcrumb(currentFolderId, requestId);
   }, [currentFolderId]);
 
   function loadKpiCategories() {
@@ -3986,6 +4029,7 @@ export default function Kpis() {
 
   function navigateToFolder(folderId) {
     setOpenMenuId(null);
+    setSelectedIds([]);
     setSearchParams((prev) => {
       const next = new URLSearchParams(prev);
       if (folderId) {
@@ -4180,6 +4224,23 @@ export default function Kpis() {
     'latest_date',
     'desc'
   );
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredKpis = sortedKpis.filter((kpi) => {
+    const matchesSearch =
+      !normalizedSearchTerm ||
+      [kpi.name, kpi.unit].some((value) => String(value || '').toLowerCase().includes(normalizedSearchTerm));
+    const matchesStatus = statusFilter === 'all' || getKpiOverviewStatus(kpi) === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+  const statusCounts = kpis.reduce(
+    (counts, kpi) => {
+      counts.all += 1;
+      counts[getKpiOverviewStatus(kpi)] += 1;
+      return counts;
+    },
+    { all: 0, good: 0, warning: 0, bad: 0, neutral: 0 }
+  );
+  const hasActiveKpiFilter = Boolean(normalizedSearchTerm) || statusFilter !== 'all';
 
   return (
     <div>
@@ -4225,14 +4286,62 @@ export default function Kpis() {
 
       <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} />
 
-      <div className="mt-4">
-        <SortSelect
-          options={KPI_SORT_OPTIONS}
-          sortKey={sortKey}
-          direction={direction}
-          onChangeKey={setSortKey}
-          onToggleDirection={() => toggleSort(sortKey)}
-        />
+      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <label className="relative block min-w-0 flex-1 lg:max-w-md">
+            <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <span className="sr-only">Rechercher un KPI</span>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Rechercher par nom ou unité..."
+              className="w-full rounded-md border border-slate-300 py-2.5 pl-9 pr-3 text-sm text-slate-900 outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20"
+            />
+          </label>
+          <SortSelect
+            options={KPI_SORT_OPTIONS}
+            sortKey={sortKey}
+            direction={direction}
+            onChangeKey={setSortKey}
+            onToggleDirection={() => toggleSort(sortKey)}
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les KPI par statut">
+          {[
+            { key: 'all', label: 'Tous' },
+            { key: 'bad', label: "Hors objectif" },
+            { key: 'warning', label: 'À surveiller' },
+            { key: 'good', label: 'Objectif atteint' },
+            { key: 'neutral', label: 'Non évalués' },
+          ].map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => setStatusFilter(filter.key)}
+              className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                statusFilter === filter.key
+                  ? 'border-primary bg-primary text-white'
+                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-primary/40 hover:text-primary'
+              }`}
+              aria-pressed={statusFilter === filter.key}
+            >
+              {filter.label} <span className="ml-1 opacity-75">{statusCounts[filter.key]}</span>
+            </button>
+          ))}
+          {hasActiveKpiFilter && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearchTerm('');
+                setStatusFilter('all');
+              }}
+              className="px-2 py-1.5 text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-700"
+            >
+              Réinitialiser
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -4269,7 +4378,7 @@ export default function Kpis() {
           </div>
 
           {canManage && (
-            <SelectAllToggle ids={sortedKpis.map((kpi) => kpi.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
+            <SelectAllToggle ids={filteredKpis.map((kpi) => kpi.id)} selectedIds={selectedIds} onChange={setSelectedIds} />
           )}
 
           {canManage && (
@@ -4306,9 +4415,15 @@ export default function Kpis() {
             </div>
           ) : kpis.length === 0 ? (
             <p className="mt-6 text-sm text-slate-500">Aucun KPI directement dans ce dossier.</p>
+          ) : filteredKpis.length === 0 ? (
+            <div className="mt-6 rounded-xl border border-dashed border-slate-300 py-12 text-center">
+              <Search size={32} className="mx-auto text-slate-300" />
+              <p className="mt-3 text-sm font-medium text-slate-700">Aucun KPI ne correspond à ces filtres</p>
+              <p className="mt-1 text-sm text-slate-500">Essayez un autre terme ou réinitialisez la recherche.</p>
+            </div>
           ) : (
             <div className="mt-4 flex max-w-4xl flex-col gap-4">
-              {sortedKpis.map((kpi) => (
+              {filteredKpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
                   kpi={kpi}
