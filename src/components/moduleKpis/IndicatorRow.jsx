@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowDownRight, ArrowUpRight, Minus, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ArrowDownRight, ArrowUpRight, Loader2, Minus, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import {
   COMPARISON_MODES,
   STATUS_LABELS,
@@ -39,7 +39,7 @@ function ComparisonBadge({ indicator, mode }) {
 }
 
 // Un indicateur : suivi (valeur, état, comparaison, objectif modifiable, mini-courbe) ou à suivre (objectif proposé + bouton).
-export default function IndicatorRow({ indicator, mode, canManage, compareSelected, compareDisabled, onToggleCompare, onTrack, onUntrack, onObjectiveSaved, busy }) {
+export default function IndicatorRow({ indicator, mode, canManage, compareSelected, compareDisabled, onToggleCompare, onTrack, onUntrack, onRefresh, onObjectiveSaved, busy }) {
   const [editing, setEditing] = useState(false);
 
   if (!indicator.tracked) {
@@ -114,6 +114,10 @@ export default function IndicatorRow({ indicator, mode, canManage, compareSelect
             </p>
             {canManage && (
               <div className="flex items-center gap-1">
+                <button type="button" onClick={() => onRefresh(indicator)} disabled={busy} className="flex min-h-[40px] items-center gap-1.5 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 disabled:opacity-60">
+                  {busy ? <Loader2 size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                  Actualiser
+                </button>
                 <button type="button" onClick={() => setEditing((value) => !value)} aria-expanded={editing} className="flex min-h-[40px] items-center gap-1.5 rounded-md px-2 text-xs font-medium text-primary hover:bg-primary/5">
                   <Pencil size={13} />
                   Modifier l'objectif

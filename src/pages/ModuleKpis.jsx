@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronDown, GitCompareArrows, Loader2, Sparkles } from 'lucide-react';
+import { ArrowLeft, CheckSquare, ChevronDown, GitCompareArrows, Loader2, ListChecks, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -41,6 +41,10 @@ export default function ModuleKpis() {
   const [enabling, setEnabling] = useState(false);
   const [compareIds, setCompareIds] = useState([]);
   const [compareOpen, setCompareOpen] = useState(false);
+  const [auditIds, setAuditIds] = useState([]);
+  const [auditOnly, setAuditOnly] = useState(false);
+  const [auditMenuOpen, setAuditMenuOpen] = useState(false);
+  const [refreshingPreset, setRefreshingPreset] = useState(null);
   const loadRequestRef = useRef(0);
 
   async function load() {
@@ -72,6 +76,12 @@ export default function ModuleKpis() {
 
   const allTracked = useMemo(() => domains.flatMap((domain) => domain.indicators).filter((indicator) => indicator.tracked), [domains]);
   const compared = allTracked.filter((indicator) => compareIds.includes(indicator.preset_id));
+  const trackedIds = useMemo(() => new Set(allTracked.map((indicator) => indicator.preset_id)), [allTracked]);
+  const selectedAuditCount = auditIds.filter((id) => trackedIds.has(id)).length;
+
+  useEffect(() => {
+    setAuditIds((ids) => ids.filter((id) => trackedIds.has(id)));
+  }, [trackedIds]);
 
   function toggleDomain(key) {
     setOpenDomains((current) => {
@@ -106,6 +116,19 @@ export default function ModuleKpis() {
     }
   }
 
+  async function handleRefresh(indicator) {
+    setRefreshingPreset(indicator.preset_id);
+    setError('');
+    try {
+      await api.post(`/kpis/${indicator.kpi_id}/recompute`);
+      await load();
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible d’actualiser cet indicateur.');
+    } finally {
+      setRefreshingPreset(null);
+    }
+  }
+
   async function handleEnableEssentials() {
     setEnabling(true);
     setError('');
@@ -129,9 +152,35 @@ export default function ModuleKpis() {
     setCompareIds((ids) => (ids.includes(indicator.preset_id) ? ids.filter((id) => id !== indicator.preset_id) : ids.length >= MAX_COMPARE ? ids : [...ids, indicator.preset_id]));
   }
 
+  function toggleAudit(indicator) {
+    setAuditIds((ids) => (ids.includes(indicator.preset_id) ? ids.filter((id) => id !== indicator.preset_id) : [...ids, indicator.preset_id]));
+  }
+
+  function toggleDomainAudit(domain) {
+    const domainIds = domain.indicators.filter((indicator) => indicator.tracked).map((indicator) => indicator.preset_id);
+    setAuditIds((ids) => {
+      const allSelected = domainIds.every((id) => ids.includes(id));
+      return allSelected ? ids.filter((id) => !domainIds.includes(id)) : [...new Set([...ids, ...domainIds])];
+    });
+  }
+
+  function clearAuditSelection() {
+    setAuditIds([]);
+    setAuditOnly(false);
+  }
+
   const summary = data?.summary;
   const untrackedEssentials = summary ? summary.essential_total - summary.essential_tracked : 0;
-  const rowProps = { mode, canManage, compareDisabled: compareIds.length >= MAX_COMPARE, onToggleCompare: toggleCompare, onTrack: handleTrack, onUntrack: handleUntrack, onObjectiveSaved: load };
+  const rowProps = {
+    mode,
+    canManage,
+    compareDisabled: compareIds.length >= MAX_COMPARE,
+    onToggleCompare: toggleCompare,
+    onTrack: handleTrack,
+    onUntrack: handleUntrack,
+    onRefresh: handleRefresh,
+    onObjectiveSaved: load,
+  };
 
   return (
     <div className={compareIds.length >= 2 ? 'pb-24' : ''}>
@@ -203,6 +252,84 @@ export default function ModuleKpis() {
                   N'afficher que ce qui demande de l'attention
                 </label>
               )}
+
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setAuditMenuOpen((open) => !open)}
+                  aria-expanded={auditMenuOpen}
+                  className="flex min-h-[44px] w-full items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 text-left text-sm font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <ListChecks size={17} className="shrink-0 text-primary" />
+                    <span className="truncate">Choisir les données à auditer</span>
+                    <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{selectedAuditCount} sélectionné{selectedAuditCount > 1 ? 's' : ''}</span>
+                  </span>
+                  <ChevronDown size={17} className={`shrink-0 text-slate-400 transition-transform ${auditMenuOpen ? 'rotate-180' : ''}`} />
+                </button>
+
+                {auditMenuOpen && (
+                  <div className="mt-2 space-y-2 rounded-md border border-slate-200 p-2">
+                    {domains.map((domain) => {
+                      const domainTracked = domain.indicators.filter((indicator) => indicator.tracked);
+                      const domainSelected = domainTracked.filter((indicator) => auditIds.includes(indicator.preset_id)).length;
+                      if (domainTracked.length === 0) {
+                        return (
+                          <p key={domain.key} className="px-2 py-1 text-xs text-slate-400">
+                            {domain.label} : aucun indicateur suivi
+                          </p>
+                        );
+                      }
+                      return (
+                        <details key={domain.key} className="rounded-md border border-slate-100 bg-white" open={domainSelected > 0}>
+                          <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-2 px-2 text-sm font-medium text-slate-700">
+                            <span className="min-w-0 flex-1 truncate">{domain.label}</span>
+                            <span className="text-xs text-slate-400">{domainSelected}/{domainTracked.length}</span>
+                          </summary>
+                          <div className="space-y-1 border-t border-slate-100 px-2 py-2">
+                            <label className="flex min-h-[36px] cursor-pointer items-center gap-2 border-b border-slate-100 pb-1 text-xs font-medium text-primary">
+                              <input
+                                type="checkbox"
+                                checked={domainSelected === domainTracked.length}
+                                onChange={() => toggleDomainAudit(domain)}
+                                className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                              />
+                              Tout sélectionner dans ce domaine
+                            </label>
+                            {domainTracked.map((indicator) => (
+                              <label key={indicator.preset_id} className="flex min-h-[36px] cursor-pointer items-center gap-2 text-sm text-slate-700">
+                                <input
+                                  type="checkbox"
+                                  checked={auditIds.includes(indicator.preset_id)}
+                                  onChange={() => toggleAudit(indicator)}
+                                  className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                />
+                                <span className="min-w-0 flex-1 truncate">{indicator.label}</span>
+                                <span className="shrink-0 text-xs text-slate-400">{indicator.status === 'bad' ? 'Hors objectif' : indicator.status === 'warning' ? 'À surveiller' : indicator.status === 'good' ? 'OK' : 'Sans objectif'}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </details>
+                      );
+                    })}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                      <label className="flex min-h-[40px] cursor-pointer items-center gap-2 text-sm font-medium text-slate-700">
+                        <input
+                          type="checkbox"
+                          checked={auditOnly}
+                          onChange={(event) => setAuditOnly(event.target.checked)}
+                          disabled={selectedAuditCount === 0}
+                          className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary disabled:opacity-50"
+                        />
+                        Afficher uniquement ma sélection
+                      </label>
+                      <button type="button" onClick={clearAuditSelection} className="min-h-[40px] px-2 text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-800">
+                        Effacer la sélection
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -210,11 +337,12 @@ export default function ModuleKpis() {
                 const open = openDomains?.has(domain.key);
                 const essentials = domain.indicators.filter((indicator) => indicator.essential);
                 const others = domain.indicators.filter((indicator) => !indicator.essential);
-                const shown = essentials.filter((indicator) => !onlyIssues || (indicator.tracked && ['bad', 'warning'].includes(indicator.status)));
-                const trackedOthers = others.filter((indicator) => indicator.tracked && (!onlyIssues || ['bad', 'warning'].includes(indicator.status)));
-                const untrackedOthers = others.filter((indicator) => !indicator.tracked);
+                const isAuditVisible = (indicator) => !auditOnly || auditIds.includes(indicator.preset_id);
+                const shown = essentials.filter((indicator) => isAuditVisible(indicator) && (!onlyIssues || (indicator.tracked && ['bad', 'warning'].includes(indicator.status))));
+                const trackedOthers = others.filter((indicator) => indicator.tracked && isAuditVisible(indicator) && (!onlyIssues || ['bad', 'warning'].includes(indicator.status)));
+                const untrackedOthers = others.filter((indicator) => !auditOnly && !indicator.tracked);
                 const othersOpen = showOthers[domain.key];
-                if (onlyIssues && shown.length === 0 && trackedOthers.length === 0) return null;
+                if ((onlyIssues || auditOnly) && shown.length === 0 && trackedOthers.length === 0) return null;
                 return (
                   <section key={domain.key} className="rounded-xl border border-slate-200 bg-slate-50/50">
                     <button type="button" onClick={() => toggleDomain(domain.key)} aria-expanded={open} className="flex min-h-[60px] w-full items-center gap-3 rounded-xl p-4 text-left">
@@ -235,10 +363,10 @@ export default function ModuleKpis() {
                       <div className="space-y-2 px-3 pb-4 sm:px-4">
                         <ul className="space-y-2">
                           {shown.map((indicator) => (
-                            <IndicatorRow key={indicator.preset_id} indicator={indicator} compareSelected={compareIds.includes(indicator.preset_id)} busy={busyPreset === indicator.preset_id} {...rowProps} />
+                            <IndicatorRow key={indicator.preset_id} indicator={indicator} compareSelected={compareIds.includes(indicator.preset_id)} busy={busyPreset === indicator.preset_id || refreshingPreset === indicator.preset_id} {...rowProps} />
                           ))}
                           {trackedOthers.map((indicator) => (
-                            <IndicatorRow key={indicator.preset_id} indicator={indicator} compareSelected={compareIds.includes(indicator.preset_id)} busy={busyPreset === indicator.preset_id} {...rowProps} />
+                            <IndicatorRow key={indicator.preset_id} indicator={indicator} compareSelected={compareIds.includes(indicator.preset_id)} busy={busyPreset === indicator.preset_id || refreshingPreset === indicator.preset_id} {...rowProps} />
                           ))}
                         </ul>
                         {!onlyIssues && untrackedOthers.length > 0 && (
@@ -255,7 +383,7 @@ export default function ModuleKpis() {
                             {othersOpen && (
                               <ul className="mt-1 space-y-2">
                                 {untrackedOthers.map((indicator) => (
-                                  <IndicatorRow key={indicator.preset_id} indicator={indicator} compareSelected={false} busy={busyPreset === indicator.preset_id} {...rowProps} />
+                                <IndicatorRow key={indicator.preset_id} indicator={indicator} compareSelected={false} busy={busyPreset === indicator.preset_id || refreshingPreset === indicator.preset_id} {...rowProps} />
                                 ))}
                               </ul>
                             )}
