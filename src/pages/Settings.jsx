@@ -127,7 +127,7 @@ export default function Settings() {
         {activeTab === 'quality-policy' && <QualityPolicySettings isAdmin={isAdmin} isManager={currentUser?.role === 'manager'} />}
         {activeTab === 'risks' && isAdmin && <RiskSettings />}
         {activeTab === 'suppliers' && isAdmin && <SupplierSettingsModal embedded onSaved={() => {}} />}
-        {activeTab === 'data-security' && <SettingsDataSecurity />}
+        {activeTab === 'data-security' && <SettingsDataSecurity isAdmin={isAdmin} />}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings
             currentUser={currentUser}

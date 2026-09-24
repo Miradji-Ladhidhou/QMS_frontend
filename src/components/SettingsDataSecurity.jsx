@@ -1,11 +1,25 @@
-import { useState } from 'react';
-import { ExternalLink, LogOut, ShieldCheck } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Download, ExternalLink, KeyRound, LogOut, ShieldCheck, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { api } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
+import { useTenant } from '../lib/useTenant.js';
 
-export default function SettingsDataSecurity() {
+export default function SettingsDataSecurity({ isAdmin }) {
+  const tenant = useTenant();
   const [signingOut, setSigningOut] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmationName, setConfirmationName] = useState('');
+  const [factors, setFactors] = useState([]);
+  const [enrolling, setEnrolling] = useState(false);
+  const [enrollData, setEnrollData] = useState(null);
+  const [mfaCode, setMfaCode] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    supabase.auth.mfa.listFactors().then(({ data }) => setFactors(data?.totp || [])).catch(() => {});
+  }, []);
 
   async function signOutEverywhere() {
     if (!window.confirm('Déconnecter ce compte de tous les appareils ?')) return;
@@ -18,6 +32,69 @@ export default function SettingsDataSecurity() {
       return;
     }
     window.location.assign('/login');
+  }
+
+  async function exportData() {
+    setError('');
+    setExporting(true);
+    try {
+      const { data } = await api.get('/tenant/data-export', { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `qms-export-${tenant?.slug || 'entreprise'}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible d'exporter les données.");
+    } finally {
+      setExporting(false);
+    }
+  }
+
+  async function deleteAccount() {
+    if (!tenant?.name || confirmationName !== tenant.name) {
+      setError("Saisissez exactement le nom de l'entreprise pour confirmer.");
+      return;
+    }
+    if (!window.confirm('Cette suppression est définitive. Continuer ?')) return;
+    setDeleting(true);
+    setError('');
+    try {
+      await api.delete('/tenant/account', { data: { confirmation_name: confirmationName } });
+      await supabase.auth.signOut({ scope: 'global' });
+      window.location.assign('/login');
+    } catch (err) {
+      setError(err.response?.data?.error || "Impossible de supprimer l'entreprise.");
+      setDeleting(false);
+    }
+  }
+
+  async function enrollMfa() {
+    setError('');
+    setEnrolling(true);
+    const { data, error: enrollError } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'QMS SaaS' });
+    setEnrolling(false);
+    if (enrollError) setError("Impossible d'activer la double authentification.");
+    else setEnrollData(data);
+  }
+
+  async function verifyMfa() {
+    if (!enrollData || !mfaCode.trim()) return;
+    setError('');
+    const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId: enrollData.id });
+    if (challengeError) return setError('Impossible de démarrer la vérification MFA.');
+    const { error: verifyError } = await supabase.auth.mfa.verify({ factorId: enrollData.id, challengeId: challenge.id, code: mfaCode.trim() });
+    if (verifyError) return setError('Code MFA invalide.');
+    setFactors((current) => [...current, enrollData]);
+    setEnrollData(null);
+    setMfaCode('');
+  }
+
+  async function disableMfa(factorId) {
+    const { error: unenrollError } = await supabase.auth.mfa.unenroll({ factorId });
+    if (unenrollError) setError('Impossible de désactiver la double authentification.');
+    else setFactors((current) => current.filter((factor) => factor.id !== factorId));
   }
 
   return (
@@ -44,6 +121,34 @@ export default function SettingsDataSecurity() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <div className="flex items-center gap-2">
+          <KeyRound size={18} className="text-slate-500" />
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Double authentification</h2>
+        </div>
+        <p className="mt-2 text-sm text-slate-600">Ajoutez une validation par application d'authentification à votre compte.</p>
+        {factors.length === 0 && !enrollData ? (
+          <button type="button" onClick={enrollMfa} disabled={enrolling} className="mt-4 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60">
+            {enrolling ? 'Préparation...' : 'Activer la double authentification'}
+          </button>
+        ) : factors.length > 0 ? (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+            <span>Double authentification activée</span>
+            <button type="button" onClick={() => disableMfa(factors[0].id)} className="text-xs font-medium underline">Désactiver</button>
+          </div>
+        ) : null}
+        {enrollData && (
+          <div className="mt-4 rounded-md border border-slate-200 bg-slate-50 p-3">
+            {enrollData.totp?.qr_code && <img src={enrollData.totp.qr_code} alt="QR code de configuration MFA" className="h-40 w-40 bg-white p-2" />}
+            <label className="mt-3 block text-sm font-medium text-slate-700">Code de vérification</label>
+            <div className="mt-1 flex gap-2">
+              <input value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} inputMode="numeric" className="w-40 rounded-md border border-slate-300 px-3 py-2 text-base" />
+              <button type="button" onClick={verifyMfa} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white">Vérifier</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Documents légaux et données</h2>
         <p className="mt-2 text-sm text-slate-600">
           Consultez les informations relatives à la confidentialité et aux conditions d'utilisation. L'export complet et la
@@ -57,6 +162,23 @@ export default function SettingsDataSecurity() {
             Conditions d'utilisation <ExternalLink size={14} />
           </Link>
         </div>
+        {isAdmin && (
+          <>
+            <button type="button" onClick={exportData} disabled={exporting} className="mt-4 flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+              <Download size={16} />
+              {exporting ? 'Export...' : 'Exporter les données de l’entreprise'}
+            </button>
+            <div className="mt-5 border-t border-red-200 pt-4">
+              <p className="text-sm font-semibold text-red-800">Supprimer définitivement l’entreprise</p>
+              <p className="mt-1 text-xs text-red-700">Cette action supprime les données du tenant et les comptes associés.</p>
+              <input value={confirmationName} onChange={(event) => setConfirmationName(event.target.value)} placeholder={tenant?.name || "Nom de l'entreprise"} className="mt-3 w-full rounded-md border border-red-300 px-3 py-2 text-base sm:max-w-sm" />
+              <button type="button" onClick={deleteAccount} disabled={deleting} className="mt-2 flex items-center gap-2 rounded-md bg-red-700 px-3 py-2 text-sm font-medium text-white hover:bg-red-800 disabled:opacity-60">
+                <Trash2 size={16} />
+                {deleting ? 'Suppression...' : 'Supprimer l’entreprise'}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
