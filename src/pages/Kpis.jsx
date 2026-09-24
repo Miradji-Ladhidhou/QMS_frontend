@@ -115,6 +115,8 @@ const KPI_SORT_OPTIONS = [
   { key: 'name', label: 'nom' },
 ];
 
+const KPI_PAGE_SIZE = 25;
+
 // Date de la dernière valeur enregistrée, quelle que soit la série — sert de tri par défaut
 // (les KPI les plus récemment mis à jour en premier) sans dépendre d'un champ dédié côté API.
 function getKpiLatestDate(kpi) {
@@ -2882,6 +2884,7 @@ function KpiCard({
   onToggleSelect,
 }) {
   const currentUser = useCurrentUser();
+  const [showDetails, setShowDetails] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showChart, setShowChart] = useState(false);
   const [showImports, setShowImports] = useState(false);
@@ -3085,10 +3088,26 @@ function KpiCard({
                 </span>
               )}
             </div>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span className={`text-sm font-semibold ${KPI_STATUS_STYLES[status]}`}>
+                {averageValue === null ? 'Aucune valeur' : `${averageValue} ${kpi.unit || ''}`}
+              </span>
+              <span className="text-xs text-slate-400">{records.length} relevé{records.length > 1 ? 's' : ''}</span>
+            </div>
           </div>
         </div>
 
         <div className="flex shrink-0 items-start gap-1">
+          <button
+            type="button"
+            onClick={() => setShowDetails((prev) => !prev)}
+            aria-expanded={showDetails}
+            aria-label={showDetails ? 'Replier les détails' : 'Déplier les détails'}
+            className="flex items-center gap-1 rounded-md px-2 py-2 text-xs font-medium text-primary hover:bg-primary/5"
+          >
+            {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <span className="hidden sm:inline">{showDetails ? 'Replier' : 'Détails'}</span>
+          </button>
           <div className="relative">
             <button
               type="button"
@@ -3215,6 +3234,8 @@ function KpiCard({
         </div>
       </div>
 
+      {showDetails && (
+        <>
       {exportError && <p className="mt-1 text-xs text-red-600">{exportError}</p>}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
@@ -3463,6 +3484,8 @@ function KpiCard({
             </div>
           )}
         </div>
+      )}
+        </>
       )}
     </div>
   );
@@ -3927,6 +3950,7 @@ export default function Kpis() {
   const [recomputingId, setRecomputingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [kpiPage, setKpiPage] = useState(1);
 
   async function handleRecompute(kpi) {
     setRecomputingId(kpi.id);
@@ -4241,6 +4265,16 @@ export default function Kpis() {
     { all: 0, good: 0, warning: 0, bad: 0, neutral: 0 }
   );
   const hasActiveKpiFilter = Boolean(normalizedSearchTerm) || statusFilter !== 'all';
+  const totalKpiPages = Math.max(1, Math.ceil(filteredKpis.length / KPI_PAGE_SIZE));
+  const visibleKpis = filteredKpis.slice((kpiPage - 1) * KPI_PAGE_SIZE, kpiPage * KPI_PAGE_SIZE);
+
+  useEffect(() => {
+    setKpiPage(1);
+  }, [currentFolderId, normalizedSearchTerm, statusFilter]);
+
+  useEffect(() => {
+    if (kpiPage > totalKpiPages) setKpiPage(totalKpiPages);
+  }, [kpiPage, totalKpiPages]);
 
   return (
     <div>
@@ -4422,8 +4456,12 @@ export default function Kpis() {
               <p className="mt-1 text-sm text-slate-500">Essayez un autre terme ou réinitialisez la recherche.</p>
             </div>
           ) : (
-            <div className="mt-4 flex max-w-4xl flex-col gap-4">
-              {filteredKpis.map((kpi) => (
+            <>
+              <p className="mt-4 text-xs text-slate-500">
+                {filteredKpis.length} KPI affiché{filteredKpis.length > 1 ? 's' : ''} — {KPI_PAGE_SIZE} maximum par page
+              </p>
+              <div className="mt-2 flex max-w-4xl flex-col gap-3">
+              {visibleKpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
                   kpi={kpi}
@@ -4446,7 +4484,9 @@ export default function Kpis() {
                   onToggleSelect={() => toggleSelect(kpi.id)}
                 />
               ))}
-            </div>
+              </div>
+              <Pagination page={kpiPage} totalPages={totalKpiPages} onPageChange={setKpiPage} />
+            </>
           )}
         </>
       )}
