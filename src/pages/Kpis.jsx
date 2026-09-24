@@ -1927,6 +1927,20 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
 
             {importData && (
               <div className="mt-4">
+                    {importData.quality_report && (
+                      <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                        <p className="font-semibold">Contrôle automatique du fichier</p>
+                        <div className="mt-1 grid gap-1 sm:grid-cols-2">
+                          <span>{importData.quality_report.total_rows} lignes originales</span>
+                          <span>{importData.quality_report.empty_rows} ligne(s) vide(s)</span>
+                          <span>{importData.quality_report.empty_columns.length} colonne(s) vide(s)</span>
+                          <span>{importData.quality_report.duplicate_count} doublon(s) détecté(s)</span>
+                        </div>
+                        {importData.quality_report.status_column && <p className="mt-1">Colonne de statut détectée : <strong>{importData.quality_report.status_column}</strong></p>}
+                        {importData.quality_report.statuses.length > 0 && <p className="mt-1">Valeurs détectées : {importData.quality_report.statuses.join(', ')}</p>}
+                        {importData.quality_report.duplicate_count > 0 && <p className="mt-1 font-medium">Vérifie les doublons avant de choisir le calcul.</p>}
+                      </div>
+                    )}
                 <p className="text-sm font-medium text-slate-700">
                   {importData.row_count} ligne{importData.row_count > 1 ? 's' : ''} détectée
                   {importData.row_count > 1 ? 's' : ''}, {importData.columns.length} colonne
