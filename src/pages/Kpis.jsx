@@ -2018,10 +2018,10 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
 
                 <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div><p className="text-sm font-medium text-blue-900">Besoin d’aide pour configurer ce fichier ?</p><p className="text-xs text-blue-700">L’IA propose une recette à vérifier. Elle ne calcule ni n’applique rien seule.</p></div>
+                    <div><p className="text-sm font-medium text-blue-900">Analyser le fichier original avec l’IA</p><p className="text-xs text-blue-700">L’analyse porte sur toutes les lignes, les colonnes, les dates, les nombres et les valeurs distinctes. La suggestion reste à vérifier avant application.</p></div>
                     <button type="button" onClick={requestAiSuggestion} disabled={aiSuggestionLoading} className="rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-60">{aiSuggestionLoading ? 'Analyse…' : 'Analyser avec l’IA'}</button>
                   </div>
-                  {aiSuggestion && <div className="mt-2 rounded border border-blue-200 bg-white p-2 text-xs text-slate-700"><p><strong>Suggestion :</strong> {aiSuggestion.label} · {CALC_TYPE_LABELS[aiSuggestion.calc_type] || aiSuggestion.calc_type}</p><p className="mt-1">Confiance : <strong>{aiSuggestion.confidence ?? 0} %</strong> · {aiSuggestion.explanation}</p><button type="button" onClick={applyAiSuggestion} className="mt-2 font-medium text-primary underline underline-offset-2">Appliquer cette suggestion pour la vérifier</button></div>}
+                  {aiSuggestion && <div className="mt-2 rounded border border-blue-200 bg-white p-2 text-xs text-slate-700"><p><strong>Suggestion :</strong> {aiSuggestion.label} · {CALC_TYPE_LABELS[aiSuggestion.calc_type] || aiSuggestion.calc_type}</p><p className="mt-1">Confiance : <strong>{aiSuggestion.confidence ?? 0} %</strong> · {aiSuggestion.explanation}</p><p className="mt-1 text-slate-500">{aiSuggestion.analyzed_rows || 0} ligne(s) analysée(s) depuis le fichier original.</p><button type="button" onClick={applyAiSuggestion} className="mt-2 font-medium text-primary underline underline-offset-2">Appliquer cette suggestion pour la vérifier</button></div>}
                 </div>
 
                 {!configForm.period_column && (
