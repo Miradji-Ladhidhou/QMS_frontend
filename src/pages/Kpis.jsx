@@ -1498,6 +1498,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   const [aiSuggestion, setAiSuggestion] = useState(null);
   const [aiSuggestionLoading, setAiSuggestionLoading] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
+  const [aiAnalyzedImportKey, setAiAnalyzedImportKey] = useState('');
 
   const [result, setResult] = useState(null);
 
@@ -1543,6 +1544,8 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     setImportData(null);
     setSuggested(false);
     setSimpleMode(true);
+    setAiSuggestion(null);
+    setAiAnalyzedImportKey('');
   }
 
   function handleDownloadTemplate() {
@@ -1567,8 +1570,12 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     try {
       const { data } = await api.get(`/kpi-imports/${importId}`);
       setImportData(data);
+      setAiSuggestion(null);
+      setAiAnalyzedImportKey('');
       setSuggested(false);
       setSimpleMode(true);
+      setAiSuggestion(null);
+      setAiAnalyzedImportKey('');
     } catch (err) {
       setUploadError(err.response?.data?.error || "Impossible de charger cet import.");
     } finally {
@@ -1635,6 +1642,17 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
       setAiSuggestionLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (!importData?.import?.id) return;
+    const importKey = `${importData.import.id}:${importData.sheet_used || ''}`;
+    if (aiAnalyzedImportKey === importKey || aiSuggestionLoading) return;
+    setAiAnalyzedImportKey(importKey);
+    requestAiSuggestion();
+    // L'IA doit analyser automatiquement le fichier original dès son dépôt. Le bouton manuel
+    // reste disponible en étape 2 pour relancer après modification de la consigne.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [importData?.import?.id, importData?.sheet_used, aiAnalyzedImportKey]);
 
   function applyAiSuggestion() {
     if (!aiSuggestion) return;
@@ -1817,6 +1835,18 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                     accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
                     onChange={(e) => handleFileChange(e.target.files?.[0] ?? null)}
                     className="hidden"
+                  />
+                </div>
+
+                <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3">
+                  <label className="block text-sm font-medium text-blue-900">Consigne pour l’analyse IA</label>
+                  <p className="mt-1 text-xs text-blue-700">Écris ce que tu veux mesurer. L’analyse démarrera automatiquement après le dépôt du fichier original.</p>
+                  <textarea
+                    value={aiPrompt}
+                    onChange={(event) => setAiPrompt(event.target.value)}
+                    rows={3}
+                    placeholder="Ex : calcule le taux de conformité par mois, utilise Résultat, considère Conforme comme positif et ignore les lignes vides."
+                    className="mt-2 w-full rounded-md border border-blue-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
 
