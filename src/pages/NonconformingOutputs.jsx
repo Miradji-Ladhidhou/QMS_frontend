@@ -25,6 +25,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const OUTPUT_RESOURCE_TYPE = 'nonconforming_output';
@@ -333,6 +334,11 @@ export default function NonconformingOutputs() {
     () => sortedOutputs.filter((output) => (output.category_id || null) === currentFolderId),
     [sortedOutputs, currentFolderId]
   );
+  const [outputPage, setOutputPage] = useState(1);
+  const outputTotalPages = Math.max(1, Math.ceil(currentFolderOutputs.length / 25));
+  const pagedOutputs = currentFolderOutputs.slice((outputPage - 1) * 25, outputPage * 25);
+  useEffect(() => setOutputPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => { if (outputPage > outputTotalPages) setOutputPage(outputTotalPages); }, [outputPage, outputTotalPages]);
   // Miroir de DELETE /nonconforming-outputs/:id côté backend : admin/manager uniquement, sans
   // restriction créateur (contrairement à accidents.js) — voir le plan approuvé.
   const deletableIds = canManage ? currentFolderOutputs.map((output) => output.id) : [];
@@ -608,7 +614,7 @@ export default function NonconformingOutputs() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderOutputs.map((output) => (
+              {pagedOutputs.map((output) => (
                 <div
                   key={output.id}
                   onClick={() => navigate(`/nonconforming-outputs/${output.id}`)}
@@ -656,6 +662,7 @@ export default function NonconformingOutputs() {
                   </div>
                 </div>
               ))}
+              <Pagination page={outputPage} totalPages={outputTotalPages} onPageChange={setOutputPage} />
             </div>
           )}
         </>

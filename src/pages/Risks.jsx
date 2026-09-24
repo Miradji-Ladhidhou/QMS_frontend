@@ -34,6 +34,7 @@ import SortSelect from '../components/SortSelect.jsx';
 import AiRiskSuggestion from '../components/AiRiskSuggestion.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 import RiskThresholdBanner from '../components/risks/RiskThresholdBanner.jsx';
 import RiskKpiSuggestions from '../components/risks/RiskKpiSuggestions.jsx';
 import RiskReviewModal from '../components/risks/RiskReviewModal.jsx';
@@ -533,6 +534,11 @@ export default function Risks() {
     () => sortedRisks.filter((risk) => (risk.category_id || null) === currentFolderId && (!onlyNeedsCapa || risk.needs_capa)),
     [sortedRisks, currentFolderId, onlyNeedsCapa]
   );
+  const [riskPage, setRiskPage] = useState(1);
+  const riskTotalPages = Math.max(1, Math.ceil(currentFolderRisks.length / 25));
+  const pagedRisks = currentFolderRisks.slice((riskPage - 1) * 25, riskPage * 25);
+  useEffect(() => setRiskPage(1), [currentFolderId, searchText, statusFilter, typeFilter]);
+  useEffect(() => { if (riskPage > riskTotalPages) setRiskPage(riskTotalPages); }, [riskPage, riskTotalPages]);
 
   function handleCreated(risk) {
     setIsModalOpen(false);
@@ -878,7 +884,7 @@ export default function Risks() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderRisks.map((risk) => (
+              {pagedRisks.map((risk) => (
                 <div
                   key={risk.id}
                   onClick={() => navigate(`/risks/${risk.id}`)}
@@ -934,6 +940,7 @@ export default function Risks() {
                   )}
                 </div>
               ))}
+              <Pagination page={riskPage} totalPages={riskTotalPages} onPageChange={setRiskPage} />
             </div>
           )}
         </>

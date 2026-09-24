@@ -25,6 +25,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 import AuditorQualification from '../components/AuditorQualification.jsx';
 import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
 import { qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
@@ -340,6 +341,11 @@ export default function Audits() {
     () => sortedAudits.filter((audit) => (audit.category_id || null) === currentFolderId),
     [sortedAudits, currentFolderId]
   );
+  const [auditPage, setAuditPage] = useState(1);
+  const auditTotalPages = Math.max(1, Math.ceil(currentFolderAudits.length / 25));
+  const pagedAudits = currentFolderAudits.slice((auditPage - 1) * 25, auditPage * 25);
+  useEffect(() => setAuditPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => { if (auditPage > auditTotalPages) setAuditPage(auditTotalPages); }, [auditPage, auditTotalPages]);
 
   function handleCreated(audit) {
     setIsModalOpen(false);
@@ -591,7 +597,7 @@ export default function Audits() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderAudits.map((audit) => (
+              {pagedAudits.map((audit) => (
                 <div
                   key={audit.id}
                   onClick={() => navigate(`/audits/${audit.id}`)}
@@ -637,6 +643,7 @@ export default function Audits() {
                   <AuditStatusBadge status={audit.status} />
                 </div>
               ))}
+              <Pagination page={auditPage} totalPages={auditTotalPages} onPageChange={setAuditPage} />
             </div>
           )}
         </>

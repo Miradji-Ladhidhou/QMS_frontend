@@ -26,6 +26,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const ACCIDENT_RESOURCE_TYPE = 'accident';
@@ -443,6 +444,11 @@ export default function Accidents() {
     () => sortedAccidents.filter((accident) => (accident.category_id || null) === currentFolderId),
     [sortedAccidents, currentFolderId]
   );
+  const [accidentPage, setAccidentPage] = useState(1);
+  const accidentTotalPages = Math.max(1, Math.ceil(currentFolderAccidents.length / 25));
+  const pagedAccidents = currentFolderAccidents.slice((accidentPage - 1) * 25, accidentPage * 25);
+  useEffect(() => setAccidentPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => { if (accidentPage > accidentTotalPages) setAccidentPage(accidentTotalPages); }, [accidentPage, accidentTotalPages]);
 
   const deletableIds = currentFolderAccidents.filter((accident) => canDeleteAccident(accident, currentUser)).map((accident) => accident.id);
 
@@ -754,7 +760,7 @@ export default function Accidents() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderAccidents.map((accident) => (
+              {pagedAccidents.map((accident) => (
                 <div
                   key={accident.id}
                   onClick={() => navigate(`/accidents/${accident.id}`)}
@@ -801,6 +807,7 @@ export default function Accidents() {
                   </div>
                 </div>
               ))}
+              <Pagination page={accidentPage} totalPages={accidentTotalPages} onPageChange={setAccidentPage} />
             </div>
           )}
         </>

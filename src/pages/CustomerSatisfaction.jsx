@@ -26,6 +26,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const SURVEY_RESOURCE_TYPE = 'customer_satisfaction';
@@ -343,6 +344,11 @@ export default function CustomerSatisfaction() {
     () => sortedSurveys.filter((survey) => (survey.category_id || null) === currentFolderId),
     [sortedSurveys, currentFolderId]
   );
+  const [surveyPage, setSurveyPage] = useState(1);
+  const surveyTotalPages = Math.max(1, Math.ceil(currentFolderSurveys.length / 25));
+  const pagedSurveys = currentFolderSurveys.slice((surveyPage - 1) * 25, surveyPage * 25);
+  useEffect(() => setSurveyPage(1), [currentFolderId, searchText]);
+  useEffect(() => { if (surveyPage > surveyTotalPages) setSurveyPage(surveyTotalPages); }, [surveyPage, surveyTotalPages]);
   // Miroir de DELETE /customer-satisfaction/:id côté backend : admin/manager uniquement.
   const deletableIds = canManage ? currentFolderSurveys.map((survey) => survey.id) : [];
 
@@ -586,7 +592,7 @@ export default function CustomerSatisfaction() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderSurveys.map((survey) => (
+              {pagedSurveys.map((survey) => (
                 <div
                   key={survey.id}
                   onClick={() => navigate(`/customer-satisfaction/${survey.id}`)}
@@ -636,6 +642,7 @@ export default function CustomerSatisfaction() {
                   </div>
                 </div>
               ))}
+              <Pagination page={surveyPage} totalPages={surveyTotalPages} onPageChange={setSurveyPage} />
             </div>
           )}
         </>

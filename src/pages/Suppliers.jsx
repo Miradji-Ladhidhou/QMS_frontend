@@ -25,6 +25,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 import SupplierSummaryPanel from '../components/suppliers/SupplierSummaryPanel.jsx';
 import SupplierSettingsModal from '../components/suppliers/SupplierSettingsModal.jsx';
 import { EVALUATION_STATE_LABELS, EVALUATION_STATE_STYLES, formatScore } from '../lib/supplierPolicy.js';
@@ -392,6 +393,11 @@ export default function Suppliers() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [sortedSuppliers, currentFolderId, attentionFilter, summaryById]
   );
+  const [supplierPage, setSupplierPage] = useState(1);
+  const supplierTotalPages = Math.max(1, Math.ceil(currentFolderSuppliers.length / 25));
+  const pagedSuppliers = currentFolderSuppliers.slice((supplierPage - 1) * 25, supplierPage * 25);
+  useEffect(() => setSupplierPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => { if (supplierPage > supplierTotalPages) setSupplierPage(supplierTotalPages); }, [supplierPage, supplierTotalPages]);
 
   function handleCreated(supplier) {
     setIsModalOpen(false);
@@ -664,7 +670,7 @@ export default function Suppliers() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderSuppliers.map((supplier) => (
+              {pagedSuppliers.map((supplier) => (
                 <div
                   key={supplier.id}
                   onClick={() => navigate(`/suppliers/${supplier.id}`)}
@@ -726,6 +732,7 @@ export default function Suppliers() {
                   )}
                 </div>
               ))}
+              <Pagination page={supplierPage} totalPages={supplierTotalPages} onPageChange={setSupplierPage} />
             </div>
           )}
         </>

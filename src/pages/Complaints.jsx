@@ -28,6 +28,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const COMPLAINT_RESOURCE_TYPE = 'complaint';
@@ -374,6 +375,11 @@ export default function Complaints() {
     () => sortedComplaints.filter((complaint) => (complaint.category_id || null) === currentFolderId),
     [sortedComplaints, currentFolderId]
   );
+  const [complaintPage, setComplaintPage] = useState(1);
+  const complaintTotalPages = Math.max(1, Math.ceil(currentFolderComplaints.length / 25));
+  const pagedComplaints = currentFolderComplaints.slice((complaintPage - 1) * 25, complaintPage * 25);
+  useEffect(() => setComplaintPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => { if (complaintPage > complaintTotalPages) setComplaintPage(complaintTotalPages); }, [complaintPage, complaintTotalPages]);
 
   function handleCreated(complaint) {
     setIsModalOpen(false);
@@ -597,7 +603,7 @@ export default function Complaints() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderComplaints.map((complaint) => (
+              {pagedComplaints.map((complaint) => (
                 <div
                   key={complaint.id}
                   onClick={() => navigate(`/complaints/${complaint.id}`)}
@@ -640,6 +646,7 @@ export default function Complaints() {
                   </div>
                 </div>
               ))}
+              <Pagination page={complaintPage} totalPages={complaintTotalPages} onPageChange={setComplaintPage} />
             </div>
           )}
         </>

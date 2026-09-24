@@ -26,6 +26,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const PDCA_RESOURCE_TYPE = 'pdca';
@@ -347,6 +348,11 @@ export default function Pdca() {
     () => sortedProjects.filter((pdca) => (pdca.category_id || null) === currentFolderId),
     [sortedProjects, currentFolderId]
   );
+  const [projectPage, setProjectPage] = useState(1);
+  const projectTotalPages = Math.max(1, Math.ceil(currentFolderProjects.length / 25));
+  const pagedProjects = currentFolderProjects.slice((projectPage - 1) * 25, projectPage * 25);
+  useEffect(() => setProjectPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => { if (projectPage > projectTotalPages) setProjectPage(projectTotalPages); }, [projectPage, projectTotalPages]);
   const deletableIds = currentFolderProjects.filter((pdca) => canDeletePdca(pdca, currentUser)).map((pdca) => pdca.id);
 
   function handleCreated(pdca) {
@@ -587,7 +593,7 @@ export default function Pdca() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
-              {currentFolderProjects.map((pdca) => {
+              {pagedProjects.map((pdca) => {
                 const overdue = isTargetOverdue(pdca);
                 return (
                   <div
@@ -636,6 +642,7 @@ export default function Pdca() {
                   </div>
                 );
               })}
+              <Pagination page={projectPage} totalPages={projectTotalPages} onPageChange={setProjectPage} />
             </div>
           )}
         </>
