@@ -21,7 +21,7 @@ export function UsersProvider({ children }) {
     if (loaded) return;
     setLoaded(true);
     api
-      .get('/users')
+      .get('/users', { params: { basic: 'true' } })
       .then(({ data }) => setUsers(data))
       .catch(() => setLoaded(false));
   }, [loaded]);
