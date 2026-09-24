@@ -1495,6 +1495,8 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   const [livePreview, setLivePreview] = useState(null);
   const [livePreviewLoading, setLivePreviewLoading] = useState(false);
   const [livePreviewError, setLivePreviewError] = useState('');
+  const [aiSuggestion, setAiSuggestion] = useState(null);
+  const [aiSuggestionLoading, setAiSuggestionLoading] = useState(false);
 
   const [result, setResult] = useState(null);
 
@@ -1619,6 +1621,35 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     ...configIssues(configForm),
     ...(periodReady ? [] : ['la période est requise (colonne détectée ou date saisie manuellement)']),
   ];
+
+  async function requestAiSuggestion() {
+    setAiSuggestionLoading(true);
+    setConfigError('');
+    try {
+      const { data } = await api.post(`/kpi-imports/${importData.import.id}/ai-suggestion`);
+      setAiSuggestion(data);
+    } catch (err) {
+      setConfigError(err.response?.data?.error || 'Impossible de proposer une recette IA.');
+    } finally {
+      setAiSuggestionLoading(false);
+    }
+  }
+
+  function applyAiSuggestion() {
+    if (!aiSuggestion) return;
+    setConfigForm((prev) => ({
+      ...prev,
+      label: aiSuggestion.label || prev.label,
+      calc_type: aiSuggestion.calc_type || prev.calc_type,
+      source_column: aiSuggestion.source_column || '',
+      period_column: aiSuggestion.period_column || '',
+      group_by_column: aiSuggestion.group_by_column || '',
+      filters: Array.isArray(aiSuggestion.filters) ? aiSuggestion.filters : [],
+      filter_logic: aiSuggestion.filter_logic || 'all',
+    }));
+    setSuggested(true);
+    setSimpleMode(false);
+  }
 
   // Aperçu live : recalcule à chaque changement de champ via /evaluate, qui n'enregistre
   // rien (ni la recette, ni de valeur) — contrairement à l'ancienne version qui exigeait de
@@ -1984,6 +2015,14 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                     sampleRows={importData.sample}
                   />
                 )}
+
+                <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div><p className="text-sm font-medium text-blue-900">Besoin d’aide pour configurer ce fichier ?</p><p className="text-xs text-blue-700">L’IA propose une recette à vérifier. Elle ne calcule ni n’applique rien seule.</p></div>
+                    <button type="button" onClick={requestAiSuggestion} disabled={aiSuggestionLoading} className="rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-60">{aiSuggestionLoading ? 'Analyse…' : 'Analyser avec l’IA'}</button>
+                  </div>
+                  {aiSuggestion && <div className="mt-2 rounded border border-blue-200 bg-white p-2 text-xs text-slate-700"><p><strong>Suggestion :</strong> {aiSuggestion.label} · {CALC_TYPE_LABELS[aiSuggestion.calc_type] || aiSuggestion.calc_type}</p><p className="mt-1">Confiance : <strong>{aiSuggestion.confidence ?? 0} %</strong> · {aiSuggestion.explanation}</p><button type="button" onClick={applyAiSuggestion} className="mt-2 font-medium text-primary underline underline-offset-2">Appliquer cette suggestion pour la vérifier</button></div>}
+                </div>
 
                 {!configForm.period_column && (
                   <div className="mt-4">
