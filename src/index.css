@@ -38,6 +38,14 @@
     border-color: #cbd5e1;
   }
 
+  /* Cartes applicatives : contraste doux avec le fond de page, sans assombrir les modales ni
+     les champs blancs. */
+  .rounded-xl.border.bg-white,
+  .rounded-lg.border.bg-white {
+    background-color: #f8fafc;
+    border-color: #94a3b8;
+  }
+
   input::placeholder,
   textarea::placeholder {
     color: #64748b;
