@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CheckCircle2, AlertCircle, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
 
@@ -25,8 +25,22 @@ export default function SendQuizModal({ training, sessionLabel, records, employe
     Object.fromEntries(records.filter((record) => record.employee_id).map((record) => [record.id, employeeById.get(record.employee_id)?.email || '']))
   );
   const [error, setError] = useState('');
+  const [emailsLoading, setEmailsLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [results, setResults] = useState(null);
+  const recordIds = records.map((record) => record.id).join(',');
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .get(`/trainings/${training.id}/quiz/invite-emails`, { params: { record_ids: recordIds } })
+      .then(({ data }) => {
+        if (!cancelled) setEmails((current) => ({ ...current, ...(data.emails || {}) }));
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setEmailsLoading(false); });
+    return () => { cancelled = true; };
+  }, [training.id, recordIds]);
 
   function toggle(recordId) {
     setSelected((prev) => {
@@ -164,7 +178,10 @@ export default function SendQuizModal({ training, sessionLabel, records, employe
                         </div>
                       )
                     ) : (
-                      <p className="ml-6 mt-1 text-xs text-slate-400">Envoyé à l'adresse de son compte.</p>
+                      <div className="ml-6 mt-2">
+                        <label className="mb-1 block text-xs font-medium text-slate-500">Adresse email du compte</label>
+                        <input type="email" readOnly value={emailsLoading ? 'Chargement…' : emails[record.id] || 'Email introuvable'} className={`${INPUT_CLASS} bg-slate-50 text-slate-600`} />
+                      </div>
                     )}
                   </li>
                 );
@@ -175,7 +192,7 @@ export default function SendQuizModal({ training, sessionLabel, records, employe
 
             <button
               type="submit"
-              disabled={sending}
+              disabled={sending || emailsLoading}
               className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
             >
               {sending ? 'Envoi en cours...' : `Envoyer à ${selected.size} personne${selected.size > 1 ? 's' : ''}`}
