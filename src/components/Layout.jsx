@@ -31,6 +31,7 @@ import {
   Users2,
   Wrench,
   X,
+  Loader2,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { api } from '../lib/api.js';
@@ -309,6 +310,7 @@ export default function Layout() {
   const visibleMenuKeys = useMenuVisibility();
   const logoUrl = getTenantLogoPublicUrl(tenant?.logo_url);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   // Sous-menus des pages fusionnées : par défaut un groupe se déplie tout seul quand on est
   // dessus (voir isGroupExpanded) — mais un clic sur le chevron doit pouvoir aussi bien l'ouvrir
   // que le refermer, y compris sur le groupe actif. `to` -> booléen explicite qui prime alors
@@ -357,6 +359,8 @@ export default function Layout() {
   }
 
   async function handleLogout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
     // Journalisé AVANT signOut() : après, le jeton nécessaire à /auth/activity a disparu
     // (voir services/activityLog.js, POST /auth/activity côté backend).
     await api.post('/auth/activity', { type: 'logout', reason: 'manual' }).catch(() => {});
@@ -550,10 +554,11 @@ export default function Layout() {
           <button
             type="button"
             onClick={handleLogout}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+            disabled={isLoggingOut}
+            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
           >
-            <LogOut size={20} />
-            Déconnexion
+            {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
+            {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
           </button>
         </div>
       </aside>

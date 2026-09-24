@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, ExternalLink, KeyRound, LogOut, ShieldCheck, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, KeyRound, Loader2, LogOut, ShieldCheck, Trash2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { api } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
@@ -148,7 +148,7 @@ export default function SettingsDataSecurity({ isAdmin, isSuperAdmin, canContact
           disabled={signingOut}
           className="mt-4 flex min-h-[40px] items-center gap-2 rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
         >
-          <LogOut size={16} />
+          {signingOut ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />}
           {signingOut ? 'Déconnexion...' : 'Déconnecter tous les appareils'}
         </button>
       </div>
