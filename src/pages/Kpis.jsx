@@ -1289,6 +1289,35 @@ function ImportResultSummary({ data, unit }) {
                 </ul>
               </details>
             )}
+
+            {period.rows_preview?.length > 0 && (
+              <details className="mt-2">
+                <summary className="cursor-pointer text-xs font-medium text-primary">
+                  Voir les lignes prises en compte ({period.rows_preview.filter((row) => row.included).length})
+                </summary>
+                <div className="mt-2 max-h-56 overflow-auto rounded border border-slate-200 bg-white">
+                  <table className="min-w-full text-left text-[11px]">
+                    <thead className="sticky top-0 bg-slate-100 text-slate-500">
+                      <tr>
+                        <th className="px-2 py-1.5">Ligne</th>
+                        <th className="px-2 py-1.5">Prise en compte</th>
+                        {Object.keys(period.rows_preview[0].row_data || {}).map((column) => <th key={column} className="px-2 py-1.5">{column}</th>)}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {period.rows_preview.slice(0, 100).map((row) => (
+                        <tr key={row.row_index} className={row.included ? '' : 'bg-red-50 text-slate-400'}>
+                          <td className="px-2 py-1.5">{row.row_index}</td>
+                          <td className="px-2 py-1.5">{row.included ? 'Oui' : 'Non'}</td>
+                          {Object.keys(period.rows_preview[0].row_data || {}).map((column) => <td key={column} className="max-w-40 whitespace-nowrap px-2 py-1.5">{String(row.row_data?.[column] ?? '—')}</td>)}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {period.rows_preview.length > 100 && <p className="mt-1 text-[11px] text-slate-400">Aperçu limité aux 100 premières lignes. Le résultat porte sur les {period.rows_preview.length} lignes.</p>}
+              </details>
+            )}
           </div>
         ))}
       </div>
