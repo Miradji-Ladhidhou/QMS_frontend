@@ -1965,7 +1965,7 @@ export default function Trainings() {
                     <div
                       key={training.id}
                       id={`training-${training.id}`}
-                      className={`flex flex-col rounded-xl border bg-white p-4 shadow-sm transition-shadow sm:p-5 ${
+                      className={`flex flex-col rounded-lg border bg-white p-3 shadow-sm transition-shadow sm:p-4 ${
                         overdueCount > 0 ? 'border-red-300' : 'border-slate-200'
                       } ${highlightId === training.id ? 'ring-2 ring-primary' : ''}`}
                     >
@@ -1979,7 +1979,7 @@ export default function Trainings() {
                               className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
                             />
                           )}
-                          <p className="font-medium text-slate-900">{training.title}</p>
+                          <p className="min-w-0 break-words font-medium text-slate-900">{training.title}</p>
                         </div>
                         {canManage && (
                           <div className="flex shrink-0 gap-1">
@@ -2002,20 +2002,13 @@ export default function Trainings() {
                           </div>
                         )}
                       </div>
-                      {training.type && <p className="mt-1 text-sm text-slate-500">{training.type}</p>}
-                      <p className="mt-2 text-sm text-slate-600">
-                        {training.frequency_months
-                          ? `Renouvellement tous les ${training.frequency_months} mois`
-                          : 'Formation ponctuelle'}
-                      </p>
-                      {(training.duration || training.instructor || training.location) && (
-                        <p className="mt-1 text-xs text-slate-400">
-                          {[training.duration, training.instructor, training.location].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                      {training.description && (
-                        <p className="mt-1 line-clamp-2 text-xs text-slate-400">{training.description}</p>
-                      )}
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                        {training.type && <span className="rounded-full bg-slate-100 px-2 py-0.5">{training.type}</span>}
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                          {training.frequency_months ? `Recyclage ${training.frequency_months} mois` : 'Ponctuelle'}
+                        </span>
+                        <span className="rounded-full bg-slate-100 px-2 py-0.5">{training.records.length} réalisation{training.records.length > 1 ? 's' : ''}</span>
+                      </div>
                       {training.qualifies_internal_auditor && <AuditorTrainingBadge training={training} />}
 
                       <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -2040,6 +2033,13 @@ export default function Trainings() {
                           </button>
                         )}
                       </div>
+
+                      {isExpanded && (
+                        <div className="mt-2 space-y-1 border-t border-slate-100 pt-2">
+                          {(training.duration || training.instructor || training.location) && <p className="text-xs text-slate-500">{[training.duration, training.instructor, training.location].filter(Boolean).join(' · ')}</p>}
+                          {training.description && <p className="text-xs leading-5 text-slate-500">{training.description}</p>}
+                        </div>
+                      )}
 
                       <button
                         type="button"
