@@ -998,6 +998,19 @@ function getRecordSortValue(record, key) {
 }
 
 function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
+  const [history, setHistory] = useState(null);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyError, setHistoryError] = useState('');
+  const historyPageSize = 50;
+  useEffect(() => {
+    let cancelled = false;
+    setHistoryError('');
+    api.get(`/kpis/${kpi.id}/records`, { params: { page: historyPage, limit: historyPageSize } })
+      .then(({ data }) => { if (!cancelled) setHistory(data); })
+      .catch(() => { if (!cancelled) setHistoryError("Impossible de charger l'historique."); });
+    return () => { cancelled = true; };
+  }, [kpi.id, historyPage]);
+
   const isImportBased = kpi.calculation_type === 'import';
   const seriesConfigs = kpi.calculation_configs || [];
   const showSeriesColumn = seriesConfigs.length > 1;
@@ -1007,12 +1020,14 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   const unitForRecord = (record) =>
     record.config_id && showSeriesColumn ? resolveSeriesSettings(kpi, configById.get(record.config_id)).unit : kpi.unit || '';
   const { sorted: records, sortKey, direction, toggleSort } = useSort(
-    kpi.records,
+    history?.items || [],
     getRecordSortValue,
     'period_date',
     'desc'
   );
 
+  if (historyError) return <p className="py-3 text-sm text-red-600">{historyError}</p>;
+  if (!history) return <p className="py-3 text-sm text-slate-400">Chargement de l’historique…</p>;
   if (records.length === 0) {
     return <p className="py-3 text-sm text-slate-400">Aucune valeur enregistrée.</p>;
   }
@@ -1076,6 +1091,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
           ))}
         </tbody>
       </table>
+      <Pagination page={historyPage} totalPages={history.pagination.total_pages} onPageChange={setHistoryPage} />
     </div>
   );
 }
