@@ -1499,6 +1499,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   const [aiSuggestionLoading, setAiSuggestionLoading] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiAnalyzedImportKey, setAiAnalyzedImportKey] = useState('');
+  const [selectedAiSeriesIndex, setSelectedAiSeriesIndex] = useState(0);
 
   const [result, setResult] = useState(null);
 
@@ -1546,6 +1547,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     setSimpleMode(true);
     setAiSuggestion(null);
     setAiAnalyzedImportKey('');
+    setSelectedAiSeriesIndex(0);
   }
 
   function handleDownloadTemplate() {
@@ -1572,10 +1574,12 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
       setImportData(data);
       setAiSuggestion(null);
       setAiAnalyzedImportKey('');
+      setSelectedAiSeriesIndex(0);
       setSuggested(false);
       setSimpleMode(true);
       setAiSuggestion(null);
       setAiAnalyzedImportKey('');
+      setSelectedAiSeriesIndex(0);
     } catch (err) {
       setUploadError(err.response?.data?.error || "Impossible de charger cet import.");
     } finally {
@@ -1656,15 +1660,16 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
 
   function applyAiSuggestion() {
     if (!aiSuggestion) return;
+    const suggestion = aiSuggestion.series?.[selectedAiSeriesIndex] || aiSuggestion;
     setConfigForm((prev) => ({
       ...prev,
-      label: aiSuggestion.label || prev.label,
-      calc_type: aiSuggestion.calc_type || prev.calc_type,
-      source_column: aiSuggestion.source_column || '',
-      period_column: aiSuggestion.period_column || '',
-      group_by_column: aiSuggestion.group_by_column || '',
-      filters: Array.isArray(aiSuggestion.filters) ? aiSuggestion.filters : [],
-      filter_logic: aiSuggestion.filter_logic || 'all',
+      label: suggestion.label || prev.label,
+      calc_type: suggestion.calc_type || prev.calc_type,
+      source_column: suggestion.source_column || '',
+      period_column: suggestion.period_column || '',
+      group_by_column: suggestion.group_by_column || '',
+      filters: Array.isArray(suggestion.filters) ? suggestion.filters : [],
+      filter_logic: suggestion.filter_logic || 'all',
     }));
     setSuggested(true);
     setSimpleMode(false);
@@ -2053,7 +2058,18 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                     <button type="button" onClick={requestAiSuggestion} disabled={aiSuggestionLoading} className="rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-60">{aiSuggestionLoading ? 'Analyse…' : 'Analyser avec l’IA'}</button>
                   </div>
                   <textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Ex : calcule le taux de conformité par mois en utilisant la colonne Résultat, considère Conforme comme positif et ignore les lignes vides." rows={3} className="mt-3 w-full rounded-md border border-blue-200 bg-white px-3 py-2 text-xs text-slate-700 placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
-                  {aiSuggestion && <div className="mt-2 rounded border border-blue-200 bg-white p-2 text-xs text-slate-700"><p><strong>Suggestion :</strong> {aiSuggestion.label} · {CALC_TYPE_LABELS[aiSuggestion.calc_type] || aiSuggestion.calc_type}</p><p className="mt-1">Confiance : <strong>{aiSuggestion.confidence ?? 0} %</strong> · {aiSuggestion.explanation}</p><p className="mt-1 text-slate-500">{aiSuggestion.analyzed_rows || 0} ligne(s) analysée(s) depuis le fichier original.</p><button type="button" onClick={applyAiSuggestion} className="mt-2 font-medium text-primary underline underline-offset-2">Appliquer cette suggestion pour la vérifier</button></div>}
+                  {aiSuggestion && <div className="mt-2 rounded border border-blue-200 bg-white p-2 text-xs text-slate-700">
+                    <p><strong>Propositions adaptées :</strong> {aiSuggestion.explanation}</p>
+                    {(aiSuggestion.series || [aiSuggestion]).map((series, index) => (
+                      <label key={`${series.label || 'serie'}-${index}`} className={`mt-2 flex cursor-pointer items-start gap-2 rounded border p-2 ${selectedAiSeriesIndex === index ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
+                        <input type="radio" name="ai-series" checked={selectedAiSeriesIndex === index} onChange={() => setSelectedAiSeriesIndex(index)} className="mt-0.5" />
+                        <span><strong>{series.label}</strong> · {CALC_TYPE_LABELS[series.calc_type] || series.calc_type} · confiance {series.confidence ?? aiSuggestion.confidence ?? 0} %<span className="block text-slate-500">{series.explanation}</span></span>
+                      </label>
+                    ))}
+                    {aiSuggestion.warnings?.length > 0 && <p className="mt-2 text-amber-700">Attention : {aiSuggestion.warnings.join(' · ')}</p>}
+                    <p className="mt-1 text-slate-500">{aiSuggestion.analyzed_rows || 0} ligne(s) analysée(s) depuis le fichier original.</p>
+                    <button type="button" onClick={applyAiSuggestion} className="mt-2 font-medium text-primary underline underline-offset-2">Appliquer la proposition sélectionnée pour la vérifier</button>
+                  </div>}
                 </div>
 
                 {!configForm.period_column && (
