@@ -60,6 +60,8 @@ function NewAuditModal({ users, services, qualifications, onClose, onCreated }) 
     title: '',
     audit_type: 'process',
     scope: '',
+    criteria: '',
+    method: '',
     service_id: '',
     lead_auditor: '',
     planned_date: '',
@@ -94,6 +96,8 @@ function NewAuditModal({ users, services, qualifications, onClose, onCreated }) 
       title: form.title,
       audit_type: form.audit_type,
       scope: form.scope || undefined,
+      criteria: form.criteria || undefined,
+      method: form.method || undefined,
       service_id: form.service_id || undefined,
       lead_auditor: form.lead_auditor || undefined,
       planned_date: form.planned_date,
@@ -177,6 +181,16 @@ function NewAuditModal({ users, services, qualifications, onClose, onCreated }) 
               onChange={(e) => updateField('scope', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Critères d’audit</label>
+            <AutoTextarea rows={2} placeholder="Ex : ISO 9001 §8.4, procédure achats, exigences client" value={form.criteria} onChange={(e) => updateField('criteria', e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Méthode et preuves consultées</label>
+            <AutoTextarea rows={2} placeholder="Ex : entretiens, échantillonnage, observation terrain" value={form.method} onChange={(e) => updateField('method', e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

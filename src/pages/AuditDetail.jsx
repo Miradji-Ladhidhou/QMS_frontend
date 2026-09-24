@@ -45,6 +45,8 @@ function EditAuditModal({ audit, users, services, qualifications, onClose, onUpd
     title: audit.title,
     audit_type: audit.audit_type,
     scope: audit.scope || '',
+    criteria: audit.criteria || '',
+    method: audit.method || '',
     service_id: audit.service_id || '',
     lead_auditor: audit.lead_auditor || '',
     planned_date: audit.planned_date,
@@ -85,6 +87,8 @@ function EditAuditModal({ audit, users, services, qualifications, onClose, onUpd
         title: form.title,
         audit_type: form.audit_type,
         scope: form.scope || null,
+        criteria: form.criteria || null,
+        method: form.method || null,
         service_id: form.service_id || null,
         lead_auditor: form.lead_auditor || null,
         planned_date: form.planned_date,
@@ -162,6 +166,16 @@ function EditAuditModal({ audit, users, services, qualifications, onClose, onUpd
               onChange={(e) => updateField('scope', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Critères d’audit</label>
+            <AutoTextarea rows={2} value={form.criteria} onChange={(e) => updateField('criteria', e.target.value)} placeholder="Ex : ISO 9001 §8.4, procédure achats, exigences client" className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Méthode et preuves consultées</label>
+            <AutoTextarea rows={2} value={form.method} onChange={(e) => updateField('method', e.target.value)} placeholder="Ex : entretiens, échantillonnage de 10 dossiers, observation terrain" className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
           </div>
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -501,6 +515,8 @@ export default function AuditDetail() {
             <p className="text-sm text-slate-700">{audit.scope}</p>
           </div>
         )}
+        {audit.criteria && <div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Critères d’audit</h3><p className="mt-1 text-sm text-slate-700">{audit.criteria}</p></div>}
+        {audit.method && <div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Méthode et preuves</h3><p className="mt-1 text-sm text-slate-700">{audit.method}</p></div>}
         {audit.conclusion && (
           <div className="col-span-2 sm:col-span-4">
             <p className="text-xs text-slate-500">Conclusion</p>
