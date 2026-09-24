@@ -864,7 +864,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
 }
 
 function BulkRecordModal({ kpi, onClose, onSaved }) {
-  const [text, setText] = useState('');
+  const [rows, setRows] = useState([{ period: '', value: '', comment: '' }]);
   const [configId, setConfigId] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -886,7 +886,7 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
     return '';
   }
 
-  function parseRows() {
+  function parsePastedRows(text) {
     const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
     if (lines.length === 0) return [];
     const separator = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
@@ -894,10 +894,21 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
     const first = cells[0].map((cell) => cell.toLowerCase());
     const hasHeader = first.some((cell) => ['date', 'période', 'periode', 'valeur', 'value', 'commentaire', 'comment'].includes(cell));
     const dataRows = hasHeader ? cells.slice(1) : cells;
-    return dataRows.map((row) => ({ period_date: parseBulkDate(row[0]), value: row[1], comment: row.slice(2).join(' ') }));
+    return dataRows.map((row) => ({ period: row[0] || '', value: row[1] || '', comment: row.slice(2).join(' ') }));
   }
 
-  const parsedRows = parseRows();
+  function updateRow(index, patch) {
+    setRows((current) => current.map((row, rowIndex) => (rowIndex === index ? { ...row, ...patch } : row)));
+  }
+
+  function handlePaste(event) {
+    const pastedRows = parsePastedRows(event.clipboardData.getData('text'));
+    if (pastedRows.length === 0) return;
+    event.preventDefault();
+    setRows(pastedRows);
+  }
+
+  const parsedRows = rows.map((row) => ({ period_date: parseBulkDate(row.period), value: row.value, comment: row.comment }));
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -933,9 +944,19 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
           {kpi.frequency === 'monthly' && <p className="mt-1">Pour un KPI mensuel, le jour est accepté mais seul le mois est conservé.</p>}
         </div>
         {seriesOptions.length > 0 && <label className="mt-4 block text-sm font-medium text-slate-700">Série<select value={configId} onChange={(event) => setConfigId(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm"><option value="">Choisir une série</option>{seriesOptions.map((series) => <option key={series.id} value={series.id}>{series.label}</option>)}</select></label>}
-        <textarea value={text} onChange={(event) => setText(event.target.value)} placeholder={`Date\tValeur\tCommentaire\n24-09-2026\t42\tCommentaire facultatif`} className="mt-4 min-h-40 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
-        <p className="mt-1 text-xs text-slate-500">{parsedRows.length} ligne{parsedRows.length > 1 ? 's' : ''} détectée{parsedRows.length > 1 ? 's' : ''} · date française JJ-MM-AAAA</p>
-        {parsedRows.length > 0 && <div className="mt-3 max-h-48 overflow-auto rounded border border-slate-200"><table className="min-w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="px-2 py-1.5">Période</th><th className="px-2 py-1.5">Valeur</th><th className="px-2 py-1.5">Commentaire</th></tr></thead><tbody className="divide-y divide-slate-100">{parsedRows.slice(0, 100).map((row, index) => <tr key={index}><td className="px-2 py-1.5">{row.period_date || 'Invalide'}</td><td className="px-2 py-1.5">{row.value}</td><td className="px-2 py-1.5">{row.comment || '—'}</td></tr>)}</tbody></table></div>}
+        <div onPaste={handlePaste} className="mt-4 overflow-auto rounded border border-slate-200">
+          <table className="min-w-full text-left text-xs">
+            <thead className="bg-slate-50 text-slate-500"><tr><th className="px-2 py-2">Date (JJ-MM-AAAA)</th><th className="px-2 py-2">Valeur {kpi.unit ? `(${kpi.unit})` : ''}</th><th className="px-2 py-2">Commentaire (facultatif)</th><th className="px-2 py-2" /></tr></thead>
+            <tbody className="divide-y divide-slate-100">
+              {rows.map((row, index) => {
+                const parsed = parsedRows[index];
+                const invalid = row.period && !parsed.period_date || row.value && Number.isNaN(Number(String(row.value).replace(',', '.')));
+                return <tr key={index} className={invalid ? 'bg-red-50' : ''}><td className="p-1"><input value={row.period} onChange={(event) => updateRow(index, { period: event.target.value })} placeholder="24-09-2026" className="w-36 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><input value={row.value} onChange={(event) => updateRow(index, { value: event.target.value })} placeholder="84" className="w-24 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><input value={row.comment} onChange={(event) => updateRow(index, { comment: event.target.value })} placeholder="Commentaire" className="min-w-48 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><button type="button" onClick={() => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} aria-label="Supprimer la ligne" className="px-2 py-1 text-slate-400 hover:text-red-600">×</button></td></tr>;
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-2 flex items-center justify-between"><p className="text-xs text-slate-500">{parsedRows.length} ligne{parsedRows.length > 1 ? 's' : ''} · Colle directement depuis Excel dans le tableau.</p><button type="button" onClick={() => setRows((current) => [...current, { period: '', value: '', comment: '' }])} className="text-xs font-medium text-primary hover:underline">+ Ajouter une ligne</button></div>
         {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
         <button type="button" onClick={handleSubmit} disabled={saving || parsedRows.length === 0} className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white hover:bg-primary-700 disabled:opacity-60">{saving ? 'Enregistrement…' : `Enregistrer ${parsedRows.length || ''} valeur${parsedRows.length > 1 ? 's' : ''}`}</button>
       </div>
