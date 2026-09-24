@@ -44,6 +44,7 @@ export default function ModuleKpis() {
   const [auditIds, setAuditIds] = useState([]);
   const [auditOnly, setAuditOnly] = useState(false);
   const [auditMenuOpen, setAuditMenuOpen] = useState(false);
+  const [toolsOpen, setToolsOpen] = useState(false);
   const [refreshingPreset, setRefreshingPreset] = useState(null);
   const loadRequestRef = useRef(0);
 
@@ -229,29 +230,44 @@ export default function ModuleKpis() {
                 {summary.tracked === 0 && canManage ? ' Commencez par « Suivre l’essentiel » : une trentaine d’indicateurs choisis, prêts à l’emploi.' : ''}
               </p>
 
-              <div className="mt-3">
-                <p className="mb-1 text-xs font-medium text-slate-500">Comparer la valeur actuelle à…</p>
-                <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3" role="group" aria-label="Base de comparaison">
-                  {COMPARISON_MODES.map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setMode(item.key)}
-                      aria-pressed={mode === item.key}
-                      className={`min-h-[44px] rounded-md border px-3 text-sm font-medium sm:min-h-[40px] ${mode === item.key ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      {item.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={() => setToolsOpen((open) => !open)}
+                  aria-expanded={toolsOpen}
+                  className="flex min-h-[40px] items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900"
+                >
+                  <ChevronDown size={16} className={`transition-transform ${toolsOpen ? 'rotate-180' : ''}`} />
+                  Filtres et comparaison
+                  {onlyIssues && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">À surveiller</span>}
+                </button>
 
-              {summary.tracked > 0 && (
-                <label className="mt-3 flex min-h-[40px] cursor-pointer items-center gap-2.5 text-sm text-slate-700">
-                  <input type="checkbox" checked={onlyIssues} onChange={(e) => setOnlyIssues(e.target.checked)} className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary" />
-                  N'afficher que ce qui demande de l'attention
-                </label>
-              )}
+                {toolsOpen && (
+                  <div className="mt-2 rounded-md bg-slate-50 p-3">
+                    <p className="mb-1 text-xs font-medium text-slate-500">Comparer la valeur actuelle à…</p>
+                    <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3" role="group" aria-label="Base de comparaison">
+                      {COMPARISON_MODES.map((item) => (
+                        <button
+                          key={item.key}
+                          type="button"
+                          onClick={() => setMode(item.key)}
+                          aria-pressed={mode === item.key}
+                          className={`min-h-[44px] rounded-md border px-3 text-sm font-medium sm:min-h-[40px] ${mode === item.key ? 'border-primary bg-primary/10 text-primary' : 'border-slate-300 text-slate-600 hover:bg-white'}`}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {summary.tracked > 0 && (
+                      <label className="mt-3 flex min-h-[40px] cursor-pointer items-center gap-2.5 text-sm text-slate-700">
+                        <input type="checkbox" checked={onlyIssues} onChange={(e) => setOnlyIssues(e.target.checked)} className="h-5 w-5 rounded border-slate-300 text-primary focus:ring-primary" />
+                        N'afficher que ce qui demande de l'attention
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="mt-3 border-t border-slate-100 pt-3">
                 <button
