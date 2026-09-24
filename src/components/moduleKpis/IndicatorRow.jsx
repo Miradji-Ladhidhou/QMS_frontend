@@ -38,6 +38,29 @@ function ComparisonBadge({ indicator, mode }) {
   );
 }
 
+function downloadEvidence(indicator) {
+  const metadata = indicator.latest?.calculation_metadata;
+  if (!metadata) return;
+  const rows = [
+    ['KPI', indicator.label],
+    ['Période', indicator.latest.period_date],
+    ['Résultat', indicator.latest.value],
+    ['Type de calcul', metadata.calc_type || ''],
+    ['Colonne de période', metadata.period_column || ''],
+    ['Total de lignes', metadata.rows_total ?? ''],
+    ['Lignes retenues', metadata.rows_matched ?? ''],
+    ['Lignes valides', metadata.rows_valid ?? ''],
+    ['Lignes rejetées', metadata.rows_rejected ?? ''],
+    ['Identifiants retenus', (metadata.matched_row_ids || []).join(' | ')],
+  ];
+  const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(';')).join('\n');
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }));
+  link.download = `${indicator.preset_id}-preuve.csv`;
+  link.click();
+  URL.revokeObjectURL(link.href);
+}
+
 // Un indicateur : suivi (valeur, état, comparaison, objectif modifiable, mini-courbe) ou à suivre (objectif proposé + bouton).
 export default function IndicatorRow({ indicator, mode, canManage, compareSelected, compareDisabled, onToggleCompare, onTrack, onUntrack, onRefresh, onObjectiveSaved, busy }) {
   const [editing, setEditing] = useState(false);
@@ -105,6 +128,20 @@ export default function IndicatorRow({ indicator, mode, canManage, compareSelect
             <div className="mt-1">
               <ComparisonBadge indicator={indicator} mode={mode} />
             </div>
+          )}
+
+          {indicator.latest?.calculation_metadata && (
+            <details className="mt-2 rounded-md border border-slate-100 bg-slate-50 px-2.5 py-2">
+              <summary className="cursor-pointer text-xs font-medium text-slate-600">Voir les données prises en compte</summary>
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                <span>{indicator.latest.calculation_metadata.rows_total ?? 0} lignes analysées</span>
+                <span>{indicator.latest.calculation_metadata.rows_matched ?? 0} retenues</span>
+                <span>{indicator.latest.calculation_metadata.rows_rejected ?? 0} rejetées</span>
+                <button type="button" onClick={() => downloadEvidence(indicator)} className="font-medium text-primary underline underline-offset-2 hover:text-primary-700">
+                  Exporter la preuve
+                </button>
+              </div>
+            </details>
           )}
 
           <div className="mt-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-t border-slate-100 pt-2">
