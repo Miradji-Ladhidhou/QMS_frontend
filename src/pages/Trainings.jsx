@@ -1965,7 +1965,9 @@ export default function Trainings() {
                     <div
                       key={training.id}
                       id={`training-${training.id}`}
-                      className={`flex flex-col rounded-lg border bg-white p-3 shadow-sm transition-shadow sm:p-4 ${
+                      className={`flex flex-col bg-white p-3 transition-shadow sm:p-4 ${
+                        isExpanded ? 'border-y border-slate-200' : 'rounded-lg border shadow-sm'
+                      } ${
                         overdueCount > 0 ? 'border-red-300' : 'border-slate-200'
                       } ${highlightId === training.id ? 'ring-2 ring-primary' : ''}`}
                     >
@@ -2084,18 +2086,24 @@ export default function Trainings() {
                                   </button>
                                 )}
                               </div>
-                              <ul className="space-y-2">
+                              <div className="overflow-x-auto rounded-md border border-slate-200">
+                                <table className="min-w-full text-left text-xs">
+                                  <thead className="bg-slate-50 text-[11px] uppercase tracking-wide text-slate-500">
+                                    <tr><th className="px-3 py-2">Personne</th><th className="px-3 py-2">Réalisation</th><th className="px-3 py-2">Évaluation / QCM</th><th className="px-3 py-2 text-right">Actions</th></tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100 bg-white">
                                 {group.records.map((record) => (
-                                  <li key={record.id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
-                                    <span className="text-slate-700">
+                                  <tr key={record.id}>
+                                    <td className="px-3 py-2 text-slate-700">
                                       {personName(record)}
                                       {record.employee_id && (
-                                        <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-500">
+                                        <span className="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-500">
                                           Sans compte
                                         </span>
                                       )}
-                                      {' — '}
-                                      {formatDate(record.completed_at)}
+                                    </td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-slate-600">{formatDate(record.completed_at)}</td>
+                                    <td className="px-3 py-2">
                                       {record.evaluation_result !== null && (
                                         <span
                                           className={`ml-1.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium ${CAPA_EFFECTIVENESS_STYLES[record.evaluation_result]}`}
@@ -2104,8 +2112,8 @@ export default function Trainings() {
                                         </span>
                                       )}
                                       {canManage && <QuizAttemptBadge attempt={latestAttemptByRecord.get(record.id)} attempts={attemptsByRecord.get(record.id) || []} />}
-                                    </span>
-                                    <div className="flex max-w-full flex-wrap items-center gap-2">
+                                    </td>
+                                    <td className="px-3 py-2"><div className="flex max-w-full flex-wrap items-center justify-end gap-2">
                                       {canManage && (attemptsByRecord.get(record.id) || []).length > 0 && (
                                         <button
                                           type="button"
@@ -2162,10 +2170,12 @@ export default function Trainings() {
                                           </button>
                                         </>
                                       )}
-                                    </div>
-                                  </li>
+                                    </div></td>
+                                  </tr>
                                 ))}
-                              </ul>
+                                  </tbody>
+                                </table>
+                              </div>
                             </div>
                           ))}
                         </div>
