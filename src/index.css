@@ -43,6 +43,21 @@
 
   table thead {
     color: #334155;
+    background-color: #f1f5f9;
+    border-bottom: 2px solid #cbd5e1;
+  }
+
+  table tbody tr {
+    border-bottom: 1px solid #cbd5e1;
+  }
+
+  table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  table th,
+  table td {
+    line-height: 1.45;
   }
 
   table tbody tr:hover {
