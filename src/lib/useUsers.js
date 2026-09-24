@@ -1,4 +1,4 @@
-import { useContext } from 'react';
+import { useContext, useEffect } from 'react';
 import { UsersContext } from './UsersProvider.jsx';
 
 // Liste des utilisateurs du tenant courant — voir GET /api/users. [] tant que non chargée.
@@ -7,5 +7,9 @@ import { UsersContext } from './UsersProvider.jsx';
 // changer un rôle, désactiver, supprimer), voir UserManager.jsx — pas ce hook, en lecture
 // seule.
 export function useUsers() {
-  return useContext(UsersContext);
+  const context = useContext(UsersContext);
+  useEffect(() => {
+    context?.load();
+  }, [context]);
+  return context?.users || [];
 }

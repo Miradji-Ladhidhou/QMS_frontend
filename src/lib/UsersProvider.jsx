@@ -1,4 +1,4 @@
-import { createContext, useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useEffect, useMemo, useState } from 'react';
 import { api } from './api.js';
 
 export const UsersContext = createContext([]);
@@ -15,19 +15,27 @@ export const UsersContext = createContext([]);
 // déjà ouvertes tant que la session ne recharge pas entièrement.
 export function UsersProvider({ children }) {
   const [users, setUsers] = useState([]);
+  const [loaded, setLoaded] = useState(false);
 
   const load = useCallback(() => {
+    if (loaded) return;
+    setLoaded(true);
     api
       .get('/users')
       .then(({ data }) => setUsers(data))
-      .catch(() => {});
-  }, []);
+      .catch(() => setLoaded(false));
+  }, [loaded]);
 
   useEffect(() => {
-    load();
-    window.addEventListener('users-updated', load);
-    return () => window.removeEventListener('users-updated', load);
-  }, [load]);
+    function onUsersUpdated() {
+      setLoaded(false);
+      setUsers([]);
+    }
+    window.addEventListener('users-updated', onUsersUpdated);
+    return () => window.removeEventListener('users-updated', onUsersUpdated);
+  }, []);
 
-  return <UsersContext.Provider value={users}>{children}</UsersContext.Provider>;
+  const value = useMemo(() => ({ users, load }), [users, load]);
+
+  return <UsersContext.Provider value={value}>{children}</UsersContext.Provider>;
 }
