@@ -396,7 +396,7 @@ export default function Suppliers() {
   const [supplierPage, setSupplierPage] = useState(1);
   const supplierTotalPages = Math.max(1, Math.ceil(currentFolderSuppliers.length / 25));
   const pagedSuppliers = currentFolderSuppliers.slice((supplierPage - 1) * 25, supplierPage * 25);
-  useEffect(() => setSupplierPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => setSupplierPage(1), [currentFolderId, statusFilter]);
   useEffect(() => { if (supplierPage > supplierTotalPages) setSupplierPage(supplierTotalPages); }, [supplierPage, supplierTotalPages]);
 
   function handleCreated(supplier) {

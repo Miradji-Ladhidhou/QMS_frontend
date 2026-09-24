@@ -344,7 +344,7 @@ export default function Audits() {
   const [auditPage, setAuditPage] = useState(1);
   const auditTotalPages = Math.max(1, Math.ceil(currentFolderAudits.length / 25));
   const pagedAudits = currentFolderAudits.slice((auditPage - 1) * 25, auditPage * 25);
-  useEffect(() => setAuditPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => setAuditPage(1), [currentFolderId, statusFilter]);
   useEffect(() => { if (auditPage > auditTotalPages) setAuditPage(auditTotalPages); }, [auditPage, auditTotalPages]);
 
   function handleCreated(audit) {

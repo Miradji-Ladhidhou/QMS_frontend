@@ -378,7 +378,7 @@ export default function Complaints() {
   const [complaintPage, setComplaintPage] = useState(1);
   const complaintTotalPages = Math.max(1, Math.ceil(currentFolderComplaints.length / 25));
   const pagedComplaints = currentFolderComplaints.slice((complaintPage - 1) * 25, complaintPage * 25);
-  useEffect(() => setComplaintPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => setComplaintPage(1), [currentFolderId, statusFilter]);
   useEffect(() => { if (complaintPage > complaintTotalPages) setComplaintPage(complaintTotalPages); }, [complaintPage, complaintTotalPages]);
 
   function handleCreated(complaint) {

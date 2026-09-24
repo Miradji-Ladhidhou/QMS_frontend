@@ -537,7 +537,7 @@ export default function Risks() {
   const [riskPage, setRiskPage] = useState(1);
   const riskTotalPages = Math.max(1, Math.ceil(currentFolderRisks.length / 25));
   const pagedRisks = currentFolderRisks.slice((riskPage - 1) * 25, riskPage * 25);
-  useEffect(() => setRiskPage(1), [currentFolderId, searchText, statusFilter, typeFilter]);
+  useEffect(() => setRiskPage(1), [currentFolderId, statusFilter, typeFilter]);
   useEffect(() => { if (riskPage > riskTotalPages) setRiskPage(riskTotalPages); }, [riskPage, riskTotalPages]);
 
   function handleCreated(risk) {

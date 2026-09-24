@@ -447,7 +447,7 @@ export default function Accidents() {
   const [accidentPage, setAccidentPage] = useState(1);
   const accidentTotalPages = Math.max(1, Math.ceil(currentFolderAccidents.length / 25));
   const pagedAccidents = currentFolderAccidents.slice((accidentPage - 1) * 25, accidentPage * 25);
-  useEffect(() => setAccidentPage(1), [currentFolderId, searchText, statusFilter]);
+  useEffect(() => setAccidentPage(1), [currentFolderId, statusFilter]);
   useEffect(() => { if (accidentPage > accidentTotalPages) setAccidentPage(accidentTotalPages); }, [accidentPage, accidentTotalPages]);
 
   const deletableIds = currentFolderAccidents.filter((accident) => canDeleteAccident(accident, currentUser)).map((accident) => accident.id);
