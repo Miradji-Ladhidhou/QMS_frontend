@@ -2892,6 +2892,9 @@ function KpiCard({
   const [importsLoading, setImportsLoading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [moduleEvidence, setModuleEvidence] = useState(null);
+  const [moduleEvidenceLoading, setModuleEvidenceLoading] = useState(false);
+  const [moduleEvidenceError, setModuleEvidenceError] = useState('');
   const chartRef = useRef(null);
   const records = [...kpi.records].sort((a, b) => (a.period_date > b.period_date ? 1 : -1));
   const seriesConfigs = kpi.calculation_configs || [];
@@ -2977,6 +2980,36 @@ function KpiCard({
   const isSnapshot = isModuleBased && seriesConfigs[0]?.period_column === '__snapshot__';
   const isCountGrouped = seriesConfigs.length === 1 && seriesConfigs[0].calc_type === 'count_grouped';
   const canExportChart = isCountGrouped || hasEnoughForChart;
+  const latestRecord = records[records.length - 1];
+
+  async function loadModuleEvidence() {
+    if (!latestRecord?.id) {
+      setModuleEvidenceError('La preuve sera disponible après un nouveau recalcul.');
+      return;
+    }
+    setModuleEvidenceLoading(true);
+    setModuleEvidenceError('');
+    try {
+      const { data } = await api.get(`/kpis/${kpi.id}/records/${latestRecord.id}/module-proof`);
+      setModuleEvidence(data);
+    } catch (err) {
+      setModuleEvidenceError(err.response?.data?.error || 'Impossible de charger les données prises en compte.');
+    } finally {
+      setModuleEvidenceLoading(false);
+    }
+  }
+
+  function exportModuleEvidence() {
+    if (!moduleEvidence) return;
+    const columns = [...new Set(moduleEvidence.rows.flatMap((row) => Object.keys(row.row_data || {})))];
+    const lines = [['Ligne', 'Retenue', ...columns], ...moduleEvidence.rows.map((row) => [row.row_index, row.included ? 'oui' : 'non', ...columns.map((column) => row.row_data?.[column] ?? '')])];
+    const csv = lines.map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(';')).join('\n');
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }));
+    link.download = `${sanitizeFilename(kpi.name)}-donnees-prises-en-compte.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
 
   function loadImportsIfNeeded() {
     if (imports !== null || importsLoading) return;
@@ -3237,6 +3270,33 @@ function KpiCard({
       {showDetails && (
         <>
       {exportError && <p className="mt-1 text-xs text-red-600">{exportError}</p>}
+      {isModuleBased && (
+        <div className="mt-3 rounded-md border border-slate-200 bg-slate-50 p-2.5">
+          <button
+            type="button"
+            onClick={() => (moduleEvidence ? setModuleEvidence(null) : loadModuleEvidence())}
+            className="text-xs font-medium text-primary underline underline-offset-2 hover:text-primary-700"
+          >
+            {moduleEvidenceLoading ? 'Chargement des lignes…' : moduleEvidence ? 'Masquer les données prises en compte' : 'Voir les données prises en compte'}
+          </button>
+          {moduleEvidenceError && <p className="mt-2 text-xs text-red-600">{moduleEvidenceError}</p>}
+          {moduleEvidence && (
+            <div className="mt-2">
+              <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <span>{moduleEvidence.rows_total} lignes analysées</span>
+                <span>{moduleEvidence.rows.filter((row) => row.included).length} retenues</span>
+                <button type="button" onClick={exportModuleEvidence} className="font-medium text-primary underline underline-offset-2">Exporter les lignes</button>
+              </div>
+              <div className="mt-2 max-h-80 overflow-auto rounded border border-slate-200 bg-white">
+                <table className="min-w-full text-left text-xs">
+                  <thead className="sticky top-0 bg-slate-100 text-slate-500"><tr><th className="px-2 py-1.5">Ligne</th><th className="px-2 py-1.5">Retenue</th>{[...new Set(moduleEvidence.rows.flatMap((row) => Object.keys(row.row_data || {})))].map((column) => <th key={column} className="px-2 py-1.5">{column}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-slate-100">{moduleEvidence.rows.map((row) => <tr key={row.row_index} className={row.included ? '' : 'bg-red-50 text-slate-400'}><td className="px-2 py-1.5">{row.row_index}</td><td className="px-2 py-1.5">{row.included ? 'Oui' : 'Non'}</td>{[...new Set(moduleEvidence.rows.flatMap((item) => Object.keys(item.row_data || {})))].map((column) => <td key={column} className="max-w-48 whitespace-nowrap px-2 py-1.5">{String(row.row_data?.[column] ?? '')}</td>)}</tr>)}</tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         {averageValue === null ? (
