@@ -26,6 +26,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 
 const CATEGORIES_BASE_URL = '/categories';
 const SEARCH_DEBOUNCE_MS = 300;
@@ -421,6 +422,7 @@ export default function Documents() {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [documentPage, setDocumentPage] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -578,6 +580,17 @@ export default function Documents() {
   // Pendant une recherche plein texte, la navigation par dossier est masquée (voir plus bas) :
   // la liste affichée redevient sortedDocuments au complet, non scopée à un dossier.
   const visibleDocuments = isSearchActive ? sortedDocuments : currentFolderDocuments;
+  const documentsPerPage = 25;
+  const documentTotalPages = Math.max(1, Math.ceil(visibleDocuments.length / documentsPerPage));
+  const pagedDocuments = visibleDocuments.slice((documentPage - 1) * documentsPerPage, documentPage * documentsPerPage);
+
+  useEffect(() => {
+    setDocumentPage(1);
+  }, [search, statusFilter, currentFolderId]);
+
+  useEffect(() => {
+    if (documentPage > documentTotalPages) setDocumentPage(documentTotalPages);
+  }, [documentPage, documentTotalPages]);
 
   // file_path peut être un chemin Supabase ou un id de fichier Google Drive selon le provider
   // du document (voir B3) — seul le backend sait lequel et construit l'URL correspondante,
@@ -912,7 +925,7 @@ export default function Documents() {
           ) : (
             <>
               <div className="mt-4 space-y-3 md:hidden">
-                {visibleDocuments.map((doc) => (
+                {pagedDocuments.map((doc) => (
                   <div
                     key={doc.id}
                     onClick={() => navigate(`/documents/${doc.id}`)}
@@ -991,7 +1004,7 @@ export default function Documents() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {visibleDocuments.map((doc) => (
+                    {pagedDocuments.map((doc) => (
                       <tr key={doc.id} onClick={() => navigate(`/documents/${doc.id}`)} className="cursor-pointer hover:bg-slate-50">
                         {canManage && (
                           <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
@@ -1054,6 +1067,7 @@ export default function Documents() {
                   </tbody>
                 </table>
               </div>
+              <Pagination page={documentPage} totalPages={documentTotalPages} onPageChange={setDocumentPage} />
             </>
           )}
         </>

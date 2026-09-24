@@ -38,6 +38,7 @@ import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
+import Pagination from '../components/Pagination.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
@@ -721,6 +722,7 @@ export default function Capas() {
   const [priorityFilter, setPriorityFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
+  const [capaPage, setCapaPage] = useState(1);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingCapa, setMovingCapa] = useState(null);
@@ -852,6 +854,10 @@ export default function Capas() {
     () => sortedCapas.filter((capa) => (capa.category_id || null) === currentFolderId),
     [sortedCapas, currentFolderId]
   );
+  const capaTotalPages = Math.max(1, Math.ceil(currentFolderCapas.length / 25));
+  const pagedCapas = currentFolderCapas.slice((capaPage - 1) * 25, capaPage * 25);
+  useEffect(() => setCapaPage(1), [searchText, statusFilter, priorityFilter, serviceFilter, assigneeFilter, currentFolderId]);
+  useEffect(() => { if (capaPage > capaTotalPages) setCapaPage(capaTotalPages); }, [capaPage, capaTotalPages]);
 
   // Mêmes colonnes pour PDF/Excel/Word (avant : 6 champs identiques dans les 3, malgré un
   // commentaire prétendant Excel plus détaillé — jamais vrai) : le contenu ISO d'une CAPA
@@ -1161,7 +1167,7 @@ export default function Capas() {
           ) : (
             <>
               <div className="mt-4 space-y-3 md:hidden">
-                {currentFolderCapas.map((capa) => (
+                {pagedCapas.map((capa) => (
                   <div
                     key={capa.id}
                     onClick={() => navigate(`/capas/${capa.id}`)}
@@ -1244,7 +1250,7 @@ export default function Capas() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {currentFolderCapas.map((capa) => (
+                    {pagedCapas.map((capa) => (
                       <tr
                         key={capa.id}
                         onClick={() => navigate(`/capas/${capa.id}`)}
@@ -1286,6 +1292,7 @@ export default function Capas() {
                                     {label}
                                   </option>
                                 ))}
+                                <Pagination page={capaPage} totalPages={capaTotalPages} onPageChange={setCapaPage} />
                               </select>
                             )}
                           </div>

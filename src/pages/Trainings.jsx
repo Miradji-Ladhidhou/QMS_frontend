@@ -53,6 +53,7 @@ import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import NewFolderModal from '../components/NewFolderModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import Pagination from '../components/Pagination.jsx';
 import QuizEditorModal from '../components/trainingQuiz/QuizEditorModal.jsx';
 import SendQuizModal from '../components/trainingQuiz/SendQuizModal.jsx';
 import InstructorSignatureField from '../components/trainingQuiz/InstructorSignatureField.jsx';
@@ -1296,6 +1297,7 @@ export default function Trainings() {
   const tenant = useTenant();
   const canManage = isManagerRole(currentUser?.role);
   const [trainings, setTrainings] = useState([]);
+  const [trainingPage, setTrainingPage] = useState(1);
   // Cette page MODIFIE aussi les utilisateurs (training_exempt, voir handleExcluded/
   // handleReinstate plus bas) — contrairement aux autres pages qui lisent juste useUsers()
   // pour un menu déroulant. userOverrides applique la mutation localement pour un retour
@@ -1741,6 +1743,10 @@ export default function Trainings() {
     () => sortedTrainings.filter((training) => (training.category_id || null) === currentFolderId),
     [sortedTrainings, currentFolderId]
   );
+  const trainingTotalPages = Math.max(1, Math.ceil(currentFolderTrainings.length / 25));
+  const pagedTrainings = currentFolderTrainings.slice((trainingPage - 1) * 25, trainingPage * 25);
+  useEffect(() => setTrainingPage(1), [currentFolderId, searchText]);
+  useEffect(() => { if (trainingPage > trainingTotalPages) setTrainingPage(trainingTotalPages); }, [trainingPage, trainingTotalPages]);
 
   const excludedPeople = combinePeople(users, employees).filter((p) => p.training_exempt);
 
@@ -1941,7 +1947,7 @@ export default function Trainings() {
             </p>
           ) : (
             <div className="mt-4 flex flex-col gap-4">
-              {currentFolderTrainings.map((training) => {
+              {pagedTrainings.map((training) => {
                   const isExpanded = expandedId === training.id;
                   const overdueCount = countOverdueRecords(training, today);
                   const sessionGroups = groupRecordsBySession(training.records);
@@ -2196,6 +2202,7 @@ export default function Trainings() {
                     </div>
                   );
               })}
+              <Pagination page={trainingPage} totalPages={trainingTotalPages} onPageChange={setTrainingPage} />
             </div>
           )}
         </div>
