@@ -103,7 +103,7 @@ export const NAV_ITEMS = [
   // Gardée uniquement pour la configuration de visibilité (voir le lien fusionné juste en
   // dessous, qui reste alwaysVisible pour préserver l'accessibilité de Politique qualité —
   // ISO 9001 §5.2) : n'apparaît plus comme lien séparé dans le menu latéral.
-  { key: 'documents', to: '/documents', label: 'Documents', icon: FileText, hiddenFromSidebar: true },
+  { key: 'documents', to: '/documents', label: 'Documents', icon: FileText },
   // Fusionne Documents, Procédures ('procedures' plus bas), Mes approbations ('my-approvals'
   // plus bas) et Politique qualité (voir DocumentsHub.jsx) — lien de menu volontairement
   // alwaysVisible (pas de `key` propre, comme l'était Politique qualité seule auparavant) :
@@ -123,6 +123,7 @@ export const NAV_ITEMS = [
     to: '/documents',
     label: 'Documents',
     icon: FileText,
+    hiddenFromSidebar: true,
     alwaysVisible: true,
     matchPaths: ['/documents', '/procedures', '/my-approvals', '/quality-policy'],
     children: [
@@ -137,10 +138,10 @@ export const NAV_ITEMS = [
   // entrées 'pdca' et 'qqoqccp' restent dans ce tableau pour MenuVisibilitySettings.jsx mais
   // masquées du menu latéral.
   {
-    key: 'capas',
     to: '/capas',
     label: "Actions d'amélioration",
     icon: ClipboardList,
+    hiddenFromSidebar: true,
     matchPaths: ['/capas', '/pdca', '/qqoqccp'],
     children: [
       { to: '/capas', label: 'CAPA', icon: ClipboardList, menuKey: 'capas' },
@@ -154,10 +155,10 @@ export const NAV_ITEMS = [
   // mais masquée du menu latéral via hiddenFromSidebar : chaque module garde sa visibilité
   // configurable indépendamment, CustomerFeedback.jsx respecte les deux séparément.
   {
-    key: 'complaints',
     to: '/complaints',
     label: 'Retours clients',
     icon: MessageSquareWarning,
+    hiddenFromSidebar: true,
     matchPaths: ['/complaints', '/customer-satisfaction'],
     children: [
       { to: '/complaints', label: 'Réclamations', icon: MessageSquareWarning, menuKey: 'complaints' },
@@ -170,10 +171,10 @@ export const NAV_ITEMS = [
   // le commentaire détaillé dans HumanResources.jsx. L'entrée 'employees' plus bas reste dans
   // ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
   {
-    key: 'trainings',
     to: '/trainings',
     label: 'Ressources humaines',
     icon: GraduationCap,
+    hiddenFromSidebar: true,
     matchPaths: ['/trainings', '/employees'],
     children: [
       { to: '/employees', label: 'Personnel', icon: Contact, menuKey: 'employees' },
@@ -181,18 +182,24 @@ export const NAV_ITEMS = [
     ],
   },
   { key: 'kpis', to: '/kpis', label: 'KPIs', icon: BarChart3 },
+  { key: 'capas', to: '/capas', label: 'CAPA', icon: ClipboardList },
+  { key: 'complaints', to: '/complaints', label: 'Réclamations', icon: MessageSquareWarning },
+  { key: 'trainings', to: '/trainings', label: 'Formations', icon: GraduationCap },
+  { key: 'audits', to: '/audits', label: 'Audits internes', icon: ClipboardCheck },
+  { key: 'risks', to: '/risks', label: 'Registre des risques', icon: ShieldAlert },
+  { key: 'accidents', to: '/accidents', label: 'Accidents du travail', icon: Siren },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
   // haut, fusionné avec PDCA et QQOQCCP dans ImprovementActions.jsx) : n'apparaît plus comme
   // lien séparé dans le menu latéral.
-  { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle, hiddenFromSidebar: true },
+  { key: 'qqoqccp', to: '/qqoqccp', label: 'QQOQCCP', icon: HelpCircle },
   // Fusionné avec Revues de direction (voir QmsOversight.jsx) sous ce seul lien de menu —
   // même principe que 'complaints' plus haut : l'entrée 'management-reviews' reste dans ce
   // tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
   {
-    key: 'audits',
     to: '/audits',
     label: 'Pilotage du SMQ',
     icon: ClipboardCheck,
+    hiddenFromSidebar: true,
     matchPaths: ['/audits', '/management-reviews'],
     children: [
       { to: '/audits', label: 'Audits internes', icon: ClipboardCheck, menuKey: 'audits' },
@@ -203,10 +210,10 @@ export const NAV_ITEMS = [
   // sous ce seul lien de menu — même principe que 'complaints' plus haut : l'entrée 'haccp'
   // reste dans ce tableau pour MenuVisibilitySettings.jsx mais masquée du menu latéral.
   {
-    key: 'risks',
     to: '/risks',
     label: 'Gestion des risques',
     icon: ShieldAlert,
+    hiddenFromSidebar: true,
     matchPaths: ['/risks', '/haccp'],
     children: [
       { to: '/risks', label: 'Registre des risques', icon: ShieldAlert, menuKey: 'risks' },
@@ -215,25 +222,25 @@ export const NAV_ITEMS = [
   },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'risks'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
-  { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer, hiddenFromSidebar: true },
+  { key: 'haccp', to: '/haccp', label: 'HACCP', icon: Thermometer },
   { key: 'suppliers', to: '/suppliers', label: 'Évaluation fournisseurs', icon: Truck },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'audits'
   // plus haut) : n'apparaît plus comme lien séparé dans le menu latéral.
-  { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2, hiddenFromSidebar: true },
+  { key: 'management-reviews', to: '/management-reviews', label: 'Revues de direction', icon: Users2 },
   // Gardée uniquement pour la configuration de visibilité (voir le lien fusionné sur
   // 'documents' plus haut, qui reste alwaysVisible pour préserver l'accessibilité de
   // Politique qualité — ISO 9001 §5.2) : n'apparaît plus comme lien séparé dans le menu
   // latéral.
-  { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck, hiddenFromSidebar: true },
+  { key: 'procedures', to: '/procedures', label: 'Procédures', icon: FileCheck },
   // Fusionné avec Non-conformités produit/service (voir Incidents.jsx, qui assemble les deux
   // pages en onglets) sous ce seul lien de menu — même principe que 'complaints' plus haut :
   // l'entrée 'nonconforming-outputs' plus bas reste dans ce tableau pour
   // MenuVisibilitySettings.jsx mais masquée du menu latéral.
   {
-    key: 'accidents',
     to: '/accidents',
     label: 'Signalements',
     icon: Siren,
+    hiddenFromSidebar: true,
     matchPaths: ['/accidents', '/nonconforming-outputs'],
     children: [
       { to: '/accidents', label: 'Accidents du travail', icon: Siren, menuKey: 'accidents' },
@@ -242,7 +249,7 @@ export const NAV_ITEMS = [
   },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'capas' plus
   // haut) : n'apparaît plus comme lien séparé dans le menu latéral.
-  { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw, hiddenFromSidebar: true },
+  { key: 'pdca', to: '/pdca', label: 'PDCA', icon: RefreshCw },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'accidents'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
   {
@@ -250,14 +257,14 @@ export const NAV_ITEMS = [
     to: '/nonconforming-outputs',
     label: 'Non-conformités produit/service',
     icon: PackageX,
-    hiddenFromSidebar: true,
   },
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'complaints'
   // ci-dessus) : n'apparaît plus comme lien séparé dans le menu latéral.
-  { key: 'customer-satisfaction', to: '/customer-satisfaction', label: 'Satisfaction client', icon: Smile, hiddenFromSidebar: true },
+  { key: 'customer-satisfaction', to: '/customer-satisfaction', label: 'Satisfaction client', icon: Smile },
   // Gardée uniquement pour la configuration de visibilité (voir le lien fusionné plus haut,
   // sur 'documents') : n'apparaît plus comme lien séparé dans le menu latéral.
-  { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare, hiddenFromSidebar: true },
+  { key: 'my-approvals', to: '/my-approvals', label: 'Mes approbations', icon: CheckSquare },
+  { to: '/quality-policy', label: 'Politique qualité', icon: ScrollText, alwaysVisible: true },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
   // rester joignable quel que soit ce que l'admin a caché pour ce rôle.
@@ -271,7 +278,7 @@ export const NAV_ITEMS = [
   // Gardée uniquement pour la configuration de visibilité (voir commentaire sur 'trainings'
   // plus haut, fusionné avec Personnel dans HumanResources.jsx) : n'apparaît plus comme lien
   // séparé dans le menu latéral.
-  { key: 'employees', to: '/employees', label: 'Personnel', icon: Contact, hiddenFromSidebar: true },
+  { key: 'employees', to: '/employees', label: 'Personnel', icon: Contact },
   // Jamais configurable, comme Prise en main plus haut : c'est le seul endroit qui permet de
   // corriger la visibilité du menu, donc aucune combinaison de règles ne doit jamais pouvoir le
   // faire disparaître pour un admin. Pas adminOnly non plus (corrigé) : la page elle-même
