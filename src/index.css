@@ -34,6 +34,10 @@
     border-color: #64748b;
   }
 
+  .bg-slate-50 {
+    background-color: #e2e8f0;
+  }
+
   .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
     border-color: #cbd5e1;
   }
@@ -42,7 +46,7 @@
      les champs blancs. */
   .rounded-xl.border.bg-white,
   .rounded-lg.border.bg-white {
-    background-color: #f8fafc;
+    background-color: #ffffff;
     border-color: #94a3b8;
   }
 
