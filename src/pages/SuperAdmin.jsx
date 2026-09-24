@@ -620,6 +620,7 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
   const [actionError, setActionError] = useState('');
   const [showDeleteTenant, setShowDeleteTenant] = useState(false);
   const [pendingDeleteUser, setPendingDeleteUser] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   function load() {
     return api
@@ -666,6 +667,24 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
       setActionError(err.response?.data?.error || 'Impossible de modifier ce tenant.');
     } finally {
       setSavingTenant(false);
+    }
+  }
+
+  async function handleExportTenant() {
+    setActionError('');
+    setExporting(true);
+    try {
+      const { data } = await api.get(`/super-admin/tenants/${tenantId}/export`, { responseType: 'blob' });
+      const url = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `qms-tenant-${detail?.tenant.slug || tenantId}.json`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setActionError(err.response?.data?.error || "Impossible d'exporter ce tenant.");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -795,6 +814,15 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
                   </span>
                 )}
                 <div className="ml-auto flex gap-1.5">
+                  <button
+                    type="button"
+                    onClick={handleExportTenant}
+                    disabled={exporting}
+                    className="inline-flex items-center gap-1 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    <Download size={13} />
+                    {exporting ? 'Export...' : 'Exporter'}
+                  </button>
                   <button
                     type="button"
                     onClick={startEditTenant}
