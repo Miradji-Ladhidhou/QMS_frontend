@@ -60,7 +60,7 @@ export default function SendQuizModal({ training, sessionLabel, records, employe
       setError('Sélectionnez au moins une personne.');
       return;
     }
-    const missing = chosen.find((record) => record.employee_id && !EMAIL_PATTERN.test((emails[record.id] || '').trim()));
+    const missing = chosen.find((record) => !EMAIL_PATTERN.test((emails[record.id] || '').trim()));
     if (missing) {
       setError(`Saisissez une adresse email valide pour ${personLabel(missing)}.`);
       return;
@@ -73,7 +73,7 @@ export default function SendQuizModal({ training, sessionLabel, records, employe
       ({ data } = await api.post(`/trainings/${training.id}/quiz/invites`, {
         items: chosen.map((record) => ({
           record_id: record.id,
-          ...(record.employee_id ? { email: emails[record.id].trim() } : {}),
+          ...(emails[record.id]?.trim() ? { email: emails[record.id].trim() } : {}),
         })),
       }));
     } catch (err) {
