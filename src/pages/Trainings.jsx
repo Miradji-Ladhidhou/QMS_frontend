@@ -120,9 +120,11 @@ function groupRecordsBySession(records) {
     }
     bySessionId.get(key).records.push(record);
   }
-  const sessions = [...bySessionId.values()].sort((a, b) => (a.sessionDate < b.sessionDate ? 1 : -1));
+  const sessions = [...bySessionId.values()]
+    .map((session) => ({ ...session, records: [...session.records].sort((a, b) => (a.completed_at < b.completed_at ? 1 : -1)) }))
+    .sort((a, b) => (a.sessionDate < b.sessionDate ? 1 : -1));
   if (orphans.length > 0) {
-    sessions.push({ sessionId: null, sessionDate: null, records: orphans });
+    sessions.push({ sessionId: null, sessionDate: null, records: [...orphans].sort((a, b) => (a.completed_at < b.completed_at ? 1 : -1)) });
   }
   return sessions;
 }
@@ -2062,13 +2064,14 @@ export default function Trainings() {
                       {isExpanded && (
                         <div className="mt-2 space-y-3 border-t border-slate-100 pt-2">
                           {sessionGroups.map((group) => (
-                            <div key={group.sessionId || 'none'}>
-                              <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                            <div key={group.sessionId || 'none'} className="rounded-lg border border-slate-300 bg-slate-50/60 p-2.5 sm:p-3">
+                              <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b-2 border-slate-400 pb-2">
                                 <p className={`text-xs font-medium ${group.sessionId === null ? 'text-amber-600' : 'text-slate-500'}`}>
                                   {group.sessionId === null ? 'Sans session' : `Session du ${formatDate(group.sessionDate)}`}
                                   {' — '}
                                   {group.records.length} réalisation{group.records.length > 1 ? 's' : ''}
                                 </p>
+                                <span className="text-[11px] text-slate-500">Date : plus récente en premier</span>
                                 {canManage && training.quiz && (
                                   <button
                                     type="button"
