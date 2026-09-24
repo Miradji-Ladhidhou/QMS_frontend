@@ -5,7 +5,7 @@ import { api } from '../lib/api.js';
 import { supabase } from '../lib/supabase.js';
 import { useTenant } from '../lib/useTenant.js';
 
-export default function SettingsDataSecurity({ isAdmin }) {
+export default function SettingsDataSecurity({ isAdmin, isSuperAdmin }) {
   const tenant = useTenant();
   const [signingOut, setSigningOut] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -168,7 +168,7 @@ export default function SettingsDataSecurity({ isAdmin }) {
               <Download size={16} />
               {exporting ? 'Export...' : 'Exporter les données de l’entreprise'}
             </button>
-            <div className="mt-5 border-t border-red-200 pt-4">
+            {isSuperAdmin && <div className="mt-5 border-t border-red-200 pt-4">
               <p className="text-sm font-semibold text-red-800">Supprimer définitivement l’entreprise</p>
               <p className="mt-1 text-xs text-red-700">Cette action supprime les données du tenant et les comptes associés.</p>
               <input value={confirmationName} onChange={(event) => setConfirmationName(event.target.value)} placeholder={tenant?.name || "Nom de l'entreprise"} className="mt-3 w-full rounded-md border border-red-300 px-3 py-2 text-base sm:max-w-sm" />
@@ -176,7 +176,7 @@ export default function SettingsDataSecurity({ isAdmin }) {
                 <Trash2 size={16} />
                 {deleting ? 'Suppression...' : 'Supprimer l’entreprise'}
               </button>
-            </div>
+            </div>}
           </>
         )}
       </div>
