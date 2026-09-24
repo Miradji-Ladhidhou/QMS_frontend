@@ -863,6 +863,66 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
   );
 }
 
+function BulkRecordModal({ kpi, onClose, onSaved }) {
+  const [text, setText] = useState('');
+  const [configId, setConfigId] = useState('');
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const seriesOptions = (kpi.calculation_configs || []).filter((config) => config.calc_type === 'manual');
+  const inputType = kpi.frequency === 'monthly' ? 'month' : 'date';
+
+  function parseRows() {
+    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (lines.length === 0) return [];
+    const separator = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
+    const cells = lines.map((line) => line.split(separator).map((cell) => cell.trim()));
+    const first = cells[0].map((cell) => cell.toLowerCase());
+    const hasHeader = first.some((cell) => ['date', 'période', 'periode', 'valeur', 'value', 'commentaire', 'comment'].includes(cell));
+    const dataRows = hasHeader ? cells.slice(1) : cells;
+    return dataRows.map((row) => ({ period_date: fromInputPeriodValue(row[0] || '', kpi.frequency), value: row[1], comment: row.slice(2).join(' ') }));
+  }
+
+  const parsedRows = parseRows();
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    const records = parsedRows.map((row) => ({ ...row, config_id: configId || undefined }));
+    const invalidIndex = records.findIndex((row) => !row.period_date || row.value === '' || Number.isNaN(Number(String(row.value).replace(',', '.'))));
+    if (invalidIndex >= 0) {
+      setError(`La ligne ${invalidIndex + 1} doit contenir une période et une valeur numérique.`);
+      return;
+    }
+    setSaving(true);
+    try {
+      const { data } = await api.post(`/kpis/${kpi.id}/records/bulk`, { records: records.map((row) => ({ ...row, value: Number(String(row.value).replace(',', '.')) })) });
+      onSaved(data.records || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible d’enregistrer les valeurs collées.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <div><h2 className="text-lg font-semibold text-slate-900">Saisie en masse</h2><p className="text-sm text-slate-500">{kpi.name}</p></div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700"><X size={20} /></button>
+        </div>
+        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">Copiez depuis Excel : <strong>Période → Valeur → Commentaire</strong>. Séparez les colonnes avec des tabulations. Une ligne Excel devient une valeur KPI.</p>
+        {seriesOptions.length > 0 && <label className="mt-4 block text-sm font-medium text-slate-700">Série<select value={configId} onChange={(event) => setConfigId(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm"><option value="">Choisir une série</option>{seriesOptions.map((series) => <option key={series.id} value={series.id}>{series.label}</option>)}</select></label>}
+        <textarea value={text} onChange={(event) => setText(event.target.value)} placeholder={`Période\tValeur\tCommentaire\n2026-01\t42\tCommentaire optionnel`} className="mt-4 min-h-40 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
+        <p className="mt-1 text-xs text-slate-500">{parsedRows.length} ligne{parsedRows.length > 1 ? 's' : ''} détectée{parsedRows.length > 1 ? 's' : ''} · format période : {inputType === 'month' ? 'AAAA-MM' : 'AAAA-MM-JJ'}</p>
+        {parsedRows.length > 0 && <div className="mt-3 max-h-48 overflow-auto rounded border border-slate-200"><table className="min-w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="px-2 py-1.5">Période</th><th className="px-2 py-1.5">Valeur</th><th className="px-2 py-1.5">Commentaire</th></tr></thead><tbody className="divide-y divide-slate-100">{parsedRows.slice(0, 100).map((row, index) => <tr key={index}><td className="px-2 py-1.5">{row.period_date || 'Invalide'}</td><td className="px-2 py-1.5">{row.value}</td><td className="px-2 py-1.5">{row.comment || '—'}</td></tr>)}</tbody></table></div>}
+        {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        <button type="button" onClick={handleSubmit} disabled={saving || parsedRows.length === 0} className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white hover:bg-primary-700 disabled:opacity-60">{saving ? 'Enregistrement…' : `Enregistrer ${parsedRows.length || ''} valeur${parsedRows.length > 1 ? 's' : ''}`}</button>
+      </div>
+    </div>
+  );
+}
+
 function SourceBadge({ source }) {
   return (
     <span
@@ -2903,6 +2963,7 @@ function KpiCard({
   onDelete,
   onMove,
   onOpenRecordModal,
+  onOpenBulkRecordModal,
   onDeleteRecord,
   onOpenImportModal,
   onOpenConfigModal,
@@ -3420,14 +3481,10 @@ function KpiCard({
             Importer un fichier
           </button>
         ) : (
-          <button
-            type="button"
-            onClick={() => onOpenRecordModal(kpi, null)}
-            className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          >
-            <Plus size={14} />
-            Saisir une valeur
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => onOpenRecordModal(kpi, null)} className="flex shrink-0 items-center gap-1.5 rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50"><Plus size={14} />Saisir une valeur</button>
+            <button type="button" onClick={() => onOpenBulkRecordModal(kpi)} className="flex shrink-0 items-center gap-1.5 rounded-md border border-primary/40 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5"><Upload size={14} />Saisie en masse</button>
+          </div>
         )}
       </div>
 
@@ -4025,6 +4082,7 @@ export default function Kpis() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [recordModal, setRecordModal] = useState(null); // { kpi, record } — record null = création
+  const [bulkRecordModal, setBulkRecordModal] = useState(null);
   const [formModal, setFormModal] = useState(null); // null fermé, 'new' création, objet kpi édition
   const [importModal, setImportModal] = useState(null); // le kpi en cours d'import, ou null
   const [configModal, setConfigModal] = useState(null); // le kpi dont on édite la recette, ou null
@@ -4579,6 +4637,7 @@ export default function Kpis() {
                   onDelete={handleDelete}
                   onMove={setMoveModal}
                   onOpenRecordModal={(kpiArg, record) => setRecordModal({ kpi: kpiArg, record })}
+                  onOpenBulkRecordModal={setBulkRecordModal}
                   onDeleteRecord={handleDeleteRecord}
                   onOpenImportModal={setImportModal}
                   onOpenConfigModal={setConfigModal}
@@ -4604,6 +4663,17 @@ export default function Kpis() {
           record={recordModal.record}
           onClose={() => setRecordModal(null)}
           onSaved={(data, isEditing) => handleRecordSaved(recordModal.kpi.id, data, isEditing)}
+        />
+      )}
+
+      {bulkRecordModal && (
+        <BulkRecordModal
+          kpi={bulkRecordModal}
+          onClose={() => setBulkRecordModal(null)}
+          onSaved={() => {
+            setBulkRecordModal(null);
+            loadKpis(currentFolderId);
+          }}
         />
       )}
 
