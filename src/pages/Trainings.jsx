@@ -1912,13 +1912,13 @@ export default function Trainings() {
       )}
 
       {loading || foldersLoading ? (
-        <div className="mt-4 flex max-w-4xl flex-col gap-4">
+        <div className="mt-4 flex w-full flex-col gap-4">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-40 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
         </div>
       ) : (
-        <div className="max-w-4xl">
+        <div className="w-full">
           {(folders.length > 0 || currentUser?.role === 'admin') && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
               {folders.map((folder) => (

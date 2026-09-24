@@ -4623,7 +4623,7 @@ export default function Kpis() {
       )}
 
       {loading || foldersLoading ? (
-        <div className="mt-4 flex max-w-4xl flex-col gap-4">
+        <div className="mt-4 flex w-full flex-col gap-4">
           {[0, 1, 2].map((key) => (
             <div key={key} className="h-72 animate-pulse rounded-xl border border-slate-200 bg-white" />
           ))}
@@ -4700,7 +4700,7 @@ export default function Kpis() {
               <p className="mt-4 text-xs text-slate-500">
                 {filteredKpis.length} KPI affiché{filteredKpis.length > 1 ? 's' : ''} — {KPI_PAGE_SIZE} maximum par page
               </p>
-              <div className="mt-2 flex max-w-4xl flex-col gap-3">
+              <div className="mt-2 flex w-full flex-col gap-3">
               {visibleKpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
