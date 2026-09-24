@@ -869,7 +869,22 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const seriesOptions = (kpi.calculation_configs || []).filter((config) => config.calc_type === 'manual');
-  const inputType = kpi.frequency === 'monthly' ? 'month' : 'date';
+
+  function parseBulkDate(value) {
+    const raw = String(value || '').trim();
+    const frenchDate = raw.match(/^(\d{2})[-/.](\d{2})[-/.](\d{4})$/);
+    if (frenchDate) {
+      const [, day, month, year] = frenchDate;
+      return `${year}-${month}-${day}`;
+    }
+    const isoDate = raw.match(/^\d{4}-\d{2}-\d{2}$/);
+    if (isoDate) return raw;
+    const frenchMonth = raw.match(/^(\d{2})[-/](\d{4})$/);
+    if (frenchMonth && kpi.frequency === 'monthly') return `${frenchMonth[2]}-${frenchMonth[1]}-01`;
+    const isoMonth = raw.match(/^\d{4}-\d{2}$/);
+    if (isoMonth && kpi.frequency === 'monthly') return `${raw}-01`;
+    return '';
+  }
 
   function parseRows() {
     const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
@@ -879,7 +894,7 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
     const first = cells[0].map((cell) => cell.toLowerCase());
     const hasHeader = first.some((cell) => ['date', 'période', 'periode', 'valeur', 'value', 'commentaire', 'comment'].includes(cell));
     const dataRows = hasHeader ? cells.slice(1) : cells;
-    return dataRows.map((row) => ({ period_date: fromInputPeriodValue(row[0] || '', kpi.frequency), value: row[1], comment: row.slice(2).join(' ') }));
+    return dataRows.map((row) => ({ period_date: parseBulkDate(row[0]), value: row[1], comment: row.slice(2).join(' ') }));
   }
 
   const parsedRows = parseRows();
@@ -911,10 +926,15 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
           <div><h2 className="text-lg font-semibold text-slate-900">Saisie en masse</h2><p className="text-sm text-slate-500">{kpi.name}</p></div>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700"><X size={20} /></button>
         </div>
-        <p className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">Copiez depuis Excel : <strong>Période → Valeur → Commentaire</strong>. Séparez les colonnes avec des tabulations. Une ligne Excel devient une valeur KPI.</p>
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-3 text-xs text-blue-800">
+          <p className="font-semibold">Format à coller depuis Excel</p>
+          <p className="mt-1"><strong>Date</strong> : JJ-MM-AAAA · <strong>Valeur</strong> : nombre dans l’unité du KPI{kpi.unit ? ` (${kpi.unit})` : ''} · <strong>Commentaire</strong> : facultatif.</p>
+          <p className="mt-1 font-mono">24-09-2026&nbsp;&nbsp;&nbsp;84&nbsp;&nbsp;&nbsp;Contrôle mensuel</p>
+          {kpi.frequency === 'monthly' && <p className="mt-1">Pour un KPI mensuel, le jour est accepté mais seul le mois est conservé.</p>}
+        </div>
         {seriesOptions.length > 0 && <label className="mt-4 block text-sm font-medium text-slate-700">Série<select value={configId} onChange={(event) => setConfigId(event.target.value)} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm"><option value="">Choisir une série</option>{seriesOptions.map((series) => <option key={series.id} value={series.id}>{series.label}</option>)}</select></label>}
-        <textarea value={text} onChange={(event) => setText(event.target.value)} placeholder={`Période\tValeur\tCommentaire\n2026-01\t42\tCommentaire optionnel`} className="mt-4 min-h-40 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
-        <p className="mt-1 text-xs text-slate-500">{parsedRows.length} ligne{parsedRows.length > 1 ? 's' : ''} détectée{parsedRows.length > 1 ? 's' : ''} · format période : {inputType === 'month' ? 'AAAA-MM' : 'AAAA-MM-JJ'}</p>
+        <textarea value={text} onChange={(event) => setText(event.target.value)} placeholder={`Date\tValeur\tCommentaire\n24-09-2026\t42\tCommentaire facultatif`} className="mt-4 min-h-40 w-full rounded-md border border-slate-300 px-3 py-2 font-mono text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
+        <p className="mt-1 text-xs text-slate-500">{parsedRows.length} ligne{parsedRows.length > 1 ? 's' : ''} détectée{parsedRows.length > 1 ? 's' : ''} · date française JJ-MM-AAAA</p>
         {parsedRows.length > 0 && <div className="mt-3 max-h-48 overflow-auto rounded border border-slate-200"><table className="min-w-full text-left text-xs"><thead className="bg-slate-50 text-slate-500"><tr><th className="px-2 py-1.5">Période</th><th className="px-2 py-1.5">Valeur</th><th className="px-2 py-1.5">Commentaire</th></tr></thead><tbody className="divide-y divide-slate-100">{parsedRows.slice(0, 100).map((row, index) => <tr key={index}><td className="px-2 py-1.5">{row.period_date || 'Invalide'}</td><td className="px-2 py-1.5">{row.value}</td><td className="px-2 py-1.5">{row.comment || '—'}</td></tr>)}</tbody></table></div>}
         {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
         <button type="button" onClick={handleSubmit} disabled={saving || parsedRows.length === 0} className="mt-4 w-full rounded-md bg-primary py-3 font-medium text-white hover:bg-primary-700 disabled:opacity-60">{saving ? 'Enregistrement…' : `Enregistrer ${parsedRows.length || ''} valeur${parsedRows.length > 1 ? 's' : ''}`}</button>
