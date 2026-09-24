@@ -52,6 +52,7 @@ function downloadEvidence(indicator) {
     ['Lignes valides', metadata.rows_valid ?? ''],
     ['Lignes rejetées', metadata.rows_rejected ?? ''],
     ['Identifiants retenus', (metadata.matched_row_ids || []).join(' | ')],
+    ['Valeurs agrégées', (metadata.matched_values || []).map((item) => `${item.row_id}: ${item.value}`).join(' | ')],
   ];
   const csv = rows.map((row) => row.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(';')).join('\n');
   const link = document.createElement('a');
