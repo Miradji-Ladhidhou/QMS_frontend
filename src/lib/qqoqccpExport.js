@@ -21,7 +21,7 @@ export function buildExportColumns({ forPdf } = {}) {
     { key: 'comment_', label: 'Comment ?', width: forPdf ? 0.1 : undefined },
     { key: 'combien', label: 'Combien ?', width: forPdf ? 0.1 : undefined },
     { key: 'pourquoi', label: 'Pourquoi ?', width: forPdf ? 0.1 : undefined },
-    { key: 'ai_synthesis', label: 'Synthèse IA', width: forPdf ? 0.14 : undefined },
+    { key: 'ai_synthesis', label: 'Synthèse', width: forPdf ? 0.14 : undefined },
     { key: 'linked_capa', label: 'CAPA liée', width: forPdf ? 0.08 : undefined },
     { key: 'category', label: 'Dossier', width: forPdf ? 0.08 : undefined },
     { key: 'created_at', label: 'Créée le', width: forPdf ? 0.08 : undefined },
@@ -31,7 +31,7 @@ export function buildExportColumns({ forPdf } = {}) {
 export function buildExportRows(source) {
   return source.map((analysis) => ({
     title: analysis.title,
-    status: QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
+    status: analysis.status === 'ai_generated' ? 'À valider' : QQOQCCP_STATUS_LABELS[analysis.status] || analysis.status,
     qui: analysis.qui || '',
     quoi: analysis.quoi || '',
     ou_: analysis.ou_ || '',
