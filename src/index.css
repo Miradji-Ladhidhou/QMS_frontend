@@ -25,6 +25,36 @@
   .text-white\/80 {
     color: rgb(255 255 255 / 0.92);
   }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: #64748b;
+    opacity: 1;
+  }
+
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible,
+  button:focus-visible,
+  a:focus-visible {
+    outline: 3px solid rgb(37 99 235 / 0.35);
+    outline-offset: 2px;
+  }
+
+  table thead {
+    color: #334155;
+  }
+
+  table tbody tr:hover {
+    background-color: #f8fafc;
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    color: #64748b;
+  }
 }
 
 /* Transition douce entre pages (voir Layout.jsx#Outlet) — remplace le passage instantané et
