@@ -16,6 +16,7 @@ import {
 import Sparkline from './Sparkline.jsx';
 import ObjectiveEditor from './ObjectiveEditor.jsx';
 import { api } from '../../lib/api.js';
+import { evidenceColumnLabel, evidenceValueLabel } from '../../lib/moduleKpiEvidence.js';
 
 // Écart chiffré avec la valeur de comparaison choisie (période précédente, N-1 ou moyenne) : flèche, écart, verdict.
 function ComparisonBadge({ indicator, mode }) {
@@ -95,8 +96,8 @@ export default function IndicatorRow({ indicator, mode, canManage, compareSelect
     if (!evidence) return;
     const keys = [...new Set(evidence.rows.flatMap((row) => Object.keys(row.row_data || {})))];
     const lines = [
-      ['Ligne', 'Retenue', ...keys],
-      ...evidence.rows.map((row) => [row.row_index, row.included ? 'oui' : 'non', ...keys.map((key) => row.row_data?.[key] ?? '')]),
+      ['Ligne', 'Prise en compte', ...keys.map(evidenceColumnLabel)],
+      ...evidence.rows.map((row) => [row.row_index, row.included ? 'Oui' : 'Non', ...keys.map((key) => evidenceValueLabel(row.row_data?.[key], key))]),
     ];
     const csv = lines.map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(';')).join('\n');
     const link = document.createElement('a');
@@ -183,10 +184,10 @@ export default function IndicatorRow({ indicator, mode, canManage, compareSelect
                 <div className="mt-3 max-h-80 overflow-auto rounded border border-slate-200 bg-white">
                   <table className="min-w-full text-left text-xs">
                     <thead className="sticky top-0 bg-slate-100 text-slate-500">
-                      <tr><th className="px-2 py-1.5">Ligne</th><th className="px-2 py-1.5">Prise en compte</th>{[...new Set(evidence.rows.flatMap((row) => Object.keys(row.row_data || {})))].map((key) => <th key={key} className="px-2 py-1.5">{key}</th>)}</tr>
+                      <tr><th className="px-2 py-1.5">Ligne</th><th className="px-2 py-1.5">Prise en compte</th>{[...new Set(evidence.rows.flatMap((row) => Object.keys(row.row_data || {})))].map((key) => <th key={key} className="px-2 py-1.5">{evidenceColumnLabel(key)}</th>)}</tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {evidence.rows.map((row) => <tr key={row.row_index} className={row.included ? '' : 'bg-red-50 text-slate-400'}><td className="whitespace-nowrap px-2 py-1.5">{row.row_index}</td><td className="whitespace-nowrap px-2 py-1.5">{row.included ? 'Oui' : 'Non'}</td>{[...new Set(evidence.rows.flatMap((item) => Object.keys(item.row_data || {})))].map((key) => <td key={key} className="max-w-48 whitespace-nowrap px-2 py-1.5">{String(row.row_data?.[key] ?? '')}</td>)}</tr>)}
+                      {evidence.rows.map((row) => <tr key={row.row_index} className={row.included ? '' : 'bg-red-50 text-slate-400'}><td className="whitespace-nowrap px-2 py-1.5">{row.row_index}</td><td className="whitespace-nowrap px-2 py-1.5">{row.included ? 'Oui' : 'Non'}</td>{[...new Set(evidence.rows.flatMap((item) => Object.keys(item.row_data || {})))].map((key) => <td key={key} className="max-w-48 whitespace-nowrap px-2 py-1.5">{evidenceValueLabel(row.row_data?.[key], key)}</td>)}</tr>)}
                     </tbody>
                   </table>
                 </div>

@@ -74,6 +74,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import Pagination from '../components/Pagination.jsx';
+import { evidenceColumnLabel, evidenceValueLabel } from '../lib/moduleKpiEvidence.js';
 
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
@@ -3002,7 +3003,7 @@ function KpiCard({
   function exportModuleEvidence() {
     if (!moduleEvidence) return;
     const columns = [...new Set(moduleEvidence.rows.flatMap((row) => Object.keys(row.row_data || {})))];
-    const lines = [['Ligne', 'Retenue', ...columns], ...moduleEvidence.rows.map((row) => [row.row_index, row.included ? 'oui' : 'non', ...columns.map((column) => row.row_data?.[column] ?? '')])];
+    const lines = [['Ligne', 'Prise en compte', ...columns.map(evidenceColumnLabel)], ...moduleEvidence.rows.map((row) => [row.row_index, row.included ? 'Oui' : 'Non', ...columns.map((column) => evidenceValueLabel(row.row_data?.[column], column))])];
     const csv = lines.map((line) => line.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(';')).join('\n');
     const link = document.createElement('a');
     link.href = URL.createObjectURL(new Blob([`\ufeff${csv}`], { type: 'text/csv;charset=utf-8' }));
@@ -3289,8 +3290,8 @@ function KpiCard({
               </div>
               <div className="mt-2 max-h-80 overflow-auto rounded border border-slate-200 bg-white">
                 <table className="min-w-full text-left text-xs">
-                  <thead className="sticky top-0 bg-slate-100 text-slate-500"><tr><th className="px-2 py-1.5">Ligne</th><th className="px-2 py-1.5">Retenue</th>{[...new Set(moduleEvidence.rows.flatMap((row) => Object.keys(row.row_data || {})))].map((column) => <th key={column} className="px-2 py-1.5">{column}</th>)}</tr></thead>
-                  <tbody className="divide-y divide-slate-100">{moduleEvidence.rows.map((row) => <tr key={row.row_index} className={row.included ? '' : 'bg-red-50 text-slate-400'}><td className="px-2 py-1.5">{row.row_index}</td><td className="px-2 py-1.5">{row.included ? 'Oui' : 'Non'}</td>{[...new Set(moduleEvidence.rows.flatMap((item) => Object.keys(item.row_data || {})))].map((column) => <td key={column} className="max-w-48 whitespace-nowrap px-2 py-1.5">{String(row.row_data?.[column] ?? '')}</td>)}</tr>)}</tbody>
+                  <thead className="sticky top-0 bg-slate-100 text-slate-500"><tr><th className="px-2 py-1.5">Ligne</th><th className="px-2 py-1.5">Prise en compte</th>{[...new Set(moduleEvidence.rows.flatMap((row) => Object.keys(row.row_data || {})))].map((column) => <th key={column} className="px-2 py-1.5">{evidenceColumnLabel(column)}</th>)}</tr></thead>
+                  <tbody className="divide-y divide-slate-100">{moduleEvidence.rows.map((row) => <tr key={row.row_index} className={row.included ? '' : 'bg-red-50 text-slate-400'}><td className="px-2 py-1.5">{row.row_index}</td><td className="px-2 py-1.5">{row.included ? 'Oui' : 'Non'}</td>{[...new Set(moduleEvidence.rows.flatMap((item) => Object.keys(item.row_data || {})))].map((column) => <td key={column} className="max-w-48 whitespace-nowrap px-2 py-1.5">{evidenceValueLabel(row.row_data?.[column], column)}</td>)}</tr>)}</tbody>
                 </table>
               </div>
             </div>
