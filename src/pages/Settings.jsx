@@ -8,6 +8,10 @@ import DocumentReviewSettings from '../components/DocumentReviewSettings.jsx';
 import DriveStorageSettings from '../components/DriveStorageSettings.jsx';
 import MenuVisibilitySettings from '../components/MenuVisibilitySettings.jsx';
 import ProfileSettings from '../components/ProfileSettings.jsx';
+import QualityPolicySettings from '../components/QualityPolicySettings.jsx';
+import RiskSettings from '../components/RiskSettings.jsx';
+import SettingsDataSecurity from '../components/SettingsDataSecurity.jsx';
+import SupplierSettingsModal from '../components/suppliers/SupplierSettingsModal.jsx';
 import Groups from './Groups.jsx';
 
 // Groupé par intention plutôt qu'en une seule rangée d'onglets à défiler (10 onglets à plat,
@@ -29,6 +33,7 @@ const TAB_GROUPS = [
       { id: 'users', label: 'Utilisateurs' },
       { id: 'groups', label: 'Groupes', adminOnly: true },
       { id: 'visibility', label: 'Visibilité', adminOnly: true },
+      { id: 'quality-policy', label: 'Politique qualité' },
     ],
   },
   {
@@ -36,6 +41,14 @@ const TAB_GROUPS = [
     tabs: [
       { id: 'capa', label: 'CAPA', adminOnly: true },
       { id: 'documents', label: 'Documents', adminOnly: true },
+      { id: 'risks', label: 'Risques', adminOnly: true },
+      { id: 'suppliers', label: 'Fournisseurs', adminOnly: true },
+    ],
+  },
+  {
+    label: 'Sécurité',
+    tabs: [
+      { id: 'data-security', label: 'Données et sécurité' },
     ],
   },
 ];
@@ -111,6 +124,10 @@ export default function Settings() {
           </div>
         )}
         {activeTab === 'visibility' && isAdmin && <MenuVisibilitySettings />}
+        {activeTab === 'quality-policy' && <QualityPolicySettings isAdmin={isAdmin} isManager={currentUser?.role === 'manager'} />}
+        {activeTab === 'risks' && isAdmin && <RiskSettings />}
+        {activeTab === 'suppliers' && isAdmin && <SupplierSettingsModal embedded onSaved={() => {}} />}
+        {activeTab === 'data-security' && <SettingsDataSecurity />}
         {activeTab === 'profile' && currentUser && (
           <ProfileSettings
             currentUser={currentUser}

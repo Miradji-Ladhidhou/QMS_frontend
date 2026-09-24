@@ -9,7 +9,7 @@ const FIELD_CLASS =
 // Réglages de l'évaluation des fournisseurs (admin) : rythme d'évaluation selon la criticité, seuils qui proposent la
 // décision, poids des critères par criticité et suspension automatique. Ils s'appliquent aux évaluations à venir :
 // chaque évaluation passée garde les poids qu'elle avait à sa date.
-export default function SupplierSettingsModal({ onClose, onSaved }) {
+export default function SupplierSettingsModal({ onClose, onSaved, embedded = false }) {
   const [settings, setSettings] = useState(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -54,17 +54,18 @@ export default function SupplierSettingsModal({ onClose, onSaved }) {
     onSaved(data);
   }
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="max-h-[92vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6">
+  const content = (
+    <div className={embedded ? 'rounded-xl border border-slate-200 bg-white p-5 sm:p-6' : 'max-h-[92vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-2xl sm:rounded-xl sm:p-6'}>
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 className="text-lg font-semibold text-slate-900">Réglages de l'évaluation</h2>
             <p className="text-sm text-slate-500">Rythme, seuils de décision et poids des critères.</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fermer" className="-m-2 shrink-0 p-2.5 text-slate-500 hover:text-slate-700">
-            <X size={20} />
-          </button>
+          {!embedded && (
+            <button type="button" onClick={onClose} aria-label="Fermer" className="-m-2 shrink-0 p-2.5 text-slate-500 hover:text-slate-700">
+              <X size={20} />
+            </button>
+          )}
         </div>
 
         {!settings ? (
@@ -130,6 +131,7 @@ export default function SupplierSettingsModal({ onClose, onSaved }) {
           </form>
         )}
       </div>
-    </div>
   );
+
+  return embedded ? content : <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">{content}</div>;
 }
