@@ -132,6 +132,8 @@ const TABS = [
   { id: 'stats', label: 'Statistiques' },
   { id: 'audit', label: "Journal d'audit" },
   { id: 'system', label: 'Système' },
+  { id: 'platform', label: 'Plateforme' },
+  { id: 'support', label: 'Support' },
 ];
 
 function formatDate(dateStr) {
@@ -1222,6 +1224,74 @@ function StatsTab() {
   );
 }
 
+function PlatformTab() {
+  const [metrics, setMetrics] = useState(null);
+  const [maintenance, setMaintenance] = useState({ enabled: false, message: '' });
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    Promise.all([api.get('/super-admin/metrics'), api.get('/super-admin/platform-settings')])
+      .then(([metricsResponse, settingsResponse]) => {
+        setMetrics(metricsResponse.data);
+        const setting = settingsResponse.data.find((item) => item.key === 'maintenance');
+        if (setting) setMaintenance(setting.value);
+      })
+      .catch(() => setError('Impossible de charger les réglages plateforme.'));
+  }, []);
+
+  async function saveMaintenance(event) {
+    event.preventDefault();
+    setSaving(true);
+    setMessage('');
+    setError('');
+    try {
+      const { data } = await api.patch('/super-admin/platform-settings/maintenance', maintenance);
+      setMaintenance(data.value);
+      setMessage('Mode maintenance mis à jour.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de modifier le mode maintenance.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="text-base font-semibold text-slate-900">Mode maintenance global</h2>
+        <p className="mt-1 text-sm text-slate-500">Les utilisateurs ordinaires reçoivent une réponse 503 pendant la maintenance. Les superadmins restent accessibles.</p>
+        <form onSubmit={saveMaintenance} className="mt-4 space-y-3">
+          <label className="flex items-center gap-2 text-sm font-medium text-slate-700"><input type="checkbox" checked={Boolean(maintenance.enabled)} onChange={(event) => setMaintenance((value) => ({ ...value, enabled: event.target.checked }))} className="h-5 w-5 rounded border-slate-300 text-primary" /> Activer la maintenance</label>
+          <textarea value={maintenance.message || ''} onChange={(event) => setMaintenance((value) => ({ ...value, message: event.target.value }))} rows={2} maxLength={500} className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" placeholder="Message affiché pendant la maintenance" />
+          <button type="submit" disabled={saving} className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white disabled:opacity-60">{saving ? 'Enregistrement...' : 'Enregistrer'}</button>
+        </form>
+        {message && <p className="mt-3 text-sm text-emerald-700">{message}</p>}
+        {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+      </div>
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <h2 className="text-base font-semibold text-slate-900">Métriques plateforme</h2>
+        {!metrics ? <p className="mt-3 text-sm text-slate-500">Chargement...</p> : <>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5">{Object.entries(metrics.counts).map(([key, value]) => <div key={key} className="rounded-md border border-slate-200 bg-slate-50 p-3"><p className="text-lg font-semibold text-slate-900">{value}</p><p className="text-xs text-slate-500">{key}</p></div>)}</div>
+          <p className="mt-3 text-xs text-slate-500">Process actif depuis {formatUptime(metrics.process_uptime_seconds)}. {metrics.external.message}</p>
+        </>}
+      </div>
+    </div>
+  );
+}
+
+function SupportTab() {
+  const [tickets, setTickets] = useState(null);
+  const [error, setError] = useState('');
+  useEffect(() => { api.get('/super-admin/support-tickets').then(({ data }) => setTickets(data)).catch(() => setError('Impossible de charger les tickets support.')); }, []);
+  async function updateTicket(id, status) {
+    const { data } = await api.patch(`/super-admin/support-tickets/${id}`, { status });
+    setTickets((items) => items.map((ticket) => (ticket.id === id ? data : ticket)));
+  }
+  return <div><h2 className="text-base font-semibold text-slate-900">Tickets support</h2><p className="mt-1 text-sm text-slate-500">Demandes des administrateurs et managers de tenants.</p>{error && <p className="mt-3 text-sm text-red-600">{error}</p>}{tickets && <div className="mt-4 space-y-2">{tickets.length === 0 ? <p className="text-sm text-slate-500">Aucun ticket.</p> : tickets.map((ticket) => <div key={ticket.id} className="rounded-xl border border-slate-200 bg-white p-4"><div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold text-slate-900">{ticket.subject}</p><p className="text-xs text-slate-500">{ticket.tenant?.name || 'Tenant supprimé'} · priorité {ticket.priority}</p></div><select value={ticket.status} onChange={(event) => updateTicket(ticket.id, event.target.value)} className="rounded-md border border-slate-300 px-2 py-1 text-xs"><option value="open">Ouvert</option><option value="in_progress">En cours</option><option value="resolved">Résolu</option><option value="closed">Fermé</option></select></div><p className="mt-3 whitespace-pre-wrap text-sm text-slate-700">{ticket.message}</p>{ticket.admin_note && <p className="mt-2 text-xs text-slate-500">Note : {ticket.admin_note}</p>}</div>)}</div>}</div>;
+}
+
 const ACTIVITY_SORT_OPTIONS = [
   { key: 'created_at', label: 'date' },
   { key: 'action', label: 'action' },
@@ -2053,6 +2123,8 @@ export default function SuperAdmin() {
           {activeTab === 'stats' && <StatsTab />}
           {activeTab === 'audit' && <AuditTab />}
           {activeTab === 'system' && <SystemTab />}
+          {activeTab === 'platform' && <PlatformTab />}
+          {activeTab === 'support' && <SupportTab />}
         </div>
       </main>
 

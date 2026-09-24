@@ -16,6 +16,9 @@ export default function SettingsDataSecurity({ isAdmin, isSuperAdmin }) {
   const [enrollData, setEnrollData] = useState(null);
   const [mfaCode, setMfaCode] = useState('');
   const [error, setError] = useState('');
+  const [ticketSubject, setTicketSubject] = useState('');
+  const [ticketMessage, setTicketMessage] = useState('');
+  const [ticketStatus, setTicketStatus] = useState('');
 
   useEffect(() => {
     supabase.auth.mfa.listFactors().then(({ data }) => setFactors(data?.totp || [])).catch(() => {});
@@ -97,6 +100,19 @@ export default function SettingsDataSecurity({ isAdmin, isSuperAdmin }) {
     else setFactors((current) => current.filter((factor) => factor.id !== factorId));
   }
 
+  async function createTicket(event) {
+    event.preventDefault();
+    setTicketStatus('');
+    try {
+      await api.post('/support', { subject: ticketSubject, message: ticketMessage });
+      setTicketSubject('');
+      setTicketMessage('');
+      setTicketStatus('Ticket envoyé au support.');
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de créer le ticket.');
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
@@ -118,6 +134,17 @@ export default function SettingsDataSecurity({ isAdmin, isSuperAdmin }) {
           <LogOut size={16} />
           {signingOut ? 'Déconnexion...' : 'Déconnecter tous les appareils'}
         </button>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
+        <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Contacter le support</h2>
+        <p className="mt-2 text-sm text-slate-600">Décrivez votre problème. Un super administrateur pourra suivre et traiter votre demande.</p>
+        <form onSubmit={createTicket} className="mt-4 space-y-3">
+          <input required maxLength={200} value={ticketSubject} onChange={(event) => setTicketSubject(event.target.value)} placeholder="Sujet" className="w-full rounded-md border border-slate-300 px-3 py-2 text-base" />
+          <textarea required maxLength={5000} rows={4} value={ticketMessage} onChange={(event) => setTicketMessage(event.target.value)} placeholder="Décrivez votre demande" className="w-full rounded-md border border-slate-300 px-3 py-2 text-base" />
+          <button type="submit" className="rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700">Envoyer au support</button>
+        </form>
+        {ticketStatus && <p className="mt-3 text-sm text-emerald-700">{ticketStatus}</p>}
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
