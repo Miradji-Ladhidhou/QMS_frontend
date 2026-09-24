@@ -1500,6 +1500,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   const [aiPrompt, setAiPrompt] = useState('');
   const [aiAnalyzedImportKey, setAiAnalyzedImportKey] = useState('');
   const [selectedAiSeriesIndex, setSelectedAiSeriesIndex] = useState(0);
+  const [selectedAiSeries, setSelectedAiSeries] = useState([]);
 
   const [result, setResult] = useState(null);
 
@@ -1548,6 +1549,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     setAiSuggestion(null);
     setAiAnalyzedImportKey('');
     setSelectedAiSeriesIndex(0);
+    setSelectedAiSeries([]);
   }
 
   function handleDownloadTemplate() {
@@ -1675,6 +1677,10 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     setSimpleMode(false);
   }
 
+  function toggleAiSeries(index) {
+    setSelectedAiSeries((current) => (current.includes(index) ? current.filter((item) => item !== index) : [...current, index]));
+  }
+
   // Aperçu live : recalcule à chaque changement de champ via /evaluate, qui n'enregistre
   // rien (ni la recette, ni de valeur) — contrairement à l'ancienne version qui exigeait de
   // sauvegarder la recette avant de pouvoir cliquer "Aperçu". Débounce léger pour ne pas
@@ -1711,6 +1717,29 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     setConfigError('');
     setApplying(true);
     try {
+      const suggestedSeries = aiSuggestion?.series || [];
+      const selectedSeriesToCreate = selectedAiSeries.length > 1 ? selectedAiSeries.map((index) => suggestedSeries[index]).filter(Boolean) : [];
+      if (selectedSeriesToCreate.length > 1 && selectedSeriesId === 'new') {
+        const results = [];
+        for (const series of selectedSeriesToCreate) {
+          const { data: savedConfig } = await api.post(`/kpis/${kpi.id}/series`, {
+            label: series.label,
+            calc_type: series.calc_type,
+            source_column: series.source_column || null,
+            filters: series.filters || [],
+            filter_logic: series.filter_logic || 'all',
+            group_by_column: series.group_by_column || null,
+            period_column: series.period_column || null,
+          });
+          const body = { dry_run: false, config_id: savedConfig.id };
+          if (!series.period_column) body.period_date = manualPeriod ? `${manualPeriod}-01` : undefined;
+          results.push(await api.post(`/kpi-imports/${importData.import.id}/apply`, body));
+        }
+        setResult(results[results.length - 1].data);
+        onImported();
+        setStep(3);
+        return;
+      }
       const isNewSeries = selectedSeriesId === 'new';
       const { data: savedConfig } = isNewSeries
         ? await api.post(`/kpis/${kpi.id}/series`, configPayload())
@@ -2075,14 +2104,15 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                   {aiSuggestion && <div className="mt-2 rounded border border-blue-200 bg-white p-2 text-xs text-slate-700">
                     <p><strong>Propositions adaptées :</strong> {aiSuggestion.explanation}</p>
                     {(aiSuggestion.series || [aiSuggestion]).map((series, index) => (
-                      <label key={`${series.label || 'serie'}-${index}`} className={`mt-2 flex cursor-pointer items-start gap-2 rounded border p-2 ${selectedAiSeriesIndex === index ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
-                        <input type="radio" name="ai-series" checked={selectedAiSeriesIndex === index} onChange={() => setSelectedAiSeriesIndex(index)} className="mt-0.5" />
+                      <label key={`${series.label || 'serie'}-${index}`} className={`mt-2 flex cursor-pointer items-start gap-2 rounded border p-2 ${selectedAiSeries.includes(index) || selectedAiSeriesIndex === index ? 'border-primary bg-primary/5' : 'border-slate-200'}`}>
+                        <input type="checkbox" checked={selectedAiSeries.includes(index)} onChange={() => { toggleAiSeries(index); setSelectedAiSeriesIndex(index); }} className="mt-0.5" />
                         <span><strong>{series.label}</strong> · {CALC_TYPE_LABELS[series.calc_type] || series.calc_type} · confiance {series.confidence ?? aiSuggestion.confidence ?? 0} %<span className="block text-slate-500">{series.explanation}</span></span>
                       </label>
                     ))}
                     {aiSuggestion.warnings?.length > 0 && <p className="mt-2 text-amber-700">Attention : {aiSuggestion.warnings.join(' · ')}</p>}
                     <p className="mt-1 text-slate-500">{aiSuggestion.analyzed_rows || 0} ligne(s) analysée(s) depuis le fichier original.</p>
                     <button type="button" onClick={applyAiSuggestion} className="mt-2 font-medium text-primary underline underline-offset-2">Appliquer la proposition sélectionnée pour la vérifier</button>
+                    {selectedAiSeries.length > 1 && <p className="mt-2 font-medium text-primary">{selectedAiSeries.length} séries seront créées sur le même graphique.</p>}
                   </div>}
                 </div>
 
