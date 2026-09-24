@@ -1745,7 +1745,7 @@ export default function Trainings() {
   );
   const trainingTotalPages = Math.max(1, Math.ceil(currentFolderTrainings.length / 25));
   const pagedTrainings = currentFolderTrainings.slice((trainingPage - 1) * 25, trainingPage * 25);
-  useEffect(() => setTrainingPage(1), [currentFolderId, searchText]);
+  useEffect(() => setTrainingPage(1), [currentFolderId]);
   useEffect(() => { if (trainingPage > trainingTotalPages) setTrainingPage(trainingTotalPages); }, [trainingPage, trainingTotalPages]);
 
   const excludedPeople = combinePeople(users, employees).filter((p) => p.training_exempt);
