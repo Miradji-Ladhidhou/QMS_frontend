@@ -865,6 +865,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
 
 function BulkRecordModal({ kpi, onClose, onSaved }) {
   const [rows, setRows] = useState([{ period: '', value: '', comment: '' }]);
+  const [activeCell, setActiveCell] = useState({ row: 0, column: 0 });
   const [configId, setConfigId] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -886,15 +887,13 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
     return '';
   }
 
-  function parsePastedRows(text) {
-    const lines = text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  function parsePastedMatrix(text) {
+    const lines = text.replace(/\r/g, '').split('\n').filter((line) => line.length > 0);
     if (lines.length === 0) return [];
-    const separator = lines[0].includes('\t') ? '\t' : lines[0].includes(';') ? ';' : ',';
-    const cells = lines.map((line) => line.split(separator).map((cell) => cell.trim()));
+    const cells = lines.map((line) => (line.includes('\t') ? line.split('\t') : [line]));
     const first = cells[0].map((cell) => cell.toLowerCase());
     const hasHeader = first.some((cell) => ['date', 'période', 'periode', 'valeur', 'value', 'commentaire', 'comment'].includes(cell));
-    const dataRows = hasHeader ? cells.slice(1) : cells;
-    return dataRows.map((row) => ({ period: row[0] || '', value: row[1] || '', comment: row.slice(2).join(' ') }));
+    return hasHeader ? cells.slice(1) : cells;
   }
 
   function updateRow(index, patch) {
@@ -902,10 +901,29 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
   }
 
   function handlePaste(event) {
-    const pastedRows = parsePastedRows(event.clipboardData.getData('text'));
-    if (pastedRows.length === 0) return;
+    const matrix = parsePastedMatrix(event.clipboardData.getData('text'));
+    if (matrix.length === 0) return;
     event.preventDefault();
-    setRows(pastedRows);
+    const start = activeCell;
+    const isSingleColumn = matrix.every((row) => row.length === 1);
+    const startColumn = start.column;
+    setRows((current) => {
+      const next = [...current];
+      matrix.forEach((cells, rowOffset) => {
+        const rowIndex = start.row + rowOffset;
+        while (next.length <= rowIndex) next.push({ period: '', value: '', comment: '' });
+        const row = { ...next[rowIndex] };
+        const values = isSingleColumn ? [cells[0]] : cells.slice(0, 3);
+        values.forEach((value, columnOffset) => {
+          const column = startColumn + columnOffset;
+          if (column === 0) row.period = value.trim();
+          if (column === 1) row.value = value.trim();
+          if (column === 2) row.comment = value;
+        });
+        next[rowIndex] = row;
+      });
+      return next;
+    });
   }
 
   const parsedRows = rows.map((row) => ({ period_date: parseBulkDate(row.period), value: row.value, comment: row.comment }));
@@ -951,7 +969,7 @@ function BulkRecordModal({ kpi, onClose, onSaved }) {
               {rows.map((row, index) => {
                 const parsed = parsedRows[index];
                 const invalid = row.period && !parsed.period_date || row.value && Number.isNaN(Number(String(row.value).replace(',', '.')));
-                return <tr key={index} className={invalid ? 'bg-red-50' : ''}><td className="p-1"><input value={row.period} onChange={(event) => updateRow(index, { period: event.target.value })} placeholder="24-09-2026" className="w-36 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><input value={row.value} onChange={(event) => updateRow(index, { value: event.target.value })} placeholder="84" className="w-24 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><input value={row.comment} onChange={(event) => updateRow(index, { comment: event.target.value })} placeholder="Commentaire" className="min-w-48 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><button type="button" onClick={() => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} aria-label="Supprimer la ligne" className="px-2 py-1 text-slate-400 hover:text-red-600">×</button></td></tr>;
+                return <tr key={index} className={invalid ? 'bg-red-50' : ''}><td className="p-1"><input value={row.period} onFocus={() => setActiveCell({ row: index, column: 0 })} onChange={(event) => updateRow(index, { period: event.target.value })} placeholder="24-09-2026" className="w-36 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><input value={row.value} onFocus={() => setActiveCell({ row: index, column: 1 })} onChange={(event) => updateRow(index, { value: event.target.value })} placeholder="84" className="w-24 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><input value={row.comment} onFocus={() => setActiveCell({ row: index, column: 2 })} onChange={(event) => updateRow(index, { comment: event.target.value })} placeholder="Commentaire" className="min-w-48 rounded border border-slate-200 px-2 py-1.5 text-xs" /></td><td className="p-1"><button type="button" onClick={() => setRows((current) => current.filter((_, rowIndex) => rowIndex !== index))} aria-label="Supprimer la ligne" className="px-2 py-1 text-slate-400 hover:text-red-600">×</button></td></tr>;
               })}
             </tbody>
           </table>
