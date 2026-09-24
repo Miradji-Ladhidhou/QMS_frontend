@@ -26,6 +26,18 @@
     color: rgb(255 255 255 / 0.92);
   }
 
+  .border-slate-200 {
+    border-color: #94a3b8;
+  }
+
+  .border-slate-300 {
+    border-color: #64748b;
+  }
+
+  .divide-slate-100 > :not([hidden]) ~ :not([hidden]) {
+    border-color: #cbd5e1;
+  }
+
   input::placeholder,
   textarea::placeholder {
     color: #64748b;
@@ -44,11 +56,11 @@
   table thead {
     color: #334155;
     background-color: #f1f5f9;
-    border-bottom: 2px solid #cbd5e1;
+    border-bottom: 2px solid #334155;
   }
 
   table tbody tr {
-    border-bottom: 1px solid #cbd5e1;
+    border-bottom: 1px solid #475569;
   }
 
   table tbody tr:last-child {
