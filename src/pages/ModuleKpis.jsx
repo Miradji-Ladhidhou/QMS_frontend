@@ -46,12 +46,21 @@ export default function ModuleKpis() {
   const [auditMenuOpen, setAuditMenuOpen] = useState(false);
   const [toolsOpen, setToolsOpen] = useState(false);
   const [refreshingPreset, setRefreshingPreset] = useState(null);
+  const [draftDateFrom, setDraftDateFrom] = useState('');
+  const [draftDateTo, setDraftDateTo] = useState('');
+  const [appliedRange, setAppliedRange] = useState({ from: '', to: '' });
   const loadRequestRef = useRef(0);
 
-  async function load() {
+  async function load(range = appliedRange) {
     const requestId = ++loadRequestRef.current;
     try {
-      const { data: overview } = await api.get('/kpis/module-overview');
+      const ranges = data?.domains?.reduce((result, domain) => {
+        if (range.from || range.to) result[domain.key] = range;
+        return result;
+      }, {});
+      const { data: overview } = await api.get('/kpis/module-overview', {
+        params: ranges && Object.keys(ranges).length > 0 ? { ranges: JSON.stringify(ranges) } : undefined,
+      });
       if (requestId !== loadRequestRef.current) return;
       setData(overview);
       setError('');
@@ -170,6 +179,23 @@ export default function ModuleKpis() {
     setAuditOnly(false);
   }
 
+  function applyDateRange() {
+    if (draftDateFrom && draftDateTo && draftDateFrom > draftDateTo) {
+      setError('La date de début doit précéder la date de fin.');
+      return;
+    }
+    const nextRange = { from: draftDateFrom, to: draftDateTo };
+    setAppliedRange(nextRange);
+    load(nextRange);
+  }
+
+  function clearDateRange() {
+    setDraftDateFrom('');
+    setDraftDateTo('');
+    setAppliedRange({ from: '', to: '' });
+    load({ from: '', to: '' });
+  }
+
   const summary = data?.summary;
   const untrackedEssentials = summary ? summary.essential_total - summary.essential_tracked : 0;
   const rowProps = {
@@ -244,6 +270,30 @@ export default function ModuleKpis() {
 
                 {toolsOpen && (
                   <div className="mt-2 rounded-md bg-slate-50 p-3">
+                    <div className="mb-3 border-b border-slate-200 pb-3">
+                      <p className="mb-2 text-xs font-medium text-slate-500">Période des données affichées</p>
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                        <label className="text-xs text-slate-600">
+                          Du
+                          <input type="date" value={draftDateFrom} onChange={(event) => setDraftDateFrom(event.target.value)} className="mt-1 block min-h-[40px] w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                        </label>
+                        <label className="text-xs text-slate-600">
+                          Au
+                          <input type="date" value={draftDateTo} onChange={(event) => setDraftDateTo(event.target.value)} className="mt-1 block min-h-[40px] w-full rounded-md border border-slate-300 bg-white px-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
+                        </label>
+                      </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <button type="button" onClick={applyDateRange} className="min-h-[40px] rounded-md bg-primary px-3 text-xs font-medium text-white hover:bg-primary-700">
+                          Appliquer la période
+                        </button>
+                        {(appliedRange.from || appliedRange.to) && (
+                          <button type="button" onClick={clearDateRange} className="min-h-[40px] px-2 text-xs font-medium text-slate-500 underline underline-offset-2 hover:text-slate-800">
+                            Afficher toute la période
+                          </button>
+                        )}
+                        {(appliedRange.from || appliedRange.to) && <span className="text-xs text-primary">Période active</span>}
+                      </div>
+                    </div>
                     <p className="mb-1 text-xs font-medium text-slate-500">Comparer la valeur actuelle à…</p>
                     <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-3" role="group" aria-label="Base de comparaison">
                       {COMPARISON_MODES.map((item) => (
