@@ -2,6 +2,31 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Contraste de lecture global : les textes secondaires restent discrets sans devenir difficiles
+   à lire sur les écrans mobiles ou les cartes denses. Les couleurs métier (statuts, alertes)
+   restent prioritaires et ne sont pas modifiées ici. */
+@layer utilities {
+  .text-slate-400 {
+    color: #64748b;
+  }
+
+  .text-slate-500 {
+    color: #475569;
+  }
+
+  .text-white\/60 {
+    color: rgb(255 255 255 / 0.78);
+  }
+
+  .text-white\/70 {
+    color: rgb(255 255 255 / 0.86);
+  }
+
+  .text-white\/80 {
+    color: rgb(255 255 255 / 0.92);
+  }
+}
+
 /* Transition douce entre pages (voir Layout.jsx#Outlet) — remplace le passage instantané et
    abrupt d'une page à l'autre par un léger fondu, pour que même un changement de contenu très
    rapide (une fois les requêtes redondantes éliminées, voir CurrentUserProvider.jsx) se
