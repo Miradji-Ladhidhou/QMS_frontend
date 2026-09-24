@@ -17,6 +17,7 @@ import Sparkline from './Sparkline.jsx';
 import ObjectiveEditor from './ObjectiveEditor.jsx';
 import { api } from '../../lib/api.js';
 import { evidenceColumnLabel, evidenceValueLabel } from '../../lib/moduleKpiEvidence.js';
+import AuditReading from './AuditReading.jsx';
 
 // Écart chiffré avec la valeur de comparaison choisie (période précédente, N-1 ou moyenne) : flèche, écart, verdict.
 function ComparisonBadge({ indicator, mode }) {
@@ -170,6 +171,20 @@ export default function IndicatorRow({ indicator, mode, canManage, compareSelect
             <div className="mt-1">
               <ComparisonBadge indicator={indicator} mode={mode} />
             </div>
+          )}
+
+          {indicator.latest && (
+            <AuditReading
+              current={indicator.latest.value}
+              unit={indicator.unit}
+              target={indicator.target}
+              direction={indicator.target_direction}
+              status={indicator.status}
+              period={indicator.snapshot ? 'État à ce jour' : formatPeriod(indicator.latest.period_date, indicator.frequency)}
+              comparisonLabel={COMPARISON_MODES.find((item) => item.key === mode)?.label}
+              comparisonValue={indicator[mode]?.value}
+              evidenceCount={indicator.latest.calculation_metadata?.rows_total}
+            />
           )}
 
           {indicator.latest && (

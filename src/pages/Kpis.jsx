@@ -75,6 +75,7 @@ import SortableTh from '../components/SortableTh.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { evidenceColumnLabel, evidenceValueLabel } from '../lib/moduleKpiEvidence.js';
+import AuditReading from '../components/moduleKpis/AuditReading.jsx';
 
 const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
@@ -2972,6 +2973,8 @@ function KpiCard({
   const recentRecords = [...records].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
   const averageValue =
     recentRecords.length > 0 ? Number((recentRecords.reduce((sum, r) => sum + r.value, 0) / recentRecords.length).toFixed(2)) : null;
+  const previousRecords = records.slice(0, Math.max(0, records.length - recentRecords.length));
+  const previousAverage = previousRecords.length > 0 ? Number((previousRecords.reduce((sum, record) => sum + record.value, 0) / previousRecords.length).toFixed(2)) : null;
   const status = getKpiStatus(averageValue, kpi.target, targetDirection);
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'warning' ? AlertTriangle : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
@@ -3398,6 +3401,20 @@ function KpiCard({
           </button>
         )}
       </div>
+
+      {showDetails && isModuleBased && (
+        <AuditReading
+          current={averageValue}
+          unit={kpi.unit}
+          target={kpi.target}
+          direction={targetDirection}
+          status={status === 'neutral' ? 'neutral' : status}
+          period={`Moyenne des ${recentRecords.length} derniers relevés`}
+          comparisonLabel="Moyenne des relevés précédents"
+          comparisonValue={previousAverage}
+          evidenceCount={latestRecord?.calculation_metadata?.rows_total}
+        />
+      )}
 
       <div className="mt-4 border-t border-slate-100 pt-3">
         <button
