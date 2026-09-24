@@ -202,14 +202,16 @@ function isFilterComplete(filter) {
   return filter.value !== undefined && filter.value !== null && filter.value !== '';
 }
 
-const TEMPLATE_HEADERS = ['Référence', 'Résultat', 'Valeur', 'Catégorie', 'Période'];
+const TEMPLATE_HEADERS = ['Référence', 'Date', 'Série', 'Valeur', 'Commentaire'];
 
 function buildTemplateRows() {
-  const month = new Date().toISOString().slice(0, 7);
+  const month = new Date().toISOString().slice(0, 7) + '-01';
   return [
-    ['ITEM-001', 'Conforme', '120', 'Support', month],
-    ['ITEM-002', 'Non conforme', '95', 'Logistique', month],
-    ['ITEM-003', 'Conforme', '140', 'Support', month],
+    ['ITEM-001', month, 'Conforme', '1', 'Contrôle conforme'],
+    ['ITEM-002', month, 'Non conforme', '1', 'Écart détecté'],
+    ['ITEM-003', month, 'En cours', '1', 'Contrôle à terminer'],
+    ['ITEM-004', month, 'Conforme', '1', 'Contrôle conforme'],
+    ['ITEM-005', month, 'Non contrôlé', '1', 'À planifier'],
   ];
 }
 
