@@ -34,6 +34,8 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     if (error.response?.status === 503 && !window.location.pathname.startsWith('/maintenance')) {
+      const maintenanceMessage = error.response.data?.error;
+      if (maintenanceMessage) sessionStorage.setItem('maintenance-message', maintenanceMessage);
       window.location.assign('/maintenance');
     }
     if (error.response?.status === 401 && !loggingOut && !window.location.pathname.startsWith('/login')) {

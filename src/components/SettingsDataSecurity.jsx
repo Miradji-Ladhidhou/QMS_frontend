@@ -218,8 +218,8 @@ export default function SettingsDataSecurity({ isAdmin, isSuperAdmin, canContact
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Documents légaux et données</h2>
         <p className="mt-2 text-sm text-slate-600">
-          Consultez les informations relatives à la confidentialité et aux conditions d'utilisation. L'export complet et la
-          suppression de toutes les données de l'entreprise nécessitent encore une fonctionnalité dédiée côté serveur.
+          Consultez les informations relatives à la confidentialité et aux conditions d'utilisation. Les administrateurs
+          peuvent exporter les données de l'entreprise ; sa suppression reste réservée au Super Admin.
         </p>
         <div className="mt-3 flex flex-wrap gap-3 text-sm font-medium">
           <Link to="/legal/confidentialite" className="inline-flex items-center gap-1 text-primary hover:underline">
