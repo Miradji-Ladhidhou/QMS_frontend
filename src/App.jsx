@@ -14,6 +14,7 @@ import ResetPassword from './pages/ResetPassword.jsx';
 import LegalTerms from './pages/LegalTerms.jsx';
 import LegalPrivacy from './pages/LegalPrivacy.jsx';
 import CookieNotice from './components/CookieNotice.jsx';
+import Maintenance from './pages/Maintenance.jsx';
 
 // Chargées à la demande plutôt qu'au démarrage : ces ~26 pages ne sont utiles qu'une fois
 // connecté, et une session ne visite jamais qu'une poignée d'entre elles — les regrouper dans
@@ -142,6 +143,7 @@ export default function App() {
                     <Route path="/login" element={<Navigate to="/" replace />} />
                     <Route path="/register" element={<Navigate to="/" replace />} />
                     <Route path="/reset-password" element={<ResetPassword />} />
+                    <Route path="/maintenance" element={<Maintenance />} />
                     <Route path="/legal/cgu" element={<LegalTerms />} />
                     <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
                     {/* Lien de QCM reçu par email : ouvert sans compte, mais disponible aussi quand la
@@ -206,6 +208,7 @@ export default function App() {
             <Route path="/register" element={<Register />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
             <Route path="/reset-password" element={<ResetPassword />} />
+            <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/legal/cgu" element={<LegalTerms />} />
             <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
             <Route path="/quiz/:token" element={<PublicQuiz />} />

@@ -33,6 +33,9 @@ let loggingOut = false;
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    if (error.response?.status === 503 && !window.location.pathname.startsWith('/maintenance')) {
+      window.location.assign('/maintenance');
+    }
     if (error.response?.status === 401 && !loggingOut && !window.location.pathname.startsWith('/login')) {
       loggingOut = true;
       await supabase.auth.signOut().catch(() => {});
