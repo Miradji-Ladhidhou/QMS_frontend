@@ -6,19 +6,45 @@ import {
   ClipboardCheck,
   ClipboardList,
   Eye,
+  FileCheck,
   FileText,
   GraduationCap,
   HelpCircle,
   LayoutDashboard,
   MessageSquareWarning,
+  PackageX,
+  RefreshCw,
+  ScrollText,
+  Siren,
   Settings,
+  Smile,
   ShieldAlert,
   Truck,
   Users,
   Users2,
+  Wrench,
+  CheckSquare,
 } from 'lucide-react';
 
 const SECTIONS = [
+  {
+    icon: LayoutDashboard,
+    title: 'Bien démarrer : le parcours recommandé',
+    body: (
+      <>
+        <p>
+          Commencez par renseigner l'<strong>entreprise</strong>, les services, les utilisateurs et les dossiers. Ajoutez ensuite
+          vos documents et procédures, puis configurez les formations, indicateurs, audits et risques utiles à votre activité.
+        </p>
+        <ol className="mt-2 list-decimal space-y-1 pl-5">
+          <li>Paramétrer l'entreprise, les rôles, les services et les dossiers.</li>
+          <li>Créer les documents de référence et faire valider les procédures.</li>
+          <li>Enregistrer les formations, les risques, les audits et les indicateurs.</li>
+          <li>Suivre les échéances dans le Planning et traiter les actions jusqu'à leur vérification.</li>
+        </ol>
+      </>
+    ),
+  },
   {
     icon: LayoutDashboard,
     title: 'Dashboard',
@@ -61,6 +87,42 @@ const SECTIONS = [
     ),
   },
   {
+    icon: FileCheck,
+    title: 'Procédures et validation documentaire',
+    body: (
+      <>
+        <p>
+          Rédigez une procédure par sections, ajoutez des tableaux, encadrés, listes et documents associés, puis créez une
+          <strong> nouvelle version</strong> lorsque le contenu évolue.
+        </p>
+        <p className="mt-2">
+          Soumettez-la à approbation, suivez son statut et exportez la version en <strong>Word ou PDF</strong>. Les documents
+          approuvés restent traçables dans leur historique.
+        </p>
+      </>
+    ),
+  },
+  {
+    icon: CheckSquare,
+    title: 'Mes approbations',
+    body: (
+      <p>
+        Retrouvez les documents et versions qui attendent votre décision. Ouvrez le contenu, vérifiez la version proposée,
+        ajoutez un commentaire si nécessaire, puis <strong>approuvez ou refusez</strong> la demande.
+      </p>
+    ),
+  },
+  {
+    icon: ScrollText,
+    title: 'Politique qualité',
+    body: (
+      <p>
+        Publiez la politique qualité de l'entreprise, gérez sa version en vigueur et suivez les utilisateurs qui l'ont lue.
+        Elle reste accessible depuis l'espace Documents.
+      </p>
+    ),
+  },
+  {
     icon: ClipboardList,
     title: 'CAPA (actions correctives/préventives)',
     body: (
@@ -76,15 +138,41 @@ const SECTIONS = [
   {
     icon: MessageSquareWarning,
     title: 'Réclamations clients',
-    body: <p>Enregistrez une réclamation, assignez-la, suivez sa résolution — même logique de suivi que les CAPA.</p>,
+    body: (
+      <p>
+        Enregistrez une réclamation, assignez-la, documentez l'analyse et suivez sa résolution. Demandez ensuite la
+        <strong> satisfaction du client</strong> et ouvrez une CAPA si une action systémique est nécessaire.
+      </p>
+    ),
+  },
+  {
+    icon: Smile,
+    title: 'Satisfaction client',
+    body: (
+      <p>
+        Envoyez ou enregistrez un retour client, suivez la note et la méthode utilisée, puis analysez les tendances. Les
+        résultats complètent le traitement des réclamations et alimentent la revue de direction.
+      </p>
+    ),
   },
   {
     icon: HelpCircle,
     title: 'QQOQCCP',
     body: (
       <p>
-        Structurez un problème en 7 questions (Qui, Quoi, Où, Quand, Comment, Combien, Pourquoi). Une IA peut proposer une
-        synthèse et des actions, que vous pouvez ensuite transformer en CAPA en un clic.
+        Structurez un problème en 7 questions (Qui, Quoi, Où, Quand, Comment, Combien, Pourquoi). Une proposition de
+        synthèse et d'actions peut ensuite être revue avant de créer une CAPA.
+      </p>
+    ),
+  },
+  {
+    icon: RefreshCw,
+    title: 'PDCA',
+    body: (
+      <p>
+        Organisez une amélioration en quatre étapes : <strong>Plan</strong>, <strong>Do</strong>, <strong>Check</strong> et
+        <strong> Act</strong>. Utilisez-le pour planifier une action, suivre sa réalisation, vérifier son efficacité et
+        capitaliser la décision.
       </p>
     ),
   },
@@ -111,7 +199,32 @@ const SECTIONS = [
   {
     icon: ClipboardCheck,
     title: 'Audits internes',
-    body: <p>Planifiez un audit, consignez ses constats, transformez un constat en CAPA quand nécessaire.</p>,
+    body: (
+      <p>
+        Planifiez un audit, désignez un auditeur, renseignez le périmètre et la check-list, puis consignez les constats.
+        Transformez un écart en CAPA quand nécessaire et conservez le rapport exporté.
+      </p>
+    ),
+  },
+  {
+    icon: Siren,
+    title: 'Accidents du travail',
+    body: (
+      <p>
+        Déclarez un accident, décrivez les faits, les personnes concernées et les mesures immédiates, puis suivez l'analyse
+        et les actions jusqu'à la clôture. Les droits d'accès permettent de limiter les informations sensibles.
+      </p>
+    ),
+  },
+  {
+    icon: PackageX,
+    title: 'Non-conformités produit/service',
+    body: (
+      <p>
+        Enregistrez un produit ou service non conforme, son origine, sa disposition et la décision prise. Reliez-le à une
+        CAPA lorsque la cause nécessite une action corrective durable.
+      </p>
+    ),
   },
   {
     icon: ShieldAlert,
@@ -121,7 +234,12 @@ const SECTIONS = [
   {
     icon: Truck,
     title: 'Fournisseurs',
-    body: <p>Le référentiel de vos fournisseurs et leur historique d'évaluations, avec rappel de la prochaine échéance.</p>,
+    body: (
+      <p>
+        Gérez le référentiel fournisseurs, les contacts, les documents et les évaluations. Les critères pondérés produisent
+        une note et une décision, avec rappel de la prochaine échéance.
+      </p>
+    ),
   },
   {
     icon: Users2,
@@ -130,6 +248,16 @@ const SECTIONS = [
       <p>
         Préparez une revue de direction avec un état des lieux du SMQ capturé automatiquement à la clôture, et suivez les
         actions décidées.
+      </p>
+    ),
+  },
+  {
+    icon: Wrench,
+    title: 'Services et organisation',
+    body: (
+      <p>
+        Les services structurent les responsabilités, les filtres du Dashboard et les affectations. Utilisez-les pour relier
+        les personnes, audits, formations, risques et actions à votre organisation réelle.
       </p>
     ),
   },
