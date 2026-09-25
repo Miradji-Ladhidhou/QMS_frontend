@@ -1062,7 +1062,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   }
 
   return (
-    <div className="overflow-x-auto overflow-y-visible">
+    <div className="overflow-visible">
       {showSeriesColumn ? (
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
           <thead className="text-xs uppercase tracking-wide text-slate-600">
