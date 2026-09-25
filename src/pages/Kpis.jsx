@@ -1065,7 +1065,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
     <div className="overflow-x-auto">
       {showSeriesColumn ? (
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
+          <thead className="sticky top-0 z-20 bg-slate-50 text-xs uppercase tracking-wide text-slate-600 shadow-[0_2px_0_0_#cbd5e1]">
             <tr>
               <th className="border-b border-slate-300 px-3 py-2.5 font-semibold">Période</th>
               {seriesColumns.map((series) => <th key={series.id} className="border-b border-l border-slate-300 px-3 py-2.5 font-semibold">{series.label}<span className="ml-1 font-normal normal-case text-slate-500">({series.unit || '—'})</span><span className="block text-[10px] font-normal normal-case text-slate-500">Valeur · source · commentaire · actions</span></th>)}
