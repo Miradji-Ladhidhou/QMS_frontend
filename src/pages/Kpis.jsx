@@ -131,6 +131,23 @@ function getKpiSortValue(kpi, key) {
 }
 
 function getKpiOverviewStatus(kpi) {
+  const configs = kpi.calculation_configs || [];
+  if (configs.length > 1) {
+    const statuses = configs.map((config) => {
+      const values = (kpi.records || [])
+        .filter((record) => record.config_id === config.id)
+        .sort((a, b) => (a.period_date < b.period_date ? -1 : 1))
+        .slice(-KPI_RECENT_WINDOW)
+        .map((record) => record.value);
+      const average = values.length > 0 ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null;
+      const settings = resolveSeriesSettings(kpi, config);
+      return getKpiStatus(average, settings.target, settings.direction);
+    });
+    if (statuses.includes('bad')) return 'bad';
+    if (statuses.includes('warning')) return 'warning';
+    if (statuses.some((status) => status === 'good')) return 'good';
+    return 'neutral';
+  }
   const recentRecords = [...(kpi.records || [])]
     .sort((a, b) => (a.period_date < b.period_date ? -1 : 1))
     .slice(-KPI_RECENT_WINDOW);
@@ -3269,11 +3286,12 @@ function KpiCard({
   // toute la vie du KPI, qui dilue une mauvaise tendance récente derrière un vieil historique
   // bon). Le graphique en dessous continue d'afficher chaque période, y compris les anciennes.
   const recentRecords = [...records].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
+  const hasValues = records.length > 0;
   const averageValue =
-    recentRecords.length > 0 ? Number((recentRecords.reduce((sum, r) => sum + r.value, 0) / recentRecords.length).toFixed(2)) : null;
+    !showMultiSeries && recentRecords.length > 0 ? Number((recentRecords.reduce((sum, r) => sum + r.value, 0) / recentRecords.length).toFixed(2)) : null;
   const previousRecords = records.slice(0, Math.max(0, records.length - recentRecords.length));
-  const previousAverage = previousRecords.length > 0 ? Number((previousRecords.reduce((sum, record) => sum + record.value, 0) / previousRecords.length).toFixed(2)) : null;
-  const status = getKpiStatus(averageValue, kpi.target, targetDirection);
+  const previousAverage = !showMultiSeries && previousRecords.length > 0 ? Number((previousRecords.reduce((sum, record) => sum + record.value, 0) / previousRecords.length).toFixed(2)) : null;
+  const status = showMultiSeries ? 'neutral' : getKpiStatus(averageValue, kpi.target, targetDirection);
   const StatusIcon = status === 'good' ? CheckCircle2 : status === 'warning' ? AlertTriangle : status === 'bad' ? AlertCircle : null;
   const hasTarget = kpi.target !== null && kpi.target !== undefined;
   const hasEnoughForChart = chartData.length >= 2;
@@ -3425,7 +3443,7 @@ function KpiCard({
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className={`text-sm font-semibold ${KPI_STATUS_STYLES[status]}`}>
-                {averageValue === null ? 'Aucune valeur' : `${averageValue} ${kpi.unit || ''}`}
+                {showMultiSeries ? `${orderedLabels.length} séries` : averageValue === null ? 'Aucune valeur' : `${averageValue} ${kpi.unit || ''}`}
               </span>
               <span className="text-xs text-slate-400">{records.length} relevé{records.length > 1 ? 's' : ''}</span>
             </div>
@@ -3601,7 +3619,7 @@ function KpiCard({
       )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        {averageValue === null ? (
+        {!hasValues ? (
           <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         ) : showMultiSeries ? (
           <div className="flex w-full flex-col gap-2">
