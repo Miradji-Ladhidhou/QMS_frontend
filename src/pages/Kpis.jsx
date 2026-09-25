@@ -1382,9 +1382,15 @@ function CalculationConfigFields({ form, onChange, columns, sampleRows }) {
 
 // Rendu partagé entre l'aperçu (dry-run) et le résultat final d'un apply : mêmes champs,
 // count_grouped affichant une répartition plutôt qu'une valeur unique.
-function ImportResultSummary({ data, unit }) {
+function ImportResultSummary({ data, unit, seriesLabel }) {
   return (
     <div className="space-y-3">
+      {seriesLabel && (
+        <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-primary/5 px-3 py-2">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-primary" />
+          <span className="text-sm font-semibold text-primary-900">Série importée : {seriesLabel}</span>
+        </div>
+      )}
       <p className="text-sm text-slate-700">
         <span className="font-medium text-emerald-700">{data.rows_processed}</span> ligne
         {data.rows_processed > 1 ? 's' : ''} traitée{data.rows_processed > 1 ? 's' : ''} sur {data.rows_total}
@@ -2171,7 +2177,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                     <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-slate-500">
                       Aperçu {livePreviewLoading && '— calcul en cours...'}
                     </p>
-                    {livePreview && <ImportResultSummary data={livePreview} unit={kpi.unit} />}
+                    {livePreview && <ImportResultSummary data={livePreview} unit={kpi.unit} seriesLabel={configForm.label} />}
                   </div>
                 )}
 
@@ -2210,7 +2216,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
               <CheckCircle2 size={16} />
               Import appliqué avec succès
             </p>
-            <ImportResultSummary data={result} unit={kpi.unit} />
+            <ImportResultSummary data={result} unit={kpi.unit} seriesLabel={configForm.label} />
             <button
               type="button"
               onClick={onClose}
