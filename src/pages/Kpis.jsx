@@ -1062,13 +1062,13 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto overflow-y-visible">
       {showSeriesColumn ? (
         <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="sticky top-0 z-20 bg-slate-50 text-xs uppercase tracking-wide text-slate-600 shadow-[0_2px_0_0_#cbd5e1]">
+          <thead className="text-xs uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="border-b border-slate-300 px-3 py-2.5 font-semibold">Période</th>
-              {seriesColumns.map((series) => <th key={series.id} className="border-b border-l border-slate-300 px-3 py-2.5 font-semibold">{series.label}<span className="ml-1 font-normal normal-case text-slate-500">({series.unit || '—'})</span><span className="block text-[10px] font-normal normal-case text-slate-500">Valeur · source · commentaire · actions</span></th>)}
+              <th className="sticky top-0 z-20 border-b border-slate-300 bg-slate-50 px-3 py-2.5 font-semibold shadow-[0_2px_0_0_#cbd5e1]">Période</th>
+              {seriesColumns.map((series) => <th key={series.id} className="sticky top-0 z-20 border-b border-l border-slate-300 bg-slate-50 px-3 py-2.5 font-semibold shadow-[0_2px_0_0_#cbd5e1]">{series.label}<span className="ml-1 font-normal normal-case text-slate-500">({series.unit || '—'})</span><span className="block text-[10px] font-normal normal-case text-slate-500">Valeur · source · commentaire · actions</span></th>)}
             </tr>
           </thead>
           <tbody>
