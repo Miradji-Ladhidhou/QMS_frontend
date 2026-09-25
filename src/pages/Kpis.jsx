@@ -1492,21 +1492,21 @@ function ImportResultSummary({ data, unit, seriesLabel }) {
                 <summary className="cursor-pointer text-xs font-medium text-primary">
                   Voir les lignes prises en compte ({period.rows_preview.filter((row) => row.included).length})
                 </summary>
-                <div className="mt-2 max-h-56 overflow-auto rounded border border-slate-200 bg-white">
-                  <table className="min-w-full text-left text-[11px]">
-                    <thead className="sticky top-0 bg-slate-100 text-slate-500">
+                <div className="mt-2 max-h-56 overflow-auto rounded-md border border-slate-200 bg-white">
+                  <table className="min-w-full border-separate border-spacing-0 text-left text-[11px]">
+                    <thead className="sticky top-0 z-10 bg-slate-50 text-slate-600 shadow-[0_1px_0_0_#cbd5e1]">
                       <tr>
-                        <th className="px-2 py-1.5">Ligne</th>
-                        <th className="px-2 py-1.5">Prise en compte</th>
-                        {Object.keys(period.rows_preview[0].row_data || {}).map((column) => <th key={column} className="px-2 py-1.5">{column}</th>)}
+                        <th className="border-b border-slate-200 px-2.5 py-2 font-semibold">Ligne</th>
+                        <th className="border-b border-slate-200 px-2.5 py-2 font-semibold">Série : {seriesLabel || '—'}</th>
+                        {Object.keys(period.rows_preview[0].row_data || {}).map((column) => <th key={column} className="border-b border-slate-200 px-2.5 py-2 font-semibold">{column}</th>)}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody>
                       {period.rows_preview.slice(0, 100).map((row) => (
-                        <tr key={row.row_index} className={row.included ? '' : 'bg-red-50 text-slate-400'}>
-                          <td className="px-2 py-1.5">{row.row_index}</td>
-                          <td className="px-2 py-1.5">{row.included ? 'Oui' : 'Non'}</td>
-                          {Object.keys(period.rows_preview[0].row_data || {}).map((column) => <td key={column} className="max-w-40 whitespace-nowrap px-2 py-1.5">{String(row.row_data?.[column] ?? '—')}</td>)}
+                        <tr key={row.row_index} className={row.included ? 'odd:bg-slate-50/70 border-b border-slate-100' : 'bg-red-50 text-slate-400'}>
+                          <td className="px-2.5 py-2 font-medium">{row.row_index}</td>
+                          <td className="px-2.5 py-2">{row.included ? 'Retenue' : 'Rejetée'}</td>
+                          {Object.keys(period.rows_preview[0].row_data || {}).map((column) => <td key={column} className="max-w-40 whitespace-nowrap px-2.5 py-2 text-slate-600">{String(row.row_data?.[column] ?? '—')}</td>)}
                         </tr>
                       ))}
                     </tbody>
