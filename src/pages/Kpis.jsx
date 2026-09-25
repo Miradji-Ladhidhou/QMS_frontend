@@ -3427,7 +3427,9 @@ function KpiCard({
       period_date: formatDate(record.period_date),
       series: labelForRecord(record),
       value: record.value,
-      unit: unitForRecord(record),
+      unit: record.config_id && seriesConfigs.length > 1
+        ? resolveSeriesSettings(kpi, seriesById.get(record.config_id)).unit
+        : kpi.unit || '',
       source: SOURCE_LABELS[record.source] || record.source,
       comment: record.comment || '',
     }));
