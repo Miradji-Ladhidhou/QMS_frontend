@@ -3417,13 +3417,17 @@ function KpiCard({
     const sortedRecords = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
     const columns = [
       { key: 'period_date', label: 'Période' },
+      { key: 'series', label: 'Série' },
       { key: 'value', label: 'Valeur' },
+      { key: 'unit', label: 'Unité' },
       { key: 'source', label: 'Source' },
       { key: 'comment', label: 'Commentaire' },
     ];
     const rows = sortedRecords.map((record) => ({
       period_date: formatDate(record.period_date),
+      series: labelForRecord(record),
       value: record.value,
+      unit: unitForRecord(record),
       source: SOURCE_LABELS[record.source] || record.source,
       comment: record.comment || '',
     }));
