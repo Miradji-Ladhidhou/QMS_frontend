@@ -1064,27 +1064,27 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   return (
     <div className="overflow-x-auto">
       {showSeriesColumn ? (
-        <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="text-xs uppercase tracking-wide text-slate-500">
+        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
+          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-600">
             <tr>
-              <th className="py-2 pr-3">Période</th>
-              {seriesColumns.map((series) => <th key={series.id} className="border-l border-slate-200 px-3 py-2">{series.label}<span className="ml-1 font-normal normal-case">({series.unit || '—'})</span><span className="block text-[10px] font-normal normal-case text-slate-400">Valeur · commentaire · actions</span></th>)}
+              <th className="border-b border-slate-300 px-3 py-2.5 font-semibold">Période</th>
+              {seriesColumns.map((series) => <th key={series.id} className="border-b border-l border-slate-300 px-3 py-2.5 font-semibold">{series.label}<span className="ml-1 font-normal normal-case text-slate-500">({series.unit || '—'})</span><span className="block text-[10px] font-normal normal-case text-slate-500">Valeur · source · commentaire · actions</span></th>)}
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-100">
+          <tbody>
             {recordsByPeriod.map(({ period, records: periodRecords }) => (
-              <tr key={period}>
-                <td className="whitespace-nowrap py-2 pr-3 text-slate-700">{formatDate(period)}</td>
+              <tr key={period} className="odd:bg-slate-50/70">
+                <td className="whitespace-nowrap border-b border-slate-200 px-3 py-3 align-top font-medium text-slate-700">{formatDate(period)}</td>
                 {seriesColumns.map((series) => {
                   const record = periodRecords.find((item) => item.config_id === series.id);
-                  return <td key={series.id} className="border-l border-slate-100 px-3 py-2 align-top text-slate-800">{record ? (
-                    <div className="min-w-36 space-y-1">
+                  return <td key={series.id} className="border-b border-l border-slate-200 px-3 py-3 align-top text-slate-800">{record ? (
+                    <div className="min-w-40 space-y-1.5 rounded-md border border-slate-200 bg-white p-2.5 shadow-sm">
                       <p className="font-semibold">{record.value} {series.unit}</p>
                       {isImportBased && <div className="text-xs text-slate-500"><SourceBadge source={record.source} /></div>}
                       <p className="whitespace-pre-wrap text-xs text-slate-500">{record.comment || 'Aucun commentaire'}</p>
                       {canManage && <div className="flex gap-1 border-t border-slate-100 pt-1"><button type="button" onClick={() => onEditRecord(record)} aria-label={`Modifier ${series.label}`} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-primary"><Pencil size={13} /></button><button type="button" onClick={() => onDeleteRecord(record)} aria-label={`Supprimer ${series.label}`} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={13} /></button></div>}
                     </div>
-                  ) : <span className="font-normal text-slate-300">—</span>}</td>;
+                  ) : <div className="min-w-40 rounded-md border border-dashed border-slate-200 px-3 py-5 text-center font-normal text-slate-300">Aucune donnée</div>}</td>;
                 })}
               </tr>
             ))}
