@@ -1044,6 +1044,16 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
     'period_date',
     'desc'
   );
+  const seriesColumns = seriesConfigs.map((config) => ({
+    id: config.id,
+    label: config.label,
+    unit: resolveSeriesSettings(kpi, config).unit,
+  }));
+  const recordsByPeriod = [...records.reduce((groups, record) => {
+    if (!groups.has(record.period_date)) groups.set(record.period_date, []);
+    groups.get(record.period_date).push(record);
+    return groups;
+  }, new Map())].map(([period, periodRecords]) => ({ period, records: periodRecords }));
 
   if (historyError) return <p className="py-3 text-sm text-red-600">{historyError}</p>;
   if (!history) return <p className="py-3 text-sm text-slate-400">Chargement de l’historique…</p>;
@@ -1053,7 +1063,29 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-left text-sm">
+      {showSeriesColumn ? (
+        <table className="w-full min-w-[640px] text-left text-sm">
+          <thead className="text-xs uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="py-2 pr-3">Période</th>
+              {seriesColumns.map((series) => <th key={series.id} className="border-l border-slate-200 px-3 py-2">{series.label}<span className="ml-1 font-normal normal-case">({series.unit || '—'})</span></th>)}
+              {canManage && <th className="py-2 pl-3 text-right">Actions</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {recordsByPeriod.map(({ period, records: periodRecords }) => (
+              <tr key={period}>
+                <td className="whitespace-nowrap py-2 pr-3 text-slate-700">{formatDate(period)}</td>
+                {seriesColumns.map((series) => {
+                  const record = periodRecords.find((item) => item.config_id === series.id);
+                  return <td key={series.id} className="border-l border-slate-100 px-3 py-2 font-medium text-slate-800">{record ? <>{record.value} {series.unit}</> : <span className="font-normal text-slate-300">—</span>}</td>;
+                })}
+                {canManage && <td className="py-2 pl-3 text-right"><div className="flex justify-end gap-1">{periodRecords.map((record) => <span key={record.id} className="flex gap-1"><button type="button" onClick={() => onEditRecord(record)} aria-label={`Modifier ${labelByConfigId[record.config_id] || 'la valeur'}`} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"><Pencil size={14} /></button><button type="button" onClick={() => onDeleteRecord(record)} aria-label={`Supprimer ${labelByConfigId[record.config_id] || 'la valeur'}`} className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={14} /></button></span>)}</div></td>}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      ) : <table className="w-full text-left text-sm">
         <thead className="text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <SortableTh label="Période" sortKey="period_date" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
@@ -1066,7 +1098,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
-          {records.map((record) => (
+            {records.map((record) => (
             <tr key={record.id}>
               <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(record.period_date)}</td>
               {showSeriesColumn && (
@@ -1109,7 +1141,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
             </tr>
           ))}
         </tbody>
-      </table>
+      </table>}
       <Pagination page={historyPage} totalPages={history.pagination.total_pages} onPageChange={setHistoryPage} />
     </div>
   );
