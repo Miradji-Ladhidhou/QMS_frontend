@@ -6,6 +6,41 @@ import { api } from '../lib/api.js';
 
 const POLL_INTERVAL_MS = 60000;
 const MAX_VISIBLE = 10;
+let sharedNotifications = [];
+let sharedPollTimer = null;
+let sharedRequest = null;
+const notificationListeners = new Set();
+
+async function loadSharedNotifications() {
+  if (sharedRequest) return sharedRequest;
+  sharedRequest = api
+    .get('/notifications')
+    .then(({ data }) => {
+      sharedNotifications = data || [];
+      notificationListeners.forEach((listener) => listener(sharedNotifications));
+      return sharedNotifications;
+    })
+    .catch(() => sharedNotifications)
+    .finally(() => {
+      sharedRequest = null;
+    });
+  return sharedRequest;
+}
+
+function subscribeNotifications(listener) {
+  notificationListeners.add(listener);
+  if (!sharedPollTimer) {
+    loadSharedNotifications();
+    sharedPollTimer = setInterval(loadSharedNotifications, POLL_INTERVAL_MS);
+  }
+  return () => {
+    notificationListeners.delete(listener);
+    if (notificationListeners.size === 0 && sharedPollTimer) {
+      clearInterval(sharedPollTimer);
+      sharedPollTimer = null;
+    }
+  };
+}
 
 function formatRelativeTime(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
@@ -19,25 +54,14 @@ function formatRelativeTime(dateStr) {
 }
 
 export default function NotificationBell({ variant = 'sidebar' }) {
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState(sharedNotifications);
   const [isOpen, setIsOpen] = useState(false);
   const [position, setPosition] = useState(null);
   const buttonRef = useRef(null);
   const dropdownRef = useRef(null);
 
-  async function loadNotifications() {
-    try {
-      const { data } = await api.get('/notifications');
-      setNotifications(data);
-    } catch {
-      // silencieux : un échec de polling ne doit pas perturber le reste de l'app
-    }
-  }
-
   useEffect(() => {
-    loadNotifications();
-    const interval = setInterval(loadNotifications, POLL_INTERVAL_MS);
-    return () => clearInterval(interval);
+    return subscribeNotifications(setNotifications);
   }, []);
 
   // Clic en dehors : le panneau est maintenant en portal (voir plus bas), donc il n'est plus un
@@ -61,21 +85,21 @@ export default function NotificationBell({ variant = 'sidebar' }) {
   const visibleNotifications = notifications.slice(0, MAX_VISIBLE);
 
   async function markAsRead(id) {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    const next = sharedNotifications.map((n) => (n.id === id ? { ...n, read: true } : n));
+    sharedNotifications = next;
+    notificationListeners.forEach((listener) => listener(next));
     try {
       await api.patch(`/notifications/${id}/read`);
-    } catch {
-      loadNotifications();
-    }
+    } catch { await loadSharedNotifications(); }
   }
 
   async function markAllAsRead() {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    const next = sharedNotifications.map((n) => ({ ...n, read: true }));
+    sharedNotifications = next;
+    notificationListeners.forEach((listener) => listener(next));
     try {
       await api.patch('/notifications/read-all');
-    } catch {
-      loadNotifications();
-    }
+    } catch { await loadSharedNotifications(); }
   }
 
   // Le bouton vit dans la sidebar, qui a overflow-x-hidden/overflow-y-auto (pour son propre
