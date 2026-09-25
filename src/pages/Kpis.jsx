@@ -1024,7 +1024,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   useEffect(() => {
     let cancelled = false;
     setHistoryError('');
-    api.get(`/kpis/${kpi.id}/records`, { params: { page: historyPage, limit: historyPageSize } })
+    api.get(`/kpis/${kpi.id}/records`, { params: { page: historyPage, limit: historyPageSize, grouped: (kpi.calculation_configs || []).length > 1 } })
       .then(({ data }) => { if (!cancelled) setHistory(data); })
       .catch(() => { if (!cancelled) setHistoryError("Impossible de charger l'historique."); });
     return () => { cancelled = true; };
