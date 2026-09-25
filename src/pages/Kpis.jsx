@@ -1065,7 +1065,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
     <div className="overflow-x-auto">
       {showSeriesColumn ? (
         <table className="w-full min-w-[640px] text-left text-sm">
-          <thead className="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_0_#e2e8f0]">
+          <thead className="text-xs uppercase tracking-wide text-slate-500">
             <tr>
               <th className="py-2 pr-3">Période</th>
               {seriesColumns.map((series) => <th key={series.id} className="border-l border-slate-200 px-3 py-2">{series.label}<span className="ml-1 font-normal normal-case">({series.unit || '—'})</span><span className="block text-[10px] font-normal normal-case text-slate-400">Valeur · commentaire · actions</span></th>)}
@@ -1091,7 +1091,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
           </tbody>
         </table>
       ) : <table className="w-full text-left text-sm">
-        <thead className="sticky top-0 z-10 bg-white text-xs uppercase tracking-wide text-slate-500 shadow-[0_1px_0_0_#e2e8f0]">
+        <thead className="text-xs uppercase tracking-wide text-slate-500">
           <tr>
             <SortableTh label="Période" sortKey="period_date" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
             {showSeriesColumn && <th className="py-2 pr-3">Série</th>}
