@@ -1071,7 +1071,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
     history?.items || [],
     getRecordSortValue,
     'period_date',
-    'desc'
+    'asc'
   );
   const seriesColumns = seriesConfigs.map((config) => ({
     id: config.id,
