@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  ChevronsUpDown,
   ClipboardCheck,
   Download,
   FileSpreadsheet,
@@ -698,7 +699,7 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
       period_date: fromInputPeriodValue(periodDate, kpi.frequency),
       value: Number(value),
       comment: comment || null,
-      config_id: configId || undefined,
+      config_id: configId || activeRecord?.config_id || undefined,
     };
 
     // onSaved() hors du try, même raison qu'ailleurs dans ce fichier : un bug du handler
@@ -762,18 +763,18 @@ function RecordModal({ kpi, record, onClose, onSaved }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          {seriesOptions.length > 0 && (
+          {(isEditing ? allConfigs.length > 0 : seriesOptions.length > 0) && (
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Série</label>
               <select
                 required
                 disabled={isEditing}
-                value={configId}
+                value={configId || activeRecord?.config_id || ''}
                 onChange={(e) => setConfigId(e.target.value)}
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
               >
                 <option value="">Choisir une série</option>
-                {seriesOptions.map((series) => (
+                {(isEditing ? allConfigs : seriesOptions).map((series) => (
                   <option key={series.id} value={series.id}>
                     {series.label}
                   </option>
@@ -1017,6 +1018,9 @@ function SourceBadge({ source }) {
 
 function getRecordSortValue(record, key) {
   if (key === 'recorded_by') return record.recorded_by_user?.full_name || '';
+  if (key === 'source') return SOURCE_LABELS[record.source] || record.source || '';
+  if (key === 'comment') return record.comment || '';
+  if (key === 'value') return typeof record.value === 'number' ? record.value : Number(record.value) || 0;
   return record[key];
 }
 
@@ -1025,6 +1029,8 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
   const [historyPage, setHistoryPage] = useState(1);
   const [historyError, setHistoryError] = useState('');
   const [exportingXlsx, setExportingXlsx] = useState(false);
+  const [multiSortKey, setMultiSortKey] = useState('period');
+  const [multiDirection, setMultiDirection] = useState('asc');
   const historyPageSize = 50;
   useEffect(() => {
     let cancelled = false;
@@ -1078,11 +1084,71 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
     label: config.label,
     unit: resolveSeriesSettings(kpi, config).unit,
   }));
-  const recordsByPeriod = [...records.reduce((groups, record) => {
-    if (!groups.has(record.period_date)) groups.set(record.period_date, []);
-    groups.get(record.period_date).push(record);
-    return groups;
-  }, new Map())].map(([period, periodRecords]) => ({ period, records: periodRecords }));
+
+  // Détecte s'il existe des relevés orphelins (config_id = null) sur ce KPI multi-séries
+  const hasOrphanManualRecords = useMemo(() => {
+    return (records || []).some((r) => r.config_id == null);
+  }, [records]);
+
+  const displaySeriesColumns = useMemo(() => {
+    if (!hasOrphanManualRecords) return seriesColumns;
+    return [
+      ...seriesColumns,
+      {
+        id: '__manual__',
+        label: 'Valeur manuelle',
+        unit: kpi.unit || '',
+        isOrphan: true,
+      },
+    ];
+  }, [seriesColumns, hasOrphanManualRecords, kpi.unit]);
+
+  const recordsByPeriod = useMemo(() => {
+    return [...(records || []).reduce((groups, record) => {
+      if (!groups.has(record.period_date)) groups.set(record.period_date, []);
+      groups.get(record.period_date).push(record);
+      return groups;
+    }, new Map())].map(([period, periodRecords]) => ({ period, records: periodRecords }));
+  }, [records]);
+
+  function handleToggleMultiSort(key) {
+    if (multiSortKey === key) {
+      setMultiDirection((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setMultiSortKey(key);
+      setMultiDirection('asc');
+    }
+  }
+
+  const sortedRecordsByPeriod = useMemo(() => {
+    const list = [...recordsByPeriod];
+    list.sort((a, b) => {
+      let valA, valB;
+      if (multiSortKey === 'period') {
+        valA = a.period;
+        valB = b.period;
+      } else if (multiSortKey === '__manual__') {
+        const recA = a.records.find((item) => item.config_id == null);
+        const recB = b.records.find((item) => item.config_id == null);
+        valA = recA ? recA.value : null;
+        valB = recB ? recB.value : null;
+      } else {
+        const recA = a.records.find((item) => item.config_id === multiSortKey);
+        const recB = b.records.find((item) => item.config_id === multiSortKey);
+        valA = recA ? recA.value : null;
+        valB = recB ? recB.value : null;
+      }
+      if (valA == null && valB == null) return 0;
+      if (valA == null) return 1;
+      if (valB == null) return -1;
+      if (typeof valA === 'number' && typeof valB === 'number') {
+        return multiDirection === 'asc' ? valA - valB : valB - valA;
+      }
+      const cmp = String(valA).localeCompare(String(valB), 'fr', { numeric: true });
+      return multiDirection === 'asc' ? cmp : -cmp;
+    });
+    return list;
+  }, [recordsByPeriod, multiSortKey, multiDirection]);
 
   if (historyError) return <p className="py-3 text-sm text-red-600">{historyError}</p>;
   if (!history) return <p className="py-3 text-sm text-slate-400">Chargement de l’historique…</p>;
@@ -1091,7 +1157,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
   }
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-slate-300 bg-white shadow-sm">
+    <div className="rounded-lg border border-slate-300 bg-white shadow-sm">
       {/* Barre d'état style tableur Excel */}
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-100/90 px-3 py-1.5 text-xs text-slate-600">
         <div className="flex items-center gap-2">
@@ -1121,213 +1187,283 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
         </div>
       </div>
 
-      {showSeriesColumn ? (
-        <table className="w-full min-w-[760px] border-collapse font-sans text-xs">
-          <thead>
-            {/* Ligne repère colonnes A, B, C... façon Excel */}
-            <tr className="border-b border-slate-300 bg-slate-200/80 text-[10px] font-semibold text-slate-500">
-              <th className="w-12 border-r border-slate-300 px-2 py-1 text-center">#</th>
-              <th className="border-r border-slate-300 px-3 py-1 text-center">A</th>
-              {seriesColumns.map((series, idx) => (
-                <th key={series.id} className="border-r border-slate-300 px-3 py-1 text-center last:border-r-0">
-                  {String.fromCharCode(66 + idx)}
+      <div className="max-h-[500px] overflow-auto">
+        {showSeriesColumn ? (
+          <table className="w-full min-w-[760px] border-collapse font-sans text-xs">
+            <thead>
+              {/* Ligne repère colonnes A, B, C... façon Excel */}
+              <tr className="border-b border-slate-300 bg-slate-200/90 text-[10px] font-semibold text-slate-500">
+                <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-2 py-1 text-center">#</th>
+                <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center">A</th>
+                {displaySeriesColumns.map((series, idx) => (
+                  <th key={series.id} className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center last:border-r-0">
+                    {String.fromCharCode(66 + idx)}
+                  </th>
+                ))}
+              </tr>
+              {/* Ligne des désignations des séries figée au défilement */}
+              <tr className="border-b border-slate-300 bg-slate-100 text-slate-700">
+                <th className="sticky top-6 z-20 w-12 border-b border-r border-slate-300 bg-slate-200/70 px-2 py-2 text-center font-semibold text-slate-600 shadow-[0_1px_0_0_#cbd5e1]">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleMultiSort('period')}
+                    className="mx-auto flex items-center justify-center gap-0.5 text-slate-600 hover:text-primary"
+                    title="Trier par ligne"
+                  >
+                    <span>Ligne</span>
+                  </button>
                 </th>
-              ))}
-            </tr>
-            <tr className="border-b border-slate-300 bg-slate-100 text-slate-700">
-              <th className="w-12 border-r border-slate-300 bg-slate-200/50 px-2 py-2 text-center font-semibold text-slate-600">
-                Ligne
-              </th>
-              <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Période</th>
-              {seriesColumns.map((series) => (
-                <th key={series.id} className="border-r border-slate-300 px-3 py-2 text-left font-semibold last:border-r-0">
-                  <div className="flex items-center justify-between gap-1">
-                    <span>{series.label}</span>
-                    <span className="rounded bg-slate-200/80 px-1 py-0.5 text-[10px] font-normal text-slate-600">
-                      {series.unit || '—'}
-                    </span>
-                  </div>
+                <th className="sticky top-6 z-20 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold shadow-[0_1px_0_0_#cbd5e1]">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleMultiSort('period')}
+                    className="flex items-center gap-1 font-semibold text-slate-700 hover:text-primary"
+                    title="Trier par période"
+                  >
+                    <span>Période</span>
+                    {multiSortKey === 'period' ? (
+                      multiDirection === 'asc' ? <ChevronUp size={13} className="text-primary" /> : <ChevronDown size={13} className="text-primary" />
+                    ) : (
+                      <ChevronsUpDown size={13} className="text-slate-400" />
+                    )}
+                  </button>
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {recordsByPeriod.map(({ period, records: periodRecords }, rowIdx) => (
-              <tr key={period} className="hover:bg-emerald-50/40 odd:bg-slate-50/40">
-                <td className="w-12 border-r border-slate-200 bg-slate-100/70 px-2 py-2 text-center font-mono text-[11px] text-slate-400">
-                  {rowIdx + 1}
-                </td>
-                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-mono text-slate-700">
-                  {formatDate(period)}
-                </td>
-                {seriesColumns.map((series) => {
-                  const record = periodRecords.find((item) => item.config_id === series.id);
-                  return (
-                    <td key={series.id} className="border-r border-slate-200 px-3 py-2 align-top text-slate-800 last:border-r-0">
-                      {record ? (
-                        <div className="rounded border border-slate-200/80 bg-white p-2 shadow-xs space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="font-mono font-semibold text-slate-900">
-                              {record.value} {series.unit}
-                            </span>
-                            {canManage && (
-                              <div className="flex items-center gap-0.5">
-                                <button
-                                  type="button"
-                                  onClick={() => onEditRecord(record)}
-                                  aria-label={`Modifier ${series.label}`}
-                                  title="Modifier cette valeur"
-                                  className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-primary"
-                                >
-                                  <Pencil size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => onDeleteRecord(record)}
-                                  aria-label={`Supprimer ${series.label}`}
-                                  title="Supprimer cette valeur"
-                                  className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                >
-                                  <Trash2 size={12} />
-                                </button>
+                {displaySeriesColumns.map((series) => (
+                  <th key={series.id} className={`sticky top-6 z-20 border-b border-r border-slate-300 px-3 py-2 text-left font-semibold last:border-r-0 shadow-[0_1px_0_0_#cbd5e1] ${series.isOrphan ? 'bg-amber-50/90 text-amber-900' : 'bg-slate-100 text-slate-700'}`}>
+                    <div className="flex items-center justify-between gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleMultiSort(series.id)}
+                        className="flex items-center gap-1 font-semibold hover:text-primary"
+                        title={`Trier par ${series.label}`}
+                      >
+                        <span>{series.label}</span>
+                        {multiSortKey === series.id ? (
+                          multiDirection === 'asc' ? <ChevronUp size={13} className="text-primary" /> : <ChevronDown size={13} className="text-primary" />
+                        ) : (
+                          <ChevronsUpDown size={13} className="text-slate-400" />
+                        )}
+                      </button>
+                      <span className="rounded bg-slate-200/80 px-1 py-0.5 text-[10px] font-normal text-slate-600">
+                        {series.unit || '—'}
+                      </span>
+                    </div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {sortedRecordsByPeriod.map(({ period, records: periodRecords }, rowIdx) => (
+                <tr key={period} className="hover:bg-emerald-50/40 odd:bg-slate-50/40">
+                  <td className="w-12 border-r border-slate-200 bg-slate-100/70 px-2 py-2 text-center font-mono text-[11px] text-slate-400">
+                    {rowIdx + 1}
+                  </td>
+                  <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-mono text-slate-700">
+                    {formatDate(period)}
+                  </td>
+                  {displaySeriesColumns.map((series) => {
+                    const record = series.isOrphan
+                      ? periodRecords.find((item) => item.config_id == null)
+                      : periodRecords.find((item) => item.config_id === series.id);
+                    return (
+                      <td key={series.id} className="border-r border-slate-200 px-3 py-2 align-top text-slate-800 last:border-r-0">
+                        {record ? (
+                          <div className={`rounded border p-2 shadow-xs space-y-1 ${series.isOrphan ? 'border-amber-200 bg-amber-50/50' : 'border-slate-200/80 bg-white'}`}>
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono font-semibold text-slate-900">
+                                {record.value} {series.unit}
+                              </span>
+                              {canManage && (
+                                <div className="flex items-center gap-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => onEditRecord(record)}
+                                    aria-label={`Modifier ${series.label}`}
+                                    title="Modifier cette valeur"
+                                    className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-primary"
+                                  >
+                                    <Pencil size={12} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => onDeleteRecord(record)}
+                                    aria-label={`Supprimer ${series.label}`}
+                                    title="Supprimer cette valeur"
+                                    className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 size={12} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            {isImportBased && (
+                              <div>
+                                <SourceBadge source={record.source} />
                               </div>
                             )}
+                            {record.comment && (
+                              <p className="border-l-2 border-emerald-400 pl-1.5 text-[11px] text-slate-500">
+                                {record.comment}
+                              </p>
+                            )}
                           </div>
-                          {isImportBased && (
-                            <div>
-                              <SourceBadge source={record.source} />
-                            </div>
-                          )}
-                          {record.comment && (
-                            <p className="border-l-2 border-emerald-400 pl-1.5 text-[11px] text-slate-500">
-                              {record.comment}
-                            </p>
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex h-full min-h-[38px] items-center justify-center font-mono text-slate-300">
-                          —
-                        </div>
-                      )}
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <table className="w-full min-w-[620px] border-collapse font-sans text-xs">
-          <thead>
-            {/* Ligne repère colonnes A, B, C, D... style Excel */}
-            <tr className="border-b border-slate-300 bg-slate-200/80 text-[10px] font-semibold text-slate-500">
-              <th className="w-12 border-r border-slate-300 px-2 py-1 text-center">#</th>
-              <th className="border-r border-slate-300 px-3 py-1 text-center">A</th>
-              {showSeriesColumn && <th className="border-r border-slate-300 px-3 py-1 text-center">B</th>}
-              <th className="border-r border-slate-300 px-3 py-1 text-center">{showSeriesColumn ? 'C' : 'B'}</th>
-              {isImportBased && (
-                <th className="border-r border-slate-300 px-3 py-1 text-center">{showSeriesColumn ? 'D' : 'C'}</th>
-              )}
-              <th className="border-r border-slate-300 px-3 py-1 text-center">
-                {showSeriesColumn ? (isImportBased ? 'E' : 'D') : isImportBased ? 'D' : 'C'}
-              </th>
-              <th className="border-r border-slate-300 px-3 py-1 text-center">
-                {showSeriesColumn ? (isImportBased ? 'F' : 'E') : isImportBased ? 'E' : 'D'}
-              </th>
-              {canManage && <th className="px-3 py-1 text-center">Actions</th>}
-            </tr>
-            <tr className="border-b border-slate-300 bg-slate-100 text-slate-700">
-              <th className="w-12 border-r border-slate-300 bg-slate-200/50 px-2 py-2 text-center font-semibold text-slate-600">
-                Ligne
-              </th>
-              <SortableTh
-                label="Période"
-                sortKey="period_date"
-                activeKey={sortKey}
-                direction={direction}
-                onSort={toggleSort}
-                className="border-r border-slate-300 px-3 py-2 text-left font-semibold"
-              />
-              {showSeriesColumn && <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Série</th>}
-              <SortableTh
-                label="Valeur"
-                sortKey="value"
-                activeKey={sortKey}
-                direction={direction}
-                onSort={toggleSort}
-                className="border-r border-slate-300 px-3 py-2 text-right font-semibold"
-                align="right"
-              />
-              {isImportBased && <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Source</th>}
-              <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Commentaire</th>
-              <SortableTh
-                label="Saisi par"
-                sortKey="recorded_by"
-                activeKey={sortKey}
-                direction={direction}
-                onSort={toggleSort}
-                className="border-r border-slate-300 px-3 py-2 text-left font-semibold"
-              />
-              {canManage && <th className="px-3 py-2 text-center font-semibold">Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-200">
-            {records.map((record, index) => (
-              <tr key={record.id} className="hover:bg-emerald-50/40 odd:bg-slate-50/40">
-                <td className="w-12 border-r border-slate-200 bg-slate-100/70 px-2 py-2 text-center font-mono text-[11px] text-slate-400">
-                  {index + 1}
-                </td>
-                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-mono text-slate-700">
-                  {formatDate(record.period_date)}
-                </td>
-                {showSeriesColumn && (
-                  <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-slate-600">
-                    {record.config_id ? labelByConfigId[record.config_id] || '—' : '—'}
-                  </td>
-                )}
-                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-right font-mono font-semibold text-slate-900">
-                  {record.value} {unitForRecord(record)}
-                </td>
+                        ) : (
+                          <div className="flex h-full min-h-[38px] items-center justify-center font-mono text-slate-300">
+                            —
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <table className="w-full min-w-[620px] border-collapse font-sans text-xs">
+            <thead>
+              {/* Ligne repère colonnes A, B, C, D... style Excel */}
+              <tr className="border-b border-slate-300 bg-slate-200/90 text-[10px] font-semibold text-slate-500">
+                <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-2 py-1 text-center">#</th>
+                <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center">A</th>
+                {showSeriesColumn && <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center">B</th>}
+                <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center">{showSeriesColumn ? 'C' : 'B'}</th>
                 {isImportBased && (
-                  <td className="border-r border-slate-200 px-3 py-2">
-                    <SourceBadge source={record.source} />
-                  </td>
+                  <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center">{showSeriesColumn ? 'D' : 'C'}</th>
                 )}
-                <td className="border-r border-slate-200 px-3 py-2 text-slate-600">
-                  {record.comment || <span className="text-slate-300">—</span>}
-                </td>
-                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-slate-600">
-                  {record.recorded_by_user?.full_name || <span className="text-slate-300">—</span>}
-                </td>
+                <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center">
+                  {showSeriesColumn ? (isImportBased ? 'E' : 'D') : isImportBased ? 'D' : 'C'}
+                </th>
+                <th className="sticky top-0 z-20 h-6 border-b border-r border-slate-300 bg-slate-200 px-3 py-1 text-center">
+                  {showSeriesColumn ? (isImportBased ? 'F' : 'E') : isImportBased ? 'E' : 'D'}
+                </th>
+                {canManage && <th className="sticky top-0 z-20 h-6 border-b border-slate-300 bg-slate-200 px-3 py-1 text-center">Actions</th>}
+              </tr>
+              {/* Ligne des désignations figée au défilement avec boutons de tri */}
+              <tr className="border-b border-slate-300 bg-slate-100 text-slate-700">
+                <th className="sticky top-6 z-20 w-12 border-b border-r border-slate-300 bg-slate-200/70 px-2 py-2 text-center font-semibold text-slate-600 shadow-[0_1px_0_0_#cbd5e1]">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('period_date')}
+                    className="mx-auto flex items-center justify-center gap-0.5 text-slate-600 hover:text-primary"
+                    title="Trier par ligne"
+                  >
+                    <span>Ligne</span>
+                  </button>
+                </th>
+                <SortableTh
+                  label="Période"
+                  sortKey="period_date"
+                  activeKey={sortKey}
+                  direction={direction}
+                  onSort={toggleSort}
+                  className="sticky top-6 z-20 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold shadow-[0_1px_0_0_#cbd5e1]"
+                />
+                {showSeriesColumn && (
+                  <th className="sticky top-6 z-20 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold shadow-[0_1px_0_0_#cbd5e1]">
+                    Série
+                  </th>
+                )}
+                <SortableTh
+                  label="Valeur"
+                  sortKey="value"
+                  activeKey={sortKey}
+                  direction={direction}
+                  onSort={toggleSort}
+                  className="sticky top-6 z-20 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 text-right font-semibold shadow-[0_1px_0_0_#cbd5e1]"
+                  align="right"
+                />
+                {isImportBased && (
+                  <SortableTh
+                    label="Source"
+                    sortKey="source"
+                    activeKey={sortKey}
+                    direction={direction}
+                    onSort={toggleSort}
+                    className="sticky top-6 z-20 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold shadow-[0_1px_0_0_#cbd5e1]"
+                  />
+                )}
+                <SortableTh
+                  label="Commentaire"
+                  sortKey="comment"
+                  activeKey={sortKey}
+                  direction={direction}
+                  onSort={toggleSort}
+                  className="sticky top-6 z-20 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold shadow-[0_1px_0_0_#cbd5e1]"
+                />
+                <SortableTh
+                  label="Saisi par"
+                  sortKey="recorded_by"
+                  activeKey={sortKey}
+                  direction={direction}
+                  onSort={toggleSort}
+                  className="sticky top-6 z-20 border-b border-r border-slate-300 bg-slate-100 px-3 py-2 text-left font-semibold shadow-[0_1px_0_0_#cbd5e1]"
+                />
                 {canManage && (
-                  <td className="px-3 py-2 text-center">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => onEditRecord(record)}
-                        aria-label="Modifier"
-                        title="Modifier la cellule"
-                        className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-primary"
-                      >
-                        <Pencil size={13} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDeleteRecord(record)}
-                        aria-label="Supprimer"
-                        title="Supprimer la ligne"
-                        className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
-                      >
-                        <Trash2 size={13} />
-                      </button>
-                    </div>
-                  </td>
+                  <th className="sticky top-6 z-20 border-b border-slate-300 bg-slate-100 px-3 py-2 text-center font-semibold text-slate-600 shadow-[0_1px_0_0_#cbd5e1]">
+                    Actions
+                  </th>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      )}
+            </thead>
+            <tbody className="divide-y divide-slate-200">
+              {records.map((record, index) => (
+                <tr key={record.id} className="hover:bg-emerald-50/40 odd:bg-slate-50/40">
+                  <td className="w-12 border-r border-slate-200 bg-slate-100/70 px-2 py-2 text-center font-mono text-[11px] text-slate-400">
+                    {index + 1}
+                  </td>
+                  <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-mono text-slate-700">
+                    {formatDate(record.period_date)}
+                  </td>
+                  {showSeriesColumn && (
+                    <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-slate-600">
+                      {record.config_id ? labelByConfigId[record.config_id] || '—' : '—'}
+                    </td>
+                  )}
+                  <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-right font-mono font-semibold text-slate-900">
+                    {record.value} {unitForRecord(record)}
+                  </td>
+                  {isImportBased && (
+                    <td className="border-r border-slate-200 px-3 py-2">
+                      <SourceBadge source={record.source} />
+                    </td>
+                  )}
+                  <td className="border-r border-slate-200 px-3 py-2 text-slate-600">
+                    {record.comment || <span className="text-slate-300">—</span>}
+                  </td>
+                  <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-slate-600">
+                    {record.recorded_by_user?.full_name || <span className="text-slate-300">—</span>}
+                  </td>
+                  {canManage && (
+                    <td className="px-3 py-2 text-center">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => onEditRecord(record)}
+                          aria-label="Modifier"
+                          title="Modifier la cellule"
+                          className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-primary"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDeleteRecord(record)}
+                          aria-label="Supprimer"
+                          title="Supprimer la ligne"
+                          className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
       <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
         <Pagination page={historyPage} totalPages={history.pagination.total_pages} onPageChange={setHistoryPage} />
       </div>
