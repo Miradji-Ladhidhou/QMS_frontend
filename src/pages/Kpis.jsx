@@ -15,6 +15,7 @@ import {
   ChevronUp,
   ChevronsUpDown,
   ClipboardCheck,
+  Copy,
   Download,
   FileSpreadsheet,
   FileText,
@@ -3547,6 +3548,7 @@ function KpiCard({
   isMenuOpen,
   onToggleMenu,
   onEdit,
+  onCopy,
   onDelete,
   onMove,
   onOpenRecordModal,
@@ -3928,6 +3930,19 @@ function KpiCard({
                     >
                       <Settings size={14} />
                       Séries (courbes)
+                    </button>
+                  )}
+                  {canManage && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onToggleMenu(null);
+                        onCopy(kpi);
+                      }}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <Copy size={14} />
+                      Dupliquer (avec séries)
                     </button>
                   )}
                   {canManage && (
@@ -5119,6 +5134,20 @@ export default function Kpis() {
     }
   }
 
+  async function handleCopyKpi(kpi) {
+    const suggestedName = `${kpi.name} (copie)`;
+    const newName = window.prompt(`Nom du nouveau KPI copié (les séries seront dupliquées sans les données) :`, suggestedName);
+    if (newName === null) return; // Annulation utilisateur
+    const finalName = newName.trim() || suggestedName;
+
+    try {
+      const { data: created } = await api.post(`/kpis/${kpi.id}/copy`, { name: finalName });
+      setKpis((prev) => [created, ...prev]);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de copier ce KPI.');
+    }
+  }
+
   function toggleMenu(id) {
     setOpenMenuId((prev) => (prev === id ? null : id));
   }
@@ -5422,6 +5451,7 @@ export default function Kpis() {
                   isMenuOpen={openMenuId === kpi.id}
                   onToggleMenu={toggleMenu}
                   onEdit={setFormModal}
+                  onCopy={handleCopyKpi}
                   onDelete={handleDelete}
                   onMove={setMoveModal}
                   onOpenRecordModal={(kpiArg, record) => setRecordModal({ kpi: kpiArg, record })}
