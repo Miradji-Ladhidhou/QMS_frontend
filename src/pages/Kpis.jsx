@@ -4546,6 +4546,86 @@ function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
   );
 }
 
+// Modale propre pour dupliquer un KPI avec ses séries sans les données
+// Remplace window.prompt() qui n'est pas supporté dans les webviews / certains navigateurs.
+function CopyKpiModal({ kpi, onClose, onCopied }) {
+  const [name, setName] = useState(`${kpi.name} (copie)`);
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const finalName = name.trim();
+    if (!finalName) {
+      setError('Le nom du KPI est requis.');
+      return;
+    }
+
+    setError('');
+    setSubmitting(true);
+    try {
+      const { data: created } = await api.post(`/kpis/${kpi.id}/copy`, { name: finalName });
+      onCopied(created);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de copier ce KPI.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Dupliquer le KPI</h2>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        <p className="mb-4 text-xs text-slate-500">
+          Toutes les séries et configurations du KPI « {kpi.name} » seront dupliquées à l'identique, sans aucune donnée ni relevé existant.
+        </p>
+
+        {error && (
+          <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Nom du nouveau KPI</label>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Ex: Taux de service (copie)"
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div className="flex gap-2 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex-1 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50"
+            >
+              {submitting ? 'Duplication...' : 'Dupliquer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // Création (folder === 'new') ou renommage (folder === l'objet dossier) — même formulaire,
 // le dossier parent est toujours celui actuellement parcouru, jamais choisi ici.
 function FolderFormModal({ folder, parentId, onClose, onSaved }) {
@@ -4908,6 +4988,7 @@ export default function Kpis() {
   const folderRequestRef = useRef(0);
   const [folderModal, setFolderModal] = useState(null); // null fermé, 'new' création, objet dossier édition
   const [moveModal, setMoveModal] = useState(null); // le kpi en cours de déplacement, ou null
+  const [copyModal, setCopyModal] = useState(null); // le kpi en cours de duplication, ou null
   const [categories, setCategories] = useState([]);
   const users = useUsers();
   const [selectedIds, setSelectedIds] = useState([]);
@@ -5134,18 +5215,8 @@ export default function Kpis() {
     }
   }
 
-  async function handleCopyKpi(kpi) {
-    const suggestedName = `${kpi.name} (copie)`;
-    const newName = window.prompt(`Nom du nouveau KPI copié (les séries seront dupliquées sans les données) :`, suggestedName);
-    if (newName === null) return; // Annulation utilisateur
-    const finalName = newName.trim() || suggestedName;
-
-    try {
-      const { data: created } = await api.post(`/kpis/${kpi.id}/copy`, { name: finalName });
-      setKpis((prev) => [created, ...prev]);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de copier ce KPI.');
-    }
+  function handleCopyKpi(kpi) {
+    setCopyModal(kpi);
   }
 
   function toggleMenu(id) {
@@ -5554,6 +5625,17 @@ export default function Kpis() {
       )}
 
       {moveModal && <MoveKpiModal kpi={moveModal} onClose={() => setMoveModal(null)} onMoved={handleKpiMoved} />}
+
+      {copyModal && (
+        <CopyKpiModal
+          kpi={copyModal}
+          onClose={() => setCopyModal(null)}
+          onCopied={(created) => {
+            setCopyModal(null);
+            setKpis((prev) => [created, ...prev]);
+          }}
+        />
+      )}
 
       {proofModal && (
         <RecordProofModal kpi={proofModal.kpi} record={proofModal.record} onClose={() => setProofModal(null)} />
