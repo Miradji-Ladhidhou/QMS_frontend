@@ -3,8 +3,10 @@ import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
   AlertTriangle,
+  ArrowDown,
   ArrowLeft,
   ArrowRight,
+  ArrowUp,
   BarChart3,
   Check,
   CheckCircle2,
@@ -3489,16 +3491,20 @@ function KpiCard({
   const averagesByLabel = orderedLabels.map((label, i) => {
     const settings = settingsByLabel.get(label);
     const seriesRecords = records.filter((r) => labelForRecord(r) === label);
-    const values = seriesRecords.map((r) => r.value);
+    const values = seriesRecords.map((r) => r.value).filter((v) => typeof v === 'number' && !Number.isNaN(v));
     const recentSeriesRecords = [...seriesRecords].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
     const recentAverage =
       recentSeriesRecords.length > 0
         ? Number((recentSeriesRecords.reduce((sum, r) => sum + r.value, 0) / recentSeriesRecords.length).toFixed(2))
         : null;
+    const maxVal = values.length > 0 ? Math.max(...values) : null;
+    const minVal = values.length > 0 ? Math.min(...values) : null;
     return {
       label,
       color: SERIES_COLORS[i % SERIES_COLORS.length],
       average: values.length > 0 ? Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2)) : null,
+      maxVal,
+      minVal,
       settings,
       status: getKpiStatus(recentAverage, settings.target, settings.direction),
     };
@@ -3512,6 +3518,9 @@ function KpiCard({
   // bon). Le graphique en dessous continue d'afficher chaque période, y compris les anciennes.
   const recentRecords = [...records].sort((a, b) => (a.period_date < b.period_date ? -1 : 1)).slice(-KPI_RECENT_WINDOW);
   const hasValues = records.length > 0;
+  const allNumericValues = records.map((r) => r.value).filter((v) => typeof v === 'number' && !Number.isNaN(v));
+  const singleMaxVal = !showMultiSeries && allNumericValues.length > 0 ? Math.max(...allNumericValues) : null;
+  const singleMinVal = !showMultiSeries && allNumericValues.length > 0 ? Math.min(...allNumericValues) : null;
   const averageValue =
     !showMultiSeries && recentRecords.length > 0 ? Number((recentRecords.reduce((sum, r) => sum + r.value, 0) / recentRecords.length).toFixed(2)) : null;
   const previousRecords = records.slice(0, Math.max(0, records.length - recentRecords.length));
@@ -3854,7 +3863,7 @@ function KpiCard({
           <span className={`text-sm ${KPI_STATUS_STYLES.neutral}`}>Aucune valeur enregistrée.</span>
         ) : showMultiSeries ? (
           <div className="flex w-full flex-col gap-2">
-            {averagesByLabel.map(({ label, color, average, settings, status: seriesStatus }) => {
+            {averagesByLabel.map(({ label, color, average, maxVal, minVal, settings, status: seriesStatus }) => {
               const SeriesStatusIcon =
                 seriesStatus === 'good' ? CheckCircle2 : seriesStatus === 'warning' ? AlertTriangle : seriesStatus === 'bad' ? AlertCircle : null;
               return (
@@ -3864,6 +3873,25 @@ function KpiCard({
                   <span className="whitespace-nowrap text-sm font-semibold text-slate-900">
                     {average !== null ? `${average} ${settings.unit}` : '—'}
                   </span>
+                  {(maxVal !== null || minVal !== null) && (
+                    <div className="inline-flex items-center gap-2 rounded-md bg-slate-100/80 px-2 py-0.5 text-xs text-slate-600">
+                      {maxVal !== null && (
+                        <span className="inline-flex items-center gap-0.5" title="Pic le plus haut">
+                          <ArrowUp size={12} className="text-emerald-600 stroke-[2.5]" />
+                          <span className="text-[11px] text-slate-400">Haut :</span>
+                          <span className="font-medium text-slate-800">{maxVal} {settings.unit}</span>
+                        </span>
+                      )}
+                      {maxVal !== null && minVal !== null && <span className="text-slate-300">·</span>}
+                      {minVal !== null && (
+                        <span className="inline-flex items-center gap-0.5" title="Pic le plus bas">
+                          <ArrowDown size={12} className="text-rose-600 stroke-[2.5]" />
+                          <span className="text-[11px] text-slate-400">Bas :</span>
+                          <span className="font-medium text-slate-800">{minVal} {settings.unit}</span>
+                        </span>
+                      )}
+                    </div>
+                  )}
                   {settings.custom && (
                     <span className="whitespace-nowrap text-xs text-slate-500">Objectif : {formatTarget(settings)}</span>
                   )}
@@ -3886,6 +3914,25 @@ function KpiCard({
               {averageValue} {kpi.unit || ''}
             </span>
             <span className="whitespace-nowrap text-xs text-slate-400">(moyenne)</span>
+            {(singleMaxVal !== null || singleMinVal !== null) && (
+              <div className="inline-flex items-center gap-2 rounded-md bg-slate-100/80 px-2 py-1 text-xs text-slate-600">
+                {singleMaxVal !== null && (
+                  <span className="inline-flex items-center gap-0.5" title="Pic le plus haut">
+                    <ArrowUp size={13} className="text-emerald-600 stroke-[2.5]" />
+                    <span className="text-[11px] text-slate-400">Haut :</span>
+                    <span className="font-semibold text-slate-800">{singleMaxVal} {kpi.unit || ''}</span>
+                  </span>
+                )}
+                {singleMaxVal !== null && singleMinVal !== null && <span className="text-slate-300">·</span>}
+                {singleMinVal !== null && (
+                  <span className="inline-flex items-center gap-0.5" title="Pic le plus bas">
+                    <ArrowDown size={13} className="text-rose-600 stroke-[2.5]" />
+                    <span className="text-[11px] text-slate-400">Bas :</span>
+                    <span className="font-semibold text-slate-800">{singleMinVal} {kpi.unit || ''}</span>
+                  </span>
+                )}
+              </div>
+            )}
             {StatusIcon && (
               <span className={`flex items-center gap-1 whitespace-nowrap text-xs font-medium ${KPI_STATUS_STYLES[status]}`}>
                 <StatusIcon size={14} />
