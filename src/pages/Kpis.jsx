@@ -5641,6 +5641,13 @@ export default function Kpis() {
         <RecordProofModal kpi={proofModal.kpi} record={proofModal.record} onClose={() => setProofModal(null)} />
       )}
 
+      {compareOpen && (
+        <CompareChartModal
+          kpis={kpis.filter((kpi) => selectedIds.includes(kpi.id))}
+          onClose={() => setCompareOpen(false)}
+        />
+      )}
+
       {isBulkMoveModalOpen && (
         <BulkMoveCategoryModal
           resourceType="kpi"
