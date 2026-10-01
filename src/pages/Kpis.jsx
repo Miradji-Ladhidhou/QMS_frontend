@@ -13,6 +13,7 @@ import {
   ChevronUp,
   ClipboardCheck,
   Download,
+  FileSpreadsheet,
   FileText,
   FileType,
   Folder,
@@ -21,6 +22,7 @@ import {
   FolderPlus,
   History,
   Image as ImageIcon,
+  LineChart as LineChartIcon,
   MoreVertical,
   Pencil,
   Plus,
@@ -1020,6 +1022,7 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   const [history, setHistory] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyError, setHistoryError] = useState('');
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const historyPageSize = 50;
   useEffect(() => {
     let cancelled = false;
@@ -1029,6 +1032,21 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
       .catch(() => { if (!cancelled) setHistoryError("Impossible de charger l'historique."); });
     return () => { cancelled = true; };
   }, [kpi.id, historyPage]);
+
+  async function handleExportXlsx() {
+    setExportingXlsx(true);
+    try {
+      await getXlsxDownload(
+        `/kpis/${kpi.id}/records/export-xlsx`,
+        {},
+        `${sanitizeFilename(kpi.name)}-tableur-historique-${new Date().toISOString().slice(0, 10)}.xlsx`
+      );
+    } catch {
+      setHistoryError("Impossible d'exporter l'historique vers Excel.");
+    } finally {
+      setExportingXlsx(false);
+    }
+  }
 
   const isImportBased = kpi.calculation_type === 'import';
   const seriesConfigs = kpi.calculation_configs || [];
@@ -1062,92 +1080,246 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   }
 
   return (
-    <div className="overflow-visible">
+    <div className="overflow-x-auto rounded-lg border border-slate-300 bg-white shadow-sm">
+      {/* Barre d'état style tableur Excel */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-slate-100/90 px-3 py-1.5 text-xs text-slate-600">
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center gap-1 font-semibold text-emerald-800">
+            <span className="flex h-4 w-4 items-center justify-center rounded bg-emerald-600 text-[10px] font-bold text-white">
+              X
+            </span>
+            Tableur historique
+          </span>
+          <button
+            type="button"
+            onClick={handleExportXlsx}
+            disabled={exportingXlsx}
+            className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-white px-2 py-0.5 text-xs font-medium text-emerald-700 shadow-2xs transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-50"
+            title="Exporter tout l'historique de ce KPI vers Excel"
+          >
+            <FileSpreadsheet size={13} className="text-emerald-600" />
+            <span>{exportingXlsx ? 'Exportation…' : 'Tout exporter vers Excel'}</span>
+          </button>
+          <span className="text-slate-400">|</span>
+          <span className="text-slate-500 font-mono">
+            {records.length} relevé{records.length > 1 ? 's' : ''}
+          </span>
+        </div>
+        <div className="text-[11px] text-slate-400">
+          Page {historyPage} / {history.pagination.total_pages || 1}
+        </div>
+      </div>
+
       {showSeriesColumn ? (
-        <table className="w-full min-w-[760px] border-separate border-spacing-0 text-left text-sm">
-          <thead className="text-xs uppercase tracking-wide text-slate-600">
-            <tr>
-              <th className="sticky top-0 z-20 border-b border-slate-300 bg-slate-50 px-3 py-2.5 font-semibold shadow-[0_2px_0_0_#cbd5e1]">Période</th>
-              {seriesColumns.map((series) => <th key={series.id} className="sticky top-0 z-20 border-b border-l border-slate-300 bg-slate-50 px-3 py-2.5 font-semibold shadow-[0_2px_0_0_#cbd5e1]">{series.label}<span className="ml-1 font-normal normal-case text-slate-500">({series.unit || '—'})</span><span className="block text-[10px] font-normal normal-case text-slate-500">Valeur · source · commentaire · actions</span></th>)}
+        <table className="w-full min-w-[760px] border-collapse font-sans text-xs">
+          <thead>
+            {/* Ligne repère colonnes A, B, C... façon Excel */}
+            <tr className="border-b border-slate-300 bg-slate-200/80 text-[10px] font-semibold text-slate-500">
+              <th className="w-12 border-r border-slate-300 px-2 py-1 text-center">#</th>
+              <th className="border-r border-slate-300 px-3 py-1 text-center">A</th>
+              {seriesColumns.map((series, idx) => (
+                <th key={series.id} className="border-r border-slate-300 px-3 py-1 text-center last:border-r-0">
+                  {String.fromCharCode(66 + idx)}
+                </th>
+              ))}
+            </tr>
+            <tr className="border-b border-slate-300 bg-slate-100 text-slate-700">
+              <th className="w-12 border-r border-slate-300 bg-slate-200/50 px-2 py-2 text-center font-semibold text-slate-600">
+                Ligne
+              </th>
+              <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Période</th>
+              {seriesColumns.map((series) => (
+                <th key={series.id} className="border-r border-slate-300 px-3 py-2 text-left font-semibold last:border-r-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <span>{series.label}</span>
+                    <span className="rounded bg-slate-200/80 px-1 py-0.5 text-[10px] font-normal text-slate-600">
+                      {series.unit || '—'}
+                    </span>
+                  </div>
+                </th>
+              ))}
             </tr>
           </thead>
-          <tbody>
-            {recordsByPeriod.map(({ period, records: periodRecords }) => (
-              <tr key={period} className="odd:bg-slate-50/70">
-                <td className="whitespace-nowrap border-b border-slate-200 px-3 py-3 align-top font-medium text-slate-700">{formatDate(period)}</td>
+          <tbody className="divide-y divide-slate-200">
+            {recordsByPeriod.map(({ period, records: periodRecords }, rowIdx) => (
+              <tr key={period} className="hover:bg-emerald-50/40 odd:bg-slate-50/40">
+                <td className="w-12 border-r border-slate-200 bg-slate-100/70 px-2 py-2 text-center font-mono text-[11px] text-slate-400">
+                  {rowIdx + 1}
+                </td>
+                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-mono text-slate-700">
+                  {formatDate(period)}
+                </td>
                 {seriesColumns.map((series) => {
                   const record = periodRecords.find((item) => item.config_id === series.id);
-                  return <td key={series.id} className="border-b border-l border-slate-200 px-3 py-3 align-top text-slate-800">{record ? (
-                    <div className="min-w-40 space-y-1.5 rounded-md border border-slate-200 bg-white p-2.5 shadow-sm">
-                      <p className="font-semibold">{record.value} {series.unit}</p>
-                      {isImportBased && <div className="text-xs text-slate-500"><SourceBadge source={record.source} /></div>}
-                      <p className="whitespace-pre-wrap text-xs text-slate-500">{record.comment || 'Aucun commentaire'}</p>
-                      {canManage && <div className="flex gap-1 border-t border-slate-100 pt-1"><button type="button" onClick={() => onEditRecord(record)} aria-label={`Modifier ${series.label}`} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-primary"><Pencil size={13} /></button><button type="button" onClick={() => onDeleteRecord(record)} aria-label={`Supprimer ${series.label}`} className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-red-600"><Trash2 size={13} /></button></div>}
-                    </div>
-                  ) : <div className="min-w-40 rounded-md border border-dashed border-slate-200 px-3 py-5 text-center font-normal text-slate-300">Aucune donnée</div>}</td>;
+                  return (
+                    <td key={series.id} className="border-r border-slate-200 px-3 py-2 align-top text-slate-800 last:border-r-0">
+                      {record ? (
+                        <div className="rounded border border-slate-200/80 bg-white p-2 shadow-xs space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono font-semibold text-slate-900">
+                              {record.value} {series.unit}
+                            </span>
+                            {canManage && (
+                              <div className="flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => onEditRecord(record)}
+                                  aria-label={`Modifier ${series.label}`}
+                                  title="Modifier cette valeur"
+                                  className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-primary"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => onDeleteRecord(record)}
+                                  aria-label={`Supprimer ${series.label}`}
+                                  title="Supprimer cette valeur"
+                                  className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {isImportBased && (
+                            <div>
+                              <SourceBadge source={record.source} />
+                            </div>
+                          )}
+                          {record.comment && (
+                            <p className="border-l-2 border-emerald-400 pl-1.5 text-[11px] text-slate-500">
+                              {record.comment}
+                            </p>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="flex h-full min-h-[38px] items-center justify-center font-mono text-slate-300">
+                          —
+                        </div>
+                      )}
+                    </td>
+                  );
                 })}
               </tr>
             ))}
           </tbody>
         </table>
-      ) : <table className="w-full text-left text-sm">
-        <thead className="text-xs uppercase tracking-wide text-slate-500">
-          <tr>
-            <SortableTh label="Période" sortKey="period_date" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
-            {showSeriesColumn && <th className="py-2 pr-3">Série</th>}
-            <SortableTh label="Valeur" sortKey="value" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
-            {isImportBased && <th className="py-2 pr-3">Source</th>}
-            <th className="py-2 pr-3">Commentaire</th>
-            <SortableTh label="Saisi par" sortKey="recorded_by" activeKey={sortKey} direction={direction} onSort={toggleSort} className="py-2 pr-3" />
-            {canManage && <th className="py-2 pr-3 text-right">Actions</th>}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-            {records.map((record) => (
-            <tr key={record.id}>
-              <td className="py-2 pr-3 whitespace-nowrap text-slate-700">{formatDate(record.period_date)}</td>
-              {showSeriesColumn && (
-                <td className="py-2 pr-3 whitespace-nowrap text-slate-600">
-                  {record.config_id ? labelByConfigId[record.config_id] || '—' : '—'}
-                </td>
-              )}
-              <td className="py-2 pr-3 whitespace-nowrap font-medium text-slate-800">
-                {record.value} {unitForRecord(record)}
-              </td>
+      ) : (
+        <table className="w-full min-w-[620px] border-collapse font-sans text-xs">
+          <thead>
+            {/* Ligne repère colonnes A, B, C, D... style Excel */}
+            <tr className="border-b border-slate-300 bg-slate-200/80 text-[10px] font-semibold text-slate-500">
+              <th className="w-12 border-r border-slate-300 px-2 py-1 text-center">#</th>
+              <th className="border-r border-slate-300 px-3 py-1 text-center">A</th>
+              {showSeriesColumn && <th className="border-r border-slate-300 px-3 py-1 text-center">B</th>}
+              <th className="border-r border-slate-300 px-3 py-1 text-center">{showSeriesColumn ? 'C' : 'B'}</th>
               {isImportBased && (
-                <td className="py-2 pr-3">
-                  <SourceBadge source={record.source} />
-                </td>
+                <th className="border-r border-slate-300 px-3 py-1 text-center">{showSeriesColumn ? 'D' : 'C'}</th>
               )}
-              <td className="py-2 pr-3 text-slate-600">{record.comment || '—'}</td>
-              <td className="py-2 pr-3 whitespace-nowrap text-slate-600">{record.recorded_by_user?.full_name || '—'}</td>
-              {canManage && (
-                <td className="py-2 pr-3 text-right">
-                  <div className="flex justify-end gap-1">
-                    <button
-                      type="button"
-                      onClick={() => onEditRecord(record)}
-                      aria-label="Modifier"
-                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-primary"
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDeleteRecord(record)}
-                      aria-label="Supprimer"
-                      className="rounded-md p-1.5 text-slate-500 hover:bg-slate-100 hover:text-red-600"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </td>
-              )}
+              <th className="border-r border-slate-300 px-3 py-1 text-center">
+                {showSeriesColumn ? (isImportBased ? 'E' : 'D') : isImportBased ? 'D' : 'C'}
+              </th>
+              <th className="border-r border-slate-300 px-3 py-1 text-center">
+                {showSeriesColumn ? (isImportBased ? 'F' : 'E') : isImportBased ? 'E' : 'D'}
+              </th>
+              {canManage && <th className="px-3 py-1 text-center">Actions</th>}
             </tr>
-          ))}
-        </tbody>
-      </table>}
-      <Pagination page={historyPage} totalPages={history.pagination.total_pages} onPageChange={setHistoryPage} />
+            <tr className="border-b border-slate-300 bg-slate-100 text-slate-700">
+              <th className="w-12 border-r border-slate-300 bg-slate-200/50 px-2 py-2 text-center font-semibold text-slate-600">
+                Ligne
+              </th>
+              <SortableTh
+                label="Période"
+                sortKey="period_date"
+                activeKey={sortKey}
+                direction={direction}
+                onSort={toggleSort}
+                className="border-r border-slate-300 px-3 py-2 text-left font-semibold"
+              />
+              {showSeriesColumn && <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Série</th>}
+              <SortableTh
+                label="Valeur"
+                sortKey="value"
+                activeKey={sortKey}
+                direction={direction}
+                onSort={toggleSort}
+                className="border-r border-slate-300 px-3 py-2 text-right font-semibold"
+                align="right"
+              />
+              {isImportBased && <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Source</th>}
+              <th className="border-r border-slate-300 px-3 py-2 text-left font-semibold">Commentaire</th>
+              <SortableTh
+                label="Saisi par"
+                sortKey="recorded_by"
+                activeKey={sortKey}
+                direction={direction}
+                onSort={toggleSort}
+                className="border-r border-slate-300 px-3 py-2 text-left font-semibold"
+              />
+              {canManage && <th className="px-3 py-2 text-center font-semibold">Actions</th>}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-200">
+            {records.map((record, index) => (
+              <tr key={record.id} className="hover:bg-emerald-50/40 odd:bg-slate-50/40">
+                <td className="w-12 border-r border-slate-200 bg-slate-100/70 px-2 py-2 text-center font-mono text-[11px] text-slate-400">
+                  {index + 1}
+                </td>
+                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-mono text-slate-700">
+                  {formatDate(record.period_date)}
+                </td>
+                {showSeriesColumn && (
+                  <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-slate-600">
+                    {record.config_id ? labelByConfigId[record.config_id] || '—' : '—'}
+                  </td>
+                )}
+                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-right font-mono font-semibold text-slate-900">
+                  {record.value} {unitForRecord(record)}
+                </td>
+                {isImportBased && (
+                  <td className="border-r border-slate-200 px-3 py-2">
+                    <SourceBadge source={record.source} />
+                  </td>
+                )}
+                <td className="border-r border-slate-200 px-3 py-2 text-slate-600">
+                  {record.comment || <span className="text-slate-300">—</span>}
+                </td>
+                <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-slate-600">
+                  {record.recorded_by_user?.full_name || <span className="text-slate-300">—</span>}
+                </td>
+                {canManage && (
+                  <td className="px-3 py-2 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onEditRecord(record)}
+                        aria-label="Modifier"
+                        title="Modifier la cellule"
+                        className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-primary"
+                      >
+                        <Pencil size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onDeleteRecord(record)}
+                        aria-label="Supprimer"
+                        title="Supprimer la ligne"
+                        className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
+                  </td>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <div className="border-t border-slate-200 bg-slate-50 px-3 py-2">
+        <Pagination page={historyPage} totalPages={history.pagination.total_pages} onPageChange={setHistoryPage} />
+      </div>
     </div>
   );
 }
@@ -3247,6 +3419,7 @@ function KpiCard({
   const [showDetails, setShowDetails] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [showChart, setShowChart] = useState(false);
+  const [chartType, setChartType] = useState('line'); // 'line' | 'bar'
   const [showImports, setShowImports] = useState(false);
   const [imports, setImports] = useState(null);
   const [importsLoading, setImportsLoading] = useState(false);
@@ -3778,18 +3951,51 @@ function KpiCard({
       )}
 
       <div className="mt-4 border-t border-slate-100 pt-3">
-        <button
-          type="button"
-          onClick={() => setShowChart((prev) => !prev)}
-          aria-expanded={showChart}
-          aria-controls={`kpi-chart-${kpi.id}`}
-          className="flex min-h-[40px] items-center gap-1.5 text-sm font-medium text-primary hover:underline"
-        >
-          {showChart ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-          <BarChart3 size={15} />
-          {showChart ? 'Masquer le graphique' : 'Voir le graphique'}
-          <span className="font-normal text-slate-400">({chartData.length} période{chartData.length > 1 ? 's' : ''})</span>
-        </button>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <button
+            type="button"
+            onClick={() => setShowChart((prev) => !prev)}
+            aria-expanded={showChart}
+            aria-controls={`kpi-chart-${kpi.id}`}
+            className="flex min-h-[40px] items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+          >
+            {showChart ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+            <BarChart3 size={15} />
+            {showChart ? 'Masquer le graphique' : 'Voir le graphique'}
+            <span className="font-normal text-slate-400">({chartData.length} période{chartData.length > 1 ? 's' : ''})</span>
+          </button>
+
+          {showChart && !isCountGrouped && hasEnoughForChart && (
+            <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5 text-xs font-medium text-slate-600">
+              <button
+                type="button"
+                onClick={() => setChartType('line')}
+                className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-colors ${
+                  chartType === 'line'
+                    ? 'bg-white text-primary font-semibold shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Afficher sous forme de courbe"
+              >
+                <LineChartIcon size={14} />
+                <span>Courbe</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setChartType('bar')}
+                className={`flex items-center gap-1 rounded-md px-2.5 py-1 transition-colors ${
+                  chartType === 'bar'
+                    ? 'bg-white text-primary font-semibold shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Afficher sous forme de bâtons"
+              >
+                <BarChart3 size={14} />
+                <span>Bâtons</span>
+              </button>
+            </div>
+          )}
+        </div>
 
         {showChart && (
           <div id={`kpi-chart-${kpi.id}`} ref={chartRef} className="mt-3 bg-white">
@@ -3800,68 +4006,129 @@ function KpiCard({
                 {hasEnoughForChart ? (
                   <>
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
-                        <CartesianGrid stroke={GRID_COLOR} vertical={false} />
-                        <XAxis
-                          dataKey="period_date"
-                          tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fill: MUTED_COLOR, fontSize: 11 }}
-                        />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
-                        <Tooltip
-                          formatter={(val, name) => [`${val} ${settingsByLabel.get(name)?.unit ?? kpi.unit ?? ''}`, name]}
-                          labelFormatter={(label) => formatDate(label)}
-                          contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
-                        />
-                        {hasTarget && someSeriesFollowsKpi && (
-                          <ReferenceLine
-                            y={kpi.target}
-                            stroke={MUTED_COLOR}
-                            strokeDasharray="4 4"
-                            label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
+                      {chartType === 'bar' ? (
+                        <BarChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+                          <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                          <XAxis
+                            dataKey="period_date"
+                            tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: MUTED_COLOR, fontSize: 11 }}
                           />
-                        )}
-                        {averagesByLabel
-                          .filter(({ settings }) => settings.custom && settings.target !== null)
-                          .map(({ label, color, settings }) => (
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
+                          <Tooltip
+                            formatter={(val, name) => [`${val} ${settingsByLabel.get(name)?.unit ?? kpi.unit ?? ''}`, name]}
+                            labelFormatter={(label) => formatDate(label)}
+                            contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+                          />
+                          {hasTarget && someSeriesFollowsKpi && (
                             <ReferenceLine
-                              key={`target-${label}`}
-                              y={settings.target}
-                              stroke={color}
+                              y={kpi.target}
+                              stroke={MUTED_COLOR}
                               strokeDasharray="4 4"
-                              strokeOpacity={0.7}
-                              label={{ value: `Objectif ${label}`, position: 'insideBottomRight', fontSize: 10, fill: color }}
+                              label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
                             />
-                          ))}
-                        {orderedLabels.map((label, i) => {
-                          const color = SERIES_COLORS[i % SERIES_COLORS.length];
-                          return (
-                            <Line
-                              key={label}
-                              type="monotone"
-                              dataKey={label}
-                              name={label}
-                              stroke={color}
-                              strokeWidth={2}
-                              connectNulls={false}
-                              dot={({ key: _key, ...dotProps }) => (
-                                <SeriesDot
-                                  key={`${label}-${dotProps.payload.period_date}`}
-                                  {...dotProps}
-                                  seriesLabel={label}
-                                  color={color}
-                                  clickable={isImportBased}
-                                  onSelect={handleSeriesPointClick}
-                                />
-                              )}
-                              activeDot={{ r: 6 }}
+                          )}
+                          {averagesByLabel
+                            .filter(({ settings }) => settings.custom && settings.target !== null)
+                            .map(({ label, color, settings }) => (
+                              <ReferenceLine
+                                key={`target-${label}`}
+                                y={settings.target}
+                                stroke={color}
+                                strokeDasharray="4 4"
+                                strokeOpacity={0.7}
+                                label={{ value: `Objectif ${label}`, position: 'insideBottomRight', fontSize: 10, fill: color }}
+                              />
+                            ))}
+                          {orderedLabels.map((label, i) => {
+                            const color = SERIES_COLORS[i % SERIES_COLORS.length];
+                            return (
+                              <Bar
+                                key={label}
+                                dataKey={label}
+                                name={label}
+                                fill={color}
+                                radius={[4, 4, 0, 0]}
+                                cursor={isImportBased ? 'pointer' : undefined}
+                                onClick={
+                                  isImportBased
+                                    ? (entry) => {
+                                        const rec = entry?.__records?.[label];
+                                        if (rec) handleSeriesPointClick(rec);
+                                      }
+                                    : undefined
+                                }
+                              />
+                            );
+                          })}
+                          {showMultiSeries && <Legend wrapperStyle={{ fontSize: 11 }} />}
+                        </BarChart>
+                      ) : (
+                        <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 0, left: -16 }}>
+                          <CartesianGrid stroke={GRID_COLOR} vertical={false} />
+                          <XAxis
+                            dataKey="period_date"
+                            tickFormatter={(date) => formatPeriodShort(date, kpi.frequency)}
+                            axisLine={false}
+                            tickLine={false}
+                            tick={{ fill: MUTED_COLOR, fontSize: 11 }}
+                          />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fill: MUTED_COLOR, fontSize: 11 }} width={40} />
+                          <Tooltip
+                            formatter={(val, name) => [`${val} ${settingsByLabel.get(name)?.unit ?? kpi.unit ?? ''}`, name]}
+                            labelFormatter={(label) => formatDate(label)}
+                            contentStyle={{ fontSize: 12, borderRadius: 8, borderColor: '#e2e8f0' }}
+                          />
+                          {hasTarget && someSeriesFollowsKpi && (
+                            <ReferenceLine
+                              y={kpi.target}
+                              stroke={MUTED_COLOR}
+                              strokeDasharray="4 4"
+                              label={{ value: 'Objectif', position: 'insideTopRight', fontSize: 11, fill: MUTED_COLOR }}
                             />
-                          );
-                        })}
-                        {showMultiSeries && <Legend wrapperStyle={{ fontSize: 11 }} />}
-                      </LineChart>
+                          )}
+                          {averagesByLabel
+                            .filter(({ settings }) => settings.custom && settings.target !== null)
+                            .map(({ label, color, settings }) => (
+                              <ReferenceLine
+                                key={`target-${label}`}
+                                y={settings.target}
+                                stroke={color}
+                                strokeDasharray="4 4"
+                                strokeOpacity={0.7}
+                                label={{ value: `Objectif ${label}`, position: 'insideBottomRight', fontSize: 10, fill: color }}
+                              />
+                            ))}
+                          {orderedLabels.map((label, i) => {
+                            const color = SERIES_COLORS[i % SERIES_COLORS.length];
+                            return (
+                              <Line
+                                key={label}
+                                type="monotone"
+                                dataKey={label}
+                                name={label}
+                                stroke={color}
+                                strokeWidth={2}
+                                connectNulls={false}
+                                dot={({ key: _key, ...dotProps }) => (
+                                  <SeriesDot
+                                    key={`${label}-${dotProps.payload.period_date}`}
+                                    {...dotProps}
+                                    seriesLabel={label}
+                                    color={color}
+                                    clickable={isImportBased}
+                                    onSelect={handleSeriesPointClick}
+                                  />
+                                )}
+                                activeDot={{ r: 6 }}
+                              />
+                            );
+                          })}
+                          {showMultiSeries && <Legend wrapperStyle={{ fontSize: 11 }} />}
+                        </LineChart>
+                      )}
                     </ResponsiveContainer>
                     {isImportBased && (
                       <p className="mt-1 text-center text-xs text-slate-400">Cliquez sur un point pour voir le détail</p>
