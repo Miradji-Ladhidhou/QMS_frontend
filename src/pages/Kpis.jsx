@@ -1018,7 +1018,7 @@ function getRecordSortValue(record, key) {
   return record[key];
 }
 
-function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, onCaptureChartImage }) {
+function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, chartType = 'line' }) {
   const [history, setHistory] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyError, setHistoryError] = useState('');
@@ -1036,13 +1036,9 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, onCa
   async function handleExportXlsx() {
     setExportingXlsx(true);
     try {
-      let chartImage = null;
-      if (onCaptureChartImage) {
-        chartImage = await onCaptureChartImage();
-      }
       const response = await api.post(
         `/kpis/${kpi.id}/records/export-xlsx`,
-        { chartImage },
+        { chartType: chartType || 'line' },
         { responseType: 'blob' }
       );
       const filename = `${sanitizeFilename(kpi.name)}-tableur-historique-${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -3599,21 +3595,6 @@ function KpiCard({
     await exportChartPng();
   }
 
-  async function captureChartImage() {
-    if (!canExportChart) return null;
-    try {
-      if (!showChart) {
-        setShowChart(true);
-        await new Promise((resolve) => setTimeout(resolve, 350));
-      }
-      if (!chartRef.current) return null;
-      return await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
-    } catch (err) {
-      console.warn("Capture du graphique pour Excel impossible:", err);
-      return null;
-    }
-  }
-
   function buildDataExportPayload() {
     const sortedRecords = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
     const columns = [
@@ -4191,7 +4172,7 @@ function KpiCard({
                 canManage={canManage && !isModuleBased}
                 onEditRecord={(record) => onOpenRecordModal(kpi, record)}
                 onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
-                onCaptureChartImage={captureChartImage}
+                chartType={chartType}
               />
             </div>
           )}
