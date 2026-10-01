@@ -4392,33 +4392,68 @@ function KpiCard({
 
 // Fil d'Ariane de navigation dans les dossiers de KPI — réutilisé tel quel dans la page
 // principale et dans le sélecteur de destination de MoveKpiModal.
-function FolderBreadcrumb({ breadcrumb, onNavigate }) {
+function FolderBreadcrumb({ breadcrumb = [], onNavigate }) {
+  const isInsideFolder = breadcrumb.length > 0;
+  const parentFolder = breadcrumb.length > 1 ? breadcrumb[breadcrumb.length - 2] : null;
+
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1 text-sm text-slate-500">
-      <button
-        type="button"
-        onClick={() => onNavigate(null)}
-        className={`rounded px-1 hover:text-primary hover:underline ${
-          breadcrumb.length === 0 ? 'font-medium text-slate-900' : ''
-        }`}
-      >
-        Tous les KPI
-      </button>
-      {breadcrumb.map((folder, i) => (
-        <span key={folder.id} className="flex items-center gap-1">
-          <ChevronRight size={14} className="shrink-0 text-slate-300" />
-          <button
-            type="button"
-            onClick={() => onNavigate(folder.id)}
-            className={`rounded px-1 hover:text-primary hover:underline ${
-              i === breadcrumb.length - 1 ? 'font-medium text-slate-900' : ''
-            }`}
-          >
-            {folder.name}
-          </button>
-        </span>
-      ))}
-    </div>
+    <nav
+      aria-label="Navigation dans les dossiers"
+      className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs"
+    >
+      {isInsideFolder && (
+        <button
+          type="button"
+          onClick={() => onNavigate(parentFolder ? parentFolder.id : null)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
+          title={parentFolder ? `Remonter à « ${parentFolder.name} »` : 'Remonter à « Tous les KPI »'}
+        >
+          <ArrowLeft size={14} className="text-slate-600" />
+          <span className="hidden sm:inline">Dossier parent</span>
+          <span className="sm:hidden">Retour</span>
+        </button>
+      )}
+
+      {isInsideFolder && <span className="h-5 w-px bg-slate-200" aria-hidden="true" />}
+
+      <div className="flex flex-wrap items-center gap-1 text-xs">
+        <button
+          type="button"
+          onClick={() => onNavigate(null)}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+            breadcrumb.length === 0
+              ? 'border border-primary/25 bg-primary/10 font-semibold text-primary shadow-2xs'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          }`}
+        >
+          <Folder size={13} className={breadcrumb.length === 0 ? 'text-primary fill-primary/20' : 'text-slate-400'} />
+          <span>Tous les KPI</span>
+        </button>
+
+        {breadcrumb.map((folder, i) => {
+          const isCurrent = i === breadcrumb.length - 1;
+          return (
+            <span key={folder.id} className="flex items-center gap-1">
+              <ChevronRight size={13} className="shrink-0 text-slate-400" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => onNavigate(folder.id)}
+                aria-current={isCurrent ? 'page' : undefined}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                  isCurrent
+                    ? 'border border-primary/30 bg-primary/10 font-semibold text-primary shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+                title={folder.name}
+              >
+                <Folder size={13} className={isCurrent ? 'text-primary fill-primary/20' : 'text-slate-400'} />
+                <span className="max-w-[140px] truncate sm:max-w-[200px]">{folder.name}</span>
+              </button>
+            </span>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
 
@@ -4426,19 +4461,37 @@ function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/40 hover:shadow-md">
-      <button type="button" onClick={onOpen} className="flex w-full flex-col items-start gap-2 text-left">
-        <Folder size={26} className="text-primary" />
-        <span className="line-clamp-2 break-words pr-6 text-sm font-medium text-slate-900">{folder.name}</span>
+    <div className="group relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full flex-1 flex-col items-start gap-2.5 text-left focus:outline-none"
+      >
+        <div className="flex w-full items-center justify-between">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+            <Folder size={22} className="transition-transform group-hover:scale-110" />
+          </div>
+          <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 transition-colors group-hover:bg-primary/15 group-hover:text-primary">
+            <span>Ouvrir</span>
+            <ChevronRight size={12} />
+          </span>
+        </div>
+        <span className="line-clamp-2 break-words pr-6 text-sm font-semibold text-slate-900 group-hover:text-primary">
+          {folder.name}
+        </span>
       </button>
 
       {canManage && (
       <div className="absolute right-2 top-2">
         <button
           type="button"
-          onClick={() => setMenuOpen((prev) => !prev)}
-          aria-label="Actions"
-          className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen((prev) => !prev);
+          }}
+          aria-label="Actions sur le dossier"
+          title="Options du dossier"
+          className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
         >
           <MoreVertical size={16} />
         </button>
@@ -4446,16 +4499,16 @@ function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+            <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
               <button
                 type="button"
                 onClick={() => {
                   setMenuOpen(false);
                   onRename();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
               >
-                <Pencil size={14} />
+                <Pencil size={13} className="text-slate-500" />
                 Renommer
               </button>
               <button
@@ -4464,9 +4517,9 @@ function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
                   setMenuOpen(false);
                   onDelete();
                 }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50"
               >
-                <Trash2 size={14} />
+                <Trash2 size={13} className="text-red-500" />
                 Supprimer
               </button>
             </div>

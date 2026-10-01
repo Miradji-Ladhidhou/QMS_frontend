@@ -1,27 +1,43 @@
 import { useState } from 'react';
-import { Folder, MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { ArrowUpRight, Folder, MoreVertical, Pencil, Trash2 } from 'lucide-react';
 
-// Tuile de dossier cliquable — extraite de Kpis.jsx (seul module à avoir eu des dossiers
-// imbriqués jusqu'ici), réutilisée tel quelle par tous les modules à dossiers désormais
-// imbriqués. onRename/onDelete restent optionnels (non fournis => pas de menu kebab) pour les
-// usages en lecture seule (ex. sélecteur de destination dans FolderPickerModal.jsx).
+// Tuile de dossier cliquable — ergonomie renforcée avec icône dossier colorée,
+// badge interactif d'ouverture et boutons bien contrastés.
 export default function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   return (
-    <div className="relative rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/40 hover:shadow-md">
-      <button type="button" onClick={onOpen} className="flex w-full flex-col items-start gap-2 text-left">
-        <Folder size={26} className="text-primary" />
-        <span className="line-clamp-2 break-words pr-6 text-sm font-medium text-slate-900">{folder.name}</span>
+    <div className="group relative flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition-all duration-150 hover:-translate-y-0.5 hover:border-primary hover:shadow-md">
+      <button
+        type="button"
+        onClick={onOpen}
+        className="flex w-full flex-1 flex-col items-start gap-2.5 text-left focus:outline-none"
+      >
+        <div className="flex w-full items-center justify-between">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-white">
+            <Folder size={22} className="transition-transform group-hover:scale-110" />
+          </div>
+          <span className="flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600 transition-colors group-hover:bg-primary/15 group-hover:text-primary">
+            <span>Ouvrir</span>
+            <ArrowUpRight size={12} />
+          </span>
+        </div>
+        <span className="line-clamp-2 break-words pr-6 text-sm font-semibold text-slate-900 group-hover:text-primary">
+          {folder.name}
+        </span>
       </button>
 
       {canManage && (onRename || onDelete) && (
         <div className="absolute right-2 top-2">
           <button
             type="button"
-            onClick={() => setMenuOpen((prev) => !prev)}
-            aria-label="Actions"
-            className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+            onClick={(e) => {
+              e.stopPropagation();
+              setMenuOpen((prev) => !prev);
+            }}
+            aria-label="Actions sur le dossier"
+            title="Options du dossier"
+            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
             <MoreVertical size={16} />
           </button>
@@ -29,7 +45,7 @@ export default function FolderTile({ folder, canManage, onOpen, onRename, onDele
           {menuOpen && (
             <>
               <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-              <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
+              <div className="absolute right-0 top-full z-20 mt-1 w-40 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-xl">
                 {onRename && (
                   <button
                     type="button"
@@ -37,9 +53,9 @@ export default function FolderTile({ folder, canManage, onOpen, onRename, onDele
                       setMenuOpen(false);
                       onRename();
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-slate-700 hover:bg-slate-50"
                   >
-                    <Pencil size={14} />
+                    <Pencil size={13} className="text-slate-500" />
                     Renommer
                   </button>
                 )}
@@ -50,9 +66,9 @@ export default function FolderTile({ folder, canManage, onOpen, onRename, onDele
                       setMenuOpen(false);
                       onDelete();
                     }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                    className="flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50"
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} className="text-red-500" />
                     Supprimer
                   </button>
                 )}

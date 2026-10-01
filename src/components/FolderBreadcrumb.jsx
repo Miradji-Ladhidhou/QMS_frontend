@@ -1,38 +1,77 @@
-import { ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Folder, Home } from 'lucide-react';
 
-// Fil d'Ariane de navigation dans une arborescence de dossiers — extrait de Kpis.jsx (seul
-// module à avoir eu des dossiers imbriqués jusqu'ici), réutilisé tel quel par tous les modules
-// à dossiers désormais imbriqués. `breadcrumb` = chaîne racine → dossier courant INCLUS (voir
-// GET /:id/breadcrumb côté backend) ; le dernier élément (le dossier actuellement ouvert) est
-// mis en gras plutôt que redondant avec un libellé "vous êtes ici" séparé. Fait aussi office
-// de seule navigation "retour" : cliquer un ancêtre, ou `rootLabel`, y ramène directement —
-// pas de bouton dédié.
-export default function FolderBreadcrumb({ breadcrumb, onNavigate, rootLabel }) {
+// Fil d'Ariane et boutons de navigation dans l'arborescence des dossiers.
+// Permet de voir clairement où on se trouve, de remonter d'un niveau (Retour au dossier parent)
+// et d'accéder directement à la racine ou à n'importe quel dossier parent via des boutons lisibles.
+export default function FolderBreadcrumb({ breadcrumb = [], onNavigate, rootLabel = 'Tous les dossiers' }) {
+  const isInsideFolder = breadcrumb.length > 0;
+  // Le dossier parent immédiat pour le bouton "Retour"
+  const parentFolder = breadcrumb.length > 1 ? breadcrumb[breadcrumb.length - 2] : null;
+
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1 text-sm text-slate-500">
-      <button
-        type="button"
-        onClick={() => onNavigate(null)}
-        className={`inline-flex min-h-[40px] items-center rounded px-1 hover:text-primary hover:underline sm:min-h-0 ${
-          breadcrumb.length === 0 ? 'font-medium text-slate-900' : ''
-        }`}
-      >
-        {rootLabel}
-      </button>
-      {breadcrumb.map((folder, i) => (
-        <span key={folder.id} className="flex items-center gap-1">
-          <ChevronRight size={14} className="shrink-0 text-slate-300" />
-          <button
-            type="button"
-            onClick={() => onNavigate(folder.id)}
-            className={`inline-flex min-h-[40px] items-center rounded px-1 hover:text-primary hover:underline sm:min-h-0 ${
-              i === breadcrumb.length - 1 ? 'font-medium text-slate-900' : ''
-            }`}
-          >
-            {folder.name}
-          </button>
-        </span>
-      ))}
-    </div>
+    <nav
+      aria-label="Navigation dans les dossiers"
+      className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs"
+    >
+      {/* Bouton de retour rapide vers le niveau parent lorsque l'on est dans un dossier */}
+      {isInsideFolder && (
+        <button
+          type="button"
+          onClick={() => onNavigate(parentFolder ? parentFolder.id : null)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
+          title={parentFolder ? `Remonter à « ${parentFolder.name} »` : `Remonter à « ${rootLabel} »`}
+        >
+          <ArrowLeft size={14} className="text-slate-600" />
+          <span className="hidden sm:inline">Dossier parent</span>
+          <span className="sm:hidden">Retour</span>
+        </button>
+      )}
+
+      {isInsideFolder && <span className="h-5 w-px bg-slate-200" aria-hidden="true" />}
+
+      {/* Liste du fil d'Ariane avec boutons bien découpés */}
+      <div className="flex flex-wrap items-center gap-1 text-xs">
+        {/* Bouton Racine */}
+        <button
+          type="button"
+          onClick={() => onNavigate(null)}
+          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+            breadcrumb.length === 0
+              ? 'border border-primary/25 bg-primary/10 font-semibold text-primary shadow-2xs'
+              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+          }`}
+        >
+          <Home size={13} className={breadcrumb.length === 0 ? 'text-primary' : 'text-slate-400'} />
+          <span>{rootLabel}</span>
+        </button>
+
+        {/* Chaque ancêtre dans le chemin */}
+        {breadcrumb.map((folder, i) => {
+          const isCurrent = i === breadcrumb.length - 1;
+          return (
+            <span key={folder.id} className="flex items-center gap-1">
+              <ChevronRight size={13} className="shrink-0 text-slate-400" aria-hidden="true" />
+              <button
+                type="button"
+                onClick={() => onNavigate(folder.id)}
+                aria-current={isCurrent ? 'page' : undefined}
+                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-all ${
+                  isCurrent
+                    ? 'border border-primary/30 bg-primary/10 font-semibold text-primary shadow-2xs'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+                title={folder.name}
+              >
+                <Folder
+                  size={13}
+                  className={isCurrent ? 'fill-primary/20 text-primary' : 'text-slate-400'}
+                />
+                <span className="max-w-[140px] truncate sm:max-w-[200px]">{folder.name}</span>
+              </button>
+            </span>
+          );
+        })}
+      </div>
+    </nav>
   );
 }
