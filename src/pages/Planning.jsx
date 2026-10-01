@@ -27,6 +27,7 @@ import {
   Repeat,
   Search,
   ShieldAlert,
+  TableProperties,
   Trash2,
   Truck,
   Users,
@@ -69,6 +70,7 @@ const TYPE_CONFIG = {
   management_review: { label: 'Revue de direction', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
   management_review_due: { label: 'Revue à programmer', icon: Users, className: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
   review_action: { label: 'Revue de direction', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
+  register: { label: 'Registre', icon: TableProperties, className: 'bg-teal-100 text-teal-800', dot: 'bg-teal-600' },
 };
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim'];
@@ -759,7 +761,7 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
     </div>
   );
 
-  if (item.type === 'capa' || item.type === 'document' || item.type === 'procedure') {
+  if (item.link) {
     return <Link to={item.link}>{content}</Link>;
   }
   return <div>{content}</div>;

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Download, Folder, FolderCog, FolderInput, FolderPlus, HardDrive, Loader2, Plus, Search, Server, Upload, X } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Download, FileText, Folder, FolderCog, FolderInput, FolderPlus, HardDrive, Loader2, Plus, Search, Server, TableProperties, Upload, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useTenant } from '../lib/useTenant.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -24,6 +24,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import DocumentBulkMoveModal from '../components/DocumentBulkMoveModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import DocumentRegisters from '../components/DocumentRegisters.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import PageGuide from '../components/PageGuide.jsx';
 import Pagination from '../components/Pagination.jsx';
@@ -439,6 +440,29 @@ export default function Documents() {
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingDocument, setMovingDocument] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeSection = searchParams.get('tab') === 'registers' ? 'registers' : 'documents';
+  const selectedRegisterId = searchParams.get('register_id') || null;
+
+  function handleSectionChange(section) {
+    const nextParams = new URLSearchParams(searchParams);
+    if (section === 'documents') {
+      nextParams.delete('tab');
+      nextParams.delete('register_id');
+    } else {
+      nextParams.set('tab', 'registers');
+    }
+    setSearchParams(nextParams);
+  }
+
+  function handleSelectRegisterId(id) {
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('tab', 'registers');
+    if (id) nextParams.set('register_id', id);
+    else nextParams.delete('register_id');
+    setSearchParams(nextParams);
+  }
+
   const {
     currentFolderId,
     navigateToFolder,
@@ -757,38 +781,79 @@ export default function Documents() {
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Documents</h1>
-        <div className="flex flex-wrap gap-2">
-          <ExportMenu
-            disabled={filteredDocuments.length === 0}
-            onExportPdf={() => handleExportPdf()}
-            exportingPdf={exportingPdf}
-            onExportXlsx={() => handleExportXlsx()}
-            exportingXlsx={exportingXlsx}
-            onExportWord={() => handleExportWord()}
-            exportingWord={exportingWord}
-            onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
-            exportingDrive={exportingDrive}
-          />
-          <button
-            type="button"
-            onClick={() => setIsImportModalOpen(true)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
-          >
-            <Upload size={18} />
-            Importer
-          </button>
-          <button
-            type="button"
-            onClick={() => setIsModalOpen(true)}
-            className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
-          >
-            <Plus size={18} />
-            Nouveau document
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">
+            {activeSection === 'documents' ? 'Documents' : 'Registres documentaires'}
+          </h1>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => handleSectionChange('documents')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all ${
+                activeSection === 'documents'
+                  ? 'bg-white font-semibold text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FileText size={14} />
+              <span>Bibliothèque</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSectionChange('registers')}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 transition-all ${
+                activeSection === 'registers'
+                  ? 'bg-white font-semibold text-emerald-800 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <TableProperties size={14} className={activeSection === 'registers' ? 'text-emerald-700' : ''} />
+              <span>Registres</span>
+            </button>
+          </div>
         </div>
+
+        {activeSection === 'documents' ? (
+          <div className="flex flex-wrap gap-2">
+            <ExportMenu
+              disabled={filteredDocuments.length === 0}
+              onExportPdf={() => handleExportPdf()}
+              exportingPdf={exportingPdf}
+              onExportXlsx={() => handleExportXlsx()}
+              exportingXlsx={exportingXlsx}
+              onExportWord={() => handleExportWord()}
+              exportingWord={exportingWord}
+              onExportDrive={tenant?.storage_provider === 'google_drive' ? () => handleExportDrive() : undefined}
+              exportingDrive={exportingDrive}
+            />
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 sm:flex-none"
+            >
+              <Upload size={18} />
+              Importer
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 sm:flex-none"
+            >
+              <Plus size={18} />
+              Nouveau document
+            </button>
+          </div>
+        ) : null}
       </div>
-      <PageGuide id="documents" />
+
+      {activeSection === 'documents' && <PageGuide id="documents" />}
+
+      {activeSection === 'registers' ? (
+        <div className="mt-4">
+          <DocumentRegisters selectedRegisterId={selectedRegisterId} onSelectRegisterId={handleSelectRegisterId} />
+        </div>
+      ) : (
+        <>
       {tenant?.storage_provider === 'google_drive' && (
         <p className="mt-2 flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-700">
           <HardDrive size={16} className="shrink-0" />
@@ -1071,6 +1136,8 @@ export default function Documents() {
             </>
           )}
         </>
+      )}
+      </>
       )}
 
       {isModalOpen && (
