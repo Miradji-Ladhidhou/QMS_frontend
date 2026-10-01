@@ -1018,7 +1018,7 @@ function getRecordSortValue(record, key) {
   return record[key];
 }
 
-function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
+function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, onCaptureChartImage }) {
   const [history, setHistory] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyError, setHistoryError] = useState('');
@@ -1036,11 +1036,24 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord }) {
   async function handleExportXlsx() {
     setExportingXlsx(true);
     try {
-      await getXlsxDownload(
+      let chartImage = null;
+      if (onCaptureChartImage) {
+        chartImage = await onCaptureChartImage();
+      }
+      const response = await api.post(
         `/kpis/${kpi.id}/records/export-xlsx`,
-        {},
-        `${sanitizeFilename(kpi.name)}-tableur-historique-${new Date().toISOString().slice(0, 10)}.xlsx`
+        { chartImage },
+        { responseType: 'blob' }
       );
+      const filename = `${sanitizeFilename(kpi.name)}-tableur-historique-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
     } catch {
       setHistoryError("Impossible d'exporter l'historique vers Excel.");
     } finally {
@@ -3586,6 +3599,21 @@ function KpiCard({
     await exportChartPng();
   }
 
+  async function captureChartImage() {
+    if (!canExportChart) return null;
+    try {
+      if (!showChart) {
+        setShowChart(true);
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+      if (!chartRef.current) return null;
+      return await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
+    } catch (err) {
+      console.warn("Capture du graphique pour Excel impossible:", err);
+      return null;
+    }
+  }
+
   function buildDataExportPayload() {
     const sortedRecords = [...kpi.records].sort((a, b) => (a.period_date < b.period_date ? 1 : -1));
     const columns = [
@@ -4163,6 +4191,7 @@ function KpiCard({
                 canManage={canManage && !isModuleBased}
                 onEditRecord={(record) => onOpenRecordModal(kpi, record)}
                 onDeleteRecord={(record) => onDeleteRecord(kpi, record)}
+                onCaptureChartImage={captureChartImage}
               />
             </div>
           )}
