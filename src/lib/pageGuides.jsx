@@ -30,6 +30,19 @@ export const PAGE_GUIDES = {
     example:
       "« Manuel qualité v3 », formulaire « Fiche de non-conformité », procédure « Gestion des achats » — rangés dans les dossiers Qualité, Production, RH.",
   },
+  registers: {
+    title: 'Les registres documentaires du SMQ',
+    body: (
+      <p>
+        Tableurs dynamiques pour centraliser vos <strong>exigences réglementaires</strong>, <strong>dérogations</strong>,{' '}
+        <strong>équipements</strong> ou <strong>enregistrements périodiques</strong>. Chaque registre possède ses propres
+        colonnes personnalisées et peut alimenter automatiquement le <strong>planning unifié</strong> dès qu'une date
+        d'échéance y est renseignée.
+      </p>
+    ),
+    example:
+      "Registre des textes réglementaires → texte applicable + organisme + date d'échéance cochée « Suivi planning » → l'échéance apparaît automatiquement dans l'agenda unifié.",
+  },
   capas: {
     title: "Traiter un problème pour qu'il ne revienne pas",
     body: (
