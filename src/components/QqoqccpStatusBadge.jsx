@@ -10,11 +10,6 @@ export default function QqoqccpStatusBadge({ status }) {
       >
         {QQOQCCP_STATUS_LABELS[status] ?? status}
       </span>
-      {status === 'ai_generated' && (
-        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
-          Généré par IA
-        </span>
-      )}
     </span>
   );
 }
