@@ -50,6 +50,13 @@ const TREATMENT_FIELDS = [
   'comment',
 ];
 
+const CAPA_LIFECYCLE_STEPS = [
+  { key: 'open', label: 'Ouverte' },
+  { key: 'in_progress', label: 'En cours' },
+  { key: 'pending_verification', label: 'En vérification' },
+  { key: 'closed', label: 'Clôturée' },
+];
+
 function buildTreatmentForm(capa) {
   return {
     title: capa.title || '',
@@ -82,6 +89,46 @@ function getDelayDays(priority, priorityDelays) {
 function formatDateTime(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleString('fr-FR');
+}
+
+function CapaLifecycle({ status }) {
+  const activeIndex = CAPA_LIFECYCLE_STEPS.findIndex((step) => step.key === status);
+
+  return (
+    <div className="mt-4 border-t border-slate-100 pt-4">
+      <ol aria-label="Étapes du cycle de vie de la CAPA" className="grid grid-cols-4 gap-1">
+        {CAPA_LIFECYCLE_STEPS.map((step, index) => {
+          const isComplete = activeIndex >= 0 && index < activeIndex;
+          const isCurrent = index === activeIndex;
+          const reached = isComplete || isCurrent;
+
+          return (
+            <li key={step.key} aria-current={isCurrent ? 'step' : undefined} className="flex min-w-0 flex-col items-center gap-1.5 text-center">
+              <span
+                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
+                  isCurrent
+                    ? 'bg-primary text-white'
+                    : isComplete
+                      ? 'bg-emerald-100 text-emerald-700'
+                      : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {index + 1}
+              </span>
+              <span className={`text-[11px] leading-tight sm:text-xs ${reached ? 'font-medium text-slate-800' : 'text-slate-500'}`}>
+                {step.label}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+      {status === 'overdue' && (
+        <p className="mt-3 text-xs text-red-700">
+          En retard signale une échéance dépassée; cette alerte est distincte des étapes du cycle.
+        </p>
+      )}
+    </div>
+  );
 }
 
 // Volontairement minimal (titre + échéance) : l'édition complète (assigné, priorité,
@@ -581,6 +628,7 @@ export default function CapaDetail() {
             <CapaPriorityBadge priority={capa.priority} />
             <CapaStatusBadge status={capa.status} />
           </div>
+          <CapaLifecycle status={capa.status} />
         </div>
 
         <dl className="mt-5 grid grid-cols-1 gap-4 border-t border-slate-100 pt-5 sm:grid-cols-2">
@@ -632,10 +680,12 @@ export default function CapaDetail() {
             <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Échéance</dt>
             <dd className="mt-1 text-sm text-slate-800">{formatDate(capa.due_date)}</dd>
           </div>
-          <div>
-            <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Clôturée le</dt>
-            <dd className="mt-1 text-sm text-slate-800">{formatDate(capa.closed_at)}</dd>
-          </div>
+          {capa.status === 'closed' && capa.closed_at && (
+            <div>
+              <dt className="text-xs font-medium uppercase tracking-wide text-slate-500">Clôturée le</dt>
+              <dd className="mt-1 text-sm text-slate-800">{formatDate(capa.closed_at)}</dd>
+            </div>
+          )}
         </dl>
       </div>
 
@@ -820,7 +870,7 @@ export default function CapaDetail() {
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
             >
               <Save size={16} />
-              {savingTreatment ? 'Enregistrement...' : 'Enregistrer'}
+              {savingTreatment ? 'Enregistrement...' : 'Enregistrer le traitement'}
             </button>
           )}
         </div>
@@ -903,7 +953,7 @@ export default function CapaDetail() {
               className="flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
             >
               <Save size={16} />
-              {savingEffectiveness ? 'Enregistrement...' : 'Enregistrer'}
+              {savingEffectiveness ? 'Enregistrement...' : 'Enregistrer la vérification'}
             </button>
           )}
         </div>

@@ -348,7 +348,8 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         <strong>Ouverte → En cours → En vérification → Clôturée.</strong> La clôture n'est possible qu'avec une action
-        corrective renseignée <strong>et</strong> une vérification d'efficacité positive.
+        corrective renseignée <strong>et</strong> une vérification d'efficacité positive. « En retard » signale une
+        échéance dépassée, pas une étape du cycle.
       </p>
     ),
     example:
