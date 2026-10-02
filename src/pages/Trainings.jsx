@@ -1747,7 +1747,7 @@ export default function Trainings() {
   );
   const trainingTotalPages = Math.max(1, Math.ceil(currentFolderTrainings.length / 25));
   const pagedTrainings = currentFolderTrainings.slice((trainingPage - 1) * 25, trainingPage * 25);
-  useEffect(() => setTrainingPage(1), [currentFolderId]);
+  useEffect(() => setTrainingPage(1), [currentFolderId, search]);
   useEffect(() => { if (trainingPage > trainingTotalPages) setTrainingPage(trainingTotalPages); }, [trainingPage, trainingTotalPages]);
 
   const excludedPeople = combinePeople(users, employees).filter((p) => p.training_exempt);
@@ -1948,7 +1948,9 @@ export default function Trainings() {
               {currentFolderId ? 'Aucune formation directement dans ce dossier.' : 'Aucune formation sans dossier.'}
             </p>
           ) : (
-            <div className="mt-4 flex flex-col gap-4">
+            <>
+              <Pagination page={trainingPage} totalPages={trainingTotalPages} onPageChange={setTrainingPage} />
+              <div className="mt-4 flex flex-col gap-4">
               {pagedTrainings.map((training) => {
                   const isExpanded = expandedId === training.id;
                   const overdueCount = countOverdueRecords(training, today);
@@ -1967,11 +1969,15 @@ export default function Trainings() {
                     <div
                       key={training.id}
                       id={`training-${training.id}`}
+                      onClick={(event) => {
+                        if (training.records.length === 0 || event.target.closest('button, input, a, select, textarea, [role="button"]')) return;
+                        handleToggleExpand(training);
+                      }}
                       className={`flex flex-col bg-white p-3 transition-shadow sm:p-4 ${
                         isExpanded ? 'border-y border-slate-200' : 'rounded-lg border shadow-sm'
                       } ${
                         overdueCount > 0 ? 'border-red-300' : 'border-slate-200'
-                      } ${highlightId === training.id ? 'ring-2 ring-primary' : ''}`}
+                      } ${highlightId === training.id ? 'ring-2 ring-primary' : ''} ${training.records.length > 0 ? 'cursor-pointer hover:shadow-md' : ''}`}
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-start gap-2">
@@ -2216,7 +2222,8 @@ export default function Trainings() {
                   );
               })}
               <Pagination page={trainingPage} totalPages={trainingTotalPages} onPageChange={setTrainingPage} />
-            </div>
+              </div>
+            </>
           )}
         </div>
       )}
