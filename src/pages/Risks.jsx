@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ClipboardList, FolderCog, FolderInput, FolderPlus, Plus, Sparkles, X } from 'lucide-react';
+import { BarChart3, ChevronDown, ClipboardList, FolderCog, FolderInput, FolderPlus, Plus, Sparkles, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -131,6 +131,8 @@ function NewRiskModal({ users, services, initial, kpiId, onClose, onCreated }) {
     type: 'risk',
     category: initial?.category || '',
     description: initial?.description || '',
+    current_controls: '',
+    treatment_plan: '',
     service_id: '',
     owner: '',
     likelihood: '3',
@@ -168,6 +170,8 @@ function NewRiskModal({ users, services, initial, kpiId, onClose, onCreated }) {
       type: form.type,
       category: form.category || undefined,
       description: form.description || undefined,
+      current_controls: form.current_controls || undefined,
+      treatment_plan: form.treatment_plan || undefined,
       service_id: form.service_id || undefined,
       owner: form.owner || undefined,
       likelihood: Number(form.likelihood),
@@ -250,11 +254,32 @@ function NewRiskModal({ users, services, initial, kpiId, onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Scénario (événement, causes et conséquences)</label>
             <AutoTextarea
               rows={2}
+              placeholder="En cas de [cause], [événement redouté] pourrait entraîner [conséquence]."
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Contrôles actuels</label>
+            <AutoTextarea
+              rows={2}
+              value={form.current_controls}
+              onChange={(e) => updateField('current_controls', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Plan de traitement envisagé</label>
+            <AutoTextarea
+              rows={2}
+              value={form.treatment_plan}
+              onChange={(e) => updateField('treatment_plan', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
           </div>
@@ -360,6 +385,7 @@ function NewRiskModal({ users, services, initial, kpiId, onClose, onCreated }) {
 function AnalyzeServiceModal({ services, onClose, onAdded }) {
   const [serviceId, setServiceId] = useState('');
   const [context, setContext] = useState('');
+  const [evidence, setEvidence] = useState('');
 
   const serviceName = services.find((service) => service.id === serviceId)?.name || '';
 
@@ -391,7 +417,7 @@ function AnalyzeServiceModal({ services, onClose, onAdded }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description de l'activité</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Activité et périmètre</label>
             <AutoTextarea
               rows={3}
               placeholder="Ex : Réception des matières premières, stockage en entrepôt, préparation et expédition des commandes clients..."
@@ -401,7 +427,19 @@ function AnalyzeServiceModal({ services, onClose, onAdded }) {
             />
           </div>
 
-          <AiRiskSuggestion serviceId={serviceId || undefined} serviceName={serviceName} context={context} onAdded={onAdded} />
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Faits observés (facultatif)</label>
+            <AutoTextarea
+              rows={3}
+              placeholder="Incidents, écarts KPI, constats d'audit ou autres éléments connus pour ce service..."
+              value={evidence}
+              onChange={(e) => setEvidence(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+            <p className="mt-1 text-xs text-slate-500">L'analyse s'appuie sur les éléments saisis ici; elle ne consulte pas automatiquement les documents du dossier.</p>
+          </div>
+
+          <AiRiskSuggestion serviceId={serviceId || undefined} serviceName={serviceName} context={context} evidence={evidence} onAdded={onAdded} />
         </div>
       </div>
     </div>
@@ -438,6 +476,7 @@ export default function Risks() {
   const [onlyNeedsCapa, setOnlyNeedsCapa] = useState(false);
   const [reviewCount, setReviewCount] = useState(0);
   const [insightsKey, setInsightsKey] = useState(0);
+  const [isMatrixOpen, setIsMatrixOpen] = useState(false);
   const {
     currentFolderId,
     navigateToFolder,
@@ -535,9 +574,10 @@ export default function Risks() {
     [sortedRisks, currentFolderId, onlyNeedsCapa]
   );
   const [riskPage, setRiskPage] = useState(1);
-  const riskTotalPages = Math.max(1, Math.ceil(currentFolderRisks.length / 25));
-  const pagedRisks = currentFolderRisks.slice((riskPage - 1) * 25, riskPage * 25);
-  useEffect(() => setRiskPage(1), [currentFolderId, statusFilter, typeFilter]);
+  const [riskPageSize, setRiskPageSize] = useState(25);
+  const riskTotalPages = Math.max(1, Math.ceil(currentFolderRisks.length / riskPageSize));
+  const pagedRisks = currentFolderRisks.slice((riskPage - 1) * riskPageSize, riskPage * riskPageSize);
+  useEffect(() => setRiskPage(1), [currentFolderId, statusFilter, typeFilter, serviceFilter, onlyNeedsCapa, riskPageSize]);
   useEffect(() => { if (riskPage > riskTotalPages) setRiskPage(riskTotalPages); }, [riskPage, riskTotalPages]);
 
   function handleCreated(risk) {
@@ -749,12 +789,6 @@ export default function Risks() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {!loading && risks.length > 0 && (
-        <div className="mt-4">
-          <RiskMatrix risks={risks} />
-        </div>
-      )}
-
       <div className="mt-4 flex flex-wrap gap-2">
         <select
           value={typeFilter}
@@ -800,7 +834,25 @@ export default function Risks() {
           onChangeKey={setSortKey}
           onToggleDirection={() => toggleSort(sortKey)}
         />
+        {!loading && risks.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setIsMatrixOpen((value) => !value)}
+            aria-expanded={isMatrixOpen}
+            className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <BarChart3 size={16} />
+            Matrice
+            <ChevronDown size={14} className={`transition-transform ${isMatrixOpen ? 'rotate-180' : ''}`} />
+          </button>
+        )}
       </div>
+
+      {isMatrixOpen && !loading && risks.length > 0 && (
+        <div className="mt-3">
+          <RiskMatrix risks={risks} />
+        </div>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les risques" />
@@ -884,6 +936,15 @@ export default function Risks() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
+              <Pagination
+                page={riskPage}
+                totalPages={riskTotalPages}
+                onPageChange={setRiskPage}
+                totalItems={currentFolderRisks.length}
+                pageSize={riskPageSize}
+                onPageSizeChange={setRiskPageSize}
+                itemLabel="risques"
+              />
               {pagedRisks.map((risk) => (
                 <div
                   key={risk.id}
@@ -906,6 +967,8 @@ export default function Risks() {
                       <p className="line-clamp-2 break-words font-medium text-slate-900">{risk.title}</p>
                       <p className="break-words text-sm text-slate-500">
                         {RISK_TYPE_LABELS[risk.type]}
+                        {risk.category ? ` · ${risk.category}` : ''}
+                        {risk.service?.name ? ` · ${risk.service.name}` : ''}
                         {risk.owner_user ? ` · ${risk.owner_user.full_name}` : ''}
                         {risk.review_date ? ` · Revue le ${formatDate(risk.review_date)}` : ''}
                       </p>
@@ -940,7 +1003,15 @@ export default function Risks() {
                   )}
                 </div>
               ))}
-              <Pagination page={riskPage} totalPages={riskTotalPages} onPageChange={setRiskPage} />
+              <Pagination
+                page={riskPage}
+                totalPages={riskTotalPages}
+                onPageChange={setRiskPage}
+                totalItems={currentFolderRisks.length}
+                pageSize={riskPageSize}
+                onPageSizeChange={setRiskPageSize}
+                itemLabel="risques"
+              />
             </div>
           )}
         </>

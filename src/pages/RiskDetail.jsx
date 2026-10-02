@@ -189,9 +189,10 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Scénario (événement, causes et conséquences)</label>
             <AutoTextarea
               rows={2}
+              placeholder="En cas de [cause], [événement redouté] pourrait entraîner [conséquence]."
               value={form.description}
               onChange={(e) => updateField('description', e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
@@ -827,7 +828,7 @@ export default function RiskDetail() {
         </div>
         {risk.description && (
           <div className="col-span-2 sm:col-span-4">
-            <p className="text-xs text-slate-500">Description</p>
+            <p className="text-xs text-slate-500">Scénario (événement, causes et conséquences)</p>
             <p className="text-sm text-slate-700">{risk.description}</p>
           </div>
         )}
@@ -843,22 +844,16 @@ export default function RiskDetail() {
         />
       </div>
 
-      {(risk.current_controls || risk.treatment_plan) && (
-        <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 sm:p-5">
-          {risk.current_controls && (
-            <div>
-              <p className="text-xs text-slate-500">Contrôles actuels</p>
-              <p className="text-sm text-slate-700">{risk.current_controls}</p>
-            </div>
-          )}
-          {risk.treatment_plan && (
-            <div>
-              <p className="text-xs text-slate-500">Plan de traitement</p>
-              <p className="text-sm text-slate-700">{risk.treatment_plan}</p>
-            </div>
-          )}
+      <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 sm:p-5">
+        <div>
+          <p className="text-xs text-slate-500">Contrôles actuels</p>
+          <p className={`text-sm ${risk.current_controls ? 'text-slate-700' : 'text-slate-400'}`}>{risk.current_controls || 'Aucun contrôle renseigné'}</p>
         </div>
-      )}
+        <div>
+          <p className="text-xs text-slate-500">Plan de traitement</p>
+          <p className={`text-sm ${risk.treatment_plan ? 'text-slate-700' : 'text-slate-400'}`}>{risk.treatment_plan || 'Aucun plan renseigné'}</p>
+        </div>
+      </div>
 
       <div className="mt-4">
         {risk.linked_capa ? (

@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { RISK_TYPE_LABELS } from '../lib/riskStatus.js';
+import AutoTextarea from './AutoTextarea.jsx';
+import { IMPACT_LABELS, LIKELIHOOD_LABELS, RISK_TYPE_LABELS } from '../lib/riskStatus.js';
 
 // Suggestions IA de risques/opportunités pour un service (voir POST /risks/service-suggestion,
 // backend/src/services/groq.js) — même mécanique que AiHazardSuggestion.jsx (HACCP) : cases à
 // cocher, un seul bouton "Enregistrer" qui envoie les suggestions cochées d'un coup, chacune
 // devenant une ligne risks distincte (POST /risks, ai_generated: true).
-export default function AiRiskSuggestion({ serviceId, serviceName, context, onAdded }) {
+export default function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }) {
   const [risks, setRisks] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
@@ -21,7 +22,7 @@ export default function AiRiskSuggestion({ serviceId, serviceName, context, onAd
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post('/risks/service-suggestion', { service_name: serviceName, context });
+      const { data } = await api.post('/risks/service-suggestion', { service_name: serviceName, context, evidence });
       setRisks(data.risks || []);
       setCheckedIndexes([]);
       setAddedIndexes([]);
@@ -34,6 +35,10 @@ export default function AiRiskSuggestion({ serviceId, serviceName, context, onAd
 
   function toggleChecked(index) {
     setCheckedIndexes((prev) => (prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]));
+  }
+
+  function updateRisk(index, field, value) {
+    setRisks((prev) => prev.map((risk, itemIndex) => (itemIndex === index ? { ...risk, [field]: value } : risk)));
   }
 
   async function handleSaveSelected() {
@@ -51,10 +56,12 @@ export default function AiRiskSuggestion({ serviceId, serviceName, context, onAd
           title: risk.title,
           type: risk.type,
           category: risk.category || undefined,
+          description: risk.description || undefined,
           service_id: serviceId || undefined,
           likelihood: risk.likelihood,
           impact: risk.impact,
-          current_controls: risk.suggested_controls || undefined,
+          current_controls: risk.existing_controls || undefined,
+          treatment_plan: risk.suggested_controls || undefined,
           ai_generated: true,
         });
         newlyAdded.push(index);
@@ -74,6 +81,7 @@ export default function AiRiskSuggestion({ serviceId, serviceName, context, onAd
 
   return (
     <div>
+      <p className="mb-2 text-xs text-slate-500">Suggestions indicatives : vérifiez et corrigez le scénario, la cotation et les actions avant de les ajouter.</p>
       <button
         type="button"
         onClick={handleGenerate}
@@ -102,7 +110,7 @@ export default function AiRiskSuggestion({ serviceId, serviceName, context, onAd
 
       {risks && risks.length > 0 && (
         <>
-          <ul className="mt-3 space-y-2">
+          <ul className="mt-3 space-y-3">
             {risks.map((risk, index) => {
               const added = addedIndexes.includes(index);
               return (
@@ -117,14 +125,80 @@ export default function AiRiskSuggestion({ serviceId, serviceName, context, onAd
                     disabled={added || saving}
                     className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary disabled:opacity-50"
                   />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                      {RISK_TYPE_LABELS[risk.type] || risk.type}
-                      {risk.category ? ` · ${risk.category}` : ''} · P{risk.likelihood} G{risk.impact}
-                    </p>
-                    <p className="mt-0.5 text-sm text-slate-800">{risk.title}</p>
-                    {risk.suggested_controls && (
-                      <p className="mt-1 text-xs text-slate-500">Mesures de maîtrise suggérées : {risk.suggested_controls}</p>
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{RISK_TYPE_LABELS[risk.type] || risk.type}</p>
+                    <input
+                      aria-label={`Titre de la suggestion ${index + 1}`}
+                      value={risk.title || ''}
+                      onChange={(event) => updateRisk(index, 'title', event.target.value)}
+                      disabled={added || saving}
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                    <input
+                      aria-label={`Catégorie de la suggestion ${index + 1}`}
+                      value={risk.category || ''}
+                      onChange={(event) => updateRisk(index, 'category', event.target.value)}
+                      disabled={added || saving}
+                      placeholder="Catégorie"
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                    />
+                    <AutoTextarea
+                      aria-label={`Scénario de la suggestion ${index + 1}`}
+                      rows={2}
+                      value={risk.description || ''}
+                      onChange={(event) => updateRisk(index, 'description', event.target.value)}
+                      disabled={added || saving}
+                      placeholder="Événement redouté, causes et conséquences"
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                    />
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <label className="text-xs font-medium text-slate-600">
+                        Probabilité
+                        <select
+                          value={risk.likelihood}
+                          onChange={(event) => updateRisk(index, 'likelihood', Number(event.target.value))}
+                          disabled={added || saving}
+                          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+                        >
+                          {Object.entries(LIKELIHOOD_LABELS).map(([value, label]) => <option key={value} value={value}>{value} — {label}</option>)}
+                        </select>
+                      </label>
+                      <label className="text-xs font-medium text-slate-600">
+                        Gravité
+                        <select
+                          value={risk.impact}
+                          onChange={(event) => updateRisk(index, 'impact', Number(event.target.value))}
+                          disabled={added || saving}
+                          className="mt-1 w-full rounded-md border border-slate-300 bg-white px-2 py-2 text-sm"
+                        >
+                          {Object.entries(IMPACT_LABELS).map(([value, label]) => <option key={value} value={value}>{value} — {label}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                    <AutoTextarea
+                      aria-label={`Contrôles existants de la suggestion ${index + 1}`}
+                      rows={2}
+                      value={risk.existing_controls || ''}
+                      onChange={(event) => updateRisk(index, 'existing_controls', event.target.value)}
+                      disabled={added || saving}
+                      placeholder="Contrôles déjà en place (à confirmer)"
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                    />
+                    <AutoTextarea
+                      aria-label={`Plan de traitement de la suggestion ${index + 1}`}
+                      rows={2}
+                      value={risk.suggested_controls || ''}
+                      onChange={(event) => updateRisk(index, 'suggested_controls', event.target.value)}
+                      disabled={added || saving}
+                      placeholder="Actions de traitement suggérées"
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+                    />
+                    {risk.rationale && <p className="text-xs text-slate-600"><span className="font-medium">Pourquoi :</span> {risk.rationale}</p>}
+                    {risk.evidence_used?.length > 0 && (
+                      <p className="text-xs text-slate-600"><span className="font-medium">Faits cités :</span> {risk.evidence_used.join(' · ')}</p>
+                    )}
+                    {risk.missing_information?.length > 0 && (
+                      <p className="text-xs text-amber-800"><span className="font-medium">À confirmer :</span> {risk.missing_information.join(' · ')}</p>
                     )}
                   </div>
                   {added && (
