@@ -3775,9 +3775,9 @@ function KpiCard({
   }
 
   return (
-    <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex min-w-0 items-start gap-2">
+    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-2">
           {canManage && (
             <input
               type="checkbox"
@@ -3786,59 +3786,108 @@ function KpiCard({
               className="mt-1 h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
             />
           )}
-          <div className="min-w-0">
-            <p className="break-words font-medium text-slate-900">{kpi.name}</p>
-            {hasTarget && someSeriesFollowsKpi && (
-              <p className="text-sm text-slate-500">
-                Objectif : {targetDirection === 'max' ? '≤' : '≥'} {kpi.target} {kpi.unit || ''}
-              </p>
-            )}
-            <div className="mt-1 flex flex-wrap items-center gap-1.5">
-              {!showMultiSeries && StatusIcon && (
-                <span
-                  className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${KPI_STATUS_BADGE_STYLES[status]}`}
-                >
-                  <StatusIcon size={11} />
-                  {KPI_STATUS_LABELS[status]}
-                </span>
-              )}
-              {kpi.frequency && (
-                <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                  {FREQUENCY_LABELS[kpi.frequency] || kpi.frequency}
-                </span>
-              )}
-              {isModuleBased && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
-                  <RefreshCw size={11} />
-                  Auto — {MODULE_KPI_LABELS[kpi.source_module] || kpi.source_module}
-                </span>
-              )}
-              {isSnapshot && (
-                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
-                  photo à date
-                </span>
-              )}
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className={`text-sm font-semibold ${KPI_STATUS_STYLES[status]}`}>
-                {showMultiSeries ? `${orderedLabels.length} séries` : averageValue === null ? 'Aucune valeur' : `${averageValue} ${kpi.unit || ''}`}
-              </span>
-              <span className="text-xs text-slate-400">{records.length} relevé{records.length > 1 ? 's' : ''}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex shrink-0 items-start gap-1">
           <button
             type="button"
             onClick={() => setShowDetails((prev) => !prev)}
             aria-expanded={showDetails}
-            aria-label={showDetails ? 'Replier les détails' : 'Déplier les détails'}
-            className="flex items-center gap-1 rounded-md px-2 py-2 text-xs font-medium text-primary hover:bg-primary/5"
+            aria-label={`${showDetails ? 'Replier' : 'Afficher'} les détails de ${kpi.name}`}
+            className="flex min-w-0 flex-1 items-start justify-between gap-3 rounded-md text-left hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
           >
-            {showDetails ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            <span className="hidden sm:inline">{showDetails ? 'Replier' : 'Détails'}</span>
+            <div className="min-w-0">
+              <p className="break-words font-medium text-slate-900">{kpi.name}</p>
+              {hasTarget && someSeriesFollowsKpi && (
+                <p className="text-sm text-slate-500">
+                  Objectif : {targetDirection === 'max' ? '≤' : '≥'} {kpi.target} {kpi.unit || ''}
+                </p>
+              )}
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                {!showMultiSeries && StatusIcon && (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${KPI_STATUS_BADGE_STYLES[status]}`}
+                  >
+                    <StatusIcon size={11} />
+                    {KPI_STATUS_LABELS[status]}
+                  </span>
+                )}
+                {kpi.frequency && (
+                  <span className="inline-block rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                    {FREQUENCY_LABELS[kpi.frequency] || kpi.frequency}
+                  </span>
+                )}
+                {isModuleBased && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                    <RefreshCw size={11} />
+                    Auto — {MODULE_KPI_LABELS[kpi.source_module] || kpi.source_module}
+                  </span>
+                )}
+                {isSnapshot && (
+                  <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    photo à date
+                  </span>
+                )}
+              </div>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                <span className={`text-sm font-semibold ${KPI_STATUS_STYLES[status]}`}>
+                  {showMultiSeries ? `${orderedLabels.length} séries` : averageValue === null ? 'Aucune valeur' : `${averageValue} ${kpi.unit || ''}`}
+                </span>
+                <span className="text-xs text-slate-400">{records.length} relevé{records.length > 1 ? 's' : ''}</span>
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 self-center">
+              {hasEnoughForChart && orderedLabels.length > 0 && (
+                <div className="h-10 w-20 sm:h-12 sm:w-28" role="img" aria-label={`Tendance sur ${chartData.length} périodes`}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData} margin={{ top: 4, right: 2, bottom: 4, left: 2 }}>
+                      {orderedLabels.map((label) => (
+                        <YAxis
+                          key={label}
+                          yAxisId={label}
+                          dataKey={label}
+                          domain={[
+                            (dataMin) => Math.min(0, dataMin, settingsByLabel.get(label)?.target ?? Infinity),
+                            (dataMax) => Math.max(0, dataMax, settingsByLabel.get(label)?.target ?? -Infinity),
+                          ]}
+                          hide
+                        />
+                      ))}
+                      {orderedLabels.map((label, index) => {
+                        const target = settingsByLabel.get(label)?.target;
+                        return target === null || target === undefined ? null : (
+                          <ReferenceLine
+                            key={`target-${label}`}
+                            y={target}
+                            yAxisId={label}
+                            stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
+                            strokeDasharray="2 2"
+                            strokeOpacity={0.55}
+                          />
+                        );
+                      })}
+                      {orderedLabels.map((label, index) => (
+                        <Line
+                          key={label}
+                          type="linear"
+                          dataKey={label}
+                          yAxisId={label}
+                          stroke={SERIES_COLORS[index % SERIES_COLORS.length]}
+                          strokeWidth={2}
+                          connectNulls
+                          dot={false}
+                          activeDot={false}
+                          isAnimationActive={false}
+                        />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
+              {showDetails ? <ChevronUp size={16} className="text-primary" /> : <ChevronDown size={16} className="text-primary" />}
+            </div>
           </button>
+        </div>
+
+        <div className="flex shrink-0 items-start gap-1">
           <div className="relative">
             <button
               type="button"
@@ -5000,6 +5049,7 @@ export default function Kpis() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [kpiPage, setKpiPage] = useState(1);
+  const [kpiPageSize, setKpiPageSize] = useState(KPI_PAGE_SIZE);
 
   async function handleRecompute(kpi) {
     setRecomputingId(kpi.id);
@@ -5318,8 +5368,22 @@ export default function Kpis() {
     { all: 0, good: 0, warning: 0, bad: 0, neutral: 0 }
   );
   const hasActiveKpiFilter = Boolean(normalizedSearchTerm) || statusFilter !== 'all';
-  const totalKpiPages = Math.max(1, Math.ceil(filteredKpis.length / KPI_PAGE_SIZE));
-  const visibleKpis = filteredKpis.slice((kpiPage - 1) * KPI_PAGE_SIZE, kpiPage * KPI_PAGE_SIZE);
+  const totalKpiPages = Math.max(1, Math.ceil(filteredKpis.length / kpiPageSize));
+  const visibleKpis = filteredKpis.slice((kpiPage - 1) * kpiPageSize, kpiPage * kpiPageSize);
+  const kpiPagination = (
+    <Pagination
+      page={kpiPage}
+      totalPages={totalKpiPages}
+      onPageChange={setKpiPage}
+      totalItems={filteredKpis.length}
+      pageSize={kpiPageSize}
+      onPageSizeChange={(pageSize) => {
+        setKpiPageSize(pageSize);
+        setKpiPage(1);
+      }}
+      itemLabel="KPI"
+    />
+  );
 
   useEffect(() => {
     setKpiPage(1);
@@ -5373,7 +5437,7 @@ export default function Kpis() {
 
       <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} />
 
-      <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
+      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <label className="relative block min-w-0 flex-1 lg:max-w-md">
             <Search size={17} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -5394,7 +5458,7 @@ export default function Kpis() {
             onToggleDirection={() => toggleSort(sortKey)}
           />
         </div>
-        <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les KPI par statut">
+        <div className="mt-2 flex flex-wrap gap-2" role="group" aria-label="Filtrer les KPI par statut">
           {[
             { key: 'all', label: 'Tous' },
             { key: 'bad', label: "Hors objectif" },
@@ -5510,10 +5574,9 @@ export default function Kpis() {
             </div>
           ) : (
             <>
-              <p className="mt-4 text-xs text-slate-500">
-                {filteredKpis.length} KPI affiché{filteredKpis.length > 1 ? 's' : ''} — {KPI_PAGE_SIZE} maximum par page
-              </p>
-              <div className="mt-2 flex w-full flex-col gap-3">
+              <p className="mt-4 text-xs text-slate-500">{filteredKpis.length} KPI au total</p>
+              {kpiPagination}
+              <div className="mt-2 flex w-full flex-col gap-2">
               {visibleKpis.map((kpi) => (
                 <KpiCard
                   key={kpi.id}
@@ -5540,7 +5603,7 @@ export default function Kpis() {
                 />
               ))}
               </div>
-              <Pagination page={kpiPage} totalPages={totalKpiPages} onPageChange={setKpiPage} />
+              {kpiPagination}
             </>
           )}
         </>

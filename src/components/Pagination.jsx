@@ -1,7 +1,7 @@
 import { ChevronFirst, ChevronLast } from 'lucide-react';
 
 // Les options de comptage sont facultatives pour préserver les usages compacts existants.
-export default function Pagination({ page, totalPages, onPageChange, totalItems, pageSize = 25, onPageSizeChange }) {
+export default function Pagination({ page, totalPages, onPageChange, totalItems, pageSize = 25, onPageSizeChange, itemLabel = 'documents' }) {
   if (totalPages <= 1 && totalItems === undefined) return null;
 
   const firstItem = totalItems ? (page - 1) * pageSize + 1 : 0;
@@ -13,7 +13,7 @@ export default function Pagination({ page, totalPages, onPageChange, totalItems,
   return (
     <div className="mt-3 flex flex-col gap-3 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        {totalItems !== undefined && <span>{firstItem}–{lastItem} sur {totalItems} documents</span>}
+        {totalItems !== undefined && <span>{firstItem}–{lastItem} sur {totalItems} {itemLabel}</span>}
         {onPageSizeChange && (
           <label className="flex items-center gap-2">
             Par page
@@ -27,7 +27,7 @@ export default function Pagination({ page, totalPages, onPageChange, totalItems,
           </label>
         )}
       </div>
-      <nav aria-label={hasDetails ? 'Pagination des documents' : 'Pagination'} className="flex items-center gap-1">
+      <nav aria-label={hasDetails ? `Pagination des ${itemLabel}` : 'Pagination'} className="flex items-center gap-1">
         {hasDetails && (
           <button
             type="button"
