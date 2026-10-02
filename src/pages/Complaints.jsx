@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FolderCog, FolderInput, FolderPlus, Plus, X } from 'lucide-react';
+import { FolderCog, FolderInput, FolderPlus, Plus, Search, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -36,6 +36,11 @@ const COMPLAINT_RESOURCE_TYPE = 'complaint';
 function formatDate(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleDateString('fr-FR');
+}
+
+function isComplaintOverdue(complaint) {
+  return complaint.due_date && !['resolved', 'closed'].includes(complaint.status)
+    && complaint.due_date < new Date().toISOString().slice(0, 10);
 }
 
 const COMPLAINT_SORT_OPTIONS = [
@@ -279,6 +284,7 @@ export default function Complaints() {
   const users = useUsers();
   const [services, setServices] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -371,14 +377,29 @@ export default function Complaints() {
   // dossier ne fait que choisir, côté affichage, quel sous-ensemble montrer — filtrage client
   // de la liste déjà chargée, même principe que Risks.jsx. "Sans dossier" (racine) =
   // category_id null.
-  const currentFolderComplaints = useMemo(
-    () => sortedComplaints.filter((complaint) => (complaint.category_id || null) === currentFolderId),
-    [sortedComplaints, currentFolderId]
-  );
+  const currentFolderComplaints = useMemo(() => {
+    const query = searchQuery.trim().toLocaleLowerCase('fr');
+    return sortedComplaints.filter((complaint) => {
+      if ((complaint.category_id || null) !== currentFolderId) return false;
+      if (!query) return true;
+      return [
+        complaint.customer_name,
+        complaint.description,
+        complaint.product_service,
+        complaint.assigned?.full_name,
+        complaint.service?.name,
+        complaint.category?.name,
+      ].some((value) => value?.toLocaleLowerCase('fr').includes(query));
+    });
+  }, [sortedComplaints, currentFolderId, searchQuery]);
   const [complaintPage, setComplaintPage] = useState(1);
-  const complaintTotalPages = Math.max(1, Math.ceil(currentFolderComplaints.length / 25));
-  const pagedComplaints = currentFolderComplaints.slice((complaintPage - 1) * 25, complaintPage * 25);
-  useEffect(() => setComplaintPage(1), [currentFolderId, statusFilter]);
+  const [complaintPageSize, setComplaintPageSize] = useState(25);
+  const complaintTotalPages = Math.max(1, Math.ceil(currentFolderComplaints.length / complaintPageSize));
+  const pagedComplaints = currentFolderComplaints.slice(
+    (complaintPage - 1) * complaintPageSize,
+    complaintPage * complaintPageSize
+  );
+  useEffect(() => setComplaintPage(1), [currentFolderId, statusFilter, searchQuery, complaintPageSize]);
   useEffect(() => { if (complaintPage > complaintTotalPages) setComplaintPage(complaintTotalPages); }, [complaintPage, complaintTotalPages]);
 
   function handleCreated(complaint) {
@@ -487,6 +508,17 @@ export default function Complaints() {
       <PageGuide id="complaints" />
 
       <div className="mt-4 flex flex-wrap gap-2">
+        <label className="relative min-w-56 flex-1 sm:max-w-md">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(event) => setSearchQuery(event.target.value)}
+            placeholder="Rechercher une réclamation"
+            aria-label="Rechercher une réclamation"
+            className="w-full rounded-md border border-slate-300 bg-white py-2.5 pl-9 pr-3 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+        </label>
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
@@ -599,7 +631,11 @@ export default function Complaints() {
             </div>
           ) : currentFolderComplaints.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">
-              {currentFolderId ? 'Aucune réclamation directement dans ce dossier.' : 'Aucune réclamation sans dossier.'}
+              {searchQuery.trim()
+                ? 'Aucune réclamation ne correspond à cette recherche.'
+                : currentFolderId
+                  ? 'Aucune réclamation directement dans ce dossier.'
+                  : 'Aucune réclamation sans dossier.'}
             </p>
           ) : (
             <div className="mt-4 space-y-3">
@@ -607,7 +643,7 @@ export default function Complaints() {
                 <div
                   key={complaint.id}
                   onClick={() => navigate(`/complaints/${complaint.id}`)}
-                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                  className="flex cursor-pointer items-start justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md sm:items-center"
                 >
                   {canManage && (
                     <input
@@ -623,7 +659,12 @@ export default function Complaints() {
                     <p className="truncate text-sm text-slate-500">
                       {formatDate(complaint.received_date)}
                       {complaint.assigned ? ` · ${complaint.assigned.full_name}` : ''}
+                      {complaint.service?.name ? ` · ${complaint.service.name}` : ''}
                     </p>
+                    <p className="mt-1 truncate text-sm text-slate-700">{complaint.description}</p>
+                    {complaint.product_service && (
+                      <p className="truncate text-xs text-slate-500">Produit / service : {complaint.product_service}</p>
+                    )}
                     {canManage && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <button
@@ -640,13 +681,28 @@ export default function Complaints() {
                       </div>
                     )}
                   </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <CapaPriorityBadge priority={complaint.severity} />
-                    <ComplaintStatusBadge status={complaint.status} />
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <CapaPriorityBadge priority={complaint.severity} />
+                      <ComplaintStatusBadge status={complaint.status} />
+                    </div>
+                    {complaint.due_date && (
+                      <span className={`text-xs font-medium ${isComplaintOverdue(complaint) ? 'text-red-700' : 'text-slate-500'}`}>
+                        {isComplaintOverdue(complaint) ? 'En retard · ' : 'Échéance · '}{formatDate(complaint.due_date)}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
-              <Pagination page={complaintPage} totalPages={complaintTotalPages} onPageChange={setComplaintPage} />
+              <Pagination
+                page={complaintPage}
+                totalPages={complaintTotalPages}
+                onPageChange={setComplaintPage}
+                totalItems={currentFolderComplaints.length}
+                pageSize={complaintPageSize}
+                onPageSizeChange={setComplaintPageSize}
+                itemLabel="réclamations"
+              />
             </div>
           )}
         </>

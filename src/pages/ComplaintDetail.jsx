@@ -26,6 +26,11 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
 
+function isComplaintOverdue(complaint) {
+  return complaint.due_date && !['resolved', 'closed'].includes(complaint.status)
+    && complaint.due_date < new Date().toISOString().slice(0, 10);
+}
+
 // Ajoute `days` jours à la date du jour, au format yyyy-mm-dd attendu par <input type="date">.
 function addDaysToToday(days) {
   const date = new Date();
@@ -643,9 +648,15 @@ export default function ComplaintDetail() {
       </button>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{complaint.customer_name}</h1>
+        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Réclamation de {complaint.customer_name}</h1>
         <div className="flex flex-wrap items-center gap-2">
           <CapaPriorityBadge priority={complaint.severity} />
+          {isComplaintOverdue(complaint) && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-1 text-xs font-medium text-red-700">
+              <AlertTriangle size={14} />
+              Réponse en retard
+            </span>
+          )}
           {canManage ? (
             <select
               value={complaint.status}
@@ -709,7 +720,9 @@ export default function ComplaintDetail() {
         </div>
         <div>
           <p className="text-xs text-slate-500">Échéance de réponse</p>
-          <p className="text-sm font-medium text-slate-800">{formatDate(complaint.due_date)}</p>
+          <p className={`text-sm font-medium ${isComplaintOverdue(complaint) ? 'text-red-700' : 'text-slate-800'}`}>
+            {formatDate(complaint.due_date)}
+          </p>
         </div>
         <div>
           <p className="text-xs text-slate-500">Service concerné</p>
@@ -719,6 +732,12 @@ export default function ComplaintDetail() {
           <p className="text-xs text-slate-500">Assigné à</p>
           <p className="text-sm font-medium text-slate-800">{complaint.assigned?.full_name || 'Non assigné'}</p>
         </div>
+        {complaint.customer_contact && (
+          <div>
+            <p className="text-xs text-slate-500">Contact client</p>
+            <p className="text-sm font-medium text-slate-800">{complaint.customer_contact}</p>
+          </div>
+        )}
         <div className="col-span-2 sm:col-span-4">
           <p className="text-xs text-slate-500">Description</p>
           <p className="text-sm text-slate-700">{complaint.description}</p>
@@ -731,7 +750,7 @@ export default function ComplaintDetail() {
         )}
       </div>
 
-      {(complaint.root_cause || complaint.resolution) && (
+      {(complaint.root_cause || complaint.resolution || complaint.customer_satisfied !== null) && (
         <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-2 sm:p-5">
           {complaint.root_cause && (
             <div>
