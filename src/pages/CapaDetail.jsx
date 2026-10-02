@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Lock, Plus, Save, Send, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
-import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
+import { CAPA_EFFECTIVENESS_LABELS, CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useUsers } from '../lib/useUsers.js';
@@ -248,6 +248,7 @@ export default function CapaDetail() {
 
   const [effectivenessVerified, setEffectivenessVerified] = useState('');
   const [effectivenessNotes, setEffectivenessNotes] = useState('');
+  const [selectedStatus, setSelectedStatus] = useState('');
   const [savingEffectiveness, setSavingEffectiveness] = useState(false);
   const [effectivenessSaved, setEffectivenessSaved] = useState(false);
   const [effectivenessError, setEffectivenessError] = useState('');
@@ -275,6 +276,7 @@ export default function CapaDetail() {
       setIsPrivate(Boolean(data.is_private_to_me));
       setEffectivenessVerified(effectivenessToSelectValue(data.effectiveness_verified));
       setEffectivenessNotes(data.effectiveness_notes || '');
+      setSelectedStatus(data.status);
     } catch {
       setError('Impossible de charger cette CAPA.');
     } finally {
@@ -343,11 +345,14 @@ export default function CapaDetail() {
     setSavingEffectiveness(true);
 
     try {
-      const { data } = await api.patch(`/capas/${id}`, {
+      const payload = {
         effectiveness_verified: selectValueToEffectiveness(effectivenessVerified),
         effectiveness_notes: effectivenessNotes || null,
-      });
+      };
+      if (selectedStatus !== capa.status) payload.status = selectedStatus;
+      const { data } = await api.patch(`/capas/${id}`, payload);
       setCapa((prev) => ({ ...prev, ...data, comments: prev.comments }));
+      setSelectedStatus(data.status);
       setEffectivenessSaved(true);
     } catch (err) {
       setEffectivenessError(err.response?.data?.error || 'Impossible d’enregistrer la vérification.');
@@ -837,7 +842,7 @@ export default function CapaDetail() {
         )}
         {effectivenessSaved && (
           <p className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
-            Vérification enregistrée.
+            Modifications enregistrées.
           </p>
         )}
 
@@ -868,6 +873,28 @@ export default function CapaDetail() {
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
             />
           </div>
+
+          {canManage && (
+            <div>
+              <label htmlFor="capa-status" className="mb-1 block text-sm font-medium text-slate-700">Statut de la CAPA</label>
+              <select
+                id="capa-status"
+                value={selectedStatus}
+                onChange={(event) => setSelectedStatus(event.target.value)}
+                disabled={savingEffectiveness}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 sm:max-w-xs"
+              >
+                {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
+              {capa.due_date && capa.due_date < new Date().toISOString().slice(0, 10) && !['closed', 'overdue'].includes(selectedStatus) && (
+                <p className="mt-2 text-xs text-amber-700">
+                  L'échéance est dépassée : cette CAPA repassera en retard à la prochaine consultation de la liste. Modifiez son échéance pour conserver ce statut.
+                </p>
+              )}
+            </div>
+          )}
 
           {canManage && (
             <button

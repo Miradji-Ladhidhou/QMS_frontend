@@ -1,11 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   Check,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   ClipboardList,
   Filter,
@@ -21,6 +20,8 @@ import {
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useMenuVisibility } from '../lib/useMenuVisibility.js';
+import { useTenant } from '../lib/useTenant.js';
+import { useUsers } from '../lib/useUsers.js';
 
 // Se met à jour toutes les 30s plutôt qu'à chaque seconde : l'heure affichée n'a besoin
 // d'être qu'approximativement fraîche ici, pas d'un vrai chronomètre — inutile de re-render
@@ -38,32 +39,14 @@ function capitalize(text) {
   return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
-// Neutre (gris) plutôt que rouge/vert : le sens "mieux/moins bien" d'une variation dépend du
-// compteur (plus de CAPA clôturées = bien, plus de CAPA en retard = mal) — pas de règle unique
-// fiable à coder en dur sans se tromper sur au moins un widget. delta undefined/null (pas
-// d'instantané assez ancien, ou vue filtrée par service) => rien affiché.
-function TrendBadge({ delta }) {
-  if (delta === undefined || delta === null || delta === 0) return null;
-  const Icon = delta > 0 ? ArrowUp : ArrowDown;
-  return (
-    <span className="inline-flex items-center gap-0.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-xs font-medium text-slate-500">
-      <Icon size={11} />
-      {Math.abs(delta)}
-    </span>
-  );
-}
-
-function StatCard({ icon: Icon, label, value, accent, trend }) {
+function StatCard({ icon: Icon, label, value, accent }) {
   return (
     <div className="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${accent}`}>
         <Icon size={22} />
       </div>
       <div>
-        <div className="flex items-center gap-1.5">
-          <p className="text-2xl font-semibold text-slate-900">{value}</p>
-          <TrendBadge delta={trend} />
-        </div>
+        <p className="text-2xl font-semibold text-slate-900">{value}</p>
         <p className="text-sm text-slate-500">{label}</p>
       </div>
     </div>
@@ -84,7 +67,8 @@ function StatSkeleton() {
 
 // `to` optionnel : rend la carte cliquable vers l'outil concerné (comme le bandeau "en
 // retard" plus haut), sans rien changer pour les 3 widgets existants qui ne l'utilisaient pas.
-function WidgetCard({ title, to, children }) {
+function WidgetCard({ title, to, children, value, showZeroMetrics }) {
+  if (value === 0 && !showZeroMetrics) return null;
   const Wrapper = to ? Link : 'div';
   const wrapperProps = to ? { to } : {};
   return (
@@ -115,6 +99,22 @@ const ACTIVITY_MODULE_LABELS = {
   haccp: 'HACCP',
 };
 
+const DUE_MODULE_LABELS = {
+  capa: 'CAPA',
+  document: 'Document',
+  procedure: 'Procédure',
+  training: 'Formation',
+  task: 'Tâche',
+  audit: 'Audit',
+  complaint: 'Réclamation',
+  risk: 'Risque',
+  supplier: 'Fournisseur',
+  pdca: 'PDCA',
+  review_action: 'Action de revue',
+  management_review: 'Revue de direction',
+  register: 'Registre',
+};
+
 function formatRelativeTime(dateStr) {
   const diffMs = Date.now() - new Date(dateStr).getTime();
   const minutes = Math.floor(diffMs / 60000);
@@ -128,6 +128,7 @@ function formatRelativeTime(dateStr) {
 }
 
 function RecentActivityPanel({ items }) {
+  const [expanded, setExpanded] = useState(false);
   if (items === null) {
     return (
       <div className="mt-6 animate-pulse rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
@@ -147,23 +148,30 @@ function RecentActivityPanel({ items }) {
       {items.length === 0 ? (
         <p className="text-sm text-slate-500">Aucune activité récente.</p>
       ) : (
-        <ul className="divide-y divide-slate-100">
-          {items.map((item) => (
-            <li key={`${item.module}-${item.id}`}>
-              <Link to={item.link} className="flex items-center justify-between gap-3 py-2 hover:text-primary">
-                <div className="flex min-w-0 items-center gap-2">
-                  <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                    {ACTIVITY_MODULE_LABELS[item.module] || item.module}
-                  </span>
-                  <span className="truncate text-sm text-slate-700">
-                    {item.action === 'created' ? 'Créé' : 'Modifié'} — {item.label}
-                  </span>
-                </div>
-                <span className="shrink-0 text-xs text-slate-400">{formatRelativeTime(item.timestamp)}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="divide-y divide-slate-100">
+            {(expanded ? items : items.slice(0, 3)).map((item) => (
+              <li key={`${item.module}-${item.id}`}>
+                <Link to={item.link} className="flex items-center justify-between gap-3 py-2 hover:text-primary">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                      {ACTIVITY_MODULE_LABELS[item.module] || item.module}
+                    </span>
+                    <span className="truncate text-sm text-slate-700">
+                      {item.action === 'created' ? 'Créé' : 'Modifié'} — {item.label}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-xs text-slate-400">{formatRelativeTime(item.timestamp)}</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          {items.length > 3 && (
+            <button type="button" onClick={() => setExpanded((visible) => !visible)} aria-expanded={expanded} className="mt-2 text-xs font-medium text-primary hover:underline">
+              {expanded ? 'Réduire' : `Voir les ${items.length - 3} autres activités`}
+            </button>
+          )}
+        </>
       )}
     </div>
   );
@@ -178,12 +186,11 @@ function WidgetSkeleton() {
   );
 }
 
-function BigNumber({ value, suffix, trend }) {
+function BigNumber({ value, suffix }) {
   return (
     <div className="flex items-baseline gap-2">
       <span className="text-3xl font-semibold text-slate-900">{value}</span>
       <span className="text-sm text-slate-500">{suffix}</span>
-      <TrendBadge delta={trend} />
     </div>
   );
 }
@@ -206,6 +213,8 @@ function KpiPreviewRow({ kpi }) {
 
 export default function Dashboard() {
   const currentUser = useCurrentUser();
+  const tenant = useTenant();
+  const users = useUsers();
   const role = currentUser?.role;
   const isMember = role === 'member';
   // null tant que non chargé => tout afficher, comme Layout.jsx (évite un flash "carte visible
@@ -214,6 +223,7 @@ export default function Dashboard() {
   const isModuleVisible = (key) => !visibleMenuKeys || visibleMenuKeys.includes(key);
   const canFilterByService = role === 'admin' || role === 'manager';
   const now = useLiveClock();
+  const timeZone = tenant?.timezone || 'UTC';
 
   const [stats, setStats] = useState(null);
   const [allServices, setAllServices] = useState([]);
@@ -221,17 +231,25 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [recentActivity, setRecentActivity] = useState(null);
+  const [overdueItems, setOverdueItems] = useState(null);
+  const [showZeroMetrics, setShowZeroMetrics] = useState(false);
+  const statsRequestRef = useRef(0);
 
   async function loadStats(serviceIds) {
+    const requestId = ++statsRequestRef.current;
     setError('');
-    try {
-      const { data } = await api.get('/dashboard/stats', {
-        params: serviceIds.length > 0 ? { service_id: serviceIds } : {},
-      });
-      setStats(data);
-    } catch {
-      setError('Impossible de charger le tableau de bord.');
-    }
+    setOverdueItems(null);
+    const params = serviceIds.length > 0 ? { service_id: serviceIds } : {};
+    const [statsResult, planningResult] = await Promise.allSettled([
+      api.get('/dashboard/stats', { params }),
+      api.get('/planning', { params }),
+    ]);
+    if (requestId !== statsRequestRef.current) return;
+    if (statsResult.status === 'fulfilled') setStats(statsResult.value.data);
+    else setError('Impossible de charger le tableau de bord.');
+    setOverdueItems(planningResult.status === 'fulfilled' && statsResult.status === 'fulfilled'
+      ? planningResult.value.data.items.filter((item) => item.is_overdue).slice(0, 5)
+      : []);
   }
 
   async function loadRecentActivity() {
@@ -314,15 +332,29 @@ export default function Dashboard() {
     { id: 'overdue', label: 'En retard', icon: AlertTriangle, accent: 'bg-red-100 text-red-700' },
     { id: 'closed', label: 'Clôturées', icon: ClipboardList, accent: 'bg-emerald-100 text-emerald-700' },
   ];
+  const zeroWidgetCount = stats ? [
+    !isMember && isModuleVisible('documents') && stats.documents.to_review,
+    !isMember && isModuleVisible('procedures') && stats.procedures.to_review,
+    isModuleVisible('trainings') && stats.trainings.to_renew,
+    !isMember && isModuleVisible('kpis') && stats.kpis.off_target,
+    !isMember && isModuleVisible('haccp') && stats.haccp.active_plans,
+    isModuleVisible('audits') && stats.audits.active,
+    isModuleVisible('complaints') && stats.complaints.active,
+    isModuleVisible('risks') && stats.risks.active,
+    !isMember && isModuleVisible('suppliers') && stats.suppliers.active,
+    !isMember && isModuleVisible('management-reviews') && stats.management_reviews.draft,
+    !isMember && isModuleVisible('accidents') && stats.accidents.open,
+    isModuleVisible('pdca') && stats.pdca.active,
+  ].filter((value) => value === 0).length + (isModuleVisible('capas') ? capaCards.filter((card) => stats.capas[card.id] === 0).length : 0) : 0;
 
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Dashboard</h1>
       <p className="mt-1 text-sm text-slate-500">
         {currentUser?.full_name ? `Bonjour, ${currentUser.full_name.split(' ')[0]} — ` : ''}
-        {capitalize(now.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))}
+        {capitalize(new Intl.DateTimeFormat('fr-FR', { timeZone, weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now))}
         {' · '}
-        {now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+        {new Intl.DateTimeFormat('fr-FR', { timeZone, hour: '2-digit', minute: '2-digit' }).format(now)}
       </p>
 
       {error && (
@@ -333,14 +365,14 @@ export default function Dashboard() {
       )}
 
       {canFilterByService && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-slate-900">
+        <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+          <div className="mr-1 flex items-center gap-2 font-semibold text-slate-700">
             <Filter size={16} />
-            Filtrer par service
+            Services
           </div>
 
           {allServices.length === 0 ? (
-            <p className="text-sm text-slate-500">Aucun service configuré.</p>
+            <span className="text-slate-500">Aucun service configuré</span>
           ) : (
             <div className="flex flex-wrap gap-2">
               {allServices.map((service) => {
@@ -348,7 +380,7 @@ export default function Dashboard() {
                 return (
                   <label
                     key={service.id}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                    className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm transition-colors ${
                       checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
@@ -366,13 +398,13 @@ export default function Dashboard() {
             </div>
           )}
 
-          <p className="mt-3 text-xs text-slate-400">
+          <span className="text-xs text-slate-500">
             {selectedServiceIds.length === 0
               ? role === 'manager'
-                ? 'Aucune sélection : vos services par défaut.'
-                : "Aucune sélection : vue globale de l'entreprise."
-              : `${selectedServiceIds.length} service(s) sélectionné(s).`}
-          </p>
+                ? 'Mes services par défaut'
+                : 'Vue globale'
+              : `${selectedServiceIds.length} sélectionné${selectedServiceIds.length > 1 ? 's' : ''}`}
+          </span>
         </div>
       )}
 
@@ -399,7 +431,6 @@ export default function Dashboard() {
               <p className={`text-2xl font-semibold ${stats.overdue.total > 0 ? 'text-red-700' : 'text-emerald-700'}`}>
                 {stats.overdue.total}
               </p>
-              <TrendBadge delta={stats.trends?.['overdue.total']} />
             </div>
             <p className="text-sm text-slate-600">
               {stats.overdue.total > 0
@@ -410,27 +441,57 @@ export default function Dashboard() {
         </Link>
       )}
 
+      {stats?.overdue.total > 0 && overdueItems !== null && (
+        <section className="mt-3 rounded-lg border border-slate-200 bg-white px-4 py-3 sm:px-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-slate-900">À traiter en priorité</h2>
+            <Link to="/planning?overdue=1" className="shrink-0 text-xs font-medium text-primary hover:underline">Tous les retards</Link>
+          </div>
+          {overdueItems.length > 0 ? (
+            <ul className="mt-2 divide-y divide-slate-100">
+              {overdueItems.map((item) => {
+                const assignee = users.find((user) => user.id === (item.assignee_id || item.assigned_to));
+                return (
+                  <li key={`${item.type}-${item.id}`}>
+                    <Link to={item.link} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2 text-sm hover:text-primary">
+                      <span className="w-24 shrink-0 text-xs font-medium text-slate-500 sm:w-32">{DUE_MODULE_LABELS[item.type] || item.type}</span>
+                      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+                        <span className="min-w-0 break-words font-medium text-slate-800 sm:truncate">{item.title}</span>
+                        {assignee && <span className="text-xs text-slate-500">{assignee.full_name}</span>}
+                      </span>
+                      <time dateTime={item.date} className="shrink-0 text-xs font-medium text-red-700">{item.date?.slice(0, 10).split('-').reverse().join('/')}</time>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : <p className="mt-2 text-sm text-slate-500">Consultez le planning pour le détail des retards.</p>}
+        </section>
+      )}
+
       {isModuleVisible('capas') && (
         <>
           <h2 className="mt-6 text-sm font-semibold text-slate-900 sm:text-base">{capaTitle}</h2>
-          <div className="mt-3 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+          <div className={`mt-3 grid grid-cols-2 gap-3 sm:gap-4 ${loading || !stats || showZeroMetrics || capaCards.filter((card) => stats.capas[card.id] !== 0).length > 2 ? 'lg:grid-cols-4' : 'lg:grid-cols-2'}`}>
             {loading || !stats
               ? [0, 1, 2, 3].map((key) => <StatSkeleton key={key} />)
-              : capaCards.map((card) => (
-                  <StatCard key={card.id} {...card} value={stats.capas[card.id]} trend={stats.trends?.[`capas.${card.id}`]} />
+              : capaCards.filter((card) => showZeroMetrics || stats.capas[card.id] !== 0).map((card) => (
+                  <StatCard key={card.id} {...card} value={stats.capas[card.id]} />
                 ))}
           </div>
         </>
       )}
 
-      <div className={`mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 ${isMember ? '' : 'lg:grid-cols-3'}`}>
+      {canFilterByService && <RecentActivityPanel items={recentActivity} />}
+
+      <div className={`mt-6 grid grid-cols-1 items-start gap-4 sm:grid-cols-2 ${isMember ? '' : 'lg:grid-cols-3'}`}>
         {!isMember &&
           isModuleVisible('documents') &&
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="Documents à réviser" to="/documents">
-              <BigNumber value={stats.documents.to_review} suffix="document(s) à réviser sous 30 jours" trend={stats.trends?.['documents.to_review']} />
+            <WidgetCard title="Documents à réviser" to="/documents" value={stats.documents.to_review} showZeroMetrics={showZeroMetrics}>
+              <BigNumber value={stats.documents.to_review} suffix="document(s) à réviser sous 30 jours" />
             </WidgetCard>
           ))}
 
@@ -439,11 +500,10 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="Procédures à réviser" to="/procedures">
+            <WidgetCard title="Procédures à réviser" to="/procedures" value={stats.procedures.to_review} showZeroMetrics={showZeroMetrics}>
               <BigNumber
                 value={stats.procedures.to_review}
                 suffix="procédure(s) à réviser sous 30 jours"
-                trend={stats.trends?.['procedures.to_review']}
               />
             </WidgetCard>
           ))}
@@ -452,8 +512,8 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title={trainingsTitle} to="/trainings">
-              <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" trend={stats.trends?.['trainings.to_renew']} />
+            <WidgetCard title={trainingsTitle} to="/trainings" value={stats.trainings.to_renew} showZeroMetrics={showZeroMetrics}>
+              <BigNumber value={stats.trainings.to_renew} suffix="formation(s) à renouveler sous 60 jours" />
             </WidgetCard>
           ))}
 
@@ -462,24 +522,19 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="KPI hors objectif" to="/kpis">
+            <WidgetCard title="KPI hors objectif" to="/kpis" value={stats.kpis.off_target} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <TrendingDown size={20} className={stats.kpis.off_target > 0 ? 'text-red-600' : 'text-slate-300'} />
-                <BigNumber value={stats.kpis.off_target} suffix="indicateur(s) sous l'objectif" trend={stats.trends?.['kpis.off_target']} />
+                <BigNumber value={stats.kpis.off_target} suffix="indicateur(s) sous l'objectif" />
               </div>
               {stats.kpis.preview?.length > 0 && (
-                <div className="mt-2 divide-y divide-slate-100 border-t border-slate-100">
-                  {stats.kpis.preview.map((kpi) => (
-                    <KpiPreviewRow key={kpi.id} kpi={kpi} />
-                  ))}
+                <div className="mt-2 border-t border-slate-100 pt-1">
+                  <KpiPreviewRow kpi={stats.kpis.preview[0]} />
                 </div>
               )}
-              {/* Aperçu volontairement limité à 3 (voir dashboard.js#computeKpiSummary) même
-                  avec 60 KPI en tout : seul le total ci-dessus reflète le vrai nombre, cette
-                  ligne le rappelle plutôt que de laisser croire que la liste est complète. */}
-              {stats.kpis.off_target > (stats.kpis.preview?.length || 0) && (
-                <p className="mt-1 text-xs text-slate-400">
-                  + {stats.kpis.off_target - stats.kpis.preview.length} autre(s), voir la page KPI
+              {stats.kpis.off_target > 1 && (
+                <p className="text-xs text-slate-500">
+                  + {stats.kpis.off_target - 1} autre{stats.kpis.off_target > 2 ? 's' : ''} indicateur{stats.kpis.off_target > 2 ? 's' : ''} hors objectif
                 </p>
               )}
             </WidgetCard>
@@ -490,10 +545,10 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="Plans HACCP actifs" to="/haccp">
+            <WidgetCard title="Plans HACCP actifs" to="/haccp" value={stats.haccp.active_plans} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <Thermometer size={20} className="text-slate-300" />
-                <BigNumber value={stats.haccp.active_plans} suffix="plan(s) actif(s)" trend={stats.trends?.['haccp.active_plans']} />
+                <BigNumber value={stats.haccp.active_plans} suffix="plan(s) actif(s)" />
               </div>
               {(stats.haccp.overdue_ccps > 0 || stats.haccp.deviating_ccps > 0) && (
                 <p className="mt-2 text-xs font-medium text-red-700">
@@ -509,10 +564,10 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title={auditsTitle} to="/audits">
+            <WidgetCard title={auditsTitle} to="/audits" value={stats.audits.active} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <ClipboardCheck size={20} className="text-slate-300" />
-                <BigNumber value={stats.audits.active} suffix="audit(s) en cours" trend={stats.trends?.['audits.active']} />
+                <BigNumber value={stats.audits.active} suffix="audit(s) en cours" />
               </div>
               <OverdueNote count={stats.audits.overdue} />
             </WidgetCard>
@@ -522,10 +577,10 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title={complaintsTitle} to="/complaints">
+            <WidgetCard title={complaintsTitle} to="/complaints" value={stats.complaints.active} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <MessageSquareWarning size={20} className="text-slate-300" />
-                <BigNumber value={stats.complaints.active} suffix="réclamation(s) ouverte(s)" trend={stats.trends?.['complaints.active']} />
+                <BigNumber value={stats.complaints.active} suffix="réclamation(s) ouverte(s)" />
               </div>
               <OverdueNote count={stats.complaints.overdue} />
             </WidgetCard>
@@ -535,10 +590,10 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title={risksTitle} to="/risks">
+            <WidgetCard title={risksTitle} to="/risks" value={stats.risks.active} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <ShieldAlert size={20} className="text-slate-300" />
-                <BigNumber value={stats.risks.active} suffix="risque(s) actif(s)" trend={stats.trends?.['risks.active']} />
+                <BigNumber value={stats.risks.active} suffix="risque(s) actif(s)" />
               </div>
               <OverdueNote count={stats.risks.overdue} />
             </WidgetCard>
@@ -549,10 +604,10 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="Fournisseurs à évaluer" to="/suppliers">
+            <WidgetCard title="Fournisseurs à évaluer" to="/suppliers" value={stats.suppliers.active} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <Truck size={20} className="text-slate-300" />
-                <BigNumber value={stats.suppliers.active} suffix="évaluation(s) à planifier" trend={stats.trends?.['suppliers.active']} />
+                <BigNumber value={stats.suppliers.active} suffix="évaluation(s) à planifier" />
               </div>
               <OverdueNote count={stats.suppliers.overdue} />
             </WidgetCard>
@@ -563,13 +618,12 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="Revues de direction à clôturer" to="/management-reviews">
+            <WidgetCard title="Revues de direction à clôturer" to="/management-reviews" value={stats.management_reviews.draft} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <Users2 size={20} className="text-slate-300" />
                 <BigNumber
                   value={stats.management_reviews.draft}
                   suffix="revue(s) en attente de clôture"
-                  trend={stats.trends?.['management_reviews.draft']}
                 />
               </div>
             </WidgetCard>
@@ -580,10 +634,10 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title="Accidents du travail" to="/accidents">
+            <WidgetCard title="Accidents du travail" to="/accidents" value={stats.accidents.open} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <Siren size={20} className="text-slate-300" />
-                <BigNumber value={stats.accidents.open} suffix="accident(s) ouvert(s)" trend={stats.trends?.['accidents.open']} />
+                <BigNumber value={stats.accidents.open} suffix="accident(s) ouvert(s)" />
               </div>
             </WidgetCard>
           ))}
@@ -592,17 +646,23 @@ export default function Dashboard() {
           (loading || !stats ? (
             <WidgetSkeleton />
           ) : (
-            <WidgetCard title={pdcaTitle} to="/pdca">
+            <WidgetCard title={pdcaTitle} to="/pdca" value={stats.pdca.active} showZeroMetrics={showZeroMetrics}>
               <div className="flex items-baseline gap-2">
                 <RefreshCw size={20} className="text-slate-300" />
-                <BigNumber value={stats.pdca.active} suffix="projet(s) actif(s)" trend={stats.trends?.['pdca.active']} />
+                <BigNumber value={stats.pdca.active} suffix="projet(s) actif(s)" />
               </div>
               <OverdueNote count={stats.pdca.overdue} />
             </WidgetCard>
           ))}
       </div>
 
-      {canFilterByService && <RecentActivityPanel items={recentActivity} />}
+      {zeroWidgetCount > 0 && (
+        <button type="button" onClick={() => setShowZeroMetrics((visible) => !visible)} aria-expanded={showZeroMetrics} className="mt-4 flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-primary">
+          <ChevronDown size={16} className={`transition-transform ${showZeroMetrics ? 'rotate-180' : ''}`} />
+          {showZeroMetrics ? 'Masquer' : 'Afficher'} {zeroWidgetCount} indicateur{zeroWidgetCount > 1 ? 's' : ''} à zéro
+        </button>
+      )}
+
     </div>
   );
 }
