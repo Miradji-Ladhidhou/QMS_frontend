@@ -69,7 +69,7 @@ const TYPE_CONFIG = {
   // Revue de direction programmée (brouillon daté) et rappel « à programmer » (voir fetchManagementReviewItems).
   management_review: { label: 'Revue de direction', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
   management_review_due: { label: 'Revue à programmer', icon: Users, className: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
-  review_action: { label: 'Revue de direction', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
+  review_action: { label: 'Action de revue', icon: Users, className: 'bg-cyan-100 text-cyan-700', dot: 'bg-cyan-500' },
   register: { label: 'Registre', icon: TableProperties, className: 'bg-teal-100 text-teal-800', dot: 'bg-teal-600' },
 };
 
@@ -494,6 +494,13 @@ function formatIsoDate(date) {
   return `${y}-${m}-${d}`;
 }
 
+function getDaysOverdue(dateStr) {
+  const today = formatIsoDate(new Date());
+  const dueTime = Date.parse(`${dateStr}T00:00:00Z`);
+  const todayTime = Date.parse(`${today}T00:00:00Z`);
+  return Math.max(1, Math.round((todayTime - dueTime) / 86400000));
+}
+
 // Aperçu chiffré calculé sur `items` (le périmètre chargé, scope service compris) plutôt que
 // sur `filteredItems` : un total qui bougerait avec les filtres de recherche/type juste
 // en-dessous serait déroutant (deux nombres qui se répondent l'un l'autre plutôt qu'un vrai
@@ -542,7 +549,7 @@ function getMonthCells(year, month) {
 // interaction directe visible depuis la liste). Le badge devient un bouton qui déplie le détail
 // de la checklist directement sur la carte, chaque étape cochable en un clic (PATCH
 // /tasks/:id { checklist } uniquement, pas besoin d'ouvrir le formulaire).
-function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkDone, onToggleChecklistItem, onAddChecklistItem, onEdit, onDelete }) {
+function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkDone, onToggleChecklistItem, onAddChecklistItem, onEdit, onDelete, spacious = false }) {
   const config = TYPE_CONFIG[item.type];
   const Icon = config.icon;
   const isTask = item.type === 'task';
@@ -556,6 +563,7 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
   const checklist = isTask ? item.checklist || [] : [];
   const checklistDone = checklist.filter((entry) => entry.done).length;
   const checklistTotal = checklist.length;
+  const daysOverdue = item.is_overdue ? getDaysOverdue(item.date) : 0;
 
   function submitNewChecklistItem() {
     const text = newChecklistText.trim();
@@ -572,7 +580,7 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
         priorityBorder ? `border-l-4 ${priorityBorder}` : ''
       }`}
     >
-      <div className="flex items-center gap-3 p-3 sm:p-4">
+      <div className={`flex items-center gap-3 ${spacious ? 'p-4 sm:p-5' : 'p-3 sm:p-4'}`}>
       {isTask && deletable && (
         <input
           type="checkbox"
@@ -611,7 +619,7 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
           {item.is_overdue && (
             <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-700">
               <AlertTriangle size={11} />
-              En retard
+              En retard de {daysOverdue} jour{daysOverdue > 1 ? 's' : ''}
             </span>
           )}
           {isTask && item.done && (
@@ -762,7 +770,7 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
   );
 
   if (item.link) {
-    return <Link to={item.link}>{content}</Link>;
+    return <Link to={item.link} className="block">{content}</Link>;
   }
   return <div>{content}</div>;
 }
@@ -960,8 +968,8 @@ export default function Planning() {
   const [showDoneTasks, setShowDoneTasks] = useState(false);
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [searchText, setSearchText] = useState('');
-  const [viewMode, setViewMode] = useState('calendar');
-  const [groupBy, setGroupBy] = useState('type');
+  const [viewMode, setViewMode] = useState('list');
+  const [groupBy, setGroupBy] = useState('date');
   const [expandedTypeFolders, setExpandedTypeFolders] = useState(() => new Set());
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => formatIsoDate(new Date()));
@@ -1191,9 +1199,7 @@ export default function Planning() {
   }, {});
   const dates = Object.keys(grouped).sort();
 
-  // Regroupement "par type" (voir groupBy) : tout mélangé sous une seule date rendait la liste
-  // difficile à parcourir dès qu'il y avait plusieurs sortes d'éléments le même jour — un dossier
-  // par module (même ordre que les puces de filtre ci-dessus), chacun trié par échéance.
+  // Regroupement par type : chaque groupe suit l'ordre des filtres et ses éléments sont triés par échéance.
   const groupedByType = Object.keys(TYPE_CONFIG)
     .map((type) => {
       const typeItems = filteredItems.filter((item) => item.type === type);
@@ -1206,6 +1212,9 @@ export default function Planning() {
       return { type, items: typeItems, dates: Object.keys(byDate).sort(), byDate };
     })
     .filter((group) => group.items.length > 0);
+  const calendarMonthKey = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}`;
+  const calendarMonthItemCount = filteredItems.filter((item) => item.date.startsWith(calendarMonthKey)).length;
+  const itemsOutsideCalendarMonth = filteredItems.length - calendarMonthItemCount;
 
   // Décrit les filtres réellement actifs pour le sous-titre de l'export — un auditeur qui reçoit
   // ce document doit savoir sur quel périmètre il porte sans avoir à redemander.
@@ -1519,7 +1528,7 @@ export default function Planning() {
             }`}
           >
             <Folder size={12} />
-            Par dossier
+            Par type
           </button>
         </div>
       )}
@@ -1577,6 +1586,27 @@ export default function Planning() {
             selectedDate={selectedCalendarDate}
             onSelectDate={setSelectedCalendarDate}
           />
+          {calendarMonthItemCount === 0 && itemsOutsideCalendarMonth > 0 && (
+            <div role="status" className="mt-4 flex flex-col gap-3 rounded-lg border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-800">Aucune échéance filtrée dans ce mois</p>
+                <p className="mt-1 text-sm text-slate-600">
+                  {itemsOutsideCalendarMonth} élément{itemsOutsideCalendarMonth > 1 ? 's' : ''} se trouve{itemsOutsideCalendarMonth > 1 ? 'nt' : ''} en dehors du mois affiché.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setViewMode('list');
+                  setGroupBy('date');
+                }}
+                className="inline-flex shrink-0 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-100"
+              >
+                <List size={16} />
+                Voir les éléments dans la liste
+              </button>
+            </div>
+          )}
           <div className="mt-4">
             <h2 className="mb-2 text-sm font-semibold text-slate-500">{formatDateHeading(selectedCalendarDate)}</h2>
             {(grouped[selectedCalendarDate] || []).length === 0 ? (
@@ -1634,12 +1664,13 @@ export default function Planning() {
                         <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
                           {formatDateHeading(date)}
                         </h3>
-                        <div className="space-y-2">
+                        <div className="space-y-3">
                           {byDate[date].map((item) => (
                             <PlanningItemCard
                               key={`${item.type}-${item.id}`}
                               item={item}
                               currentUser={currentUser}
+                              spacious
                                         selected={selectedTaskIds.includes(item.id)}
                               onToggleSelect={() => toggleSelectTask(item.id)}
                               onMarkDone={handleMarkDone}
@@ -1663,12 +1694,13 @@ export default function Planning() {
           {dates.map((date) => (
             <div key={date}>
               <h2 className="mb-2 text-sm font-semibold text-slate-500">{formatDateHeading(date)}</h2>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 {grouped[date].map((item) => (
                   <PlanningItemCard
                     key={`${item.type}-${item.id}`}
                     item={item}
                     currentUser={currentUser}
+                    spacious
                     selected={selectedTaskIds.includes(item.id)}
                     onToggleSelect={() => toggleSelectTask(item.id)}
                     onMarkDone={handleMarkDone}
