@@ -22,13 +22,9 @@ export const PAGE_GUIDES = {
     title: 'La bibliothèque documentaire',
     body: (
       <p>
-        Toutes vos procédures, formulaires et enregistrements, avec <strong>gestion des versions</strong> et piste
-        d'audit. Chaque document est rangé dans un <strong>dossier</strong> laissé ouvert à tous ou restreint à certaines
-        personnes.
+        Procédures, formulaires et enregistrements avec <strong>versions</strong>, piste d'audit et accès organisés par dossier.
       </p>
     ),
-    example:
-      "« Manuel qualité v3 », formulaire « Fiche de non-conformité », procédure « Gestion des achats » — rangés dans les dossiers Qualité, Production, RH.",
   },
   registers: {
     title: 'Les registres documentaires du SMQ',

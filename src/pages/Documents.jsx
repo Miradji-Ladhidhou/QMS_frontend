@@ -52,6 +52,15 @@ function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString('fr-FR');
 }
 
+function isReviewOverdue(dateStr) {
+  if (!dateStr) return false;
+  const reviewDate = new Date(`${dateStr.slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(reviewDate.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return reviewDate < today;
+}
+
 function MatchLocationBadge({ location }) {
   if (!location) return null;
 
@@ -424,6 +433,7 @@ export default function Documents() {
   const [searchError, setSearchError] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [documentPage, setDocumentPage] = useState(1);
+  const [documentsPerPage, setDocumentsPerPage] = useState(25);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
@@ -604,13 +614,25 @@ export default function Documents() {
   // Pendant une recherche plein texte, la navigation par dossier est masquée (voir plus bas) :
   // la liste affichée redevient sortedDocuments au complet, non scopée à un dossier.
   const visibleDocuments = isSearchActive ? sortedDocuments : currentFolderDocuments;
-  const documentsPerPage = 25;
   const documentTotalPages = Math.max(1, Math.ceil(visibleDocuments.length / documentsPerPage));
   const pagedDocuments = visibleDocuments.slice((documentPage - 1) * documentsPerPage, documentPage * documentsPerPage);
+  const documentPagination = (
+    <Pagination
+      page={documentPage}
+      totalPages={documentTotalPages}
+      onPageChange={setDocumentPage}
+      totalItems={visibleDocuments.length}
+      pageSize={documentsPerPage}
+      onPageSizeChange={(pageSize) => {
+        setDocumentsPerPage(pageSize);
+        setDocumentPage(1);
+      }}
+    />
+  );
 
   useEffect(() => {
     setDocumentPage(1);
-  }, [search, statusFilter, currentFolderId]);
+  }, [search, statusFilter, currentFolderId, sortKey, direction]);
 
   useEffect(() => {
     if (documentPage > documentTotalPages) setDocumentPage(documentTotalPages);
@@ -989,6 +1011,7 @@ export default function Documents() {
             </p>
           ) : (
             <>
+              {documentPagination}
               <div className="mt-4 space-y-3 md:hidden">
                 {pagedDocuments.map((doc) => (
                   <div
@@ -1034,7 +1057,12 @@ export default function Documents() {
                       <MatchLocationBadge location={doc.match_location} />
                     </div>
                     {doc.review_date && (
-                      <p className="mt-2 text-xs text-slate-500">Prochaine révision : {formatDate(doc.review_date)}</p>
+                      <p className={`mt-2 text-xs ${isReviewOverdue(doc.review_date) ? 'font-medium text-red-700' : 'text-slate-500'}`}>
+                        Prochaine révision : {formatDate(doc.review_date)}
+                        {isReviewOverdue(doc.review_date) && (
+                          <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-red-700">En retard</span>
+                        )}
+                      </p>
                     )}
                     {canManage && (
                       <button
@@ -1090,29 +1118,33 @@ export default function Documents() {
                           <SearchSnippet snippet={doc.snippet} />
                         </td>
                         <td className="px-4 py-3">
-                          {canManage ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setMovingDocument(doc);
-                              }}
-                              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                            >
-                              <FolderInput size={12} />
-                              Déplacer
-                            </button>
-                          ) : (
-                            doc.category?.name || '—'
-                          )}
+                          <span className="text-slate-600">{doc.category?.name || '—'}</span>
                         </td>
                         <td className="px-4 py-3 text-slate-600">{doc.version}</td>
                         <td className="px-4 py-3">
                           <StatusBadge status={doc.status} />
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{formatDate(doc.review_date) || '—'}</td>
+                        <td className={`px-4 py-3 ${isReviewOverdue(doc.review_date) ? 'font-medium text-red-700' : 'text-slate-600'}`}>
+                          {formatDate(doc.review_date) || '—'}
+                          {isReviewOverdue(doc.review_date) && (
+                            <span className="ml-2 rounded bg-red-50 px-1.5 py-0.5 text-xs text-red-700">En retard</span>
+                          )}
+                        </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            {canManage && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setMovingDocument(doc);
+                                }}
+                                className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                              >
+                                <FolderInput size={12} />
+                                Déplacer
+                              </button>
+                            )}
                             {doc.file_path && (
                               <StorageProvenanceIcon doc={doc} onOpenInDrive={handleOpenInDrive} opening={openingDriveId === doc.id} />
                             )}
@@ -1132,7 +1164,7 @@ export default function Documents() {
                   </tbody>
                 </table>
               </div>
-              <Pagination page={documentPage} totalPages={documentTotalPages} onPageChange={setDocumentPage} />
+              {documentPagination}
             </>
           )}
         </>
