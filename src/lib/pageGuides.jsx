@@ -135,7 +135,7 @@ export const PAGE_GUIDES = {
       "problème « retards de livraison » → Quoi : commandes de plus de 50 lignes · Où : préparation · Quand : fin de mois · Pourquoi : pic de charge non anticipé.",
   },
   audits: {
-    title: 'Programmer et mener les audits internes',
+    title: 'Planifier et suivre les audits internes',
     body: (
       <>
         <p>
@@ -152,10 +152,11 @@ export const PAGE_GUIDES = {
           <strong>non qualifié</strong> selon sa formation et son QCM — un repère (ISO 9001 §9.2), jamais un blocage. Cliquez sur la
           formation pour la retrouver dans la page Formations.
         </p>
+        <p>
+          Exemple — audit du processus Achats : point fort « fournisseurs bien suivis », écart « commande sans bon signé » → une CAPA est ouverte.
+        </p>
       </>
     ),
-    example:
-      "audit du processus Achats le 12 mars → point fort « fournisseurs bien suivis », écart « 2 commandes sans bon signé » → une CAPA est ouverte sur l'écart.",
   },
   risks: {
     title: 'Le registre des risques et opportunités',
@@ -395,8 +396,8 @@ export const PAGE_GUIDES = {
     body: (
       <>
         <p>
-          <strong>Planifié → En cours → Terminé.</strong> Consignez chaque <strong>constat</strong> avec son type ; un
-          constat de type non-conformité peut être transformé en CAPA depuis la fiche.
+          <strong>Planifié → En cours → Terminé → Clôturé.</strong> « Terminé » enregistre la conclusion de l'audit ; « Clôturé »
+          exige aussi une CAPA associée à chaque non-conformité majeure. Consignez les constats et transformez les non-conformités en CAPA depuis la fiche.
         </p>
       </>
     ),
@@ -409,9 +410,11 @@ export const PAGE_GUIDES = {
           <strong>taux de conformité</strong> se calcule tout seul. Le bouton <strong>Exporter</strong> produit la fiche PDF (avec la
           qualification de l'auditeur), Excel, Word ou l'enregistre sur le Drive.
         </p>
+        <p>
+          Exemple — une procédure non appliquée, classée « non-conformité mineure », peut donner lieu à une CAPA depuis le constat.
+        </p>
       </>
     ),
-    example: "constat « procédure d'achat non appliquée » classé « non-conformité mineure » → bouton « Créer une CAPA ».",
   },
   accidentDetail: {
     title: "Suivi d'un accident",

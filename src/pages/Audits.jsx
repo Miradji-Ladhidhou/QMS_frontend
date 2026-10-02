@@ -358,6 +358,16 @@ export default function Audits() {
   const [auditPage, setAuditPage] = useState(1);
   const auditTotalPages = Math.max(1, Math.ceil(currentFolderAudits.length / 25));
   const pagedAudits = currentFolderAudits.slice((auditPage - 1) * 25, auditPage * 25);
+  const auditPagination = (
+    <Pagination
+      page={auditPage}
+      totalPages={auditTotalPages}
+      onPageChange={setAuditPage}
+      totalItems={currentFolderAudits.length}
+      pageSize={25}
+      itemLabel={currentFolderAudits.length > 1 ? 'audits' : 'audit'}
+    />
+  );
   useEffect(() => setAuditPage(1), [currentFolderId, statusFilter]);
   useEffect(() => { if (auditPage > auditTotalPages) setAuditPage(auditTotalPages); }, [auditPage, auditTotalPages]);
 
@@ -523,14 +533,24 @@ export default function Audits() {
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les audits" />
 
         {currentUser?.role === 'admin' && (
-          <button
-            type="button"
-            onClick={() => setIsManageCategoriesOpen(true)}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            <FolderCog size={16} />
-            Gérer les dossiers
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsNewFolderOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <FolderPlus size={16} />
+              Nouveau dossier
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsManageCategoriesOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <FolderCog size={16} />
+              Gérer les dossiers
+            </button>
+          </div>
         )}
       </div>
 
@@ -573,21 +593,11 @@ export default function Audits() {
         </div>
       ) : (
         <>
-          {(folders.length > 0 || currentUser?.role === 'admin') && (
+          {folders.length > 0 && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
               {folders.map((folder) => (
                 <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
               ))}
-              {currentUser?.role === 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => setIsNewFolderOpen(true)}
-                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
-                >
-                  <FolderPlus size={26} />
-                  <span className="text-sm font-medium">Nouveau dossier</span>
-                </button>
-              )}
             </div>
           )}
 
@@ -610,55 +620,58 @@ export default function Audits() {
               {currentFolderId ? 'Aucun audit directement dans ce dossier.' : 'Aucun audit sans dossier.'}
             </p>
           ) : (
-            <div className="mt-4 space-y-3">
-              {pagedAudits.map((audit) => (
-                <div
-                  key={audit.id}
-                  onClick={() => navigate(`/audits/${audit.id}`)}
-                  className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
-                >
-                  {canManage && (
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.includes(audit.id)}
-                      onClick={(e) => e.stopPropagation()}
-                      onChange={() => toggleSelect(audit.id)}
-                      className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
-                    />
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate font-medium text-slate-900">{audit.title}</p>
-                    <p className="text-sm text-slate-500">
-                      {AUDIT_TYPE_LABELS[audit.audit_type]} · {formatDate(audit.planned_date)}
-                      {audit.service ? ` · ${audit.service.name}` : ''}
-                      {audit.lead ? ` · ${audit.lead.full_name}` : ''}
-                    </p>
-                    {audit.lead_auditor && (
-                      <div className="mt-1">
-                        <AuditorQualification userId={audit.lead_auditor} qualifications={qualifications} />
-                      </div>
-                    )}
+            <>
+              {auditPagination}
+              <div className="mt-3 space-y-3">
+                {pagedAudits.map((audit) => (
+                  <div
+                    key={audit.id}
+                    onClick={() => navigate(`/audits/${audit.id}`)}
+                    className="flex cursor-pointer items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                  >
                     {canManage && (
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setMovingAudit(audit);
-                          }}
-                          className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
-                        >
-                          <FolderInput size={12} />
-                          Déplacer
-                        </button>
-                      </div>
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.includes(audit.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        onChange={() => toggleSelect(audit.id)}
+                        className="h-4 w-4 shrink-0 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
                     )}
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-medium text-slate-900">{audit.title}</p>
+                      <p className="text-sm text-slate-500">
+                        {AUDIT_TYPE_LABELS[audit.audit_type]} · {formatDate(audit.planned_date)}
+                        {audit.service ? ` · ${audit.service.name}` : ''}
+                        {audit.lead ? ` · ${audit.lead.full_name}` : ''}
+                      </p>
+                      {audit.lead_auditor && (
+                        <div className="mt-1">
+                          <AuditorQualification userId={audit.lead_auditor} qualifications={qualifications} />
+                        </div>
+                      )}
+                      {canManage && (
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setMovingAudit(audit);
+                            }}
+                            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50"
+                          >
+                            <FolderInput size={12} />
+                            Déplacer
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <AuditStatusBadge status={audit.status} />
                   </div>
-                  <AuditStatusBadge status={audit.status} />
-                </div>
-              ))}
-              <Pagination page={auditPage} totalPages={auditTotalPages} onPageChange={setAuditPage} />
-            </div>
+                ))}
+              </div>
+              {auditPagination}
+            </>
           )}
         </>
       )}

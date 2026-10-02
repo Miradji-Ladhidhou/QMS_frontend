@@ -491,34 +491,34 @@ export default function AuditDetail() {
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
-        <div>
+      <div className="mt-4 flex flex-wrap items-start gap-x-6 gap-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <div className="min-w-[8rem] flex-1">
           <p className="text-xs text-slate-500">Type</p>
           <p className="text-sm font-medium text-slate-800">{AUDIT_TYPE_LABELS[audit.audit_type]}</p>
         </div>
-        <div>
+        <div className="min-w-[8rem] flex-1">
           <p className="text-xs text-slate-500">Date planifiée</p>
           <p className="text-sm font-medium text-slate-800">{formatDate(audit.planned_date)}</p>
         </div>
-        <div>
+        <div className="min-w-[8rem] flex-1">
           <p className="text-xs text-slate-500">Service audité</p>
           <p className="text-sm font-medium text-slate-800">{audit.service?.name || '—'}</p>
         </div>
-        <div>
+        <div className="min-w-[12rem] flex-1">
           <p className="text-xs text-slate-500">Auditeur</p>
           <p className="text-sm font-medium text-slate-800">{audit.lead?.full_name || 'À désigner'}</p>
           <AuditorQualification userId={audit.lead_auditor} qualifications={qualifications} detailed />
         </div>
         {audit.scope && (
-          <div className="col-span-2 sm:col-span-4">
+          <div className="min-w-[10rem] flex-[2]">
             <p className="text-xs text-slate-500">Périmètre</p>
             <p className="text-sm text-slate-700">{audit.scope}</p>
           </div>
         )}
-        {audit.criteria && <div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Critères d’audit</h3><p className="mt-1 text-sm text-slate-700">{audit.criteria}</p></div>}
-        {audit.method && <div className="mt-4"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Méthode et preuves</h3><p className="mt-1 text-sm text-slate-700">{audit.method}</p></div>}
+        {audit.criteria && <div className="min-w-[12rem] flex-1"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Critères d’audit</h3><p className="mt-1 text-sm text-slate-700">{audit.criteria}</p></div>}
+        {audit.method && <div className="min-w-[12rem] flex-1"><h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Méthode et preuves</h3><p className="mt-1 text-sm text-slate-700">{audit.method}</p></div>}
         {audit.conclusion && (
-          <div className="col-span-2 sm:col-span-4">
+          <div className="min-w-[16rem] flex-[2]">
             <p className="text-xs text-slate-500">Conclusion</p>
             <p className="text-sm text-slate-700">{audit.conclusion}</p>
           </div>

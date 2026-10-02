@@ -420,7 +420,7 @@ export default function AuditChecklist({ auditId, canManage, onChanged }) {
       {items === null ? (
         <div className="mt-3 h-24 animate-pulse rounded-xl border border-slate-200 bg-white" />
       ) : items.length === 0 ? (
-        <p className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+        <p className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
           Aucune question pour l'instant.{' '}
           {canManage
             ? "Ajoutez vos questions ci-dessous, collez une liste, ou laissez l'IA proposer une check-list adaptée à cet audit."
