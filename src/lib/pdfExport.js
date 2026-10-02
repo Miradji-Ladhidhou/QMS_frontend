@@ -53,7 +53,7 @@ export async function exportToXlsx(filename, title, columns, rows, { subtitle, g
 // yyyyMMddHHmmss — évite toute collision avec la numérotation manuelle des documents existants
 // (ex. "QP-001") sans avoir besoin d'interroger la base pour un numéro "propre".
 function buildExportDocumentNumber(moduleCode) {
-  const stamp = new Date().toISOString().replace(/[-:TZ]/g, '').slice(0, 14);
+  const stamp = new Date().toISOString().replace(/\D/g, '').slice(0, 14);
   return `EXPORT-${moduleCode}-${stamp}`;
 }
 

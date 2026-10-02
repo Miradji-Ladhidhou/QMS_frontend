@@ -2,12 +2,19 @@ import { QQOQCCP_STATUS_LABELS, QQOQCCP_STATUS_STYLES } from '../lib/qqoqccpStat
 
 export default function QqoqccpStatusBadge({ status }) {
   return (
-    <span
-      className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
-        QQOQCCP_STATUS_STYLES[status] ?? 'bg-slate-100 text-slate-700'
-      }`}
-    >
-      {QQOQCCP_STATUS_LABELS[status] ?? status}
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span
+        className={`inline-flex items-center whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${
+          QQOQCCP_STATUS_STYLES[status] ?? 'bg-slate-100 text-slate-700'
+        }`}
+      >
+        {QQOQCCP_STATUS_LABELS[status] ?? status}
+      </span>
+      {status === 'ai_generated' && (
+        <span className="inline-flex items-center whitespace-nowrap rounded-full bg-sky-100 px-2 py-0.5 text-xs font-medium text-sky-700">
+          Généré par IA
+        </span>
+      )}
     </span>
   );
 }

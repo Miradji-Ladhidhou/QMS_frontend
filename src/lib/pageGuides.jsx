@@ -126,13 +126,14 @@ export const PAGE_GUIDES = {
     title: "Cadrer un problème avant d'agir",
     body: (
       <p>
-        Analyse d'une situation en répondant à sept questions — <strong>Q</strong>uoi, <strong>Q</strong>ui,{' '}
-        <strong>O</strong>ù, <strong>Q</strong>uand, <strong>C</strong>omment, <strong>C</strong>ombien,{' '}
-        <strong>P</strong>ourquoi. Souvent utilisée en amont d'une CAPA pour ne rien oublier.
+        Analysez une situation avec sept questions : <strong>Q</strong>ui, <strong>Q</strong>uoi, <strong>O</strong>ù,{' '}
+        <strong>Q</strong>uand, <strong>C</strong>omment, <strong>C</strong>ombien et <strong>P</strong>ourquoi.{' '}
+        Une méthode utile avant d'engager une CAPA.
       </p>
     ),
     example:
       "problème « retards de livraison » → Quoi : commandes de plus de 50 lignes · Où : préparation · Quand : fin de mois · Pourquoi : pic de charge non anticipé.",
+    exampleCollapsible: true,
   },
   audits: {
     title: 'Planifier et suivre les audits internes',

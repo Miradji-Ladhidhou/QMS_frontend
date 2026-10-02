@@ -19,6 +19,7 @@ import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
 import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
+import Pagination from '../components/Pagination.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
@@ -142,6 +143,8 @@ export default function Qqoqccp() {
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingAnalysis, setMovingAnalysis] = useState(null);
+  const [analysisPage, setAnalysisPage] = useState(1);
+  const [analysisPageSize, setAnalysisPageSize] = useState(25);
   const {
     currentFolderId,
     navigateToFolder,
@@ -223,6 +226,19 @@ export default function Qqoqccp() {
     () => sortedAnalyses.filter((analysis) => (analysis.category_id || null) === currentFolderId),
     [sortedAnalyses, currentFolderId]
   );
+  const analysisTotalPages = Math.max(1, Math.ceil(currentFolderAnalyses.length / analysisPageSize));
+  const visibleAnalyses = currentFolderAnalyses.slice(
+    (analysisPage - 1) * analysisPageSize,
+    analysisPage * analysisPageSize
+  );
+
+  useEffect(() => {
+    setAnalysisPage(1);
+  }, [currentFolderId, sortKey, direction]);
+
+  useEffect(() => {
+    setAnalysisPage((page) => Math.min(page, analysisTotalPages));
+  }, [analysisTotalPages]);
 
   function handleCreated(analysis) {
     setIsModalOpen(false);
@@ -318,13 +334,26 @@ export default function Qqoqccp() {
           options={QQOQCCP_SORT_OPTIONS}
           sortKey={sortKey}
           direction={direction}
-          onChangeKey={setSortKey}
-          onToggleDirection={() => toggleSort(sortKey)}
+          onChangeKey={(key) => {
+            setAnalysisPage(1);
+            setSortKey(key);
+          }}
+          onToggleDirection={() => {
+            setAnalysisPage(1);
+            toggleSort(sortKey);
+          }}
         />
       </div>
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les analyses" />
+        <FolderBreadcrumb
+          breadcrumb={breadcrumb}
+          onNavigate={(folderId) => {
+            setAnalysisPage(1);
+            navigateToFolder(folderId);
+          }}
+          rootLabel="Toutes les analyses"
+        />
 
         {currentUser?.role === 'admin' && (
           <button
@@ -411,15 +440,28 @@ export default function Qqoqccp() {
               {currentFolderId ? 'Aucune analyse directement dans ce dossier.' : 'Aucune analyse sans dossier.'}
             </p>
           ) : (
-            <div className="mt-4 space-y-3">
-              {currentFolderAnalyses.map((analysis) => (
+            <div className="mt-4">
+              <Pagination
+                page={analysisPage}
+                totalPages={analysisTotalPages}
+                onPageChange={setAnalysisPage}
+                totalItems={currentFolderAnalyses.length}
+                pageSize={analysisPageSize}
+                onPageSizeChange={(size) => {
+                  setAnalysisPageSize(size);
+                  setAnalysisPage(1);
+                }}
+                itemLabel="analyses"
+              />
+              <div className="mt-2 space-y-2">
+              {visibleAnalyses.map((analysis) => (
                 <div
                   key={analysis.id}
                   onClick={() => navigate(`/qqoqccp/${analysis.id}`)}
-                  className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm hover:border-primary/40 hover:shadow-md"
+                  className="cursor-pointer rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm hover:border-primary/40 hover:shadow-md"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                    <div className="flex min-w-0 flex-1 items-center gap-3">
                       {canManage && (
                         <input
                           type="checkbox"
@@ -434,10 +476,9 @@ export default function Qqoqccp() {
                         <p className="text-sm text-slate-500">{formatDate(analysis.created_at)}</p>
                       </div>
                     </div>
-                    <QqoqccpStatusBadge status={analysis.status} />
-                  </div>
-                  {canEditAnalysis(analysis) && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                      <QqoqccpStatusBadge status={analysis.status} />
+                      {canEditAnalysis(analysis) && (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -449,10 +490,24 @@ export default function Qqoqccp() {
                         <FolderInput size={12} />
                         Déplacer
                       </button>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
+              </div>
+              <Pagination
+                page={analysisPage}
+                totalPages={analysisTotalPages}
+                onPageChange={setAnalysisPage}
+                totalItems={currentFolderAnalyses.length}
+                pageSize={analysisPageSize}
+                onPageSizeChange={(size) => {
+                  setAnalysisPageSize(size);
+                  setAnalysisPage(1);
+                }}
+                itemLabel="analyses"
+              />
             </div>
           )}
         </>

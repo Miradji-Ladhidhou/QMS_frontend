@@ -72,12 +72,22 @@ export default function PageGuide({ id }) {
             <ChevronDown size={13} className={`transition-transform ${expanded ? 'rotate-180' : ''}`} />
           </button>
         )}
-        {guide.example && (
+        {guide.example && guide.exampleCollapsible ? (
+          <details className="mt-1.5 text-xs">
+            <summary className="inline-flex min-h-[40px] cursor-pointer list-none items-center font-medium text-primary hover:underline sm:min-h-0">
+              Voir un exemple
+            </summary>
+            <p className="mt-1.5 border-l-2 border-slate-300 pl-2 text-slate-500">
+              <span className="font-medium text-slate-600">Exemple — </span>
+              {guide.example}
+            </p>
+          </details>
+        ) : guide.example ? (
           <p className="mt-1.5 border-l-2 border-slate-300 pl-2 text-xs text-slate-500">
             <span className="font-medium text-slate-600">Exemple — </span>
             {guide.example}
           </p>
-        )}
+        ) : null}
       </div>
       <button
         type="button"
