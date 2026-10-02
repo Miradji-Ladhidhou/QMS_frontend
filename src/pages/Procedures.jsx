@@ -93,6 +93,7 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
   const [title, setTitle] = useState(initialTitle || '');
   const [process, setProcess] = useState('');
   const [nextReviewDate, setNextReviewDate] = useState('');
+  const [step, setStep] = useState('details');
   const [categoryId, setCategoryId] = useState('');
   const [categoryName, setCategoryName] = useState('');
   const [isPrivate, setIsPrivate] = useState(false);
@@ -131,6 +132,10 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
 
   async function handleSubmit(event) {
     event.preventDefault();
+    if (step === 'details') {
+      setStep('content');
+      return;
+    }
     setError('');
     setSubmitting(true);
 
@@ -186,98 +191,120 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
           <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Numéro</label>
-              <input
-                type="text"
-                required
-                value={number}
-                onChange={(e) => setNumber(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Processus</label>
-              <input
-                type="text"
-                value={process}
-                onChange={(e) => setProcess(e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
-            <input
-              type="text"
-              required
-              maxLength={300}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Prochaine date de révision</label>
-            <input
-              type="date"
-              value={nextReviewDate}
-              onChange={(e) => setNextReviewDate(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
-
-          <CategoryVisibilityField
-            baseUrl={CATEGORIES_BASE_URL}
-            resourceType={PROCEDURE_RESOURCE_TYPE}
-            categoryName={categoryName}
-            categoryId={categoryId}
-            onCategoryIdChange={setCategoryId}
-            onCategoryNameChange={setCategoryName}
-            isPrivate={isPrivate}
-            onIsPrivateChange={setIsPrivate}
-          />
-
-          {qqoqccpId ? (
-            <div>
-              <button
-                type="button"
-                onClick={generateFromQqoqccp}
-                disabled={generatingFromQqoqccp}
-                className="flex items-center gap-2 rounded-md border border-purple-300 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
-              >
-                {generatingFromQqoqccp ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Sparkles size={16} />
-                )}
-                {generatingFromQqoqccp
-                  ? 'Génération depuis l\'analyse en cours...'
-                  : aiGenerated
-                    ? 'Régénérer depuis l\'analyse QQOQCCP'
-                    : 'Générer depuis l\'analyse QQOQCCP'}
-              </button>
-            </div>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <AiProcedureDraft title={title} process={process} onGenerated={handleAiGenerated} />
-              <AiFullProcedureDraft title={title} onGenerated={handleAiGenerated} />
-            </div>
+        <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <p className="text-sm font-medium text-slate-700">
+            {step === 'details' ? 'Étape 1 sur 2 · Informations' : 'Étape 2 sur 2 · Rédaction'}
+          </p>
+          {step === 'content' && (
+            <button type="button" onClick={() => setStep('details')} className="text-sm font-medium text-primary hover:text-primary-700">
+              Modifier les informations
+            </button>
           )}
+        </div>
 
-          <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {step === 'details' ? (
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                  <label htmlFor="procedure-number" className="mb-1 block text-sm font-medium text-slate-700">Numéro</label>
+                  <input
+                    type="text"
+                    id="procedure-number"
+                    required
+                    value={number}
+                    onChange={(e) => setNumber(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="procedure-process" className="mb-1 block text-sm font-medium text-slate-700">Processus</label>
+                  <input
+                    type="text"
+                    id="procedure-process"
+                    value={process}
+                    onChange={(e) => setProcess(e.target.value)}
+                    className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  />
+                </div>
+              </div>
 
-          <button
-            type="submit"
-            disabled={submitting}
-            className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
-          >
-            {submitting ? 'Création...' : 'Créer la procédure'}
-          </button>
+              <div>
+                <label htmlFor="procedure-title" className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+                <input
+                  type="text"
+                  id="procedure-title"
+                  required
+                  maxLength={300}
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="procedure-next-review" className="mb-1 block text-sm font-medium text-slate-700">Prochaine date de révision</label>
+                <input
+                  type="date"
+                  id="procedure-next-review"
+                  value={nextReviewDate}
+                  onChange={(e) => setNextReviewDate(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
+
+              <CategoryVisibilityField
+                baseUrl={CATEGORIES_BASE_URL}
+                resourceType={PROCEDURE_RESOURCE_TYPE}
+                categoryName={categoryName}
+                categoryId={categoryId}
+                onCategoryIdChange={setCategoryId}
+                onCategoryNameChange={setCategoryName}
+                isPrivate={isPrivate}
+                onIsPrivateChange={setIsPrivate}
+              />
+
+              <button type="submit" className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700">
+                Continuer vers la rédaction
+              </button>
+            </>
+          ) : (
+            <>
+              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                <span className="font-medium">{number} · {title}</span>
+                {process && <span className="text-slate-500"> · {process}</span>}
+              </div>
+
+              {qqoqccpId ? (
+                <div>
+                  <button
+                    type="button"
+                    onClick={generateFromQqoqccp}
+                    disabled={generatingFromQqoqccp}
+                    className="flex items-center gap-2 rounded-md border border-purple-300 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
+                  >
+                    {generatingFromQqoqccp ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                    {generatingFromQqoqccp ? 'Génération depuis l\'analyse en cours...' : aiGenerated ? 'Régénérer depuis l\'analyse QQOQCCP' : 'Générer depuis l\'analyse QQOQCCP'}
+                  </button>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  <AiProcedureDraft title={title} process={process} onGenerated={handleAiGenerated} />
+                  <AiFullProcedureDraft title={title} onGenerated={handleAiGenerated} />
+                </div>
+              )}
+
+              <ProcedureSectionsEditor template={template} content={content} onChange={setContent} />
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
+              >
+                {submitting ? 'Création...' : 'Créer la procédure'}
+              </button>
+            </>
+          )}
         </form>
       </div>
     </div>

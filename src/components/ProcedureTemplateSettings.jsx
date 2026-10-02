@@ -152,8 +152,8 @@ export default function ProcedureTemplateSettings() {
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Style des documents exportés</h2>
         <p className="mt-1 text-sm text-slate-500">
-          S'applique à l'export Word de chaque procédure — neutre par défaut, personnalisable pour rester cohérent
-          avec votre charte.
+          S'applique aux exports Word et PDF de chaque procédure — neutre par défaut, personnalisable pour rester
+          cohérent avec votre charte.
         </p>
 
         <div className="mt-4 space-y-4">
