@@ -24,6 +24,7 @@ import ReviewActionCard from '../components/managementReview/ReviewActionCard.js
 import ReviewAiDraftModal from '../components/managementReview/ReviewAiDraftModal.jsx';
 import ReviewValidateModal from '../components/managementReview/ReviewValidateModal.jsx';
 import ReviewMailingModal from '../components/managementReview/ReviewMailingModal.jsx';
+import ReviewParticipantsField, { parseReviewParticipants } from '../components/managementReview/ReviewParticipantsField.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -53,6 +54,13 @@ const TEXT_SECTIONS = [
   { key: 'resource_adequacy', label: 'Adéquation des ressources' },
   { key: 'improvement_opportunities', label: "Opportunités d'amélioration" },
   { key: 'conclusions', label: 'Conclusions et décisions' },
+];
+
+const PARTICIPANT_ATTENDANCE_OPTIONS = [
+  { value: 'pending', label: 'À confirmer' },
+  { value: 'present', label: 'Présent(e)' },
+  { value: 'absent', label: 'Absent(e)' },
+  { value: 'excused', label: 'Excusé(e)' },
 ];
 
 function SnapshotStat({ value, label }) {
@@ -136,11 +144,38 @@ function InputCard({ title, children }) {
   );
 }
 
-function InputDataBlock({ inputSnapshot, canRefresh, refreshing, onRefresh }) {
+function InputDataBlock({ inputSnapshot, canRefresh, canSetPeriod, hasPeriod, refreshing, onRefresh, onEdit }) {
   if (!inputSnapshot) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500 sm:p-5">
-        Aucune donnée d'entrée disponible (revue créée avant cette fonctionnalité, ou sans période définie).
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 sm:p-5">
+        <div>
+          <p className="text-sm font-medium text-slate-800">Données d'entrée indisponibles</p>
+          <p className="mt-1 text-sm text-slate-500">
+            {hasPeriod
+              ? 'La période est définie, mais les données n’ont pas encore été calculées.'
+              : 'Définissez la période analysée pour rassembler les indicateurs, audits et actions concernés.'}
+          </p>
+        </div>
+        {hasPeriod && canRefresh ? (
+          <button
+            type="button"
+            onClick={onRefresh}
+            disabled={refreshing}
+            className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+          >
+            <RefreshCw size={14} className={refreshing ? 'animate-spin' : ''} />
+            {refreshing ? 'Calcul...' : 'Générer les données d’entrée'}
+          </button>
+        ) : canSetPeriod ? (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="flex min-h-[40px] items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <Pencil size={14} />
+            Définir la période
+          </button>
+        ) : null}
       </div>
     );
   }
@@ -327,6 +362,7 @@ function EditReviewModal({ review, onClose, onUpdated }) {
     title: review.title,
     review_date: review.review_date,
     participants: review.participants || '',
+    participant_attendance: review.participant_attendance || {},
     period_start: review.period_start || '',
     period_end: review.period_end || '',
     category_id: review.category_id || '',
@@ -364,6 +400,10 @@ function EditReviewModal({ review, onClose, onUpdated }) {
     // onUpdated() volontairement hors du try : voir Kpis.jsx pour l'incident de référence — un
     // bug dans le callback du parent ne doit jamais se faire passer pour un échec de l'appel API.
     const { category_name, ...formForApi } = form;
+    const participantNames = new Set(parseReviewParticipants(form.participants));
+    formForApi.participant_attendance = Object.fromEntries(
+      Object.entries(form.participant_attendance).filter(([name]) => participantNames.has(name))
+    );
     let response;
     try {
       response = await api.patch(`/management-reviews/${review.id}`, { ...formForApi, category_id: categoryId });
@@ -402,7 +442,7 @@ function EditReviewModal({ review, onClose, onUpdated }) {
             />
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div>
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">Date de revue</label>
               <input
@@ -413,16 +453,28 @@ function EditReviewModal({ review, onClose, onUpdated }) {
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Participants</label>
-              <input
-                type="text"
-                value={form.participants}
-                onChange={(e) => updateField('participants', e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-              />
-            </div>
+            <ReviewParticipantsField value={form.participants} onChange={(value) => updateField('participants', value)} />
           </div>
+
+          {parseReviewParticipants(form.participants).length > 0 && (
+            <fieldset className="space-y-2">
+              <legend className="text-sm font-medium text-slate-700">Présence</legend>
+              {parseReviewParticipants(form.participants).map((name) => (
+                <label key={name} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                  <span className="break-words text-slate-700">{name}</span>
+                  <select
+                    value={form.participant_attendance[name] || 'pending'}
+                    onChange={(event) => updateField('participant_attendance', { ...form.participant_attendance, [name]: event.target.value })}
+                    className="min-h-[40px] rounded-md border border-slate-300 px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                  >
+                    {PARTICIPANT_ATTENDANCE_OPTIONS.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+            </fieldset>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -461,15 +513,18 @@ function EditReviewModal({ review, onClose, onUpdated }) {
           />
 
           {TEXT_SECTIONS.map(({ key, label }) => (
-            <div key={key}>
-              <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
+            <details key={key} className="rounded-md border border-slate-200 px-3 py-2">
+              <summary className="cursor-pointer text-sm font-medium text-slate-700">
+                {label}
+                <span className="ml-2 text-xs font-normal text-slate-400">{form[key] ? 'Renseigné' : 'À compléter'}</span>
+              </summary>
               <AutoTextarea
-                rows={2}
+                rows={3}
                 value={form[key]}
                 onChange={(e) => updateField(key, e.target.value)}
-                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
-            </div>
+            </details>
           ))}
 
           <button
@@ -1071,7 +1126,22 @@ export default function ManagementReviewDetail() {
         </div>
         <div>
           <p className="text-xs text-slate-500">Participants</p>
-          <p className="text-sm font-medium text-slate-800">{review.participants || '—'}</p>
+          {parseReviewParticipants(review.participants).length === 0 ? (
+            <p className="text-sm font-medium text-slate-800">—</p>
+          ) : (
+            <ul className="mt-1 space-y-1">
+              {parseReviewParticipants(review.participants).map((name) => {
+                const status = review.participant_attendance?.[name] || 'pending';
+                const label = PARTICIPANT_ATTENDANCE_OPTIONS.find((option) => option.value === status)?.label || 'À confirmer';
+                return (
+                  <li key={name} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                    <span className="break-words font-medium text-slate-800">{name}</span>
+                    <span className="text-xs text-slate-500">{label}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </div>
 
@@ -1079,8 +1149,11 @@ export default function ManagementReviewDetail() {
         <InputDataBlock
           inputSnapshot={review.input_snapshot}
           canRefresh={canManage && review.status === 'draft' && Boolean(review.period_start && review.period_end)}
+          canSetPeriod={canManage && review.status === 'draft' && !review.is_validated}
+          hasPeriod={Boolean(review.period_start && review.period_end)}
           refreshing={refreshingSnapshot}
           onRefresh={handleRefreshSnapshot}
+          onEdit={() => setIsEditModalOpen(true)}
         />
       </div>
 

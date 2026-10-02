@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, CheckCircle2, Mail, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import AutoTextarea from '../AutoTextarea.jsx';
+import { parseReviewParticipants } from './ReviewParticipantsField.jsx';
 
 const INPUT_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -33,8 +34,8 @@ export default function ReviewMailingModal({ review, kind, onClose, onSent }) {
       .then(({ data }) => {
         setPeople(data);
         // Présélection : les personnes dont le nom figure dans la liste des participants de la revue.
-        const participants = (review.participants || '').toLowerCase();
-        setSelected(new Set(data.filter((person) => person.name && participants.includes(person.name.toLowerCase())).map((person) => `${person.kind}:${person.id}`)));
+        const participants = new Set(parseReviewParticipants(review.participants).map((name) => name.toLocaleLowerCase()));
+        setSelected(new Set(data.filter((person) => person.name && participants.has(person.name.toLocaleLowerCase())).map((person) => `${person.kind}:${person.id}`)));
       })
       .catch(() => {
         setPeople([]);

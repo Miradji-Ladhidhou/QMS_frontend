@@ -24,6 +24,7 @@ import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import ReviewScheduleBanner from '../components/managementReview/ReviewScheduleBanner.jsx';
+import ReviewParticipantsField from '../components/managementReview/ReviewParticipantsField.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const REVIEW_RESOURCE_TYPE = 'management_review';
@@ -141,16 +142,7 @@ function NewReviewModal({ onClose, onCreated }) {
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Participants</label>
-            <input
-              type="text"
-              placeholder="Ex : Direction, Qualité, Production"
-              value={participants}
-              onChange={(e) => setParticipants(e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
+          <ReviewParticipantsField value={participants} onChange={setParticipants} />
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
@@ -547,6 +539,24 @@ export default function ManagementReviews() {
                   <div className="min-w-0 flex-1">
                     <p className="line-clamp-2 break-words font-medium text-slate-900">{review.title}</p>
                     <p className="text-sm text-slate-500">{formatDate(review.review_date)}</p>
+                    <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
+                      {review.action_summary?.total ? (
+                        <>
+                          <span>{review.action_summary.open} action(s) ouverte(s)</span>
+                          {review.action_summary.overdue > 0 && (
+                            <span className="font-medium text-red-700">{review.action_summary.overdue} en retard</span>
+                          )}
+                          {review.action_summary.next_due && (
+                            <span>
+                              Prochaine échéance : {formatDate(review.action_summary.next_due.due_date)}
+                              {review.action_summary.next_due.owner ? ` · ${review.action_summary.next_due.owner}` : ''}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span>Aucune action décidée</span>
+                      )}
+                    </p>
                     {canManage && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <button
