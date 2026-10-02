@@ -270,12 +270,12 @@ export const PAGE_GUIDES = {
     title: 'Accidents et presqu’accidents du travail',
     body: (
       <p>
-        Déclarer un accident (ou un presqu'accident), analyser sa cause et suivre les <strong>jours d'arrêt</strong>.
-        Volet santé-sécurité au travail.
+        Déclarer les faits et les mesures immédiates, puis laisser les responsables documenter l'investigation et suivre les <strong>jours d'arrêt</strong>.
+        Le registre distingue les accidents des presqu'accidents.
       </p>
     ),
     example:
-      "« coupure à la main sur la trancheuse, 3 jours d'arrêt » → cause : protection retirée → action : cadenassage de la protection + rappel de la consigne.",
+      "Déclaration : « coupure à la main sur la trancheuse » → action immédiate : mise à l'arrêt. Investigation : protection retirée → action corrective : sécuriser la protection et rappeler la consigne.",
   },
   pdca: {
     title: 'Piloter une amélioration en 4 étapes',

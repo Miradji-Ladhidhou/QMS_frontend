@@ -104,9 +104,14 @@ function PersonField({ users, employees, value, onChange }) {
 function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
   const [form, setForm] = useState({
     title: '',
+    incident_type: 'accident',
     occurred_at: new Date().toISOString().slice(0, 10),
+    occurred_time: '',
     location: '',
     person: '',
+    injury_type: '',
+    injury_location: '',
+    witness_name: '',
     service_id: '',
     description: '',
     immediate_cause: '',
@@ -123,6 +128,16 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function changeIncidentType(value) {
+    setForm((prev) => ({
+      ...prev,
+      incident_type: value,
+      ...(value === 'near_miss' ? {
+        person: '', injury_type: '', injury_location: '', with_lost_time: false, lost_days: '',
+      } : {}),
+    }));
   }
 
   async function handleSubmit(event) {
@@ -145,16 +160,20 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
 
     const payload = {
       title: form.title,
+      incident_type: form.incident_type,
       occurred_at: form.occurred_at,
+      occurred_time: form.occurred_time || undefined,
       location: form.location || undefined,
-      injured_user_id: personKind === 'user' ? personId : undefined,
-      injured_employee_id: personKind === 'employee' ? personId : undefined,
+      injured_user_id: form.incident_type === 'accident' && personKind === 'user' ? personId : undefined,
+      injured_employee_id: form.incident_type === 'accident' && personKind === 'employee' ? personId : undefined,
+      injury_type: form.injury_type || undefined,
+      injury_location: form.injury_location || undefined,
+      witness_name: form.witness_name || undefined,
       service_id: form.service_id || undefined,
       description: form.description || undefined,
-      immediate_cause: form.immediate_cause || undefined,
       immediate_actions: form.immediate_actions || undefined,
       severity: form.severity,
-      with_lost_time: form.with_lost_time,
+      with_lost_time: form.incident_type === 'accident' && form.with_lost_time,
       lost_days: form.with_lost_time && form.lost_days ? Number(form.lost_days) : undefined,
       category_id: categoryId,
     };
@@ -177,7 +196,7 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Déclarer un accident du travail</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Déclarer un événement SST</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
             <X size={20} />
           </button>
@@ -188,8 +207,9 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <p className="text-xs text-slate-500">Les champs marqués d’un * sont obligatoires. La date de déclaration est enregistrée automatiquement.</p>
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Titre *</label>
             <input
               type="text"
               required
@@ -200,14 +220,42 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
             />
           </div>
 
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Type d’événement *</label>
+            <select
+              required
+              value={form.incident_type}
+              onChange={(e) => changeIncidentType(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="accident">Accident du travail</option>
+              <option value="near_miss">Presqu’accident</option>
+            </select>
+          </div>
+
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <p className="-mt-2 text-xs text-slate-500">
+              {form.incident_type === 'near_miss'
+                ? 'Pour un presqu’accident, évaluez la gravité potentielle de la situation.'
+                : 'Décrivez les faits constatés; l’analyse des causes sera documentée lors de l’investigation.'}
+            </p>
+
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Date de l'accident</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Date de l’événement *</label>
               <input
                 type="date"
                 required
                 value={form.occurred_at}
                 onChange={(e) => updateField('occurred_at', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Heure</label>
+              <input
+                type="time"
+                value={form.occurred_time}
+                onChange={(e) => updateField('occurred_time', e.target.value)}
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
@@ -222,7 +270,19 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
             </div>
           </div>
 
-          <PersonField users={users} employees={employees} value={form.person} onChange={(value) => updateField('person', value)} />
+          {form.incident_type === 'accident' && (
+            <PersonField users={users} employees={employees} value={form.person} onChange={(value) => updateField('person', value)} />
+          )}
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Témoin (facultatif)</label>
+            <input
+              type="text"
+              value={form.witness_name}
+              onChange={(e) => updateField('witness_name', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service concerné</label>
@@ -241,7 +301,7 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Description des circonstances</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Faits observés</label>
             <AutoTextarea
               rows={2}
               value={form.description}
@@ -250,15 +310,28 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
             />
           </div>
 
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Cause immédiate</label>
-            <AutoTextarea
-              rows={2}
-              value={form.immediate_cause}
-              onChange={(e) => updateField('immediate_cause', e.target.value)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-            />
-          </div>
+          {form.incident_type === 'accident' && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Nature de la blessure</label>
+                <input
+                  type="text"
+                  value={form.injury_type}
+                  onChange={(e) => updateField('injury_type', e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Zone touchée</label>
+                <input
+                  type="text"
+                  value={form.injury_location}
+                  onChange={(e) => updateField('injury_location', e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                />
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Actions immédiates prises</label>
@@ -285,8 +358,9 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
             </select>
           </div>
 
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          {form.incident_type === 'accident' && (
+            <div>
+              <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
               <input
                 type="checkbox"
                 checked={form.with_lost_time}
@@ -294,18 +368,19 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
                 className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
               />
               Avec arrêt de travail
-            </label>
-            {form.with_lost_time && (
+              </label>
+              {form.with_lost_time && (
               <input
                 type="number"
                 min="0"
-                placeholder="Nombre de jours d'arrêt"
+                placeholder="Jours d’arrêt (si connus)"
                 value={form.lost_days}
                 onChange={(e) => updateField('lost_days', e.target.value)}
                 className="mt-2 w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
-            )}
-          </div>
+              )}
+            </div>
+          )}
 
           <CategoryVisibilityField
             baseUrl={CATEGORIES_BASE_URL}
@@ -317,13 +392,14 @@ function NewAccidentModal({ users, employees, services, onClose, onCreated }) {
             isPrivate={isPrivate}
             onIsPrivateChange={setIsPrivate}
           />
+          <p className="text-xs text-amber-800">Cette fiche peut contenir des données personnelles liées à une blessure. Choisissez sa visibilité selon vos règles internes; un dossier restreint limite l’accès aux personnes autorisées.</p>
 
           <button
             type="submit"
             disabled={submitting}
             className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
           >
-            {submitting ? 'Déclaration...' : "Déclarer l'accident"}
+            {submitting ? 'Enregistrement...' : 'Enregistrer le signalement'}
           </button>
         </form>
       </div>
@@ -341,8 +417,10 @@ export default function Accidents() {
   const [services, setServices] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
+  const [incidentTypeFilter, setIncidentTypeFilter] = useState('');
   const [serviceFilter, setServiceFilter] = useState('');
   const [lostTimeFilter, setLostTimeFilter] = useState(false);
+  const [accidentPageSize, setAccidentPageSize] = useState(25);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -405,6 +483,7 @@ export default function Accidents() {
     setError('');
     try {
       const params = {};
+      if (incidentTypeFilter) params.incident_type = incidentTypeFilter;
       if (statusFilter) params.status = statusFilter;
       if (severityFilter) params.severity = severityFilter;
       if (serviceFilter) params.service_id = serviceFilter;
@@ -427,7 +506,7 @@ export default function Accidents() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter, severityFilter, serviceFilter, lostTimeFilter]);
+  }, [incidentTypeFilter, statusFilter, severityFilter, serviceFilter, lostTimeFilter]);
 
   const { sorted: sortedAccidents, sortKey, direction, setSortKey, toggleSort } = useSort(
     accidents,
@@ -445,9 +524,9 @@ export default function Accidents() {
     [sortedAccidents, currentFolderId]
   );
   const [accidentPage, setAccidentPage] = useState(1);
-  const accidentTotalPages = Math.max(1, Math.ceil(currentFolderAccidents.length / 25));
-  const pagedAccidents = currentFolderAccidents.slice((accidentPage - 1) * 25, accidentPage * 25);
-  useEffect(() => setAccidentPage(1), [currentFolderId, statusFilter]);
+  const accidentTotalPages = Math.max(1, Math.ceil(currentFolderAccidents.length / accidentPageSize));
+  const pagedAccidents = currentFolderAccidents.slice((accidentPage - 1) * accidentPageSize, accidentPage * accidentPageSize);
+  useEffect(() => setAccidentPage(1), [currentFolderId, incidentTypeFilter, statusFilter, severityFilter, serviceFilter, lostTimeFilter, sortKey, direction, accidentPageSize]);
   useEffect(() => { if (accidentPage > accidentTotalPages) setAccidentPage(accidentTotalPages); }, [accidentPage, accidentTotalPages]);
 
   const deletableIds = currentFolderAccidents.filter((accident) => canDeleteAccident(accident, currentUser)).map((accident) => accident.id);
@@ -470,11 +549,16 @@ export default function Accidents() {
   function buildExportColumns({ forPdf } = {}) {
     return [
       { key: 'title', label: 'Titre', width: forPdf ? 0.16 : undefined },
+      { key: 'incident_type', label: 'Type', width: forPdf ? 0.1 : undefined },
       { key: 'occurred_at', label: 'Date', width: forPdf ? 0.08 : undefined },
+      { key: 'occurred_time', label: 'Heure', width: forPdf ? 0.06 : undefined },
       { key: 'location', label: 'Lieu', width: forPdf ? 0.1 : undefined },
       { key: 'severity', label: 'Gravité', width: forPdf ? 0.1 : undefined },
       { key: 'status', label: 'Statut', width: forPdf ? 0.1 : undefined },
       { key: 'person', label: 'Personne', width: forPdf ? 0.12 : undefined },
+      { key: 'injury_type', label: 'Blessure', width: forPdf ? 0.1 : undefined },
+      { key: 'injury_location', label: 'Zone touchée', width: forPdf ? 0.1 : undefined },
+      { key: 'witness_name', label: 'Témoin', width: forPdf ? 0.1 : undefined },
       { key: 'service', label: 'Service', width: forPdf ? 0.12 : undefined },
       { key: 'with_lost_time', label: 'Arrêt de travail', width: forPdf ? 0.12 : undefined },
       { key: 'description', label: 'Description', width: forPdf ? 0.16 : undefined },
@@ -490,11 +574,16 @@ export default function Accidents() {
   function buildExportRows(source) {
     return source.map((accident) => ({
       title: accident.title,
+      incident_type: accident.incident_type === 'near_miss' ? 'Presqu’accident' : 'Accident du travail',
       occurred_at: formatDate(accident.occurred_at),
+      occurred_time: accident.occurred_time?.slice(0, 5) || '',
       location: accident.location || '',
       severity: ACCIDENT_SEVERITY_LABELS[accident.severity] || accident.severity,
       status: ACCIDENT_STATUS_LABELS[accident.status] || accident.status,
       person: injuredPersonName(accident) || '',
+      injury_type: accident.injury_type || '',
+      injury_location: accident.injury_location || '',
+      witness_name: accident.witness_name || '',
       service: accident.service?.name || '',
       with_lost_time: accident.with_lost_time ? `Oui (${accident.lost_days ?? '—'} j)` : 'Non',
       description: accident.description || '',
@@ -509,6 +598,7 @@ export default function Accidents() {
 
   function filterSummary() {
     const parts = [];
+    if (incidentTypeFilter) parts.push(`Type : ${incidentTypeFilter === 'near_miss' ? 'presqu’accident' : 'accident'}`);
     if (severityFilter) parts.push(`Gravité : ${ACCIDENT_SEVERITY_LABELS[severityFilter] || severityFilter}`);
     if (statusFilter) parts.push(`Statut : ${ACCIDENT_STATUS_LABELS[statusFilter] || statusFilter}`);
     if (serviceFilter) parts.push(`Service : ${services.find((s) => s.id === serviceFilter)?.name || serviceFilter}`);
@@ -522,7 +612,7 @@ export default function Accidents() {
     setExportPdfError('');
     try {
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToPdf(`accidents-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre des accidents du travail', buildExportColumns({ forPdf: true }), buildExportRows(source), {
+      await exportToPdf(`registre-sst-${new Date().toISOString().slice(0, 10)}.pdf`, 'Registre santé-sécurité au travail', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -539,7 +629,7 @@ export default function Accidents() {
     setExportPdfError('');
     try {
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToXlsx(`accidents-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Registre des accidents du travail', buildExportColumns(), buildExportRows(source), {
+      await exportToXlsx(`registre-sst-${new Date().toISOString().slice(0, 10)}.xlsx`, 'Registre santé-sécurité au travail', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -556,7 +646,7 @@ export default function Accidents() {
     setExportPdfError('');
     try {
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToWord(`accidents-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre des accidents du travail', buildExportColumns(), buildExportRows(source), {
+      await exportToWord(`registre-sst-${new Date().toISOString().slice(0, 10)}.docx`, 'Registre santé-sécurité au travail', buildExportColumns(), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -574,7 +664,7 @@ export default function Accidents() {
     setDriveSuccess('');
     try {
       const countLabel = `${source.length} accident${source.length > 1 ? 's' : ''}`;
-      await exportToDrive('ACCIDENT', 'Registre des accidents du travail', buildExportColumns({ forPdf: true }), buildExportRows(source), {
+      await exportToDrive('ACCIDENT', 'Registre santé-sécurité au travail', buildExportColumns({ forPdf: true }), buildExportRows(source), {
         subtitle: [countLabel, ...filterSummary()].join(' · '),
         generatedBy: currentUser?.full_name,
       });
@@ -589,7 +679,7 @@ export default function Accidents() {
   return (
     <div>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Accidents du travail</h1>
+        <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Accidents et presqu’accidents du travail</h1>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
             disabled={accidents.length === 0}
@@ -608,7 +698,7 @@ export default function Accidents() {
             className="flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
           >
             <Plus size={18} />
-            Déclarer un accident
+            Signaler un événement
           </button>
         </div>
       </div>
@@ -624,7 +714,16 @@ export default function Accidents() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      <div className="mt-4 flex flex-wrap gap-2">
+      {(accidents.length > 0 || incidentTypeFilter || statusFilter || severityFilter || serviceFilter || lostTimeFilter) && <div className="mt-4 flex flex-wrap gap-2">
+        <select
+          value={incidentTypeFilter}
+          onChange={(e) => setIncidentTypeFilter(e.target.value)}
+          className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+        >
+          <option value="">Accidents et presqu’accidents</option>
+          <option value="accident">Accidents uniquement</option>
+          <option value="near_miss">Presqu’accidents uniquement</option>
+        </select>
         <select
           value={severityFilter}
           onChange={(e) => setSeverityFilter(e.target.value)}
@@ -679,7 +778,7 @@ export default function Accidents() {
           onChangeKey={setSortKey}
           onToggleDirection={() => toggleSort(sortKey)}
         />
-      </div>
+      </div>}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les accidents" />
@@ -744,14 +843,14 @@ export default function Accidents() {
 
           {accidents.length === 0 && folders.length === 0 ? (
             <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-              <p className="text-base font-medium text-slate-700">Aucun accident du travail enregistré pour l'instant</p>
+              <p className="text-base font-medium text-slate-700">Aucun accident ou presqu’accident enregistré pour l’instant</p>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(true)}
                 className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
               >
                 <Plus size={18} />
-                Déclarer le premier accident
+                Signaler le premier événement
               </button>
             </div>
           ) : currentFolderAccidents.length === 0 ? (
@@ -760,6 +859,15 @@ export default function Accidents() {
             </p>
           ) : (
             <div className="mt-4 space-y-3">
+              <Pagination
+                page={accidentPage}
+                totalPages={accidentTotalPages}
+                onPageChange={setAccidentPage}
+                totalItems={currentFolderAccidents.length}
+                pageSize={accidentPageSize}
+                onPageSizeChange={setAccidentPageSize}
+                itemLabel="accidents"
+              />
               {pagedAccidents.map((accident) => (
                 <div
                   key={accident.id}
@@ -786,6 +894,9 @@ export default function Accidents() {
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {accident.incident_type === 'near_miss' && (
+                      <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Presqu’accident</span>
+                    )}
                     {accident.with_lost_time && (
                       <span className="rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
                         Arrêt de travail{accident.lost_days ? ` — ${accident.lost_days} j` : ''}
@@ -807,7 +918,15 @@ export default function Accidents() {
                   </div>
                 </div>
               ))}
-              <Pagination page={accidentPage} totalPages={accidentTotalPages} onPageChange={setAccidentPage} />
+              <Pagination
+                page={accidentPage}
+                totalPages={accidentTotalPages}
+                onPageChange={setAccidentPage}
+                totalItems={currentFolderAccidents.length}
+                pageSize={accidentPageSize}
+                onPageSizeChange={setAccidentPageSize}
+                itemLabel="accidents"
+              />
             </div>
           )}
         </>

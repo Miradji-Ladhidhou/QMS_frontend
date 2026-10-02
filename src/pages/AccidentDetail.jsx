@@ -62,9 +62,14 @@ function injuredPersonName(accident) {
 function EditAccidentModal({ accident, users, employees, services, onClose, onUpdated }) {
   const [form, setForm] = useState({
     title: accident.title,
+    incident_type: accident.incident_type || 'accident',
     occurred_at: accident.occurred_at,
+    occurred_time: accident.occurred_time?.slice(0, 5) || '',
     location: accident.location || '',
     person: initialPersonKey(accident),
+    injury_type: accident.injury_type || '',
+    injury_location: accident.injury_location || '',
+    witness_name: accident.witness_name || '',
     service_id: accident.service_id || '',
     description: accident.description || '',
     immediate_cause: accident.immediate_cause || '',
@@ -82,6 +87,16 @@ function EditAccidentModal({ accident, users, employees, services, onClose, onUp
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
+  }
+
+  function changeIncidentType(value) {
+    setForm((prev) => ({
+      ...prev,
+      incident_type: value,
+      ...(value === 'near_miss' ? {
+        person: '', injury_type: '', injury_location: '', with_lost_time: false, lost_days: '',
+      } : {}),
+    }));
   }
 
   async function handleSubmit(event) {
@@ -108,18 +123,23 @@ function EditAccidentModal({ accident, users, employees, services, onClose, onUp
     try {
       response = await api.patch(`/accidents/${accident.id}`, {
         title: form.title,
+        incident_type: form.incident_type,
         occurred_at: form.occurred_at,
+        occurred_time: form.occurred_time || null,
         location: form.location || null,
-        injured_user_id: personKind === 'user' ? personId : null,
-        injured_employee_id: personKind === 'employee' ? personId : null,
+        injured_user_id: form.incident_type === 'accident' && personKind === 'user' ? personId : null,
+        injured_employee_id: form.incident_type === 'accident' && personKind === 'employee' ? personId : null,
+        injury_type: form.incident_type === 'accident' ? form.injury_type || null : null,
+        injury_location: form.incident_type === 'accident' ? form.injury_location || null : null,
+        witness_name: form.witness_name || null,
         service_id: form.service_id || null,
         description: form.description || null,
         immediate_cause: form.immediate_cause || null,
         immediate_actions: form.immediate_actions || null,
         root_cause: form.root_cause || null,
         severity: form.severity,
-        with_lost_time: form.with_lost_time,
-        lost_days: form.with_lost_time && form.lost_days ? Number(form.lost_days) : null,
+        with_lost_time: form.incident_type === 'accident' && form.with_lost_time,
+        lost_days: form.incident_type === 'accident' && form.with_lost_time && form.lost_days ? Number(form.lost_days) : null,
         category_id: categoryId,
       });
     } catch (err) {
@@ -135,7 +155,7 @@ function EditAccidentModal({ accident, users, employees, services, onClose, onUp
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
       <div className="max-h-[90vh] w-full overflow-y-auto overflow-x-hidden rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Modifier l'accident</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Modifier le signalement</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
             <X size={20} />
           </button>
@@ -146,6 +166,17 @@ function EditAccidentModal({ accident, users, employees, services, onClose, onUp
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Type d’événement</label>
+            <select
+              value={form.incident_type}
+              onChange={(e) => changeIncidentType(e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="accident">Accident du travail</option>
+              <option value="near_miss">Presqu’accident</option>
+            </select>
+          </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
             <input
@@ -159,12 +190,21 @@ function EditAccidentModal({ accident, users, employees, services, onClose, onUp
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-slate-700">Date de l'accident</label>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Date de l’événement</label>
               <input
                 type="date"
                 required
                 value={form.occurred_at}
                 onChange={(e) => updateField('occurred_at', e.target.value)}
+                className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+              />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-slate-700">Heure</label>
+              <input
+                type="time"
+                value={form.occurred_time}
+                onChange={(e) => updateField('occurred_time', e.target.value)}
                 className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
               />
             </div>
@@ -179,6 +219,7 @@ function EditAccidentModal({ accident, users, employees, services, onClose, onUp
             </div>
           </div>
 
+          {form.incident_type === 'accident' && (
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Personne concernée</label>
             <select
@@ -193,6 +234,35 @@ function EditAccidentModal({ accident, users, employees, services, onClose, onUp
                 </option>
               ))}
             </select>
+          </div>
+          )}
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Témoin</label>
+            <input
+              type="text"
+              value={form.witness_name}
+              onChange={(e) => updateField('witness_name', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          {form.incident_type === 'accident' && (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Nature de la blessure</label>
+                <input type="text" value={form.injury_type} onChange={(e) => updateField('injury_type', e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Zone touchée</label>
+                <input type="text" value={form.injury_location} onChange={(e) => updateField('injury_location', e.target.value)} className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary" />
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-slate-200 pt-4">
+            <h3 className="text-sm font-semibold text-slate-800">Investigation et suivi</h3>
+            <p className="mt-1 text-xs text-slate-500">Réservés aux responsables; documenter les causes après analyse des faits.</p>
           </div>
 
           <div>
@@ -422,7 +492,7 @@ function CreateAccidentCapaModal({ accidentId, accident, users, services, priori
           </div>
 
           <AiCapaSuggestion
-            context={`Accident du travail : ${accident.title}${accident.description ? `. ${accident.description}` : ''}${accident.immediate_cause ? ` Cause immédiate : ${accident.immediate_cause}` : ''}`}
+            context={`${accident.incident_type === 'near_miss' ? 'Presqu’accident' : 'Accident du travail'} : ${accident.title}${accident.description ? `. ${accident.description}` : ''}${accident.immediate_cause ? ` Cause immédiate : ${accident.immediate_cause}` : ''}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}
           />
@@ -674,27 +744,51 @@ export default function AccidentDetail() {
 
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
         <div>
+          <p className="text-xs text-slate-500">Type d’événement</p>
+          <p className="text-sm font-medium text-slate-800">{accident.incident_type === 'near_miss' ? 'Presqu’accident' : 'Accident du travail'}</p>
+        </div>
+        <div>
           <p className="text-xs text-slate-500">Date de l'accident</p>
           <p className="text-sm font-medium text-slate-800">{formatDate(accident.occurred_at)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Heure</p>
+          <p className="text-sm font-medium text-slate-800">{accident.occurred_time?.slice(0, 5) || '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Déclaré le</p>
+          <p className="text-sm font-medium text-slate-800">{formatDate(accident.created_at)}</p>
         </div>
         <div>
           <p className="text-xs text-slate-500">Lieu</p>
           <p className="text-sm font-medium text-slate-800">{accident.location || '—'}</p>
         </div>
-        <div>
+        {accident.incident_type !== 'near_miss' && <div>
           <p className="text-xs text-slate-500">Personne concernée</p>
           <p className="text-sm font-medium text-slate-800">{injuredPersonName(accident) || '—'}</p>
-        </div>
+        </div>}
+        {accident.witness_name && <div>
+          <p className="text-xs text-slate-500">Témoin</p>
+          <p className="text-sm font-medium text-slate-800">{accident.witness_name}</p>
+        </div>}
+        {accident.injury_type && <div>
+          <p className="text-xs text-slate-500">Nature de la blessure</p>
+          <p className="text-sm font-medium text-slate-800">{accident.injury_type}</p>
+        </div>}
+        {accident.injury_location && <div>
+          <p className="text-xs text-slate-500">Zone touchée</p>
+          <p className="text-sm font-medium text-slate-800">{accident.injury_location}</p>
+        </div>}
         <div>
           <p className="text-xs text-slate-500">Service concerné</p>
           <p className="text-sm font-medium text-slate-800">{accident.service?.name || '—'}</p>
         </div>
-        <div>
+        {accident.incident_type !== 'near_miss' && <div>
           <p className="text-xs text-slate-500">Arrêt de travail</p>
           <p className="text-sm font-medium text-slate-800">
             {accident.with_lost_time ? `Oui — ${accident.lost_days ?? '—'} jour(s)` : 'Non'}
           </p>
-        </div>
+        </div>}
         {accident.description && (
           <div className="col-span-2 sm:col-span-4">
             <p className="text-xs text-slate-500">Description des circonstances</p>
