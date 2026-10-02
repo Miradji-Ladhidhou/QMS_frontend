@@ -723,6 +723,7 @@ export default function Capas() {
   const [serviceFilter, setServiceFilter] = useState('');
   const [assigneeFilter, setAssigneeFilter] = useState('');
   const [capaPage, setCapaPage] = useState(1);
+  const [capaPageSize, setCapaPageSize] = useState(25);
   const [isManageCategoriesOpen, setIsManageCategoriesOpen] = useState(false);
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [movingCapa, setMovingCapa] = useState(null);
@@ -854,8 +855,8 @@ export default function Capas() {
     () => sortedCapas.filter((capa) => (capa.category_id || null) === currentFolderId),
     [sortedCapas, currentFolderId]
   );
-  const capaTotalPages = Math.max(1, Math.ceil(currentFolderCapas.length / 25));
-  const pagedCapas = currentFolderCapas.slice((capaPage - 1) * 25, capaPage * 25);
+  const capaTotalPages = Math.max(1, Math.ceil(currentFolderCapas.length / capaPageSize));
+  const pagedCapas = currentFolderCapas.slice((capaPage - 1) * capaPageSize, capaPage * capaPageSize);
   useEffect(() => setCapaPage(1), [searchText, statusFilter, priorityFilter, serviceFilter, assigneeFilter, currentFolderId]);
   useEffect(() => { if (capaPage > capaTotalPages) setCapaPage(capaTotalPages); }, [capaPage, capaTotalPages]);
 
@@ -1088,14 +1089,24 @@ export default function Capas() {
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les CAPA" />
 
         {currentUser?.role === 'admin' && (
-          <button
-            type="button"
-            onClick={() => setIsManageCategoriesOpen(true)}
-            className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-          >
-            <FolderCog size={16} />
-            Gérer les dossiers
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsNewFolderOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <FolderPlus size={16} />
+              Nouveau dossier
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsManageCategoriesOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+            >
+              <FolderCog size={16} />
+              Gérer les dossiers
+            </button>
+          </div>
         )}
       </div>
 
@@ -1143,17 +1154,22 @@ export default function Capas() {
               {folders.map((folder) => (
                 <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
               ))}
-              {currentUser?.role === 'admin' && (
-                <button
-                  type="button"
-                  onClick={() => setIsNewFolderOpen(true)}
-                  className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 p-4 text-slate-500 transition-colors hover:border-primary/40 hover:text-primary"
-                >
-                  <FolderPlus size={26} />
-                  <span className="text-sm font-medium">Nouveau dossier</span>
-                </button>
-              )}
             </div>
+          )}
+
+          {currentFolderCapas.length > 0 && (
+            <Pagination
+              page={capaPage}
+              totalPages={capaTotalPages}
+              onPageChange={setCapaPage}
+              totalItems={currentFolderCapas.length}
+              pageSize={capaPageSize}
+              onPageSizeChange={(size) => {
+                setCapaPageSize(size);
+                setCapaPage(1);
+              }}
+              itemLabel="CAPA"
+            />
           )}
 
           {capas.length === 0 && folders.length === 0 ? (
@@ -1196,7 +1212,7 @@ export default function Capas() {
                       <CapaPriorityBadge priority={capa.priority} />
                     </div>
                     <div className="mt-3 flex flex-wrap items-center gap-2">
-                      <CapaStatusBadge status={capa.status} />
+                      {!canManage && <CapaStatusBadge status={capa.status} />}
                     </div>
                     <p className="mt-2 text-sm text-slate-500">Échéance : {formatDate(capa.due_date)}</p>
                     <p className="mt-1 text-xs text-slate-400">
@@ -1209,6 +1225,7 @@ export default function Capas() {
                           disabled={updatingId === capa.id}
                           onClick={(e) => e.stopPropagation()}
                           onChange={(e) => handleStatusChange(e, capa)}
+                          aria-label="Statut de la CAPA"
                           className="w-full rounded-md border border-slate-300 px-2 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                         >
                           {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
@@ -1234,8 +1251,8 @@ export default function Capas() {
                 ))}
               </div>
 
-              <div className="mt-4 hidden overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
-                <table className="w-full text-left text-sm">
+              <div className="mt-4 hidden max-w-full overflow-x-auto rounded-xl border border-slate-200 bg-white md:block">
+                <table className="w-full min-w-[1100px] text-left text-sm">
                   <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                     <tr>
                       {canManage && <th className="w-8 px-4 py-3" />}
@@ -1278,13 +1295,14 @@ export default function Capas() {
                         <td className="px-4 py-3 text-slate-600">{formatDate(capa.due_date)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-2">
-                            <CapaStatusBadge status={capa.status} />
+                            {!canManage && <CapaStatusBadge status={capa.status} />}
                             {canManage && (
                               <select
                                 value={capa.status}
                                 disabled={updatingId === capa.id}
                                 onClick={(e) => e.stopPropagation()}
                                 onChange={(e) => handleStatusChange(e, capa)}
+                                aria-label="Statut de la CAPA"
                                 className="rounded-md border border-slate-300 px-2 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
                               >
                                 {Object.entries(CAPA_STATUS_LABELS).map(([value, label]) => (
@@ -1292,7 +1310,6 @@ export default function Capas() {
                                     {label}
                                   </option>
                                 ))}
-                                <Pagination page={capaPage} totalPages={capaTotalPages} onPageChange={setCapaPage} />
                               </select>
                             )}
                           </div>
@@ -1314,6 +1331,18 @@ export default function Capas() {
                   </tbody>
                 </table>
               </div>
+              <Pagination
+                page={capaPage}
+                totalPages={capaTotalPages}
+                onPageChange={setCapaPage}
+                totalItems={currentFolderCapas.length}
+                pageSize={capaPageSize}
+                onPageSizeChange={(size) => {
+                  setCapaPageSize(size);
+                  setCapaPage(1);
+                }}
+                itemLabel="CAPA"
+              />
             </>
           )}
         </>

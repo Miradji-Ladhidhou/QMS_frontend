@@ -43,12 +43,11 @@ export const PAGE_GUIDES = {
     title: "Traiter un problème pour qu'il ne revienne pas",
     body: (
       <p>
-        Une CAPA (action corrective / préventive) sert à remonter à la <strong>cause racine</strong> d'un problème,
-        décider une <strong>action</strong>, puis <strong>vérifier qu'elle a marché</strong> avant de clôturer.
+        Une CAPA identifie la <strong>cause racine</strong>, définit une <strong>action</strong> et vérifie son efficacité
+        avant clôture.
       </p>
     ),
-    example:
-      "un client reçoit un colis abîmé → cause : palettes mal filmées → action : nouveau standard de filmage + contrôle avant expédition → vérification : aucune récidive sur 2 mois, on clôture.",
+    example: 'Colis abîmé → cause identifiée → action corrective → absence de récidive vérifiée.',
   },
   complaints: {
     title: 'Suivre les réclamations clients',
