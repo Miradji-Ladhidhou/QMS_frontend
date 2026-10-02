@@ -533,6 +533,55 @@ function PlanningSummary({ items }) {
   );
 }
 
+function PlanningPagination({ total, pageSize, currentPage, pageCount, onPageChange, onPageSizeChange }) {
+  const firstItem = (currentPage - 1) * pageSize + 1;
+  const lastItem = Math.min(currentPage * pageSize, total);
+
+  return (
+    <nav aria-label="Pagination de la liste" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-slate-500">
+        Affichage de {firstItem} à {lastItem} sur {total} éléments
+      </p>
+      <div className="flex items-center gap-2">
+        <label className="flex items-center gap-2 text-sm text-slate-600">
+          Par page
+          <select
+            value={pageSize}
+            onChange={(event) => onPageSizeChange(Number(event.target.value))}
+            aria-label="Nombre d’éléments par page"
+            className="rounded-md border border-slate-300 bg-white px-2 py-1.5 text-sm text-slate-700"
+          >
+            <option value={10}>10</option>
+            <option value={20}>20</option>
+            <option value={50}>50</option>
+          </select>
+        </label>
+        <button
+          type="button"
+          onClick={() => onPageChange((page) => Math.max(1, page - 1))}
+          disabled={currentPage === 1}
+          aria-label="Page précédente"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronLeft size={16} />
+        </button>
+        <span className="min-w-16 text-center text-sm tabular-nums text-slate-600">
+          {currentPage} / {pageCount}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPageChange((page) => Math.min(pageCount, page + 1))}
+          disabled={currentPage === pageCount}
+          aria-label="Page suivante"
+          className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 text-slate-600 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </nav>
+  );
+}
+
 function getMonthCells(year, month) {
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7; // lundi = 0
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -970,6 +1019,8 @@ export default function Planning() {
   const [searchText, setSearchText] = useState('');
   const [viewMode, setViewMode] = useState('list');
   const [groupBy, setGroupBy] = useState('date');
+  const [listPage, setListPage] = useState(1);
+  const [listPageSize, setListPageSize] = useState(10);
   const [expandedTypeFolders, setExpandedTypeFolders] = useState(() => new Set());
   const [calendarDate, setCalendarDate] = useState(() => new Date());
   const [selectedCalendarDate, setSelectedCalendarDate] = useState(() => formatIsoDate(new Date()));
@@ -1027,6 +1078,10 @@ export default function Planning() {
       return true;
     });
   }, [items, doneTaskItems, showDoneTasks, typeFilter, overdueOnly, assigneeFilter, searchText]);
+
+  useEffect(() => {
+    setListPage(1);
+  }, [filteredItems, groupBy, listPageSize]);
 
   function toggleSelectTask(id) {
     setSelectedTaskIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -1212,6 +1267,13 @@ export default function Planning() {
       return { type, items: typeItems, dates: Object.keys(byDate).sort(), byDate };
     })
     .filter((group) => group.items.length > 0);
+  const listItems = groupBy === 'type'
+    ? groupedByType.flatMap((group) => group.dates.flatMap((date) => group.byDate[date]))
+    : dates.flatMap((date) => grouped[date]);
+  const listPageCount = Math.max(1, Math.ceil(listItems.length / listPageSize));
+  const currentListPage = Math.min(listPage, listPageCount);
+  const pageItems = listItems.slice((currentListPage - 1) * listPageSize, currentListPage * listPageSize);
+  const visibleListItemKeys = new Set(pageItems.map((item) => `${item.type}-${item.id}`));
   const calendarMonthKey = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}`;
   const calendarMonthItemCount = filteredItems.filter((item) => item.date.startsWith(calendarMonthKey)).length;
   const itemsOutsideCalendarMonth = filteredItems.length - calendarMonthItemCount;
@@ -1558,6 +1620,19 @@ export default function Planning() {
         onClear={() => setSelectedTaskIds([])}
       />
 
+      {viewMode === 'list' && !loading && listItems.length > listPageSize && (
+        <div className="mt-5">
+          <PlanningPagination
+            total={listItems.length}
+            pageSize={listPageSize}
+            currentPage={currentListPage}
+            pageCount={listPageCount}
+            onPageChange={setListPage}
+            onPageSizeChange={setListPageSize}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="mt-4 space-y-3">
           {[0, 1, 2].map((key) => (
@@ -1635,10 +1710,11 @@ export default function Planning() {
         <p className="mt-6 text-sm text-slate-500">Rien à venir pour l'instant.</p>
       ) : groupBy === 'type' ? (
         <div className="mt-6 space-y-3">
-          {groupedByType.map(({ type, items: typeItems, dates: typeDates, byDate }) => {
+          {groupedByType.filter(({ items: typeItems }) => typeItems.some((item) => visibleListItemKeys.has(`${item.type}-${item.id}`))).map(({ type, items: typeItems, dates: typeDates, byDate }) => {
             const config = TYPE_CONFIG[type];
             const FolderIcon = config.icon;
             const collapsed = !expandedTypeFolders.has(type);
+            const visibleDates = typeDates.filter((date) => byDate[date].some((item) => visibleListItemKeys.has(`${item.type}-${item.id}`)));
             return (
               <div key={type} className="rounded-xl border border-slate-200 bg-white shadow-sm">
                 <button
@@ -1659,13 +1735,13 @@ export default function Planning() {
                 </button>
                 {!collapsed && (
                   <div className="space-y-4 border-t border-slate-100 p-3 sm:p-4">
-                    {typeDates.map((date) => (
+                    {visibleDates.map((date) => (
                       <div key={date}>
                         <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
                           {formatDateHeading(date)}
                         </h3>
                         <div className="space-y-3">
-                          {byDate[date].map((item) => (
+                          {byDate[date].filter((item) => visibleListItemKeys.has(`${item.type}-${item.id}`)).map((item) => (
                             <PlanningItemCard
                               key={`${item.type}-${item.id}`}
                               item={item}
@@ -1691,11 +1767,11 @@ export default function Planning() {
         </div>
       ) : (
         <div className="mt-6 space-y-6">
-          {dates.map((date) => (
+          {dates.filter((date) => grouped[date].some((item) => visibleListItemKeys.has(`${item.type}-${item.id}`))).map((date) => (
             <div key={date}>
               <h2 className="mb-2 text-sm font-semibold text-slate-500">{formatDateHeading(date)}</h2>
               <div className="space-y-3">
-                {grouped[date].map((item) => (
+                {grouped[date].filter((item) => visibleListItemKeys.has(`${item.type}-${item.id}`)).map((item) => (
                   <PlanningItemCard
                     key={`${item.type}-${item.id}`}
                     item={item}
@@ -1713,6 +1789,19 @@ export default function Planning() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {viewMode === 'list' && !loading && listItems.length > listPageSize && (
+        <div className="mt-5">
+          <PlanningPagination
+            total={listItems.length}
+            pageSize={listPageSize}
+            currentPage={currentListPage}
+            pageCount={listPageCount}
+            onPageChange={setListPage}
+            onPageSizeChange={setListPageSize}
+          />
         </div>
       )}
 
