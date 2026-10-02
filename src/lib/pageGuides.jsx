@@ -233,7 +233,7 @@ export const PAGE_GUIDES = {
       </>
     ),
     example:
-      "« Emballages Martin » évalué chaque année : qualité 18/20, délais 15/20, réactivité 16/20 → maintenu. Sous 12/20 → plan de progrès ou changement de fournisseur.",
+      "« Emballages Martin » évalué chaque année : qualité 4,5/5, délais 3,5/5, prix 4/5, réactivité 4/5 → moyenne pondérée 4/5 (poids égaux), maintenu. Une note sous le seuil de surveillance défini dans Réglages déclenche une revue de qualification et un plan de progrès ou un remplacement.",
   },
   'management-reviews': {
     title: 'Préparer et acter la revue de direction',
@@ -469,7 +469,7 @@ export const PAGE_GUIDES = {
         </p>
       </>
     ),
-    example: "qualité 16, délais 12, réactivité 14 → note globale 14/20 → statut « qualifié sous surveillance ».",
+    example: "Qualité 3/5, délais 2,5/5, prix 3/5, réactivité 2,5/5 → note pondérée 2,75/5 (poids égaux) → « sous surveillance » avec les seuils par défaut.",
   },
   managementReviewDetail: {
     title: 'Contenu de la revue de direction',
