@@ -1274,6 +1274,7 @@ export default function Planning() {
   const currentListPage = Math.min(listPage, listPageCount);
   const pageItems = listItems.slice((currentListPage - 1) * listPageSize, currentListPage * listPageSize);
   const visibleListItemKeys = new Set(pageItems.map((item) => `${item.type}-${item.id}`));
+  const shouldShowListPagination = listItems.length > 10;
   const calendarMonthKey = `${calendarDate.getFullYear()}-${String(calendarDate.getMonth() + 1).padStart(2, '0')}`;
   const calendarMonthItemCount = filteredItems.filter((item) => item.date.startsWith(calendarMonthKey)).length;
   const itemsOutsideCalendarMonth = filteredItems.length - calendarMonthItemCount;
@@ -1620,7 +1621,7 @@ export default function Planning() {
         onClear={() => setSelectedTaskIds([])}
       />
 
-      {viewMode === 'list' && !loading && listItems.length > listPageSize && (
+      {viewMode === 'list' && !loading && shouldShowListPagination && (
         <div className="mt-5">
           <PlanningPagination
             total={listItems.length}
@@ -1792,7 +1793,7 @@ export default function Planning() {
         </div>
       )}
 
-      {viewMode === 'list' && !loading && listItems.length > listPageSize && (
+      {viewMode === 'list' && !loading && shouldShowListPagination && (
         <div className="mt-5">
           <PlanningPagination
             total={listItems.length}
