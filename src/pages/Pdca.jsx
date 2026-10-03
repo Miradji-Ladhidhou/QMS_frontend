@@ -348,6 +348,7 @@ export default function Pdca() {
     () => sortedProjects.filter((pdca) => (pdca.category_id || null) === currentFolderId),
     [sortedProjects, currentFolderId]
   );
+  const hasActiveFilters = Boolean(statusFilter || serviceFilter || searchText.trim());
   const [projectPage, setProjectPage] = useState(1);
   const projectTotalPages = Math.max(1, Math.ceil(currentFolderProjects.length / 25));
   const pagedProjects = currentFolderProjects.slice((projectPage - 1) * 25, projectPage * 25);
@@ -475,45 +476,49 @@ export default function Pdca() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      <div className="relative mt-4">
-        <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Rechercher par titre ou description..."
-          value={searchText}
-          onChange={(e) => setSearchText(e.target.value)}
-          className="w-full rounded-md border border-slate-300 py-2.5 pl-10 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-        />
-      </div>
+      {(projects.length > 0 || hasActiveFilters) && (
+        <>
+          <div className="relative mt-4">
+            <Search size={18} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Rechercher par titre ou description..."
+              value={searchText}
+              onChange={(e) => setSearchText(e.target.value)}
+              className="w-full rounded-md border border-slate-300 py-2.5 pl-10 pr-3 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
 
-      <div className="mt-3 flex flex-wrap gap-2">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-        >
-          <option value="">Tous les statuts</option>
-          {Object.entries(PDCA_STATUS_LABELS).map(([value, label]) => (
-            <option key={value} value={value}>
-              {label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={serviceFilter}
-          onChange={(e) => setServiceFilter(e.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
-        >
-          <option value="">Tous les services</option>
-          {services.map((service) => (
-            <option key={service.id} value={service.id}>
-              {service.name}
-            </option>
-          ))}
-        </select>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Tous les statuts</option>
+              {Object.entries(PDCA_STATUS_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <select
+              value={serviceFilter}
+              onChange={(e) => setServiceFilter(e.target.value)}
+              className="rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Tous les services</option>
+              {services.map((service) => (
+                <option key={service.id} value={service.id}>
+                  {service.name}
+                </option>
+              ))}
+            </select>
 
-        <SortSelect options={PDCA_SORT_OPTIONS} sortKey={sortKey} direction={direction} onChangeKey={setSortKey} onToggleDirection={() => toggleSort(sortKey)} />
-      </div>
+            <SortSelect options={PDCA_SORT_OPTIONS} sortKey={sortKey} direction={direction} onChangeKey={setSortKey} onToggleDirection={() => toggleSort(sortKey)} />
+          </div>
+        </>
+      )}
 
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les projets" />
@@ -562,7 +567,7 @@ export default function Pdca() {
               {folders.map((folder) => (
                 <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
               ))}
-              {currentUser?.role === 'admin' && (
+              {currentUser?.role === 'admin' && (projects.length > 0 || folders.length > 0) && (
                 <button
                   type="button"
                   onClick={() => setIsNewFolderOpen(true)}
@@ -576,21 +581,56 @@ export default function Pdca() {
           )}
 
           {projects.length === 0 && folders.length === 0 ? (
-            <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-              <p className="text-base font-medium text-slate-700">Aucun projet PDCA enregistré pour l'instant</p>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-              >
-                <Plus size={18} />
-                Créer le premier projet
-              </button>
+            <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-slate-300 px-5 py-8 text-center sm:py-10">
+              <p className="text-base font-medium text-slate-700">
+                {hasActiveFilters ? 'Aucun projet ne correspond à ces critères.' : "Aucun projet PDCA enregistré pour l'instant"}
+              </p>
+              {hasActiveFilters ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchText('');
+                    setStatusFilter('');
+                    setServiceFilter('');
+                  }}
+                  className="mt-4 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
+                >
+                  Effacer les filtres
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsModalOpen(true)}
+                  className="mt-4 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                >
+                  <Plus size={18} />
+                  Créer le premier projet
+                </button>
+              )}
             </div>
           ) : currentFolderProjects.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">
-              {currentFolderId ? 'Aucun projet directement dans ce dossier.' : 'Aucun projet sans dossier.'}
-            </p>
+            <div className="mt-4">
+              <p className="text-sm text-slate-500">
+                {hasActiveFilters
+                  ? 'Aucun projet ne correspond à ces critères dans ce dossier.'
+                  : currentFolderId
+                    ? 'Aucun projet directement dans ce dossier.'
+                    : 'Aucun projet sans dossier.'}
+              </p>
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchText('');
+                    setStatusFilter('');
+                    setServiceFilter('');
+                  }}
+                  className="mt-2 text-sm font-medium text-primary hover:underline"
+                >
+                  Effacer les filtres
+                </button>
+              )}
+            </div>
           ) : (
             <div className="mt-4 space-y-3">
               {pagedProjects.map((pdca) => {

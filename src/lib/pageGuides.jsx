@@ -287,12 +287,12 @@ export const PAGE_GUIDES = {
     title: 'Piloter une amélioration en 4 étapes',
     body: (
       <p>
-        Conduire un projet d'amélioration selon le cycle <strong>Plan – Do – Check – Act</strong>, étape après étape
-        jusqu'à la clôture.
+        Conduire un projet d'amélioration selon le cycle <strong>Planifier – Réaliser – Vérifier – Ajuster</strong>,
+        étape après étape jusqu'à la clôture.
       </p>
     ),
     example:
-      "projet « réduire les rebuts de 30 % » : Plan (analyse + objectif) → Do (nouveau réglage) → Check (mesure sur 1 mois) → Act (on standardise ou on ajuste).",
+      "projet « réduire les rebuts de 30 % » : Planifier (analyse + objectif) → Réaliser (nouveau réglage) → Vérifier (mesure sur 1 mois) → Ajuster (on standardise ou on corrige).",
   },
   'nonconforming-outputs': {
     title: 'Produits / services non conformes',

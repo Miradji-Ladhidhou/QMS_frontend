@@ -1,4 +1,10 @@
-export const PDCA_STATUS_LABELS = { plan: 'Plan', do: 'Do', check: 'Check', act: 'Act', closed: 'Clôturé' };
+export const PDCA_STATUS_LABELS = {
+  plan: 'Planifier',
+  do: 'Réaliser',
+  check: 'Vérifier',
+  act: 'Ajuster',
+  closed: 'Clôturé',
+};
 
 export const PDCA_STATUS_STYLES = {
   plan: 'bg-slate-100 text-slate-700',
