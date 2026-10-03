@@ -23,15 +23,15 @@ export default function CcpLimitsFields({ form, updateField }) {
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">Minimum</label>
-          <input type="text" inputMode="decimal" placeholder="—" value={form.limit_min} onChange={(e) => updateField('limit_min', e.target.value)} className={FIELD_CLASS} />
+          <input type="text" inputMode="decimal" placeholder="Ex. : 0" value={form.limit_min} onChange={(e) => updateField('limit_min', e.target.value)} className={FIELD_CLASS} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">Maximum</label>
-          <input type="text" inputMode="decimal" placeholder="—" value={form.limit_max} onChange={(e) => updateField('limit_max', e.target.value)} className={FIELD_CLASS} />
+          <input type="text" inputMode="decimal" placeholder="Ex. : 4" value={form.limit_max} onChange={(e) => updateField('limit_max', e.target.value)} className={FIELD_CLASS} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-medium text-slate-600">Unité</label>
-          <input type="text" maxLength={20} placeholder="°C" value={form.limit_unit} onChange={(e) => updateField('limit_unit', e.target.value)} className={FIELD_CLASS} />
+          <input type="text" maxLength={20} placeholder="Ex. : °C" value={form.limit_unit} onChange={(e) => updateField('limit_unit', e.target.value)} className={FIELD_CLASS} />
         </div>
       </div>
 

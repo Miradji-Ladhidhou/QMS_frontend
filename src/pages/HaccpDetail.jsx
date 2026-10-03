@@ -447,16 +447,16 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Limites critiques</label>
-          <AutoTextarea rows={2} required value={form.critical_limits} onChange={(e) => updateField('critical_limits', e.target.value)} className={FIELD_CLASS} />
+          <AutoTextarea rows={2} required value={form.critical_limits} onChange={(e) => updateField('critical_limits', e.target.value)} placeholder="Ex. : Température à cœur ≥ 63 °C pendant 30 secondes" className={FIELD_CLASS} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Procédure de surveillance</label>
-          <AutoTextarea rows={2} required value={form.monitoring_procedure} onChange={(e) => updateField('monitoring_procedure', e.target.value)} className={FIELD_CLASS} />
+          <AutoTextarea rows={2} required value={form.monitoring_procedure} onChange={(e) => updateField('monitoring_procedure', e.target.value)} placeholder="Ex. : Mesurer au cœur du produit avec une sonde désinfectée et étalonnée." className={FIELD_CLASS} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence de surveillance</label>
-            <input type="text" placeholder="Ex : En continu" value={form.monitoring_frequency} onChange={(e) => updateField('monitoring_frequency', e.target.value)} className={FIELD_CLASS} />
+            <input type="text" placeholder="Ex. : À chaque livraison, pour chaque lot" value={form.monitoring_frequency} onChange={(e) => updateField('monitoring_frequency', e.target.value)} className={FIELD_CLASS} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Responsable de la surveillance</label>
@@ -473,21 +473,21 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
         <CcpLimitsFields form={form} updateField={updateField} />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Actions correctives prévues</label>
-          <AutoTextarea rows={2} value={form.corrective_action_procedure} onChange={(e) => updateField('corrective_action_procedure', e.target.value)} className={FIELD_CLASS} />
+          <AutoTextarea rows={2} value={form.corrective_action_procedure} onChange={(e) => updateField('corrective_action_procedure', e.target.value)} placeholder="Ex. : Isoler le lot et prévenir le responsable si la température dépasse la limite." className={FIELD_CLASS} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Procédure de vérification</label>
-            <AutoTextarea rows={2} value={form.verification_procedure} onChange={(e) => updateField('verification_procedure', e.target.value)} className={FIELD_CLASS} />
+            <AutoTextarea rows={2} value={form.verification_procedure} onChange={(e) => updateField('verification_procedure', e.target.value)} placeholder="Ex. : Vérifier l’étalonnage de la sonde et contrôler un relevé sur les fiches." className={FIELD_CLASS} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence de vérification</label>
-            <input type="text" value={form.verification_frequency} onChange={(e) => updateField('verification_frequency', e.target.value)} className={FIELD_CLASS} />
+            <input type="text" placeholder="Ex. : Étalonnage mensuel et revue hebdomadaire des relevés" value={form.verification_frequency} onChange={(e) => updateField('verification_frequency', e.target.value)} className={FIELD_CLASS} />
           </div>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Enregistrements à conserver</label>
-          <AutoTextarea rows={2} value={form.record_keeping_procedure} onChange={(e) => updateField('record_keeping_procedure', e.target.value)} className={FIELD_CLASS} />
+          <AutoTextarea rows={2} value={form.record_keeping_procedure} onChange={(e) => updateField('record_keeping_procedure', e.target.value)} placeholder="Ex. : Fiche de réception datée avec température relevée et signature du contrôleur." className={FIELD_CLASS} />
         </div>
         <button type="submit" disabled={submitting} className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
           {submitting ? 'Enregistrement...' : 'Enregistrer'}
