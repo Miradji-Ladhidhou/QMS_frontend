@@ -71,6 +71,7 @@ import { useSort } from '../lib/useSort.js';
 import SortSelect from '../components/SortSelect.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
+import FolderBreadcrumb from '../components/FolderBreadcrumb.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import BulkSelectionBar from '../components/BulkSelectionBar.jsx';
@@ -4454,73 +4455,6 @@ function KpiCard({
   );
 }
 
-// Fil d'Ariane de navigation dans les dossiers de KPI — réutilisé tel quel dans la page
-// principale et dans le sélecteur de destination de MoveKpiModal.
-function FolderBreadcrumb({ breadcrumb = [], onNavigate }) {
-  const isInsideFolder = breadcrumb.length > 0;
-  const parentFolder = breadcrumb.length > 1 ? breadcrumb[breadcrumb.length - 2] : null;
-
-  return (
-    <nav
-      aria-label="Navigation dans les dossiers"
-      className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs"
-    >
-      {isInsideFolder && (
-        <button
-          type="button"
-          onClick={() => onNavigate(parentFolder ? parentFolder.id : null)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200"
-          title={parentFolder ? `Remonter à « ${parentFolder.name} »` : 'Remonter à « Tous les KPI »'}
-        >
-          <ArrowLeft size={14} className="text-slate-600" />
-          <span className="hidden sm:inline">Dossier parent</span>
-          <span className="sm:hidden">Retour</span>
-        </button>
-      )}
-
-      {isInsideFolder && <span className="h-5 w-px bg-slate-200" aria-hidden="true" />}
-
-      <div className="flex flex-wrap items-center gap-1 text-xs">
-        <button
-          type="button"
-          onClick={() => onNavigate(null)}
-          className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-all ${
-            breadcrumb.length === 0
-              ? 'border border-primary/25 bg-primary/10 font-semibold text-primary shadow-2xs'
-              : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-          }`}
-        >
-          <Folder size={13} className={breadcrumb.length === 0 ? 'text-primary fill-primary/20' : 'text-slate-400'} />
-          <span>Tous les KPI</span>
-        </button>
-
-        {breadcrumb.map((folder, i) => {
-          const isCurrent = i === breadcrumb.length - 1;
-          return (
-            <span key={folder.id} className="flex items-center gap-1">
-              <ChevronRight size={13} className="shrink-0 text-slate-400" aria-hidden="true" />
-              <button
-                type="button"
-                onClick={() => onNavigate(folder.id)}
-                aria-current={isCurrent ? 'page' : undefined}
-                className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 font-medium transition-all ${
-                  isCurrent
-                    ? 'border border-primary/30 bg-primary/10 font-semibold text-primary shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-                }`}
-                title={folder.name}
-              >
-                <Folder size={13} className={isCurrent ? 'text-primary fill-primary/20' : 'text-slate-400'} />
-                <span className="max-w-[140px] truncate sm:max-w-[200px]">{folder.name}</span>
-              </button>
-            </span>
-          );
-        })}
-      </div>
-    </nav>
-  );
-}
-
 function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -4821,7 +4755,7 @@ function MoveKpiModal({ kpi, onClose, onMoved }) {
           <p className="mb-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
         )}
 
-        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={setPickerFolderId} />
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={setPickerFolderId} rootLabel="Tous les KPI" />
 
         <div className="mt-3 flex-1 overflow-y-auto overflow-x-hidden rounded-md border border-slate-100">
           {loadingFolders ? (
@@ -5435,7 +5369,7 @@ export default function Kpis() {
       </div>
       <PageGuide id="kpis" />
 
-      <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} />
+      <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les KPI" />
 
       <div className="mt-4 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">

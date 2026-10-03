@@ -19,6 +19,7 @@ import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { isManagerRole } from '../lib/roles.js';
 import FolderTile from './FolderTile.jsx';
+import FolderBreadcrumb from './FolderBreadcrumb.jsx';
 
 function sanitizeFilename(name) {
   return (name || 'registre').toLowerCase().replace(/[^a-z0-9à-ÿ_-]/gi, '-');
@@ -48,6 +49,7 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
   const importInput = useRef(null);
   const [currentFolder, setCurrentFolder] = useState(null);
   const [searchFilter, setSearchFilter] = useState('');
+  const [folderToRename, setFolderToRename] = useState(null);
 
   // Modales
   const [isNewRegisterOpen, setIsNewRegisterOpen] = useState(false);
@@ -168,6 +170,25 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
     }
   }
 
+  async function handleRenameFolder(newName) {
+    const trimmedName = newName.trim();
+    if (!folderToRename || !trimmedName) return;
+    try {
+      await api.patch('/registers/folders/rename', {
+        folder: folderToRename,
+        new_name: trimmedName,
+      });
+      setRegisters((prev) => prev.map((register) => (
+        register.folder === folderToRename ? { ...register, folder: trimmedName } : register
+      )));
+      if (currentFolder === folderToRename) setCurrentFolder(trimmedName);
+      setFolderToRename(null);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de renommer le dossier.');
+      throw err;
+    }
+  }
+
   // Tri dynamique
   function handleToggleSort(colId) {
     if (sortColId === colId) {
@@ -180,6 +201,8 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
 
   const columns = activeRegister?.columns || [];
   const rows = activeRegister?.rows || [];
+  const isRegulatoryRegister = /r[eé]glementair/i
+    .test(`${activeRegister?.title || ''} ${activeRegister?.description || ''}`);
 
   // Filtrage par texte
   const filteredRows = useMemo(() => {
@@ -276,38 +299,83 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 text-sm">
-          <button type="button" onClick={() => openFolder(null)} className="font-medium text-primary hover:underline">Registres</button>
-          {currentFolder && <><span className="text-slate-400">/</span><span className="text-slate-700">{currentFolder}</span></>}
-          {activeRegister && <><span className="text-slate-400">/</span><span className="text-slate-700">{activeRegister.title}</span></>}
-        </div>
+        <FolderBreadcrumb
+          breadcrumb={currentFolder ? [{ id: currentFolder, name: currentFolder }] : []}
+          onNavigate={openFolder}
+          rootLabel="Tous les registres"
+        />
         {canManage && !activeRegister && <button type="button" onClick={() => setIsNewRegisterOpen(true)} className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-700"><Plus size={16} /> Nouveau registre</button>}
       </div>
 
       {!activeRegister && <>
         {!currentFolder && folders.length > 0 && <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
-          {folders.map((folder) => <FolderTile key={folder} folder={{ name: folder }} canManage={false} onOpen={() => openFolder(folder)} />)}
+          {folders.map((folder) => (
+            <FolderTile
+              key={folder}
+              folder={{ name: folder }}
+              canManage={canManage}
+              onOpen={() => openFolder(folder)}
+              onRename={() => setFolderToRename(folder)}
+            />
+          ))}
         </div>}
-        {visibleRegisters.length > 0 && <div className="overflow-hidden rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
-          {visibleRegisters.map((register) => <button key={register.id} type="button" onClick={() => loadRegisterDetail(register.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"><TableProperties size={19} className="text-emerald-700" /><span className="flex-1 text-sm font-medium text-slate-800">{register.title}</span><span className="text-xs text-slate-500">{register.rows_count || 0} entrée(s)</span></button>)}
-        </div>}
+        {currentFolder && (
+          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+            <h2 className="text-sm font-semibold text-slate-800">
+              Contenu du dossier « {currentFolder} »
+            </h2>
+            {visibleRegisters.length > 0 ? (
+              <p className="mt-0.5 text-xs text-slate-500">
+                {visibleRegisters.length} registre{visibleRegisters.length > 1 ? 's' : ''} dans ce dossier.
+              </p>
+            ) : (
+              <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-slate-600">Ce dossier ne contient aucun registre pour le moment.</p>
+                {canManage && (
+                  <button
+                    type="button"
+                    onClick={() => setIsNewRegisterOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700"
+                  >
+                    <Plus size={15} />
+                    Créer un registre dans ce dossier
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        {visibleRegisters.length > 0 && <>
+          {!currentFolder && (
+            <div>
+              <h2 className="text-sm font-semibold text-slate-700">Registres sans dossier</h2>
+              <p className="mt-0.5 text-xs text-slate-500">Ces registres ne sont associés à aucun dossier.</p>
+            </div>
+          )}
+          <div className="overflow-hidden rounded-lg border border-slate-200 bg-white divide-y divide-slate-100">
+            {visibleRegisters.map((register) => <button key={register.id} type="button" onClick={() => loadRegisterDetail(register.id)} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-slate-50"><TableProperties size={19} className="text-emerald-700" /><span className="flex-1 text-sm font-medium text-slate-800">{register.title}</span><span className="text-xs text-slate-500">{register.rows_count || 0} entrée(s)</span></button>)}
+          </div>
+        </>}
       </>}
 
       {/* Contenu principal du registre sélectionné */}
       {activeRegister ? (
         <div className="space-y-3">
           {/* Barre d'outils et actions du registre */}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex flex-1 flex-col gap-2 sm:flex-row sm:items-center sm:gap-4">
-              <div>
-                <h2 className="text-lg font-semibold text-slate-900">{activeRegister.title}</h2>
-                {activeRegister.description && (
-                  <p className="text-sm text-slate-500">{activeRegister.description}</p>
-                )}
-              </div>
+          <div className="flex flex-col gap-3">
+            <div className="min-w-0">
+              <h2 className="text-lg font-semibold text-slate-900">{activeRegister.title}</h2>
+              {activeRegister.description && (
+                <p className="text-sm text-slate-500">{activeRegister.description}</p>
+              )}
+              {isRegulatoryRegister && (
+                <p className="mt-1 text-xs text-slate-500">
+                  Pour assurer la traçabilité, pensez à ajouter les colonnes « Source officielle », « Responsable » et « Dernière vérification » via Options.
+                </p>
+              )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+            <div className="flex flex-wrap items-center gap-2">
                 {canManage && <>
                   <input ref={importInput} type="file" accept=".xlsx" onChange={handleImportXlsx} className="hidden" aria-label="Fichier Excel à importer" />
                   <button type="button" disabled={importingXlsx} onClick={() => importInput.current?.click()} className="inline-flex items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"><Upload size={16} />{importingXlsx ? 'Import en cours…' : 'Importer'}</button>
@@ -400,7 +468,11 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
                             type="button"
                             onClick={() => handleToggleSort(col.id)}
                             className="flex items-center gap-1.5 font-semibold text-slate-700 hover:text-primary"
-                            title={`Trier par ${col.name}`}
+                            title={
+                              /\b(score|note)\b/i.test(col.name)
+                                ? `Trier par ${col.name}. La signification et l'échelle de cette valeur dépendent de vos critères internes.`
+                                : `Trier par ${col.name}`
+                            }
                           >
                             <span>{col.name}</span>
                             {col.is_planning && (
@@ -537,7 +609,9 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
                   {searchFilter && ` trouvée(s) sur ${rows.length}`}
                 </span>
                 <span>·</span>
-                <span>{columns.length} colonne{columns.length > 1 ? 's' : ''}</span>
+                <span title="Hors numérotation des lignes et colonne Actions">
+                  {columns.length} colonne{columns.length > 1 ? 's' : ''} de données
+                </span>
               </div>
             </div>
           </div>
@@ -561,6 +635,14 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
           )}
         </div>
       ) : null}
+
+      {folderToRename && (
+        <FolderRenameModal
+          folder={folderToRename}
+          onClose={() => setFolderToRename(null)}
+          onSave={handleRenameFolder}
+        />
+      )}
 
       {/* Modale création nouveau registre */}
       {isNewRegisterOpen && (
@@ -629,6 +711,68 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
           }}
         />
       )}
+    </div>
+  );
+}
+
+function FolderRenameModal({ folder, onClose, onSave }) {
+  const [name, setName] = useState(folder);
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    if (!trimmedName) {
+      setError('Le nom du dossier est requis.');
+      return;
+    }
+    setSaving(true);
+    setError('');
+    try {
+      await onSave(trimmedName);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de renommer le dossier.');
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Renommer le dossier</h2>
+          <button type="button" onClick={onClose} className="p-1 text-slate-400 hover:text-slate-600">
+            <X size={20} />
+          </button>
+        </div>
+        <p className="mb-3 text-sm text-slate-500">
+          Le nouveau nom sera appliqué à tous les registres de ce dossier.
+        </p>
+        {error && <p role="alert" className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="rename-register-folder" className="mb-1 block text-sm font-medium text-slate-700">Nom du dossier</label>
+            <input
+              id="rename-register-folder"
+              type="text"
+              autoFocus
+              maxLength={120}
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+          </div>
+          <div className="flex gap-2 pt-2">
+            <button type="button" onClick={onClose} className="flex-1 rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Annuler
+            </button>
+            <button type="submit" disabled={saving} className="flex-1 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-50">
+              {saving ? 'Enregistrement...' : 'Renommer'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }

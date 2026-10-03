@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight, Folder, Home } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Folder, Home, MapPin } from 'lucide-react';
 
 // Fil d'Ariane et boutons de navigation dans l'arborescence des dossiers.
 // Permet de voir clairement où on se trouve, de remonter d'un niveau (Retour au dossier parent)
@@ -11,8 +11,14 @@ export default function FolderBreadcrumb({ breadcrumb = [], onNavigate, rootLabe
   return (
     <nav
       aria-label="Navigation dans les dossiers"
-      className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-xs"
+      className="mt-3 flex flex-wrap items-center gap-2 rounded-xl border border-primary/20 bg-primary/[0.04] px-3 py-2.5 shadow-xs"
     >
+      <span className="inline-flex shrink-0 items-center gap-1.5 px-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
+        <MapPin size={13} className="text-primary" />
+        Emplacement
+      </span>
+      <span className="h-5 w-px bg-slate-200" aria-hidden="true" />
+
       {/* Bouton de retour rapide vers le niveau parent lorsque l'on est dans un dossier */}
       {isInsideFolder && (
         <button

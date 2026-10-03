@@ -516,10 +516,9 @@ export default function Employees() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {employees.length > 0 && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
-          <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tout le personnel" />
-
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+        <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tout le personnel" />
+        {employees.length > 0 && (
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -537,8 +536,8 @@ export default function Employees() {
               onToggleDirection={() => toggleSort(sortKey)}
             />
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {loading || foldersLoading ? (
         <div className="mt-4 space-y-2">
