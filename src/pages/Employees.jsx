@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Ban, CheckCircle2, Folder, FolderCog, FolderInput, FolderPlus, Pencil, Plus, Trash2, X } from 'lucide-react';
+import {
+  Ban,
+  BriefcaseBusiness,
+  CheckCircle2,
+  Folder,
+  FolderCog,
+  FolderInput,
+  FolderPlus,
+  GraduationCap,
+  Mail,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
@@ -168,10 +182,10 @@ function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit
         employee.is_active ? '' : 'opacity-60'
       }`}
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <div>
+      <div className="flex flex-col gap-3">
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="font-medium text-slate-900">{employee.full_name}</span>
+            <span className="break-words font-medium text-slate-900">{employee.full_name}</span>
             <span
               className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
                 employee.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -181,10 +195,33 @@ function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit
               {employee.is_active ? 'Actif' : 'Inactif'}
             </span>
           </div>
-          {employee.email && <p className="mt-0.5 text-sm text-slate-500">{employee.email}</p>}
+          {employee.job_title && (
+            <p className="mt-2 flex items-center gap-1.5 text-sm text-slate-600">
+              <BriefcaseBusiness size={14} className="shrink-0 text-slate-400" />
+              <span>{employee.job_title}</span>
+            </p>
+          )}
+          {employee.email && (
+            <p className="mt-1 flex items-center gap-1.5 break-all text-sm text-slate-500">
+              <Mail size={14} className="shrink-0 text-slate-400" />
+              <span>{employee.email}</span>
+            </p>
+          )}
+          {employee.training_exempt && (
+            <p
+              className="mt-2 inline-flex max-w-full items-start gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800"
+              title={employee.training_exempt_reason || 'Cette personne est dispensée de formation.'}
+            >
+              <GraduationCap size={14} className="mt-px shrink-0" />
+              <span className="truncate">
+                Dispensé de formation
+                {employee.training_exempt_reason ? ` — ${employee.training_exempt_reason}` : ''}
+              </span>
+            </p>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex shrink-0 flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => onToggleActive(employee)}
@@ -201,8 +238,9 @@ function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit
           <button
             type="button"
             onClick={() => onEdit(employee)}
-            aria-label="Modifier"
-            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+            aria-label={`Modifier ${employee.full_name}`}
+            title={`Modifier ${employee.full_name}`}
+            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
           >
             <Pencil size={16} />
           </button>
@@ -210,8 +248,9 @@ function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit
             type="button"
             onClick={() => onDelete(employee)}
             disabled={deletingId === employee.id}
-            aria-label="Supprimer"
-            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600 disabled:opacity-60"
+            aria-label={`Supprimer ${employee.full_name}`}
+            title={`Supprimer ${employee.full_name}`}
+            className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 disabled:opacity-60"
           >
             <Trash2 size={16} />
           </button>
@@ -532,7 +571,7 @@ export default function Employees() {
               {currentFolderId ? 'Aucune personne directement dans ce dossier.' : 'Aucune personne sans dossier.'}
             </p>
           ) : (
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {currentFolderEmployees.map((employee) => (
                 <EmployeeCard
                   key={employee.id}
