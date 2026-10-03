@@ -18,7 +18,7 @@ import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AiHazardSuggestion from '../components/AiHazardSuggestion.jsx';
 import AiCcpSignificanceSuggestion from '../components/AiCcpSignificanceSuggestion.jsx';
 import AiCcpDefinitionSuggestion from '../components/AiCcpDefinitionSuggestion.jsx';
-import AiHaccpAnalysisReview from '../components/AiHaccpAnalysisReview.jsx';
+import AiHaccpSurveillanceSuggestion from '../components/AiHaccpSurveillanceSuggestion.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
@@ -368,21 +368,21 @@ function HazardFormModal({ stepId, hazard, laterSteps, onClose, onSaved }) {
   );
 }
 
-function CcpFormModal({ hazardId, hazard, ccp, users, onClose, onSaved }) {
+function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSaved }) {
   const [form, setForm] = useState({
     ccp_number: ccp?.ccp_number || '',
-    critical_limits: ccp?.critical_limits || '',
-    monitoring_procedure: ccp?.monitoring_procedure || '',
-    monitoring_frequency: ccp?.monitoring_frequency || '',
+    critical_limits: suggestion?.critical_limits || ccp?.critical_limits || '',
+    monitoring_procedure: suggestion?.monitoring_procedure || ccp?.monitoring_procedure || '',
+    monitoring_frequency: suggestion?.monitoring_frequency || ccp?.monitoring_frequency || '',
     limit_min: ccp?.limit_min === null || ccp?.limit_min === undefined ? '' : String(ccp.limit_min),
     limit_max: ccp?.limit_max === null || ccp?.limit_max === undefined ? '' : String(ccp.limit_max),
     limit_unit: ccp?.limit_unit || '',
     monitoring_interval_hours: ccp?.monitoring_interval_hours === null || ccp?.monitoring_interval_hours === undefined ? '' : String(Number(ccp.monitoring_interval_hours)),
     monitoring_responsible: ccp?.monitoring_responsible || '',
-    corrective_action_procedure: ccp?.corrective_action_procedure || '',
-    verification_procedure: ccp?.verification_procedure || '',
-    verification_frequency: ccp?.verification_frequency || '',
-    record_keeping_procedure: ccp?.record_keeping_procedure || '',
+    corrective_action_procedure: suggestion?.corrective_action_procedure || ccp?.corrective_action_procedure || '',
+    verification_procedure: suggestion?.verification_procedure || ccp?.verification_procedure || '',
+    verification_frequency: suggestion?.verification_frequency || ccp?.verification_frequency || '',
+    record_keeping_procedure: suggestion?.record_keeping_procedure || ccp?.record_keeping_procedure || '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -414,7 +414,12 @@ function CcpFormModal({ hazardId, hazard, ccp, users, onClose, onSaved }) {
     <ModalShell title={ccp ? 'Modifier le point critique (CCP)' : 'Nouveau point critique (CCP)'} onClose={onClose} wide>
       {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
-        {hazard && (
+        {suggestion && (
+          <p className="rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800">
+            Proposition IA préremplie. Vérifiez et ajustez les valeurs, notamment les limites chiffrées, avant d’enregistrer.
+          </p>
+        )}
+        {hazard && !suggestion && (
           <AiCcpDefinitionSuggestion
             hazardType={hazard.hazard_type}
             description={hazard.description}
@@ -794,7 +799,13 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
 
   return (
     <div className="mt-4">
-      <AiHaccpAnalysisReview plan={plan} />
+      <AiHaccpSurveillanceSuggestion
+        plan={plan}
+        canManage={canManage}
+        onOpenCcpEditor={(hazard, suggestion) => {
+          setCcpModal({ hazardId: hazard.id, hazard, ccp: hazard.ccp || undefined, suggestion });
+        }}
+      />
 
       {allCcps.length === 0 ? (
         <p className="rounded-md border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
@@ -1280,11 +1291,15 @@ export default function HaccpDetail() {
           hazard={ccpModal.hazard}
           ccp={ccpModal.ccp}
           users={users}
-          onClose={() => setCcpModal(null)}
+          onClose={() => {
+            setCcpModal(null);
+            loadPlan();
+          }}
           onSaved={() => {
             setCcpModal(null);
             loadPlan();
           }}
+          suggestion={ccpModal.suggestion}
         />
       )}
     </div>
