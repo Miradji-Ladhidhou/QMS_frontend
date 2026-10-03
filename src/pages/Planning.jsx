@@ -1452,75 +1452,118 @@ export default function Planning() {
 
         {canFilterByService && (
           <div className="mt-4">
-            <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Service</p>
             {allServices.length === 0 ? (
-              <p className="text-sm text-slate-500">Aucun service configuré.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {allServices.map((service) => {
-                  const checked = selectedServiceIds.includes(service.id);
-                  return (
-                    <label
-                      key={service.id}
-                      className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                        checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={checked}
-                        onChange={() => handleToggleService(service.id)}
-                        className="sr-only"
-                      />
-                      {checked && <Check size={14} />}
-                      {service.name}
-                    </label>
-                  );
-                })}
+              <div>
+                <p className="mb-1.5 text-sm font-medium text-slate-700">Service</p>
+                <p className="text-sm text-slate-500">Aucun service configuré.</p>
               </div>
+            ) : (
+              <details className="group relative w-fit max-w-full">
+                <p className="mb-1.5 text-sm font-medium text-slate-700">Service</p>
+                <summary className="flex max-w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                  <span className="truncate">
+                    {selectedServiceIds.length === 0
+                      ? role === 'manager'
+                        ? 'Mes services par défaut'
+                        : 'Tous les services'
+                      : selectedServiceIds.length === 1
+                        ? allServices.find((service) => service.id === selectedServiceIds[0])?.name || '1 service'
+                        : `${selectedServiceIds.length} services sélectionnés`}
+                  </span>
+                  <ChevronDown size={16} className="shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
+                </summary>
+                <div className="absolute left-0 z-20 mt-2 max-h-72 w-72 max-w-[calc(100vw-3rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                  <div className="border-b border-slate-100 px-3 pb-2 pt-1">
+                    <h3 className="text-sm font-semibold text-slate-800">Filtrer par service</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">Sélectionnez un ou plusieurs services.</p>
+                  </div>
+                  {selectedServiceIds.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedServiceIds([]);
+                        loadPlanning([]);
+                      }}
+                      className="mb-1 w-full rounded-md px-3 py-2 text-left text-sm font-medium text-primary hover:bg-slate-50"
+                    >
+                      {role === 'manager' ? 'Mes services par défaut' : 'Tous les services'}
+                    </button>
+                  )}
+                  <div className="space-y-1">
+                    {allServices.map((service) => (
+                      <label
+                        key={service.id}
+                        className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedServiceIds.includes(service.id)}
+                          onChange={() => handleToggleService(service.id)}
+                          className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                        />
+                        <span className="min-w-0 truncate">{service.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </details>
             )}
           </div>
         )}
 
         <div className="mt-4">
-          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">Type</p>
-          <div className="flex flex-wrap gap-2">
-            <label
-              className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                overdueOnly ? 'border-red-300 bg-red-50 text-red-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <input type="checkbox" checked={overdueOnly} onChange={() => setOverdueOnly((prev) => !prev)} className="sr-only" />
-              {overdueOnly && <Check size={14} />}
-              En retard uniquement
-            </label>
-
-            <label
-              className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                showDoneTasks ? 'border-emerald-300 bg-emerald-50 text-emerald-700' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-              }`}
-            >
-              <input type="checkbox" checked={showDoneTasks} onChange={() => setShowDoneTasks((prev) => !prev)} className="sr-only" />
-              {showDoneTasks && <Check size={14} />}
-              Tâches terminées
-            </label>
-
-            {Object.entries(TYPE_CONFIG).map(([type, config]) => {
-              const checked = typeFilter.includes(type);
-              return (
-                <label
-                  key={type}
-                  className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-                    checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  <input type="checkbox" checked={checked} onChange={() => toggleTypeFilter(type)} className="sr-only" />
-                  {checked && <Check size={14} />}
-                  {config.label}
+          <details className="group relative w-fit max-w-full">
+            <p className="mb-1.5 text-sm font-medium text-slate-700">Type</p>
+            <summary className="flex max-w-full cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+              <span className="truncate">
+                {typeFilter.length + Number(overdueOnly) + Number(showDoneTasks) === 0
+                  ? 'Tous les types'
+                  : `${typeFilter.length + Number(overdueOnly) + Number(showDoneTasks)} filtre${typeFilter.length + Number(overdueOnly) + Number(showDoneTasks) > 1 ? 's' : ''} sélectionné${typeFilter.length + Number(overdueOnly) + Number(showDoneTasks) > 1 ? 's' : ''}`}
+              </span>
+              <ChevronDown size={16} className="shrink-0 text-slate-500 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="absolute left-0 z-20 mt-2 max-h-80 w-80 max-w-[calc(100vw-3rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+              <div className="border-b border-slate-100 px-3 pb-2 pt-1">
+                <h3 className="text-sm font-semibold text-slate-800">Filtrer par type</h3>
+                <p className="mt-0.5 text-xs text-slate-500">Choisissez les types d’éléments à afficher.</p>
+              </div>
+              <div className="space-y-1 pt-1">
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    checked={overdueOnly}
+                    onChange={() => setOverdueOnly((prev) => !prev)}
+                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  <span>En retard uniquement</span>
                 </label>
-              );
-            })}
-          </div>
+                <label className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50">
+                  <input
+                    type="checkbox"
+                    checked={showDoneTasks}
+                    onChange={() => setShowDoneTasks((prev) => !prev)}
+                    className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                  />
+                  <span>Tâches terminées</span>
+                </label>
+                <div className="my-1 border-t border-slate-100" />
+                {Object.entries(TYPE_CONFIG).map(([type, config]) => (
+                  <label
+                    key={type}
+                    className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={typeFilter.includes(type)}
+                      onChange={() => toggleTypeFilter(type)}
+                      className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                    />
+                    <span>{config.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </details>
         </div>
 
         {users.length > 0 && (

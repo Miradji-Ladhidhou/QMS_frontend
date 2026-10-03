@@ -304,6 +304,35 @@ function isNavItemActive(item, pathname) {
 
 export default function Layout() {
   useInactivityLogout(INACTIVITY_TIMEOUT_MS);
+  useEffect(() => {
+    function closeOnOutsideClick(event) {
+      if (!(event.target instanceof Element)) return;
+
+      document.querySelectorAll('details[open]').forEach((popup) => {
+        if (!popup.contains(event.target)) popup.open = false;
+      });
+
+      const backdrop = event.target;
+      if (!backdrop.classList.contains('fixed') || !backdrop.classList.contains('inset-0')) return;
+
+      const closeButton = backdrop.querySelector(
+        'button[aria-label*="Fermer"], button[aria-label*="Close"], button[title*="Fermer"], button[title*="Close"]'
+      );
+      if (closeButton instanceof HTMLButtonElement) {
+        closeButton.click();
+        return;
+      }
+
+      const cancelButton = Array.from(backdrop.querySelectorAll('button')).find((button) =>
+        ['annuler', 'fermer', 'cancel', 'close', 'retour'].includes(button.textContent.trim().toLocaleLowerCase('fr'))
+      );
+      cancelButton?.click();
+    }
+
+    document.addEventListener('click', closeOnOutsideClick);
+    return () => document.removeEventListener('click', closeOnOutsideClick);
+  }, []);
+
   const currentUser = useCurrentUser();
   const tenant = useTenant();
   const role = useRole();

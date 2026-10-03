@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle,
-  Check,
   CheckCircle2,
   ChevronDown,
   ClipboardCheck,
@@ -366,45 +365,62 @@ export default function Dashboard() {
 
       {canFilterByService && (
         <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-          <div className="mr-1 flex items-center gap-2 font-semibold text-slate-700">
+          <div className="flex items-center gap-2 font-semibold text-slate-700">
             <Filter size={16} />
-            Services
+            <span>Services</span>
           </div>
-
           {allServices.length === 0 ? (
-            <span className="text-slate-500">Aucun service configuré</span>
+            <p className="text-slate-500">Aucun service configuré</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {allServices.map((service) => {
-                const checked = selectedServiceIds.includes(service.id);
-                return (
-                  <label
-                    key={service.id}
-                    className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2.5 py-1 text-sm transition-colors ${
-                      checked ? 'border-primary bg-primary/5 text-primary' : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}
+            <details className="group relative">
+              <summary className="flex cursor-pointer list-none items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm hover:border-primary/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <span>
+                  {selectedServiceIds.length === 0
+                    ? role === 'manager'
+                      ? 'Mes services par défaut'
+                      : 'Vue globale'
+                    : selectedServiceIds.length === 1
+                      ? allServices.find((service) => service.id === selectedServiceIds[0])?.name || '1 service'
+                      : `${selectedServiceIds.length} services sélectionnés`}
+                </span>
+                <ChevronDown size={16} className="text-slate-500 transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="absolute left-0 z-20 mt-2 max-h-72 w-72 max-w-[calc(100vw-3rem)] overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 shadow-lg">
+                <div className="border-b border-slate-100 px-3 pb-2 pt-1">
+                  <h2 className="text-sm font-semibold text-slate-800">Filtrer par service</h2>
+                  <p className="mt-0.5 text-xs text-slate-500">Sélectionnez un ou plusieurs services.</p>
+                </div>
+                {selectedServiceIds.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedServiceIds([]);
+                      loadStats([]);
+                    }}
+                    className="mb-1 w-full rounded-md px-3 py-2 text-left text-sm font-medium text-primary hover:bg-slate-50"
                   >
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={() => handleToggleService(service.id)}
-                      className="sr-only"
-                    />
-                    {checked && <Check size={14} />}
-                    {service.name}
-                  </label>
-                );
-              })}
-            </div>
+                    {role === 'manager' ? 'Mes services par défaut' : 'Vue globale'}
+                  </button>
+                )}
+                <div className="space-y-1">
+                  {allServices.map((service) => (
+                    <label
+                      key={service.id}
+                      className="flex cursor-pointer items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedServiceIds.includes(service.id)}
+                        onChange={() => handleToggleService(service.id)}
+                        className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
+                      />
+                      <span className="min-w-0 truncate">{service.name}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </details>
           )}
-
-          <span className="text-xs text-slate-500">
-            {selectedServiceIds.length === 0
-              ? role === 'manager'
-                ? 'Mes services par défaut'
-                : 'Vue globale'
-              : `${selectedServiceIds.length} sélectionné${selectedServiceIds.length > 1 ? 's' : ''}`}
-          </span>
         </div>
       )}
 

@@ -83,36 +83,34 @@ export default function Settings() {
     <div>
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Paramètres</h1>
 
-      <div className="mt-4 space-y-4 border-b border-slate-200 pb-4">
+      <nav aria-label="Sections des paramètres" className="mt-4 border-b border-slate-200 pb-4">
+        <label htmlFor="settings-section" className="mb-1.5 block text-sm font-medium text-slate-700">
+          Rubrique des paramètres
+        </label>
+        <select
+          id="settings-section"
+          value={activeTab}
+          onChange={(event) => setActiveTab(event.target.value)}
+          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm font-medium text-slate-700 shadow-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary sm:max-w-md"
+        >
         {TAB_GROUPS.map((group) => {
           const visibleTabs = group.tabs.filter((tab) => !tab.adminOnly || isAdmin);
           if (visibleTabs.length === 0) return null;
 
           return (
-            <div key={group.label}>
-              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">{group.label}</p>
-              <div className="flex flex-wrap gap-1.5">
-                {visibleTabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`rounded-full border px-3 py-1.5 text-sm font-medium transition-colors ${
-                      activeTab === tab.id
-                        ? 'border-primary bg-primary/5 text-primary'
-                        : 'border-slate-300 text-slate-600 hover:bg-slate-50'
-                    }`}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <optgroup key={group.label} label={group.label}>
+              {visibleTabs.map((tab) => (
+                <option key={tab.id} value={tab.id}>
+                  {tab.label}
+                </option>
+              ))}
+            </optgroup>
           );
         })}
-      </div>
+        </select>
+      </nav>
 
-      <div className="mt-4">
+      <section className="mt-4" aria-label="Contenu des paramètres">
         {activeTab === 'company' && <CompanySettings isAdmin={isAdmin} />}
         {activeTab === 'users' && <UserManager currentUser={currentUser} isAdmin={isAdmin} />}
         {activeTab === 'groups' && isAdmin && <Groups />}
@@ -141,7 +139,7 @@ export default function Settings() {
           />
         )}
         {activeTab === 'notifications' && <NotificationPreferences />}
-      </div>
+      </section>
     </div>
   );
 }
