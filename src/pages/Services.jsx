@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Ban, CheckCircle2, Pencil, Plus, Trash2, UserMinus, X } from 'lucide-react';
+import { Ban, CheckCircle2, Pencil, Plus, Search, Trash2, UserMinus, Users, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -16,6 +16,7 @@ const SERVICE_SORT_OPTIONS = [
 function ServiceModal({ service, onClose, onSaved }) {
   const isNew = !service;
   const [name, setName] = useState(service?.name || '');
+  const [description, setDescription] = useState(service?.description || '');
   const [isActive, setIsActive] = useState(service?.is_active ?? true);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -30,8 +31,8 @@ function ServiceModal({ service, onClose, onSaved }) {
     let response;
     try {
       response = isNew
-        ? await api.post('/services', { name })
-        : await api.patch(`/services/${service.id}`, { name, is_active: isActive });
+        ? await api.post('/services', { name, description })
+        : await api.patch(`/services/${service.id}`, { name, description, is_active: isActive });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer le service.");
       setSaving(false);
@@ -43,7 +44,7 @@ function ServiceModal({ service, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
-      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-md sm:rounded-xl sm:p-6">
+      <div className="w-full rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-slate-900">{isNew ? 'Nouveau service' : 'Modifier le service'}</h2>
           <button type="button" onClick={onClose} aria-label="Fermer" className="p-1 text-slate-500 hover:text-slate-700">
@@ -65,6 +66,21 @@ function ServiceModal({ service, onClose, onSaved }) {
               onChange={(e) => setName(e.target.value)}
               className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
             />
+          </div>
+          <div>
+            <label htmlFor="service-description" className="mb-1 block text-sm font-medium text-slate-700">
+              Description <span className="font-normal text-slate-400">(facultative)</span>
+            </label>
+            <textarea
+              id="service-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              maxLength={500}
+              rows={3}
+              placeholder="Rôle et périmètre de ce service..."
+              className="w-full resize-y rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <p className="mt-1 text-right text-xs text-slate-400">{description.length}/500</p>
           </div>
 
           {!isNew && (
@@ -94,6 +110,7 @@ function ServiceModal({ service, onClose, onSaved }) {
 
 function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
   const [managers, setManagers] = useState(null);
+  const [managersError, setManagersError] = useState('');
   const [error, setError] = useState('');
   const [toggling, setToggling] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -103,11 +120,12 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
   const [removingId, setRemovingId] = useState(null);
 
   async function loadManagers() {
+    setManagersError('');
     try {
       const { data } = await api.get(`/services/${service.id}/managers`);
       setManagers(data);
     } catch {
-      setManagers([]);
+      setManagersError('Impossible de charger les managers rattachés.');
     }
   }
 
@@ -117,6 +135,15 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
   }, [service.id]);
 
   async function handleToggleActive() {
+    if (
+      service.is_active &&
+      !window.confirm(
+        `Désactiver « ${service.name} » ? Les éléments déjà rattachés resteront inchangés, mais ce service ne pourra plus être sélectionné pour de nouveaux éléments.`
+      )
+    ) {
+      return;
+    }
+
     setError('');
     setToggling(true);
 
@@ -135,7 +162,11 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
   }
 
   async function handleDelete() {
-    if (!window.confirm(`Supprimer définitivement le service "${service.name}" ?`)) return;
+    if (
+      !window.confirm(
+        `Supprimer définitivement « ${service.name} » ? Les managers rattachés seront détachés. La suppression sera refusée si des éléments métier utilisent encore ce service ; dans ce cas, désactivez-le plutôt.`
+      )
+    ) return;
 
     setError('');
     setDeleting(true);
@@ -188,7 +219,8 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="font-medium text-slate-900">{service.name}</p>
+          <h2 className="font-medium text-slate-900">{service.name}</h2>
+          {service.description && <p className="mt-1 max-w-3xl text-sm text-slate-500">{service.description}</p>}
           <span
             className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
               service.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'
@@ -238,9 +270,19 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
       </button>
 
       <div className="mt-4 border-t border-slate-100 pt-3">
-        <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Managers rattachés</p>
+        <p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+          <Users size={14} />
+          Managers rattachés {managers && <span>({managers.length})</span>}
+        </p>
 
-        {managers === null ? (
+        {managersError ? (
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-red-600">
+            <span>{managersError}</span>
+            <button type="button" onClick={loadManagers} className="font-medium underline">
+              Réessayer
+            </button>
+          </div>
+        ) : managers === null ? (
           <div className="mt-2 h-8 animate-pulse rounded-md bg-slate-100" />
         ) : managers.length === 0 ? (
           <p className="mt-2 text-sm text-slate-400">Aucun manager rattaché.</p>
@@ -310,12 +352,27 @@ export default function Services() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+  const [query, setQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
   const { sorted: sortedServices, sortKey, direction, setSortKey, toggleSort } = useSort(
     services,
     (service, key) => service[key],
     'name',
     'asc'
   );
+  const filteredServices = useMemo(() => {
+    const normalizedQuery = query.trim().toLocaleLowerCase('fr');
+    return sortedServices.filter((service) => {
+      const matchesQuery =
+        !normalizedQuery ||
+        service.name.toLocaleLowerCase('fr').includes(normalizedQuery) ||
+        (service.description || '').toLocaleLowerCase('fr').includes(normalizedQuery);
+      const matchesStatus = statusFilter === 'all' || (statusFilter === 'active' ? service.is_active : !service.is_active);
+      return matchesQuery && matchesStatus;
+    });
+  }, [sortedServices, query, statusFilter]);
+  const activeCount = services.filter((service) => service.is_active).length;
+  const inactiveCount = services.length - activeCount;
 
   async function loadData() {
     setLoading(true);
@@ -371,14 +428,52 @@ export default function Services() {
       <PageGuide id="services" />
 
       {services.length > 0 && (
-        <div className="mt-4">
-          <SortSelect
-            options={SERVICE_SORT_OPTIONS}
-            sortKey={sortKey}
-            direction={direction}
-            onChangeKey={setSortKey}
-            onToggleDirection={() => toggleSort(sortKey)}
-          />
+        <div className="mt-4 space-y-3">
+          <div className="grid grid-cols-3 gap-2">
+            {[
+              { label: 'Total', value: services.length },
+              { label: 'Actifs', value: activeCount },
+              { label: 'Inactifs', value: inactiveCount },
+            ].map(({ label, value }) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <p className="text-xs text-slate-500">{label}</p>
+                <p className="mt-0.5 text-lg font-semibold text-slate-900">{value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <label className="relative block flex-1">
+              <span className="sr-only">Rechercher un service</span>
+              <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="search"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Rechercher par nom ou description"
+                className="min-h-11 w-full rounded-md border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+              />
+            </label>
+            <select
+              aria-label="Filtrer par statut"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value)}
+              className="min-h-11 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            >
+              <option value="all">Tous les statuts</option>
+              <option value="active">Actifs</option>
+              <option value="inactive">Inactifs</option>
+            </select>
+            <SortSelect
+              options={SERVICE_SORT_OPTIONS}
+              sortKey={sortKey}
+              direction={direction}
+              onChangeKey={setSortKey}
+              onToggleDirection={() => toggleSort(sortKey)}
+            />
+          </div>
+          <p className="text-xs text-slate-500" aria-live="polite">
+            {filteredServices.length} service{filteredServices.length === 1 ? '' : 's'} affiché{filteredServices.length === 1 ? '' : 's'}
+          </p>
         </div>
       )}
 
@@ -394,9 +489,23 @@ export default function Services() {
         </div>
       ) : services.length === 0 ? (
         <p className="mt-6 text-sm text-slate-500">Aucun service pour l'instant.</p>
+      ) : filteredServices.length === 0 ? (
+        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-white px-4 py-8 text-center">
+          <p className="text-sm font-medium text-slate-700">Aucun service ne correspond à ces critères.</p>
+          <button
+            type="button"
+            onClick={() => {
+              setQuery('');
+              setStatusFilter('all');
+            }}
+            className="mt-2 text-sm font-medium text-primary hover:underline"
+          >
+            Effacer les filtres
+          </button>
+        </div>
       ) : (
         <div className="mt-4 flex w-full flex-col gap-4">
-          {sortedServices.map((service) => (
+          {filteredServices.map((service) => (
             <ServiceCard
               key={service.id}
               service={service}
