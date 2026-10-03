@@ -18,6 +18,7 @@ import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import AiHazardSuggestion from '../components/AiHazardSuggestion.jsx';
 import AiCcpSignificanceSuggestion from '../components/AiCcpSignificanceSuggestion.jsx';
 import AiCcpDefinitionSuggestion from '../components/AiCcpDefinitionSuggestion.jsx';
+import AiHaccpAnalysisReview from '../components/AiHaccpAnalysisReview.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
@@ -791,16 +792,16 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
     }
   }
 
-  if (allCcps.length === 0) {
-    return (
-      <p className="mt-4 rounded-md border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
-        Aucun point critique défini pour l'instant — créez-en un depuis l'onglet Analyse.
-      </p>
-    );
-  }
-
   return (
     <div className="mt-4">
+      <AiHaccpAnalysisReview plan={plan} />
+
+      {allCcps.length === 0 ? (
+        <p className="rounded-md border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
+          Aucun point critique défini pour l'instant — créez-en un depuis l'onglet Analyse.
+        </p>
+      ) : (
+        <>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <select value={selectedCcpId} onChange={(e) => setSelectedCcpId(e.target.value)} aria-label="Point critique" className={`${FIELD_CLASS} sm:flex-1`}>
           {allCcps.map((ccp) => (
@@ -913,6 +914,8 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
             onCapaCreated();
           }}
         />
+      )}
+        </>
       )}
     </div>
   );
