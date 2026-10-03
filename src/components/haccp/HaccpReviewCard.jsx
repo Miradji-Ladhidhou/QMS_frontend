@@ -30,8 +30,7 @@ function ModalShell({ title, subtitle, onClose, children }) {
   );
 }
 
-// « Marquer revu » : revue annuelle du plan (principe 6, validation). Enregistre une version du plan, trace qui l'a
-// revu et quand, et fixe la prochaine revue.
+// La revue réexamine le plan ; elle ne remplace pas les preuves de validation des mesures.
 function MarkReviewedModal({ plan, onClose, onReviewed }) {
   const [nextMonths, setNextMonths] = useState(12);
   const [reason, setReason] = useState('');
@@ -59,7 +58,7 @@ function MarkReviewedModal({ plan, onClose, onReviewed }) {
       <form onSubmit={handleSubmit} className="space-y-4">
         <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
           Vérifiez que l'analyse des dangers, les CCP et leurs limites sont toujours valables (nouveau produit, nouvel équipement, incident…). Une
-          version du plan est conservée avec votre nom et la date.
+          version du plan est conservée avec votre nom et la date. Cette revue ne constitue pas, à elle seule, une validation scientifique des mesures de maîtrise.
         </p>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Prochaine revue</label>

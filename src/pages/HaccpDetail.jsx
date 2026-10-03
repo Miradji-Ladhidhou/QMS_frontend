@@ -10,7 +10,7 @@ import { describeDue, formatInterval } from '../lib/haccpMonitoring.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
-import { PLAN_STATUS_LABELS, HAZARD_TYPE_LABELS } from '../lib/haccpStatus.js';
+import { PLAN_STATUS_LABELS, HAZARD_TYPE_LABELS, CONTROL_TYPE_LABELS, CCP_APPROVAL_LABELS, isOperationalCcp } from '../lib/haccpStatus.js';
 import { RISK_LEVEL_LABELS, RISK_LEVEL_STYLES, riskLevel } from '../lib/riskStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
@@ -29,6 +29,8 @@ import CcpStatusChip from '../components/haccp/CcpStatusChip.jsx';
 import HaccpLinksCard from '../components/haccp/HaccpLinksCard.jsx';
 import HaccpReviewCard from '../components/haccp/HaccpReviewCard.jsx';
 import ReadingForm from '../components/haccp/ReadingForm.jsx';
+import HaccpDossierCard from '../components/haccp/HaccpDossierCard.jsx';
+import CcpApprovalCard from '../components/haccp/CcpApprovalCard.jsx';
 
 const FIELD_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -238,15 +240,17 @@ function StepFormModal({ planId, step, onClose, onSaved }) {
   );
 }
 
-function HazardFormModal({ stepId, hazard, laterSteps, onClose, onSaved }) {
+function HazardFormModal({ stepId, hazard, suggestion, laterSteps, onClose, onSaved }) {
   const [form, setForm] = useState({
     hazard_type: hazard?.hazard_type || 'biological',
     description: hazard?.description || '',
     existing_controls: hazard?.existing_controls || '',
     likelihood: String(hazard?.likelihood || 3),
     severity: String(hazard?.severity || 3),
-    is_significant: hazard?.is_significant || false,
-    justification: hazard?.justification || '',
+    is_significant: suggestion?.is_significant ?? hazard?.is_significant ?? false,
+    justification: suggestion?.justification || hazard?.justification || '',
+    control_type: suggestion?.control_type || hazard?.control_type || 'undetermined',
+    decision_justification: suggestion?.decision_justification || hazard?.decision_justification || '',
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -268,6 +272,8 @@ function HazardFormModal({ stepId, hazard, laterSteps, onClose, onSaved }) {
       severity: Number(form.severity),
       is_significant: form.is_significant,
       justification: form.justification || undefined,
+      control_type: form.control_type,
+      decision_justification: form.decision_justification,
     };
 
     let response;
@@ -341,6 +347,8 @@ function HazardFormModal({ stepId, hazard, laterSteps, onClose, onSaved }) {
               ...prev,
               is_significant: Boolean(suggestion.is_significant),
               justification: suggestion.justification || prev.justification,
+              control_type: suggestion.control_type || 'undetermined',
+              decision_justification: suggestion.decision_justification || suggestion.justification || prev.decision_justification,
             }));
           }}
         />
@@ -352,14 +360,23 @@ function HazardFormModal({ stepId, hazard, laterSteps, onClose, onSaved }) {
             onChange={(e) => updateField('is_significant', e.target.checked)}
             className="h-4 w-4 rounded border-slate-300 text-primary focus:ring-primary"
           />
-          Danger significatif (nécessite un point critique)
+          Danger significatif pour la sécurité du produit (distinct de la décision CCP)
         </label>
-        {form.is_significant && (
-          <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Justification</label>
-            <AutoTextarea rows={2} value={form.justification} onChange={(e) => updateField('justification', e.target.value)} className={FIELD_CLASS} />
-          </div>
-        )}
+        <label className="block text-sm font-medium text-slate-700">
+          Justification de l’évaluation du danger
+          <AutoTextarea rows={2} value={form.justification} onChange={(e) => updateField('justification', e.target.value)} className={`${FIELD_CLASS} mt-1`} />
+        </label>
+        <label className="block text-sm font-medium text-slate-700">
+          Décision de maîtrise
+          <select value={form.control_type} onChange={(e) => updateField('control_type', e.target.value)} className={`${FIELD_CLASS} mt-1`}>
+            {Object.entries(CONTROL_TYPE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </label>
+        <label className="block text-sm font-medium text-slate-700">
+          Justification de la décision (mesures, étapes ultérieures, informations manquantes)
+          <AutoTextarea rows={2} required={form.control_type !== 'undetermined'} value={form.decision_justification} onChange={(e) => updateField('decision_justification', e.target.value)} className={`${FIELD_CLASS} mt-1`} />
+        </label>
+        {form.control_type === 'process_change' && <p className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">Le procédé doit être adapté et réévalué avant activation du plan. Créer un CCP ne remplace pas une mesure de maîtrise manquante.</p>}
         <button type="submit" disabled={submitting} className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
           {submitting ? 'Enregistrement...' : 'Enregistrer'}
         </button>
@@ -374,15 +391,18 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
     critical_limits: suggestion?.critical_limits || ccp?.critical_limits || '',
     monitoring_procedure: suggestion?.monitoring_procedure || ccp?.monitoring_procedure || '',
     monitoring_frequency: suggestion?.monitoring_frequency || ccp?.monitoring_frequency || '',
-    limit_min: ccp?.limit_min === null || ccp?.limit_min === undefined ? '' : String(ccp.limit_min),
-    limit_max: ccp?.limit_max === null || ccp?.limit_max === undefined ? '' : String(ccp.limit_max),
-    limit_unit: ccp?.limit_unit || '',
-    monitoring_interval_hours: ccp?.monitoring_interval_hours === null || ccp?.monitoring_interval_hours === undefined ? '' : String(Number(ccp.monitoring_interval_hours)),
+    limit_min: suggestion || ccp?.limit_min === null || ccp?.limit_min === undefined ? '' : String(ccp.limit_min),
+    limit_max: suggestion || ccp?.limit_max === null || ccp?.limit_max === undefined ? '' : String(ccp.limit_max),
+    limit_unit: suggestion ? '' : ccp?.limit_unit || '',
+    monitoring_interval_hours: suggestion || ccp?.monitoring_interval_hours === null || ccp?.monitoring_interval_hours === undefined ? '' : String(Number(ccp.monitoring_interval_hours)),
     monitoring_responsible: ccp?.monitoring_responsible || '',
     corrective_action_procedure: suggestion?.corrective_action_procedure || ccp?.corrective_action_procedure || '',
     verification_procedure: suggestion?.verification_procedure || ccp?.verification_procedure || '',
     verification_frequency: suggestion?.verification_frequency || ccp?.verification_frequency || '',
     record_keeping_procedure: suggestion?.record_keeping_procedure || ccp?.record_keeping_procedure || '',
+    validation_source: suggestion ? '' : ccp?.validation_source || '',
+    validation_evidence: suggestion ? '' : ccp?.validation_evidence || '',
+    ai_generated: Boolean(suggestion || ccp?.ai_generated),
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -414,6 +434,9 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
     <ModalShell title={ccp ? 'Modifier le point critique (CCP)' : 'Nouveau point critique (CCP)'} onClose={onClose} wide>
       {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       <form onSubmit={handleSubmit} className="space-y-4">
+        <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          Enregistrement en brouillon. {ccp && isOperationalCcp(ccp) ? 'Modifier ce CCP suspend sa surveillance jusqu’à une nouvelle approbation.' : 'La surveillance sera autorisée après approbation explicite et vérification des preuves.'}
+        </p>
         {suggestion && (
           <p className="rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800">
             Proposition IA préremplie. Vérifiez et ajustez les valeurs, notamment les limites chiffrées, avant d’enregistrer.
@@ -437,6 +460,13 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
                 verification_procedure: suggestion.verification_procedure || prev.verification_procedure,
                 verification_frequency: suggestion.verification_frequency || prev.verification_frequency,
                 record_keeping_procedure: suggestion.record_keeping_procedure || prev.record_keeping_procedure,
+                ai_generated: true,
+                limit_min: '',
+                limit_max: '',
+                limit_unit: '',
+                monitoring_interval_hours: '',
+                validation_source: '',
+                validation_evidence: '',
               }));
             }}
           />
@@ -489,8 +519,17 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
           <label className="mb-1 block text-sm font-medium text-slate-700">Enregistrements à conserver</label>
           <AutoTextarea rows={2} value={form.record_keeping_procedure} onChange={(e) => updateField('record_keeping_procedure', e.target.value)} placeholder="Ex. : Fiche de réception datée avec température relevée et signature du contrôleur." className={FIELD_CLASS} />
         </div>
+        <label className="block text-sm font-medium text-slate-700">
+          Source des limites et des mesures de maîtrise
+          <AutoTextarea rows={2} value={form.validation_source} onChange={(e) => updateField('validation_source', e.target.value)} placeholder="Ex. : GBPH restauration, chapitre « réception des produits réfrigérés » — précisez la version et la page consultées." className={`${FIELD_CLASS} mt-1`} />
+        </label>
+        <label className="block text-sm font-medium text-slate-700">
+          Preuves de validation et confirmation de cohérence
+          <AutoTextarea rows={3} value={form.validation_evidence} onChange={(e) => updateField('validation_evidence', e.target.value)} placeholder="Ex. : Essai sur 3 livraisons avec sonde étalonnée : températures conformes consignées sur les fiches de réception." className={`${FIELD_CLASS} mt-1`} />
+          <span className="mt-1 block text-xs font-normal text-slate-500">Au moins 20 caractères avant approbation : décrivez les preuves réelles et leurs références. La longueur seule ne garantit pas leur validité.</span>
+        </label>
         <button type="submit" disabled={submitting} className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
-          {submitting ? 'Enregistrement...' : 'Enregistrer'}
+          {submitting ? 'Enregistrement...' : 'Enregistrer le brouillon CCP'}
         </button>
       </form>
     </ModalShell>
@@ -678,7 +717,9 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
       <div className="min-w-0">
         <p className="mt-0.5 break-words text-sm font-medium text-slate-800">{hazard.description}</p>
         {hazard.existing_controls && <p className="mt-1 break-words text-xs text-slate-500">Maîtrise actuelle : {hazard.existing_controls}</p>}
-        {hazard.is_significant && (
+        <p className="mt-1 text-xs font-medium text-slate-700">Décision : {CONTROL_TYPE_LABELS[hazard.control_type] || CONTROL_TYPE_LABELS.undetermined}</p>
+        {hazard.decision_justification && <p className="mt-1 whitespace-pre-wrap text-xs text-slate-500">{hazard.decision_justification}</p>}
+        {(hazard.control_type === 'ccp' || hazard.ccp) && (
           <p className="mt-1 inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700">
             Danger significatif
           </p>
@@ -692,6 +733,7 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
               <div className="flex items-start justify-between gap-3">
                 <p className="text-sm font-semibold text-slate-900">
                   Point critique {hazard.ccp.ccp_number ? `— ${hazard.ccp.ccp_number}` : ''}
+                  <span className="ml-2 text-xs font-normal text-slate-500">{CCP_APPROVAL_LABELS[hazard.ccp.status] || 'Statut à vérifier'}</span>
                 </p>
                 {canManage && (
                   <div className="flex shrink-0 items-center gap-2">
@@ -713,7 +755,7 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
                 {hazard.ccp.monitoring_interval_hours ? ` — rappel toutes les ${formatInterval(hazard.ccp.monitoring_interval_hours)}` : ''}
               </p>
               <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                <CcpStatusChip ccp={hazard.ccp} />
+                {isOperationalCcp(hazard.ccp) && <CcpStatusChip ccp={hazard.ccp} />}
                 {hazard.ccp.last_reading && (
                   <span className="text-xs text-slate-500">
                     Dernier relevé : <span className={hazard.ccp.last_reading.within_limits ? 'text-emerald-700' : 'font-medium text-red-700'}>{hazard.ccp.last_reading.recorded_value}</span>
@@ -726,7 +768,7 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
             canManage && (
               <button type="button" onClick={() => onAddCcp(hazard)} className="flex min-h-[40px] items-center gap-1 text-sm font-medium text-primary hover:underline sm:min-h-0">
                 <Plus size={14} />
-                Créer le point critique (CCP)
+                Préparer le brouillon CCP
               </button>
             )
           )}
@@ -736,10 +778,10 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
   );
 }
 
-function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onCapaCreated, onReadingSaved }) {
+function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onCapaCreated, onReadingSaved, onOpenCcpEditor, onOpenHazardEditor }) {
   const navigate = useNavigate();
   const allCcps = plan.steps.flatMap((step) =>
-    step.hazards.filter((h) => h.ccp).map((h) => ({ ...h.ccp, hazardDescription: h.description, stepName: step.name }))
+    step.hazards.filter((h) => h.ccp).map((h) => ({ ...h.ccp, hazard: h, hazardDescription: h.description, stepName: step.name }))
   );
   const [selectedCcpId, setSelectedCcpId] = useState(allCcps[0]?.id || '');
   const [logs, setLogs] = useState([]);
@@ -749,25 +791,24 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
   const [chartKey, setChartKey] = useState(0);
   const [creatingRisk, setCreatingRisk] = useState(false);
 
-  const selectedCcp = allCcps.find((c) => c.id === selectedCcpId);
-
-  async function loadLogs(ccpId) {
-    if (!ccpId) return;
-    setLoadingLogs(true);
-    try {
-      const { data } = await api.get(`/haccp/ccps/${ccpId}/monitoring-logs`);
-      setLogs(data);
-    } catch {
-      setError('Impossible de charger les relevés de surveillance.');
-    } finally {
-      setLoadingLogs(false);
-    }
-  }
+  const selectedCcp = allCcps.find((c) => c.id === selectedCcpId) || allCcps[0];
+  const effectiveCcpId = selectedCcp?.id || '';
 
   useEffect(() => {
-    loadLogs(selectedCcpId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedCcpId]);
+    let cancelled = false;
+    setLogs([]);
+    setError('');
+    if (!effectiveCcpId) {
+      setLoadingLogs(false);
+      return;
+    }
+    setLoadingLogs(true);
+    api.get(`/haccp/ccps/${effectiveCcpId}/monitoring-logs`)
+      .then(({ data }) => { if (!cancelled) setLogs(data); })
+      .catch((err) => { if (!cancelled) setError(err.response?.data?.error || 'Impossible de charger les relevés de surveillance.'); })
+      .finally(() => { if (!cancelled) setLoadingLogs(false); });
+    return () => { cancelled = true; };
+  }, [effectiveCcpId]);
 
   function handleReadingSaved(log) {
     setLogs((prev) => [log, ...prev]);
@@ -802,23 +843,23 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
       <AiHaccpSurveillanceSuggestion
         plan={plan}
         canManage={canManage}
-        onOpenCcpEditor={(hazard, suggestion) => {
-          setCcpModal({ hazardId: hazard.id, hazard, ccp: hazard.ccp || undefined, suggestion });
-        }}
+        onSaved={onReadingSaved}
+        onOpenCcpEditor={onOpenCcpEditor}
+        onOpenHazardEditor={onOpenHazardEditor}
       />
 
       {allCcps.length === 0 ? (
         <p className="rounded-md border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
-          Aucun point critique défini pour l'instant — créez-en un depuis l'onglet Analyse.
+          Aucun CCP défini. Si l’analyse en identifie un, préparez-le puis approuvez-le. Sinon, documentez les mesures de maîtrise et la conclusion « aucun CCP » dans le dossier HACCP.
         </p>
       ) : (
         <>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-        <select value={selectedCcpId} onChange={(e) => setSelectedCcpId(e.target.value)} aria-label="Point critique" className={`${FIELD_CLASS} sm:flex-1`}>
+        <select value={effectiveCcpId} onChange={(e) => setSelectedCcpId(e.target.value)} aria-label="Point critique" className={`${FIELD_CLASS} sm:flex-1`}>
           {allCcps.map((ccp) => (
             <option key={ccp.id} value={ccp.id}>
               {ccp.ccp_number ? `${ccp.ccp_number} — ` : ''}
-              {ccp.hazardDescription} ({ccp.stepName})
+              {ccp.hazardDescription} ({ccp.stepName}) — {CCP_APPROVAL_LABELS[ccp.status] || 'Statut à vérifier'}
             </option>
           ))}
         </select>
@@ -832,6 +873,11 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
 
       {selectedCcp && (
         <>
+          <div className="mt-3">
+            <CcpApprovalCard key={selectedCcp.id} ccp={selectedCcp} canManage={canManage} onEdit={() => onOpenCcpEditor(selectedCcp.hazard)} onApproved={onReadingSaved} />
+          </div>
+          {isOperationalCcp(selectedCcp) && (
+          <>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <CcpStatusChip ccp={selectedCcp} />
             {selectedCcp.monitoring_state !== 'no_schedule' && <span className="text-xs text-slate-500">{describeDue(selectedCcp)}</span>}
@@ -859,6 +905,8 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
           </div>
 
           <CcpMonitoringChart ccp={selectedCcp} refreshKey={chartKey} showAlert={!canManage} />
+          </>
+          )}
         </>
       )}
 
@@ -883,6 +931,13 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
                     {log.recorded_by_user ? ` · ${log.recorded_by_user.full_name}` : ''}
                   </p>
                   {log.corrective_action_taken && <p className="mt-1 break-words text-xs text-slate-600">Action corrective : {log.corrective_action_taken}</p>}
+                  {[
+                    ['lot_reference', 'Lot / produits concernés'],
+                    ['product_disposition', 'Blocage / maîtrise des produits'],
+                    ['disposition_decision', 'Décision sur le devenir des produits'],
+                    ['return_to_control', 'Retour à la maîtrise'],
+                    ['effectiveness_verification', 'Vérification de l’efficacité'],
+                  ].map(([field, label]) => log[field] ? <p key={field} className="mt-1 whitespace-pre-wrap text-xs text-slate-600">{label} : {log[field]}</p> : null)}
                 </div>
                 {!log.within_limits && (
                   <div>
@@ -972,8 +1027,8 @@ export default function HaccpDetail() {
     try {
       const { data } = await api.get(`/haccp/plans/${id}`);
       setPlan(data);
-    } catch {
-      /* le plan déjà affiché reste valable */
+    } catch (err) {
+      setError(err.response?.data?.error || "L'enregistrement est terminé, mais l'actualisation du plan a échoué. Rechargez la page avant de poursuivre.");
     }
   }
 
@@ -1129,6 +1184,7 @@ export default function HaccpDetail() {
       </div>
 
       <HaccpReviewCard plan={plan} canManage={canManage} onPlanChanged={(updated) => setPlan((prev) => ({ ...prev, ...updated }))} />
+      <HaccpDossierCard plan={plan} canManage={canManage} onSaved={(updated) => setPlan((prev) => ({ ...prev, ...updated }))} />
       <HaccpLinksCard planId={plan.id} canManage={canManage} refreshKey={linksKey} />
 
       <div className="mt-5 flex gap-1 border-b border-slate-200">
@@ -1245,6 +1301,13 @@ export default function HaccpDetail() {
           canManage={canManage}
           onCapaCreated={refreshPlan}
           onReadingSaved={refreshPlan}
+          onOpenCcpEditor={(hazard, suggestion) => {
+            setCcpModal({ hazardId: hazard.id, hazard, ccp: hazard.ccp || undefined, suggestion });
+          }}
+          onOpenHazardEditor={(hazard, suggestion) => {
+            const step = plan.steps.find((item) => item.hazards.some((itemHazard) => itemHazard.id === hazard.id));
+            setHazardModal({ stepId: step.id, hazard, suggestion, laterSteps: plan.steps.filter((item) => item.step_number > step.step_number) });
+          }}
         />
       )}
 
@@ -1276,6 +1339,7 @@ export default function HaccpDetail() {
         <HazardFormModal
           stepId={hazardModal.stepId}
           hazard={hazardModal.hazard}
+          suggestion={hazardModal.suggestion}
           laterSteps={hazardModal.laterSteps}
           onClose={() => setHazardModal(null)}
           onSaved={() => {
@@ -1291,10 +1355,7 @@ export default function HaccpDetail() {
           hazard={ccpModal.hazard}
           ccp={ccpModal.ccp}
           users={users}
-          onClose={() => {
-            setCcpModal(null);
-            loadPlan();
-          }}
+          onClose={() => setCcpModal(null)}
           onSaved={() => {
             setCcpModal(null);
             loadPlan();

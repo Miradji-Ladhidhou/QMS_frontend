@@ -573,9 +573,9 @@ export default function Procedures() {
 
   return (
     <div>
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-3">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Procédures</h1>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2 sm:justify-end">
           <ExportMenu
             disabled={procedures.length === 0}
             onExportPdf={handleExportPdf}
@@ -607,18 +607,18 @@ export default function Procedures() {
       </div>
       <PageGuide id="procedures" />
 
-      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
         <input
           type="text"
-          placeholder="Rechercher un numéro ou un titre..."
+          placeholder="Rechercher une procédure..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          className="min-w-0 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-base"
         />
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          className="min-w-0 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-base"
         >
           <option value="">Tous les statuts</option>
           {Object.entries(STATUS_LABELS).map(([value, label]) => (
@@ -632,7 +632,7 @@ export default function Procedures() {
           placeholder="Filtrer par processus..."
           value={processFilter}
           onChange={(e) => setProcessFilter(e.target.value)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+          className="min-w-0 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:text-base"
         />
       </div>
 
@@ -700,6 +700,38 @@ export default function Procedures() {
         </div>
       ) : (
         <>
+          {procedures.length === 0 && folders.length === 0 && (
+            <section className="mt-6 rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="max-w-2xl">
+                <h2 className="text-base font-semibold text-slate-900 sm:text-lg">
+                  Commencez par créer votre première procédure
+                </h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Rédigez-la vous-même ou préparez un premier brouillon avec l’assistance de l’IA. Vous pourrez ensuite
+                  la faire relire et approuver.
+                </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(true)}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+                  >
+                    <Plus size={18} />
+                    Création manuelle
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsFullDraftModalOpen(true)}
+                    className="inline-flex min-h-10 items-center justify-center gap-2 rounded-md border border-purple-300 px-4 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50"
+                  >
+                    <FileText size={18} />
+                    Génération IA
+                  </button>
+                </div>
+              </div>
+            </section>
+          )}
+
           {(folders.length > 0 || currentUser?.role === 'admin') && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
               {folders.map((folder) => (
@@ -718,9 +750,7 @@ export default function Procedures() {
             </div>
           )}
 
-          {procedures.length === 0 && folders.length === 0 ? (
-            <p className="mt-6 text-sm text-slate-500">Aucune procédure pour l'instant.</p>
-          ) : currentFolderProcedures.length === 0 ? (
+          {procedures.length === 0 && folders.length === 0 ? null : currentFolderProcedures.length === 0 ? (
             <p className="mt-4 text-sm text-slate-500">
               {currentFolderId ? 'Aucune procédure directement dans ce dossier.' : 'Aucune procédure sans dossier.'}
             </p>
@@ -753,6 +783,11 @@ export default function Procedures() {
                             <p className="text-sm text-slate-500">
                               {procedure.number} · {procedure.process || 'Processus non précisé'}
                             </p>
+                            {procedure.source_document_id && (
+                              <span className="mt-1 inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                                Reprise d’un document
+                              </span>
+                            )}
                           </div>
                         </div>
                         <StatusBadge status={procedure.status} />
@@ -813,7 +848,14 @@ export default function Procedures() {
                             </td>
                           )}
                           <td className="px-4 py-3 font-medium text-slate-800">{procedure.number}</td>
-                          <td className="px-4 py-3 text-slate-700">{procedure.title}</td>
+                          <td className="px-4 py-3 text-slate-700">
+                            {procedure.title}
+                            {procedure.source_document_id && (
+                              <span className="ml-2 inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-medium text-sky-700">
+                                Reprise d’un document
+                              </span>
+                            )}
+                          </td>
                           <td className="px-4 py-3 text-slate-600">{procedure.process || '—'}</td>
                           <td className="px-4 py-3 text-slate-600">{procedure.current_version?.version || '—'}</td>
                           <td className="px-4 py-3">

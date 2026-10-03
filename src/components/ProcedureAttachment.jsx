@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Loader2, Paperclip, Trash2, Upload } from 'lucide-react';
+import { HardDrive, Loader2, Paperclip, Server, Trash2, Upload } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 
@@ -87,6 +87,13 @@ export default function ProcedureAttachment({ procedureId, version, editable, on
         >
           {downloading ? 'Préparation...' : version.attachment_file_name}
         </button>
+        <span
+          title={version.attachment_storage_provider === 'google_drive' ? 'Stocké sur Google Drive' : 'Stocké dans la bibliothèque documentaire'}
+          className="inline-flex items-center gap-1 text-xs text-slate-400"
+        >
+          {version.attachment_storage_provider === 'google_drive' ? <HardDrive size={13} /> : <Server size={13} />}
+          {version.attachment_storage_provider === 'google_drive' ? 'Google Drive' : 'Stockage QMS'}
+        </span>
         {editable && (
           <button
             type="button"

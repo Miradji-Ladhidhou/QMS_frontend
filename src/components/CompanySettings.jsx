@@ -15,8 +15,13 @@ export default function CompanySettings({ isAdmin }) {
   // changement de `tenant` : une modification survenue ailleurs (un autre onglet/admin)
   // pendant une saisie en cours ici ne doit pas écraser une édition non enregistrée.
   const tenant = useTenant();
-  const [name, setName] = useState('');
-  const [timezone, setTimezone] = useState('UTC');
+  const [companyInfo, setCompanyInfo] = useState({
+    name: '',
+    timezone: 'UTC',
+    company_address: '',
+    company_phone: '',
+    company_legal_mentions: '',
+  });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [savingName, setSavingName] = useState(false);
@@ -26,8 +31,13 @@ export default function CompanySettings({ isAdmin }) {
   useEffect(() => {
     if (tenant && !seededRef.current) {
       seededRef.current = true;
-      setName(tenant.name);
-      setTimezone(tenant.timezone || 'UTC');
+      setCompanyInfo({
+        name: tenant.name || '',
+        timezone: tenant.timezone || 'UTC',
+        company_address: tenant.company_address || '',
+        company_phone: tenant.company_phone || '',
+        company_legal_mentions: tenant.company_legal_mentions || '',
+      });
     }
   }, [tenant]);
 
@@ -38,7 +48,7 @@ export default function CompanySettings({ isAdmin }) {
     setSavingName(true);
 
     try {
-      const { data } = await api.patch('/tenant', { name, timezone });
+      const { data } = await api.patch('/tenant', companyInfo);
       // TenantProvider.jsx (contexte partagé lu par useTenant() partout dans l'appli, dont ce
       // composant lui-même) ne recharge pas tout seul après ce PATCH — ce broadcast le prévient
       // explicitement, sinon le fuseau affiché reste l'ancien tant qu'aucune navigation ne
@@ -116,32 +126,70 @@ export default function CompanySettings({ isAdmin }) {
         )}
       </div>
 
-      <form onSubmit={handleNameSubmit} className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium text-slate-700">Nom de l'entreprise</label>
-          <input
-            type="text"
-            required
-            disabled={!isAdmin}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
-          />
-        </div>
-        <div className="flex-1">
-          <label className="mb-1 block text-sm font-medium text-slate-700">Fuseau horaire</label>
-          <select
-            disabled={!isAdmin}
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
-          >
-            {TIMEZONES.map((tz) => (
-              <option key={tz} value={tz}>
-                {tz}
-              </option>
-            ))}
-          </select>
+      <form onSubmit={handleNameSubmit} className="mt-5 space-y-4">
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Nom de l'entreprise</label>
+            <input
+              type="text"
+              required
+              disabled={!isAdmin}
+              value={companyInfo.name}
+              onChange={(e) => setCompanyInfo((current) => ({ ...current, name: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Fuseau horaire</label>
+            <select
+              disabled={!isAdmin}
+              value={companyInfo.timezone}
+              onChange={(e) => setCompanyInfo((current) => ({ ...current, timezone: e.target.value }))}
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            >
+              {TIMEZONES.map((tz) => (
+                <option key={tz} value={tz}>
+                  {tz}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Adresse de l'entreprise</label>
+            <input
+              type="text"
+              maxLength={300}
+              disabled={!isAdmin}
+              value={companyInfo.company_address}
+              onChange={(e) => setCompanyInfo((current) => ({ ...current, company_address: e.target.value }))}
+              placeholder="Adresse postale"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Téléphone</label>
+            <input
+              type="tel"
+              maxLength={80}
+              disabled={!isAdmin}
+              value={companyInfo.company_phone}
+              onChange={(e) => setCompanyInfo((current) => ({ ...current, company_phone: e.target.value }))}
+              placeholder="Numéro de téléphone"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
+          <div className="sm:col-span-2">
+            <label className="mb-1 block text-sm font-medium text-slate-700">Mentions légales</label>
+            <textarea
+              rows={2}
+              maxLength={300}
+              disabled={!isAdmin}
+              value={companyInfo.company_legal_mentions}
+              onChange={(e) => setCompanyInfo((current) => ({ ...current, company_legal_mentions: e.target.value }))}
+              placeholder="Forme juridique, capital, SIRET…"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary disabled:bg-slate-50 disabled:text-slate-500"
+            />
+          </div>
         </div>
         {isAdmin && (
           <button

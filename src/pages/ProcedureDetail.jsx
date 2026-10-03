@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
-import { Archive, ArrowLeft, Check, Download, FileText, FileType, Loader2, Pencil, Plus, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
+import { Archive, ArrowLeft, Check, Download, FileText, FileType, Loader2, Pencil, Plus, RefreshCw, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -355,6 +355,7 @@ export default function ProcedureDetail() {
   const [exportPdfError, setExportPdfError] = useState('');
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState('');
+  const [reimportingSource, setReimportingSource] = useState(false);
 
   async function loadProcedure() {
     setLoading(true);
@@ -498,6 +499,27 @@ export default function ProcedureDetail() {
     }
   }
 
+  async function handleReimportSource() {
+    if (
+      !window.confirm(
+        'Créer un nouveau brouillon à partir du document source lié ? Les versions déjà enregistrées resteront inchangées.'
+      )
+    ) {
+      return;
+    }
+
+    setActionError('');
+    setReimportingSource(true);
+    try {
+      await api.post(`/procedures/${id}/reimport-source`);
+      await loadProcedure();
+    } catch (err) {
+      setActionError(err.response?.data?.error || 'Impossible de réimporter le document source.');
+    } finally {
+      setReimportingSource(false);
+    }
+  }
+
   // Fusionne les sections suggérées par l'IA (voir suggest-revision-from-capa) dans le
   // contenu de la version en vigueur — mêmes clés que la fusion d'un brouillon IA
   // (handleAiGenerated), mais la source est ici une CAPA liée plutôt qu'une génération libre.
@@ -594,7 +616,8 @@ export default function ProcedureDetail() {
   const linkedAudits = procedure.linked_audits || [];
   const draftVersion = versions.find((v) => v.status === 'draft');
   const pendingVersion = versions.find((v) => v.status === 'pending');
-  const currentVersion = versions.find((v) => v.id === procedure.current_version_id);
+  const pointedVersion = versions.find((v) => v.id === procedure.current_version_id);
+  const currentVersion = pointedVersion?.status === 'approved' ? pointedVersion : null;
   // versions est trié plus récent d'abord (voir GET /:id) : le premier "rejected" trouvé est
   // donc la dernière version rejetée. Repartir de son contenu — plutôt que de la version
   // approuvée — pour que "Nouvelle version" reprenne le travail déjà fait, pas seulement le
@@ -636,6 +659,17 @@ export default function ProcedureDetail() {
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center gap-2">
+            {canManage && procedure.source_document_id && procedure.status !== 'obsolete' && (
+              <button
+                type="button"
+                onClick={handleReimportSource}
+                disabled={reimportingSource}
+                className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                {reimportingSource ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+                {reimportingSource ? 'Réimportation...' : 'Réimporter la source'}
+              </button>
+            )}
             {!draftVersion && procedure.status !== 'obsolete' && (
               <button
                 type="button"
@@ -728,7 +762,30 @@ export default function ProcedureDetail() {
           </div>
         )}
 
-        {procedure.current_version_id && (
+        {procedure.source_document && (
+          <div className="mt-4 flex flex-col gap-3 rounded-md border border-sky-200 bg-sky-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-medium text-sky-900">
+                Procédure reprise du document {procedure.source_document.number}
+              </p>
+              <p className="mt-0.5 text-sm text-sky-800">
+                {procedure.source_document.title} · version source {procedure.source_document.version}
+              </p>
+              <p className="mt-1 text-xs text-sky-700">
+                Le fichier original est conservé dans Documents. Cette procédure a son propre circuit de validation.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => navigate(`/documents/${procedure.source_document.id}`)}
+              className="shrink-0 rounded-md border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 hover:bg-sky-100"
+            >
+              Voir le document source
+            </button>
+          </div>
+        )}
+
+        {currentVersion && (
           <div className="mt-4 rounded-md border border-sky-200 bg-sky-50 p-4">
             {/* Fiche de diffusion en priorité, quand elle existe : c'est exactement son rôle
                 — un résumé condensé pour quelqu'un qui doit connaître la procédure sans
@@ -864,6 +921,12 @@ export default function ProcedureDetail() {
             <h2 className="text-sm font-semibold text-slate-900">Validation requise — v{pendingVersion.version}</h2>
             <ProcedureVersionStatusBadge status={pendingVersion.status} />
           </div>
+          {pendingVersion.author_id === currentUser?.id && (
+            <p className="mt-2 text-sm text-amber-800">
+              Vous pouvez approuver votre propre version si vous travaillez seul. Si possible, faites-la relire par une
+              autre personne.
+            </p>
+          )}
 
           <div className="mt-3">
             <ProcedureVersionComparison procedureId={procedure.id} versionId={pendingVersion.id} />
@@ -873,8 +936,7 @@ export default function ProcedureDetail() {
             <button
               type="button"
               onClick={() => handleValidate(pendingVersion.id)}
-              disabled={actingVersionId === pendingVersion.id || pendingVersion.author_id === currentUser?.id}
-              title={pendingVersion.author_id === currentUser?.id ? 'Vous ne pouvez pas valider une version que vous avez rédigée vous-même.' : undefined}
+              disabled={actingVersionId === pendingVersion.id}
               className="flex items-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
             >
               <Check size={16} />

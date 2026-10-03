@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { CONTROL_TYPE_LABELS } from '../lib/haccpStatus.js';
 
 // Complète la couverture IA du module HACCP : AiHazardSuggestion.jsx aide à identifier les
 // dangers d'une étape, celui-ci aide à trancher si un danger déjà décrit est significatif
@@ -90,10 +91,11 @@ export default function AiCcpSignificanceSuggestion({
                 suggestion.is_significant ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'
               }`}
             >
-              {suggestion.is_significant ? 'CCP nécessaire' : 'Pas de CCP'}
+              {CONTROL_TYPE_LABELS[suggestion.control_type] || 'Décision à confirmer'}
             </span>
           </div>
           <p className="text-sm text-slate-700">{suggestion.justification}</p>
+          {suggestion.decision_justification && <p className="mt-2 text-sm text-slate-700">{suggestion.decision_justification}</p>}
         </div>
       )}
     </div>

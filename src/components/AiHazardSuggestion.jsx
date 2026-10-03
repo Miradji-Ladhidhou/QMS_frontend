@@ -49,10 +49,10 @@ export default function AiHazardSuggestion({ stepId, onAdded }) {
         await api.post(`/haccp/steps/${stepId}/hazards`, {
           hazard_type: hazard.hazard_type,
           description: hazard.description,
-          existing_controls: hazard.suggested_controls || undefined,
           likelihood: hazard.likelihood,
           severity: hazard.severity,
           ai_generated: true,
+          control_type: 'undetermined',
         });
         newlyAdded.push(index);
       } catch (err) {
@@ -96,6 +96,7 @@ export default function AiHazardSuggestion({ stepId, onAdded }) {
       </button>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {hazards && <p className="mt-2 text-xs text-slate-500">Les mesures suggérées ne sont pas enregistrées comme déjà existantes. Vérifiez les dangers et documentez les mesures réellement en place dans leur formulaire.</p>}
 
       {hazards && hazards.length > 0 && (
         <>

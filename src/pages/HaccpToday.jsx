@@ -130,7 +130,7 @@ export default function HaccpToday() {
               <div className="mt-6 flex flex-col items-center rounded-xl border border-dashed border-slate-300 px-4 py-12 text-center">
                 <ClipboardCheck size={28} className="text-slate-300" />
                 <p className="mt-2 text-base font-medium text-slate-700">Aucun point critique à relever</p>
-                <p className="mt-1 max-w-sm text-sm text-slate-500">Les CCP apparaissent ici dès qu'un plan HACCP est passé « Actif ».</p>
+                <p className="mt-1 max-w-sm text-sm text-slate-500">Seuls les CCP approuvés et les CCP existants conservés des plans actifs apparaissent ici. Les brouillons restent dans le plan pour révision.</p>
                 <Link to="/haccp" className="mt-4 inline-flex min-h-[44px] items-center rounded-md border border-slate-300 px-4 text-sm font-medium text-slate-700 hover:bg-slate-50">
                   Voir les plans HACCP
                 </Link>

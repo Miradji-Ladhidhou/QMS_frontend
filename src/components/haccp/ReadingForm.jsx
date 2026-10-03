@@ -16,6 +16,13 @@ export default function ReadingForm({ ccp, onSaved }) {
   const [value, setValue] = useState('');
   const [manualVerdict, setManualVerdict] = useState(null); // true | false | null (sans limites chiffrées)
   const [action, setAction] = useState('');
+  const [driftDetails, setDriftDetails] = useState({
+    lot_reference: '',
+    product_disposition: '',
+    disposition_decision: '',
+    return_to_control: '',
+    effectiveness_verification: '',
+  });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [saved, setSaved] = useState(null);
@@ -23,6 +30,7 @@ export default function ReadingForm({ ccp, onSaved }) {
   const numericVerdict = limits ? previewVerdict(value, limits) : null;
   const verdict = limits ? numericVerdict : manualVerdict;
   const isDrift = verdict === false;
+  const requiresStructuredDrift = ccp.status === 'approved';
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -41,6 +49,7 @@ export default function ReadingForm({ ccp, onSaved }) {
       response = await api.post(`/haccp/ccps/${ccp.id}/monitoring-logs`, {
         ...(limits ? { numeric_value: parseNumber(value) } : { recorded_value: value.trim(), within_limits: manualVerdict }),
         corrective_action_taken: isDrift ? action.trim() || undefined : undefined,
+        ...(isDrift ? driftDetails : {}),
       });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer ce relevé.");
@@ -52,11 +61,13 @@ export default function ReadingForm({ ccp, onSaved }) {
     setValue('');
     setManualVerdict(null);
     setAction('');
+    setDriftDetails(Object.fromEntries(Object.keys(driftDetails).map((field) => [field, ''])));
     onSaved(response.data);
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-3">
+      {ccp.status === 'draft' && <p role="alert" className="rounded-md bg-amber-50 p-3 text-sm text-amber-800">Ce CCP est en brouillon : la surveillance est bloquée avant approbation.</p>}
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">
           {limits ? `Valeur relevée${limits.unit ? ` (${limits.unit})` : ''}` : 'Constat'}
@@ -122,9 +133,21 @@ export default function ReadingForm({ ccp, onSaved }) {
       )}
 
       {isDrift && (
-        <div>
+        <div className="space-y-3 rounded-lg border border-red-200 bg-red-50/40 p-3">
           <label className="mb-1 block text-sm font-medium text-slate-700">Action corrective immédiate</label>
           <AutoTextarea required rows={2} placeholder="Ex : lot mis en quarantaine, réglage du groupe froid…" value={action} onChange={(e) => setAction(e.target.value)} className={FIELD_CLASS} />
+          {[
+            ['lot_reference', 'Lot / produits concernés', 'Référence du lot, période ou produits potentiellement affectés.'],
+            ['product_disposition', 'Blocage et maîtrise des produits', 'Quarantaine, isolement, arrêt de distribution et traçabilité.'],
+            ['disposition_decision', 'Décision autorisée sur le devenir des produits', 'Décision et personne habilitée ; si en attente, documenter le maintien du blocage.'],
+            ['return_to_control', 'Retour à la maîtrise du procédé', 'Correction, nouvelle mesure et conditions autorisant la reprise ; préciser si encore à réaliser.'],
+            ['effectiveness_verification', 'Vérification de l’efficacité', 'Résultat et vérificateur, ou vérification planifiée avec responsable et échéance.'],
+          ].map(([field, label, placeholder]) => (
+            <label key={field} className="block text-sm font-medium text-slate-700">
+              {label}{!requiresStructuredDrift && <span className="font-normal text-slate-400"> (facultatif sur un CCP existant)</span>}
+              <AutoTextarea rows={2} required={requiresStructuredDrift} value={driftDetails[field]} onChange={(event) => setDriftDetails((previous) => ({ ...previous, [field]: event.target.value }))} placeholder={placeholder} className={`${FIELD_CLASS} mt-1`} />
+            </label>
+          ))}
         </div>
       )}
 
@@ -145,7 +168,7 @@ export default function ReadingForm({ ccp, onSaved }) {
         </div>
       )}
 
-      <button type="submit" disabled={submitting} className="min-h-[48px] w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
+      <button type="submit" disabled={submitting || ccp.status === 'draft'} className="min-h-[48px] w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
         {submitting ? 'Enregistrement...' : 'Enregistrer le relevé'}
       </button>
     </form>

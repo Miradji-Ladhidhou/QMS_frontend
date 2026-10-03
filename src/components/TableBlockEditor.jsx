@@ -10,6 +10,7 @@ const CELL_CLASS =
 export default function TableBlockEditor({ block, onChange }) {
   const headers = block.headers || [];
   const rows = block.rows || [];
+  const hasHeader = block.hasHeader !== false;
 
   function updateHeader(index, value) {
     onChange({ ...block, headers: headers.map((h, i) => (i === index ? value : h)) });
@@ -48,33 +49,44 @@ export default function TableBlockEditor({ block, onChange }) {
 
   return (
     <div className="space-y-2">
+      <label className="flex w-fit items-center gap-2 text-xs text-slate-600">
+        <input
+          type="checkbox"
+          checked={hasHeader}
+          onChange={(event) => onChange({ ...block, hasHeader: event.target.checked })}
+          className="rounded border-slate-300 text-primary focus:ring-primary"
+        />
+        Première ligne = en-têtes
+      </label>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[420px] border-collapse text-sm">
-          <thead>
-            <tr>
-              {headers.map((header, index) => (
-                <th key={index} className="border border-slate-200 p-1">
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="text"
-                      value={header}
-                      onChange={(e) => updateHeader(index, e.target.value)}
-                      className={`${CELL_CLASS} font-medium`}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeColumn(index)}
-                      aria-label="Supprimer cette colonne"
-                      className="shrink-0 p-1 text-slate-400 hover:text-red-600"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </th>
-              ))}
-              <th className="w-8" />
-            </tr>
-          </thead>
+          {hasHeader && (
+            <thead>
+              <tr>
+                {headers.map((header, index) => (
+                  <th key={index} className="border border-slate-200 p-1">
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        value={header}
+                        onChange={(e) => updateHeader(index, e.target.value)}
+                        className={`${CELL_CLASS} font-medium`}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeColumn(index)}
+                        aria-label="Supprimer cette colonne"
+                        className="shrink-0 p-1 text-slate-400 hover:text-red-600"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </th>
+                ))}
+                <th className="w-8" />
+              </tr>
+            </thead>
+          )}
           <tbody>
             {rows.map((row, rowIndex) => (
               <tr key={rowIndex}>

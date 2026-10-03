@@ -23,6 +23,8 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Procédures, formulaires et enregistrements avec <strong>versions</strong>, piste d'audit et accès organisés par dossier.
+        Une procédure existante peut être reprise depuis sa fiche pour ouvrir un brouillon dans le circuit Procédures, sans
+        modifier le document source.
       </p>
     ),
   },
@@ -189,8 +191,8 @@ export const PAGE_GUIDES = {
     title: 'Maîtrise sanitaire des aliments',
     body: (
       <p>
-        Démarche HACCP : recenser les <strong>dangers</strong>, définir les <strong>points critiques (CCP)</strong> et
-        leurs limites, organiser la surveillance et les actions correctives. Pour l'agroalimentaire.
+        Démarche HACCP : analyser les <strong>dangers</strong>, documenter les décisions de maîtrise et, lorsque nécessaire,
+        valider les <strong>points critiques (CCP)</strong>, leurs limites et leur surveillance.
       </p>
     ),
     more: (
@@ -261,11 +263,14 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Écriture assistée d'une procédure et circuit de <strong>relecture / approbation</strong>. Complémentaire de
-        Documents, orienté rédaction.
+        Documents, orienté rédaction. Depuis Documents, reprenez une procédure existante en brouillon, toujours liée à son
+        document source. Les pièces jointes suivent le stockage cloud configuré dans Documents. La conversion ne vaut pas
+        approbation.
       </p>
     ),
     example:
       "rédiger « PR-07 Gestion des non-conformités » : brouillon → relecture par le responsable qualité → approbation → publication comme document officiel.",
+    exampleCollapsible: true,
   },
   accidents: {
     title: 'Accidents et presqu’accidents du travail',
@@ -563,7 +568,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Ouvrez un point critique, saisissez la <strong>valeur relevée</strong> : le verdict « dans / hors limites » s'affiche aussitôt et le serveur le
-        confirme. Hors limites, notez l'<strong>action corrective immédiate</strong> (obligatoire).
+        confirme. Hors limites, documentez l'<strong>action corrective</strong>, les produits concernés, leur devenir et le retour à la maîtrise.
       </p>
     ),
     more: (
@@ -582,12 +587,18 @@ export const PAGE_GUIDES = {
     title: "Plan HACCP d'un produit",
     body: (
       <p>
-        Décrivez les <strong>dangers</strong>, les <strong>CCP</strong> et leurs limites critiques, puis les relevés de
-        surveillance et les actions correctives en cas de dépassement.
+        Complétez le <strong>dossier HACCP</strong>, analysez les dangers et justifiez la décision de maîtrise.
+        Les propositions IA deviennent des <strong>brouillons CCP</strong> : seuls les CCP approuvés et les CCP existants conservés autorisent la surveillance.
       </p>
     ),
     more: (
       <>
+        <p>
+          Un danger significatif ne signifie pas automatiquement un CCP : justifiez les prérequis, le CCP ou la modification du procédé.
+          Un plan sans CCP peut être activé lorsque l’analyse et sa conclusion documentée le justifient. La sélection des propositions IA
+          ne vaut ni validation scientifique ni approbation. Complétez les sources, preuves, limites, méthodes, fréquences et responsables,
+          puis approuvez chaque CCP. Modifier un CCP opérationnel le remet en brouillon.
+        </p>
         <p>
           Renseignez les <strong>limites chiffrées</strong> du CCP (min, max, unité) : chaque relevé reçoit alors un verdict automatique, la courbe du
           tableau de bord se trace et le serveur ne se fie jamais au verdict envoyé. L'<strong>intervalle de rappel</strong> prévient le responsable quand un

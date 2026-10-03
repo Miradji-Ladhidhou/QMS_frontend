@@ -30,19 +30,21 @@ function PhotoPlaceholder({ caption }) {
   );
 }
 
-function TableBlockView({ headers, rows }) {
+function TableBlockView({ headers, rows, hasHeader }) {
   return (
     <div className="mt-2 overflow-x-auto">
       <table className="w-full min-w-[420px] border-collapse text-sm">
-        <thead>
-          <tr>
-            {(headers || []).map((header, i) => (
-              <th key={i} className="border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left font-semibold text-slate-700">
-                {header}
-              </th>
-            ))}
-          </tr>
-        </thead>
+        {hasHeader !== false && (
+          <thead>
+            <tr>
+              {(headers || []).map((header, i) => (
+                <th key={i} className="border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-left font-semibold text-slate-700">
+                  {header}
+                </th>
+              ))}
+            </tr>
+          </thead>
+        )}
         <tbody>
           {(rows || []).map((row, i) => (
             <tr key={i}>
@@ -72,7 +74,7 @@ function BlockView({ block }) {
         </ul>
       );
     case 'tableau':
-      return <TableBlockView headers={block.headers} rows={block.rows} />;
+      return <TableBlockView headers={block.headers} rows={block.rows} hasHeader={block.hasHeader} />;
     case 'encadre':
       return <Callout text={block.text} />;
     case 'photo_placeholder':

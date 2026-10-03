@@ -102,6 +102,34 @@ function StorageProvenanceIcon({ doc, onOpenInDrive, opening }) {
   );
 }
 
+function getSourceProcedure(document) {
+  return Array.isArray(document.source_procedure) ? document.source_procedure[0] : document.source_procedure;
+}
+
+function SourceProcedureAction({ document, canManage, onOpenProcedure, onConvert, compact = false }) {
+  const sourceProcedure = getSourceProcedure(document);
+  if (!canManage && !sourceProcedure) return null;
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => {
+        event.stopPropagation();
+        if (sourceProcedure) onOpenProcedure(sourceProcedure.id);
+        else onConvert(document);
+      }}
+      className={
+        compact
+          ? 'mb-3 inline-flex items-center gap-1.5 rounded-md border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50'
+          : 'flex items-center gap-1.5 rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-50'
+      }
+    >
+      <FileText size={compact ? 14 : 12} />
+      {sourceProcedure ? 'Ouvrir la procédure' : 'Convertir en procédure'}
+    </button>
+  );
+}
+
 function DocumentModal({ onClose, onCreated }) {
   const [form, setForm] = useState({
     number: '',
@@ -419,6 +447,91 @@ function ImportDocumentsModal({ onClose, onImported }) {
   );
 }
 
+function ConvertDocumentToProcedureModal({ document, onClose, onConverted }) {
+  const [number, setNumber] = useState(document.number || '');
+  const [title, setTitle] = useState(document.title || '');
+  const [error, setError] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError('');
+    setSubmitting(true);
+    let result;
+    try {
+      ({ data: result } = await api.post('/procedures/from-document', {
+        document_id: document.id,
+        number,
+        title,
+      }));
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de convertir ce document en procédure.');
+      setSubmitting(false);
+      return;
+    }
+    setSubmitting(false);
+    onConverted(result.procedure);
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 sm:items-center">
+      <div className="max-h-[90vh] w-full overflow-y-auto rounded-t-xl bg-white p-5 sm:max-w-lg sm:rounded-xl sm:p-6">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900">Reprendre comme procédure</h2>
+            <p className="mt-1 text-sm text-slate-500">Le document source reste dans la bibliothèque.</p>
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fermer" className="shrink-0 p-1 text-slate-500 hover:text-slate-700">
+            <X size={20} />
+          </button>
+        </div>
+
+        {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label htmlFor="convert-procedure-number" className="mb-1 block text-sm font-medium text-slate-700">Numéro</label>
+            <input
+              id="convert-procedure-number"
+              required
+              value={number}
+              onChange={(event) => setNumber(event.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div>
+            <label htmlFor="convert-procedure-title" className="mb-1 block text-sm font-medium text-slate-700">Titre</label>
+            <input
+              id="convert-procedure-title"
+              required
+              maxLength={300}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            La nouvelle procédure sera créée en brouillon avec le contenu textuel disponible, sa version et sa date de
+            révision. Le fichier original reste rattaché au document source : aucune approbation ni archive automatique.
+          </div>
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={onClose} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-700 disabled:opacity-60"
+            >
+              {submitting ? 'Création du brouillon…' : 'Créer le brouillon'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function Documents() {
   const navigate = useNavigate();
   const tenant = useTenant();
@@ -436,6 +549,7 @@ export default function Documents() {
   const [documentsPerPage, setDocumentsPerPage] = useState(25);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [convertingDocument, setConvertingDocument] = useState(null);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -680,6 +794,11 @@ export default function Documents() {
   function handleCreated(newDocument) {
     setDocuments((prev) => [newDocument, ...prev]);
     setIsModalOpen(false);
+  }
+
+  function handleDocumentConverted(procedure) {
+    setConvertingDocument(null);
+    navigate(`/procedures/${procedure.id}`);
   }
 
   // Toujours trié par numéro croissant, indépendamment du tri affiché à l'écran — cohérence
@@ -1019,6 +1138,13 @@ export default function Documents() {
                     onClick={() => navigate(`/documents/${doc.id}`)}
                     className="cursor-pointer rounded-xl border border-slate-200 bg-white p-4 shadow-sm"
                   >
+                    <SourceProcedureAction
+                      document={doc}
+                      canManage={canManage}
+                      onOpenProcedure={(id) => navigate(`/procedures/${id}`)}
+                      onConvert={setConvertingDocument}
+                      compact
+                    />
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-2">
                         {canManage && (
@@ -1132,6 +1258,12 @@ export default function Documents() {
                         </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <SourceProcedureAction
+                              document={doc}
+                              canManage={canManage}
+                              onOpenProcedure={(id) => navigate(`/procedures/${id}`)}
+                              onConvert={setConvertingDocument}
+                            />
                             {canManage && (
                               <button
                                 type="button"
@@ -1178,6 +1310,14 @@ export default function Documents() {
 
       {isImportModalOpen && (
         <ImportDocumentsModal onClose={() => setIsImportModalOpen(false)} onImported={loadData} />
+      )}
+
+      {convertingDocument && (
+        <ConvertDocumentToProcedureModal
+          document={convertingDocument}
+          onClose={() => setConvertingDocument(null)}
+          onConverted={handleDocumentConverted}
+        />
       )}
 
       {isBulkMoveModalOpen && (
