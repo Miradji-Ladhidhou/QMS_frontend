@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Check, Download, Pencil } from 'lucide-react';
+import { Check, Download, FileText, Pencil } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import AutoTextarea from './AutoTextarea.jsx';
@@ -192,7 +192,7 @@ export default function QualityPolicySettings({ isAdmin, isManager }) {
               {downloadingPdf ? 'Génération...' : 'PDF'}
             </button>
           )}
-          {isAdmin && !isEditing && (
+          {isAdmin && !isEditing && current && (
             <button
               type="button"
               onClick={startEditing}
@@ -216,12 +216,19 @@ export default function QualityPolicySettings({ isAdmin, isManager }) {
 
       {isEditing ? (
         <form onSubmit={handlePublish} className="mt-4 space-y-3">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            <p className="font-medium">Rédigez un engagement adapté à votre entreprise.</p>
+            <p className="mt-1 text-blue-800">
+              Précisez vos orientations qualité, les engagements envers vos clients et votre démarche d’amélioration.
+              La publication rend cette version immédiatement en vigueur et demande une nouvelle prise de connaissance.
+            </p>
+          </div>
           <AutoTextarea
             required
             rows={6}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="Notre engagement en matière de qualité..."
+            placeholder="Présentez vos engagements et orientations qualité, en lien avec votre activité et les besoins de vos clients..."
             className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
           />
           <div className="flex gap-2">
@@ -243,11 +250,16 @@ export default function QualityPolicySettings({ isAdmin, isManager }) {
         </form>
       ) : current ? (
         <>
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+            <span className="rounded-full bg-primary/5 px-2 py-1 font-semibold text-primary">
+              Version {data.versions.length}
+            </span>
+            <span>
+              Publiée le {formatDateTime(current.created_at)}
+              {current.author?.full_name ? ` par ${current.author.full_name}` : ''}
+            </span>
+          </div>
           <p className="mt-4 whitespace-pre-wrap text-sm text-slate-700">{current.content}</p>
-          <p className="mt-3 text-xs text-slate-500">
-            Dernière révision : {formatDateTime(current.created_at)}
-            {current.author?.full_name ? ` par ${current.author.full_name}` : ''}
-          </p>
 
           {data.acknowledgment_summary && (
             <p className="mt-2 text-xs font-medium text-slate-600">
@@ -288,9 +300,10 @@ export default function QualityPolicySettings({ isAdmin, isManager }) {
               </button>
               {showHistory && (
                 <ul className="mt-3 space-y-2">
-                  {history.map((version) => (
+                  {history.map((version, index) => (
                     <li key={version.id} className="rounded-md border border-slate-200 p-3">
-                      <p className="text-xs text-slate-500">
+                      <p className="text-xs font-medium text-slate-600">
+                        Version {history.length - index} ·{' '}
                         {formatDateTime(version.created_at)}
                         {version.author?.full_name ? ` — ${version.author.full_name}` : ''}
                       </p>
@@ -302,11 +315,31 @@ export default function QualityPolicySettings({ isAdmin, isManager }) {
             </div>
           )}
         </>
-      ) : (
-        <p className="mt-4 text-sm text-slate-500">
-          {isAdmin ? "Aucune politique qualité publiée pour l'instant." : "La politique qualité n'a pas encore été publiée."}
-        </p>
-      )}
+      ) : !error ? (
+        <div className="mt-4 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 sm:p-8">
+          <div className="mx-auto max-w-xl text-center">
+            <span className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-white text-primary shadow-sm ring-1 ring-slate-200">
+              <FileText size={21} />
+            </span>
+            <h3 className="mt-3 text-base font-semibold text-slate-900">Aucune politique qualité en vigueur</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {isAdmin
+                ? 'La direction peut formaliser ici les engagements qualité de l’entreprise. Après publication, la politique sera disponible à toute l’équipe et chacun pourra confirmer en avoir pris connaissance.'
+                : 'La direction n’a pas encore publié la politique qualité. Elle apparaîtra ici dès sa publication et vous pourrez confirmer en avoir pris connaissance.'}
+            </p>
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={startEditing}
+                className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
+              >
+                <Pencil size={16} />
+                Rédiger la politique qualité
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

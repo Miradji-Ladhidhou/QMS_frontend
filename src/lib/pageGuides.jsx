@@ -327,6 +327,20 @@ export const PAGE_GUIDES = {
       </p>
     ),
     example: "3 éléments à valider : la procédure Achats v2, le manuel qualité v4, une fiche de poste.",
+    exampleCollapsible: true,
+  },
+  'quality-policy': {
+    title: 'L’engagement qualité de la direction',
+    body: (
+      <p>
+        La politique qualité pose les <strong>orientations de l’entreprise</strong> : ses engagements envers les clients,
+        la conformité des produits et services et l’amélioration continue. Elle donne un cadre aux objectifs qualité et
+        doit être communiquée, comprise et tenue à jour.
+      </p>
+    ),
+    example:
+      'La direction adapte le texte à son activité, le publie, puis chaque membre de l’entreprise confirme en avoir pris connaissance.',
+    exampleCollapsible: true,
   },
   services: {
     title: "Les services de l'entreprise",

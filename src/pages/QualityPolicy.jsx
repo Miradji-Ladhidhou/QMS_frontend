@@ -1,6 +1,7 @@
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { isManagerRole } from '../lib/roles.js';
 import QualityPolicySettings from '../components/QualityPolicySettings.jsx';
+import PageGuide from '../components/PageGuide.jsx';
 
 // Anciennement un onglet de Paramètres (réservé de fait à l'admin, faute de lien de menu
 // accessible aux autres rôles — voir Layout.jsx) : sortie en page de menu à part entière pour
@@ -16,6 +17,7 @@ export default function QualityPolicy() {
   return (
     <div>
       <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Politique qualité</h1>
+      <PageGuide id="quality-policy" />
       <div className="mt-4">
         <QualityPolicySettings isAdmin={isAdmin} isManager={isManager} />
       </div>
