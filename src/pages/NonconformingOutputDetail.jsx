@@ -28,7 +28,10 @@ function EditOutputModal({ output, users, services, onClose, onUpdated }) {
     title: output.title,
     description: output.description || '',
     detected_at: output.detected_at,
+    lot_reference: output.lot_reference || '',
+    containment_action: output.containment_action || '',
     service_id: output.service_id || '',
+    assigned_to: output.assigned_to || '',
     disposition: output.disposition,
     action_taken: output.action_taken || '',
     concession_reference: output.concession_reference || '',
@@ -69,7 +72,10 @@ function EditOutputModal({ output, users, services, onClose, onUpdated }) {
         title: form.title,
         description: form.description || null,
         detected_at: form.detected_at,
+        lot_reference: form.lot_reference || null,
+        containment_action: form.containment_action || null,
         service_id: form.service_id || null,
+        assigned_to: form.assigned_to || null,
         disposition: form.disposition,
         action_taken: form.action_taken || null,
         concession_reference: form.concession_reference || null,
@@ -135,6 +141,27 @@ function EditOutputModal({ output, users, services, onClose, onUpdated }) {
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Référence du lot / produit</label>
+            <input
+              type="text"
+              placeholder="Ex : LOT-2026-014"
+              value={form.lot_reference}
+              onChange={(e) => updateField('lot_reference', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Mesure de confinement immédiate</label>
+            <AutoTextarea
+              rows={2}
+              value={form.containment_action}
+              onChange={(e) => updateField('containment_action', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service concerné</label>
             <select
               value={form.service_id}
@@ -145,6 +172,22 @@ function EditOutputModal({ output, users, services, onClose, onUpdated }) {
               {services.map((service) => (
                 <option key={service.id} value={service.id}>
                   {service.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Responsable du traitement</label>
+            <select
+              value={form.assigned_to}
+              onChange={(e) => updateField('assigned_to', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              <option value="">Non assigné</option>
+              {users.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.full_name}
                 </option>
               ))}
             </select>
@@ -552,6 +595,14 @@ export default function NonconformingOutputDetail() {
           <p className="text-sm font-medium text-slate-800">{output.service?.name || '—'}</p>
         </div>
         <div>
+          <p className="text-xs text-slate-500">Lot / produit</p>
+          <p className="text-sm font-medium text-slate-800">{output.lot_reference || '—'}</p>
+        </div>
+        <div>
+          <p className="text-xs text-slate-500">Responsable du traitement</p>
+          <p className="text-sm font-medium text-slate-800">{output.assignee?.full_name || '—'}</p>
+        </div>
+        <div>
           <p className="text-xs text-slate-500">Décidé par</p>
           <p className="text-sm font-medium text-slate-800">{output.decider?.full_name || '—'}</p>
         </div>
@@ -563,6 +614,12 @@ export default function NonconformingOutputDetail() {
           <p className="text-xs text-slate-500">Description</p>
           <p className="text-sm text-slate-700">{output.description}</p>
         </div>
+        {output.containment_action && (
+          <div className="col-span-2 sm:col-span-4">
+            <p className="text-xs text-slate-500">Mesure de confinement immédiate</p>
+            <p className="text-sm text-slate-700">{output.containment_action}</p>
+          </div>
+        )}
         {output.action_taken && (
           <div className="col-span-2 sm:col-span-4">
             <p className="text-xs text-slate-500">Action menée</p>

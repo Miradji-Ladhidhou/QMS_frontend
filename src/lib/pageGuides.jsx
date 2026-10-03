@@ -304,6 +304,7 @@ export const PAGE_GUIDES = {
     ),
     example:
       "50 pièces usinées hors tolérance détectées au contrôle final → décision : tri à 100 % → 12 rebutées, 38 reprises.",
+    exampleCollapsible: true,
   },
   'customer-satisfaction': {
     title: 'Mesurer la perception des clients',

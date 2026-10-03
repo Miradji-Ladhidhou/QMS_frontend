@@ -53,6 +53,8 @@ function NewOutputModal({ services, onClose, onCreated }) {
     title: '',
     description: '',
     detected_at: new Date().toISOString().slice(0, 10),
+    lot_reference: '',
+    containment_action: '',
     service_id: '',
     disposition: 'correction',
     customer_informed: false,
@@ -87,6 +89,8 @@ function NewOutputModal({ services, onClose, onCreated }) {
       title: form.title,
       description: form.description,
       detected_at: form.detected_at,
+      lot_reference: form.lot_reference || undefined,
+      containment_action: form.containment_action || undefined,
       service_id: form.service_id || undefined,
       disposition: form.disposition,
       customer_informed: form.customer_informed,
@@ -155,6 +159,17 @@ function NewOutputModal({ services, onClose, onCreated }) {
           </div>
 
           <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Référence du lot / produit</label>
+            <input
+              type="text"
+              placeholder="Ex : LOT-2026-014 (facultatif)"
+              value={form.lot_reference}
+              onChange={(e) => updateField('lot_reference', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
+          </div>
+
+          <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Service concerné</label>
             <select
               value={form.service_id}
@@ -168,6 +183,17 @@ function NewOutputModal({ services, onClose, onCreated }) {
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Mesure de confinement immédiate</label>
+            <AutoTextarea
+              rows={2}
+              placeholder="Ex : lot isolé et expéditions suspendues (facultatif)"
+              value={form.containment_action}
+              onChange={(e) => updateField('containment_action', e.target.value)}
+              className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+            />
           </div>
 
           <div>
@@ -291,10 +317,8 @@ export default function NonconformingOutputs() {
     setLoading(true);
     setError('');
     try {
-      const params = {};
-      if (statusFilter) params.status = statusFilter;
       const [outputsRes, servicesRes] = await Promise.all([
-        api.get('/nonconforming-outputs', { params }),
+        api.get('/nonconforming-outputs'),
         api.get('/services'),
       ]);
       setOutputs(outputsRes.data);
@@ -309,15 +333,27 @@ export default function NonconformingOutputs() {
   useEffect(() => {
     loadData();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [statusFilter]);
+  }, []);
+
+  const statusFilteredOutputs = useMemo(
+    () => (statusFilter ? outputs.filter((output) => output.status === statusFilter) : outputs),
+    [outputs, statusFilter]
+  );
 
   const searchedOutputs = useMemo(() => {
     const query = searchText.trim().toLowerCase();
-    if (!query) return outputs;
-    return outputs.filter(
-      (output) => output.title.toLowerCase().includes(query) || (output.description || '').toLowerCase().includes(query)
+    if (!query) return statusFilteredOutputs;
+    return statusFilteredOutputs.filter(
+      (output) =>
+        [output.title, output.description, output.lot_reference, output.containment_action, output.assignee?.full_name]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(query))
     );
-  }, [outputs, searchText]);
+  }, [searchText, statusFilteredOutputs]);
+
+  const openOutputCount = outputs.filter((output) => output.status === 'open').length;
+  const closedOutputCount = outputs.filter((output) => output.status === 'closed').length;
+  const linkedCapaCount = outputs.filter((output) => output.linked_capa).length;
 
   const { sorted: sortedOutputs, sortKey, direction, setSortKey, toggleSort } = useSort(
     searchedOutputs,
@@ -355,11 +391,14 @@ export default function NonconformingOutputs() {
       { key: 'title', label: 'Titre', width: forPdf ? 0.12 : undefined },
       { key: 'description', label: 'Description', width: forPdf ? 0.16 : undefined },
       { key: 'detected_at', label: 'Date de détection', width: forPdf ? 0.08 : undefined },
+      { key: 'lot_reference', label: 'Lot / produit', width: forPdf ? 0.08 : undefined },
+      { key: 'containment_action', label: 'Confinement immédiat', width: forPdf ? 0.12 : undefined },
       { key: 'status', label: 'Statut', width: forPdf ? 0.08 : undefined },
       { key: 'disposition', label: 'Traitement', width: forPdf ? 0.1 : undefined },
       { key: 'action_taken', label: 'Action réalisée', width: forPdf ? 0.14 : undefined },
       { key: 'concession_reference', label: 'Référence de dérogation', width: forPdf ? 0.1 : undefined },
       { key: 'service', label: 'Service', width: forPdf ? 0.08 : undefined },
+      { key: 'assignee', label: 'Responsable', width: forPdf ? 0.08 : undefined },
       { key: 'customer_informed', label: 'Client informé', width: forPdf ? 0.08 : undefined },
       { key: 'decider', label: 'Décidé par', width: forPdf ? 0.08 : undefined },
       { key: 'closed_at', label: 'Clôturée le', width: forPdf ? 0.08 : undefined },
@@ -373,11 +412,14 @@ export default function NonconformingOutputs() {
       title: output.title,
       description: output.description || '',
       detected_at: formatDate(output.detected_at),
+      lot_reference: output.lot_reference || '',
+      containment_action: output.containment_action || '',
       status: NONCONFORMING_OUTPUT_STATUS_LABELS[output.status] || output.status,
       disposition: NONCONFORMING_OUTPUT_DISPOSITION_LABELS[output.disposition] || output.disposition,
       action_taken: output.action_taken || '',
       concession_reference: output.concession_reference || '',
       service: output.service?.name || '',
+      assignee: output.assignee?.full_name || '',
       customer_informed: output.customer_informed ? 'Oui' : 'Non',
       decider: output.decider?.full_name || '',
       closed_at: formatDate(output.closed_at),
@@ -394,7 +436,9 @@ export default function NonconformingOutputs() {
   }
 
   async function handleExportPdf(scopeIds) {
-    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    const source = scopeIds
+      ? statusFilteredOutputs.filter((output) => scopeIds.includes(output.id))
+      : statusFilteredOutputs;
     setExportingPdf(true);
     setExportError('');
     try {
@@ -413,7 +457,9 @@ export default function NonconformingOutputs() {
   }
 
   async function handleExportXlsx(scopeIds) {
-    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    const source = scopeIds
+      ? statusFilteredOutputs.filter((output) => scopeIds.includes(output.id))
+      : statusFilteredOutputs;
     setExportingXlsx(true);
     setExportError('');
     try {
@@ -432,7 +478,9 @@ export default function NonconformingOutputs() {
   }
 
   async function handleExportWord(scopeIds) {
-    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    const source = scopeIds
+      ? statusFilteredOutputs.filter((output) => scopeIds.includes(output.id))
+      : statusFilteredOutputs;
     setExportingWord(true);
     setExportError('');
     try {
@@ -451,7 +499,9 @@ export default function NonconformingOutputs() {
   }
 
   async function handleExportDrive(scopeIds) {
-    const source = scopeIds ? outputs.filter((output) => scopeIds.includes(output.id)) : outputs;
+    const source = scopeIds
+      ? statusFilteredOutputs.filter((output) => scopeIds.includes(output.id))
+      : statusFilteredOutputs;
     setExportingDrive(true);
     setExportError('');
     setDriveSuccess('');
@@ -474,7 +524,7 @@ export default function NonconformingOutputs() {
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">Non-conformités produit/service</h1>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <ExportMenu
-            disabled={outputs.length === 0}
+            disabled={statusFilteredOutputs.length === 0}
             onExportPdf={() => handleExportPdf()}
             exportingPdf={exportingPdf}
             onExportXlsx={() => handleExportXlsx()}
@@ -500,6 +550,22 @@ export default function NonconformingOutputs() {
       {exportError && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{exportError}</p>}
       {driveSuccess && (
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
+      )}
+
+      {!loading && outputs.length > 0 && (
+        <section aria-label="Indicateurs du registre" className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {[
+            { label: 'Total', value: outputs.length, accent: 'text-slate-900' },
+            { label: 'Ouvertes', value: openOutputCount, accent: 'text-amber-700' },
+            { label: 'Clôturées', value: closedOutputCount, accent: 'text-emerald-700' },
+            { label: 'Avec CAPA liée', value: linkedCapaCount, accent: 'text-primary' },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+              <p className="text-xs font-medium text-slate-500">{stat.label}</p>
+              <p className={`mt-1 text-xl font-semibold ${stat.accent}`}>{stat.value}</p>
+            </div>
+          ))}
+        </section>
       )}
 
       <div className="relative mt-4">
@@ -578,7 +644,7 @@ export default function NonconformingOutputs() {
         </div>
       ) : (
         <>
-          {(folders.length > 0 || currentUser?.role === 'admin') && (
+          {(folders.length > 0 || (currentUser?.role === 'admin' && outputs.length > 0)) && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
               {folders.map((folder) => (
                 <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
@@ -596,22 +662,33 @@ export default function NonconformingOutputs() {
             </div>
           )}
 
-          {outputs.length === 0 && folders.length === 0 ? (
+          {outputs.length === 0 ? (
             <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
               <p className="text-base font-medium text-slate-700">Aucune non-conformité produit/service enregistrée pour l'instant</p>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-              >
-                <Plus size={18} />
-                Signaler la première non-conformité
-              </button>
+              <p className="mt-2 text-sm text-slate-500">Utilisez le bouton « Signaler une non-conformité » en haut de la page pour commencer le suivi.</p>
             </div>
           ) : currentFolderOutputs.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">
-              {currentFolderId ? 'Aucune non-conformité directement dans ce dossier.' : 'Aucune non-conformité sans dossier.'}
-            </p>
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 p-8 text-center">
+              <p className="text-sm text-slate-600">
+                {searchText || statusFilter
+                  ? 'Aucune non-conformité ne correspond à ces critères dans ce dossier.'
+                  : currentFolderId
+                    ? 'Aucune non-conformité directement dans ce dossier.'
+                    : 'Aucune non-conformité sans dossier.'}
+              </p>
+              {(searchText || statusFilter) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchText('');
+                    setStatusFilter('');
+                  }}
+                  className="mt-3 text-sm font-medium text-primary hover:underline"
+                >
+                  Effacer les filtres
+                </button>
+              )}
+            </div>
           ) : (
             <div className="mt-4 space-y-3">
               {pagedOutputs.map((output) => (
@@ -643,6 +720,16 @@ export default function NonconformingOutputs() {
                     </div>
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {output.lot_reference && (
+                      <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
+                        Lot : {output.lot_reference}
+                      </span>
+                    )}
+                    {output.assignee?.full_name && (
+                      <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                        Responsable : {output.assignee.full_name}
+                      </span>
+                    )}
                     {output.customer_informed && (
                       <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">Client informé</span>
                     )}
