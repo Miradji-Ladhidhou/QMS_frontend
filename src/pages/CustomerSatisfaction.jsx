@@ -328,13 +328,44 @@ export default function CustomerSatisfaction() {
     'desc'
   );
 
-  // Moyenne des notes affichées (après recherche/filtre) — §9.1.3 : les résultats de la
-  // surveillance doivent être analysés, pas seulement collectés.
-  const averageScore = useMemo(() => {
-    if (sortedSurveys.length === 0) return null;
-    const sum = sortedSurveys.reduce((acc, s) => acc + s.score, 0);
-    return (sum / sortedSurveys.length).toFixed(1);
-  }, [sortedSurveys]);
+  const satisfactionMetrics = useMemo(() => {
+    if (surveys.length === 0) return null;
+
+    const scoreTotal = surveys.reduce((total, survey) => total + survey.score, 0);
+    const satisfiedCount = surveys.filter((survey) => survey.score >= 4).length;
+    const lowScoreCount = surveys.filter((survey) => survey.score <= 2).length;
+    const monthScores = new Map();
+
+    for (const survey of surveys) {
+      const monthKey = survey.survey_date.slice(0, 7);
+      if (!monthScores.has(monthKey)) monthScores.set(monthKey, []);
+      monthScores.get(monthKey).push(survey.score);
+    }
+
+    const currentMonth = new Date();
+    currentMonth.setDate(1);
+    const monthlyTrend = Array.from({ length: 6 }, (_, index) => {
+      const month = new Date(currentMonth);
+      month.setMonth(currentMonth.getMonth() - (5 - index));
+      const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, '0')}`;
+      const scores = monthScores.get(monthKey) || [];
+      return {
+        key: monthKey,
+        label: month.toLocaleDateString('fr-FR', { month: 'short' }),
+        average: scores.length ? scores.reduce((total, score) => total + score, 0) / scores.length : null,
+        count: scores.length,
+      };
+    });
+
+    return {
+      count: surveys.length,
+      average: (scoreTotal / surveys.length).toFixed(1),
+      satisfiedCount,
+      satisfiedRate: Math.round((satisfiedCount / surveys.length) * 100),
+      lowScoreCount,
+      monthlyTrend,
+    };
+  }, [surveys]);
 
   // sortedSurveys reste la liste COMPLÈTE (recherche + tri) : naviguer dans un dossier ne fait
   // que choisir, côté affichage, quel sous-ensemble montrer — filtrage client de la liste déjà
@@ -473,11 +504,62 @@ export default function CustomerSatisfaction() {
         <p className="mt-4 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{driveSuccess}</p>
       )}
 
-      {averageScore !== null && (
-        <div className="mt-4 inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm shadow-sm">
-          <span className="text-slate-500">Note moyenne ({sortedSurveys.length} enquête{sortedSurveys.length > 1 ? 's' : ''})</span>
-          <span className="text-base font-semibold text-slate-900">{averageScore}/5</span>
-        </div>
+      {!loading && satisfactionMetrics && (
+        <section aria-label="Indicateurs de satisfaction client" className="mt-4 space-y-3">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              {
+                label: 'Note moyenne',
+                value: `${satisfactionMetrics.average}/5`,
+                detail: methodFilter ? SATISFACTION_METHOD_LABELS[methodFilter] : 'Toutes les méthodes',
+                accent: 'text-slate-900',
+              },
+              { label: 'Clients satisfaits', value: `${satisfactionMetrics.satisfiedRate} %`, detail: `${satisfactionMetrics.satisfiedCount} note(s) de 4 ou 5`, accent: 'text-emerald-700' },
+              { label: 'Notes faibles', value: satisfactionMetrics.lowScoreCount, detail: 'Notes de 1 ou 2 sur 5', accent: satisfactionMetrics.lowScoreCount ? 'text-amber-700' : 'text-slate-900' },
+              { label: 'Retours enregistrés', value: satisfactionMetrics.count, detail: methodFilter ? SATISFACTION_METHOD_LABELS[methodFilter] : 'Toutes les méthodes', accent: 'text-primary' },
+            ].map((stat) => (
+              <div key={stat.label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <p className="text-xs font-medium text-slate-500">{stat.label}</p>
+                <p className={`mt-1 text-xl font-semibold ${stat.accent}`}>{stat.value}</p>
+                <p className="mt-0.5 text-xs text-slate-500">{stat.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold text-slate-800">Évolution mensuelle</h2>
+              <p className="text-xs text-slate-500">Note moyenne sur 5 et nombre de retours — 6 derniers mois</p>
+            </div>
+            <div className="space-y-2">
+              {satisfactionMetrics.monthlyTrend.map((month) => (
+                <div key={month.key} className="grid grid-cols-[3.5rem_minmax(0,1fr)_5.5rem] items-center gap-3 text-xs">
+                  <span className="capitalize text-slate-500">{month.label}</span>
+                  <div
+                    className="h-2.5 overflow-hidden rounded-full bg-slate-100"
+                    role="img"
+                    aria-label={
+                      month.average === null
+                        ? `${month.label} : aucun retour`
+                        : `${month.label} : moyenne ${month.average.toFixed(1)} sur 5, ${month.count} retour(s)`
+                    }
+                  >
+                    {month.average !== null && (
+                      <div
+                        className="h-full rounded-full bg-primary"
+                        style={{ width: `${(month.average / 5) * 100}%` }}
+                      />
+                    )}
+                  </div>
+                  <span className="text-right font-medium text-slate-600">
+                    {month.average === null ? '—' : `${month.average.toFixed(1)}/5`}
+                    <span className="ml-1 font-normal text-slate-400">({month.count})</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       )}
 
       <div className="relative mt-4">
@@ -517,7 +599,7 @@ export default function CustomerSatisfaction() {
       <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
         <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Toutes les enquêtes" />
 
-        {currentUser?.role === 'admin' && (
+        {currentUser?.role === 'admin' && surveys.length > 0 && (
           <button
             type="button"
             onClick={() => setIsManageCategoriesOpen(true)}
@@ -556,7 +638,7 @@ export default function CustomerSatisfaction() {
         </div>
       ) : (
         <>
-          {(folders.length > 0 || currentUser?.role === 'admin') && (
+          {(folders.length > 0 || (currentUser?.role === 'admin' && surveys.length > 0)) && (
             <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 2xl:grid-cols-6">
               {folders.map((folder) => (
                 <FolderTile key={folder.id} folder={folder} canManage={false} onOpen={() => navigateToFolder(folder.id)} />
@@ -574,22 +656,41 @@ export default function CustomerSatisfaction() {
             </div>
           )}
 
-          {surveys.length === 0 && folders.length === 0 ? (
+          {surveys.length === 0 ? (
             <div className="mt-10 flex flex-col items-center rounded-xl border border-dashed border-slate-300 py-16 text-center">
-              <p className="text-base font-medium text-slate-700">Aucune enquête de satisfaction enregistrée pour l'instant</p>
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(true)}
-                className="mt-5 flex items-center gap-2 rounded-md bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary-700"
-              >
-                <Plus size={18} />
-                Consigner la première enquête
-              </button>
+              <p className="text-base font-medium text-slate-700">
+                {methodFilter
+                  ? `Aucune enquête enregistrée avec la méthode « ${SATISFACTION_METHOD_LABELS[methodFilter]} ».`
+                  : "Aucune enquête de satisfaction enregistrée pour l'instant"}
+              </p>
+              <p className="mt-2 text-sm text-slate-500">
+                {methodFilter
+                  ? 'Essayez une autre méthode ou consignez une nouvelle enquête avec le bouton en haut de la page.'
+                  : 'Pour commencer le suivi, consignez une enquête avec le bouton en haut de la page.'}
+              </p>
             </div>
           ) : currentFolderSurveys.length === 0 ? (
-            <p className="mt-4 text-sm text-slate-500">
-              {currentFolderId ? 'Aucune enquête directement dans ce dossier.' : 'Aucune enquête sans dossier.'}
-            </p>
+            <div className="mt-4 rounded-xl border border-dashed border-slate-300 p-8 text-center">
+              <p className="text-sm text-slate-600">
+                {searchText || methodFilter
+                  ? 'Aucune enquête ne correspond à ces critères dans ce dossier.'
+                  : currentFolderId
+                    ? 'Aucune enquête directement dans ce dossier.'
+                    : 'Aucune enquête sans dossier.'}
+              </p>
+              {(searchText || methodFilter) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchText('');
+                    setMethodFilter('');
+                  }}
+                  className="mt-3 text-sm font-medium text-primary hover:underline"
+                >
+                  Effacer les filtres
+                </button>
+              )}
+            </div>
           ) : (
             <div className="mt-4 space-y-3">
               {pagedSurveys.map((survey) => (

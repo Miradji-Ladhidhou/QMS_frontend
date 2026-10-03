@@ -316,6 +316,7 @@ export const PAGE_GUIDES = {
     ),
     example:
       "enquête annuelle envoyée à 40 clients, note moyenne 4,2/5 → une réponse à 2/5 déclenche l'ouverture d'une CAPA depuis la fiche.",
+    exampleCollapsible: true,
   },
   'my-approvals': {
     title: "Votre file d'attente d'approbations",
