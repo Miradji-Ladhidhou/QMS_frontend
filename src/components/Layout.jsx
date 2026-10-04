@@ -44,6 +44,7 @@ import { ROLE_LABELS } from '../lib/roles.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import NotificationBell from './NotificationBell.jsx';
 import AppLogo from './AppLogo.jsx';
+import AiQuotaBar from './AiQuotaBar.jsx';
 
 // Déconnexion automatique après une heure sans interaction (souris, clavier, scroll, tactile) —
 // voir useInactivityLogout.js.
@@ -593,6 +594,7 @@ export default function Layout() {
       </aside>
 
       <main className="min-w-0 flex-1 px-4 py-4 sm:px-6 md:px-8 md:py-6">
+        <AiQuotaBar />
         <Suspense fallback={<ContentLoading />}>
           <div key={location.pathname} className="page-transition">
             <Outlet />

@@ -32,8 +32,14 @@ api.interceptors.request.use(async (config) => {
 let loggingOut = false;
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    if (response.config.method === 'post' || (response.config.method === 'patch' && response.config.url?.startsWith('/ai-quota/'))) {
+      window.dispatchEvent(new Event('ai-quota-refresh'));
+    }
+    return response;
+  },
   async (error) => {
+    if (error.config?.method === 'post') window.dispatchEvent(new Event('ai-quota-refresh'));
     if (isMaintenanceResponse(error.response) && !window.location.pathname.startsWith('/maintenance')) {
       const maintenanceMessage = error.response.data?.error;
       if (maintenanceMessage) sessionStorage.setItem('maintenance-message', maintenanceMessage);

@@ -31,6 +31,8 @@ import { exportTableCsv } from '../lib/pdfExport.js';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import Pagination from '../components/Pagination.jsx';
+import AiQuotaSettings from '../components/AiQuotaSettings.jsx';
+import GroqQuotaSettings from '../components/GroqQuotaSettings.jsx';
 
 const TENANT_SORT_OPTIONS = [
   { key: 'created_at', label: 'date de création' },
@@ -47,6 +49,8 @@ const MUTED_COLOR = '#94a3b8';
 const PLAN_LABELS = { free: 'Free', starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise' };
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', member: 'Membre' };
 const ACTION_LABELS = {
+  ai_quota_updated: 'Quota IA modifié',
+  groq_limits_updated: 'Plafonds Groq modifiés',
   tenant_suspended: 'Tenant suspendu',
   tenant_reactivated: 'Tenant réactivé',
   tenant_created: 'Tenant créé',
@@ -873,6 +877,8 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
                 ))}
               </div>
             </div>
+
+            <AiQuotaSettings tenantId={tenantId} />
 
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Connexion Google Drive</h3>
@@ -1722,7 +1728,9 @@ const AI_FEATURE_LABELS = {
 };
 
 const AI_CATEGORY_LABELS = {
-  rate_limit: 'Quota dépassé',
+  rate_limit: 'Limite Groq dépassée',
+  generation_limit: 'Limite de génération',
+  invalid_contract: 'Réponse IA non conforme',
   auth: 'Authentification',
   timeout: 'Délai dépassé',
   network: 'Réseau',
@@ -1898,6 +1906,8 @@ function SystemTab() {
       </p>
 
       {jobRuns.length > 0 && <JobRunsPanel runs={jobRuns} />}
+
+      <GroqQuotaSettings />
 
       {aiFailures.length > 0 && <AiFailuresPanel failures={aiFailures} />}
 
