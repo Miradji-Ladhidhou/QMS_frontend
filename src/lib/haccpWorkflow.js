@@ -1,4 +1,4 @@
-import { isOperationalCcp } from './haccpStatus.js';
+import { isDocumentedControlDecision, isOperationalCcp } from './haccpStatus.js';
 
 export const HACCP_DOSSIER_FIELDS = [
   ['product_characteristics', 'Caractéristiques du produit', 'Composition, allergènes, conditionnement, durée de vie et conditions de conservation.'],
@@ -14,7 +14,7 @@ export const HACCP_DOSSIER_FIELDS = [
 
 export const HACCP_WORKFLOW_STAGES = [
   { id: 'dossier', title: 'Dossier', description: 'Décrivez le produit, le procédé et rassemblez les preuves.' },
-  { id: 'analysis', title: 'Dangers', description: 'Pour chaque étape du procédé, identifiez les dangers et justifiez les mesures de maîtrise.' },
+  { id: 'analysis', title: 'Dangers', description: 'Ajoutez un danger ou cliquez sur « Analyser ce danger ». Un seul parcours vous guide : danger, maîtrise, puis suivi si un CCP est retenu.' },
   { id: 'ccps', title: 'Préparer les CCP', description: 'Un CCP est un point critique à maîtriser. Complétez ses limites, ses preuves et son suivi, puis faites-le approuver.' },
   { id: 'surveillance', title: 'Relevés', description: 'Mesurez les CCP opérationnels, consultez les résultats et traitez les écarts.' },
 ];
@@ -28,9 +28,7 @@ export function getHaccpWorkflow(plan) {
   const pendingCcps = ccps.length - operationalCcps.length;
   const dossierFields = HACCP_DOSSIER_FIELDS.slice(0, -1);
   const dossierCompleted = dossierFields.filter(([field]) => hasText(plan[field])).length;
-  const undecided = hazards.filter((hazard) =>
-    !['prp', 'ccp', 'process_change'].includes(hazard.control_type) || !hasText(hazard.decision_justification)
-  ).length;
+  const undecided = hazards.filter((hazard) => !isDocumentedControlDecision(hazard)).length;
 
   let next;
   if (plan.status === 'archived') {

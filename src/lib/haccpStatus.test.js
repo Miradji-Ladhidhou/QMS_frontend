@@ -1,6 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CCP_VALIDATION_FIELDS, ccpValidationIssues, isOperationalCcp, missingCcpValidationFields } from './haccpStatus.js';
+import { CCP_VALIDATION_FIELDS, canPrepareCcp, isDocumentedControlDecision, ccpValidationIssues, isOperationalCcp, missingCcpValidationFields } from './haccpStatus.js';
+
+test('CCP preparation requires a saved CCP decision, not just a significant hazard', () => {
+  assert.equal(canPrepareCcp({ is_significant: true }), false);
+  for (const control_type of ['prp', 'process_change', 'undetermined']) {
+    assert.equal(canPrepareCcp({ control_type, decision_justification: 'Décision justifiée avec les mesures adaptées', is_significant: true }), false);
+  }
+  assert.equal(canPrepareCcp({ control_type: 'ccp', decision_justification: 'Maîtrise essentielle pour prévenir le danger' }), true);
+  assert.equal(canPrepareCcp({ control_type: 'ccp', decision_justification: '12345678', is_significant: false }), true);
+});
+
+test('decision justification follows the server minimum and rejects placeholders', () => {
+  for (const decision_justification of [undefined, null, ' ', '1234567', ' TBD ', 'à compléter', 'non renseigné', 'à confirmer']) {
+    assert.equal(canPrepareCcp({ control_type: 'ccp', decision_justification }), false);
+  }
+  assert.equal(isDocumentedControlDecision({ control_type: 'prp', decision_justification: 'Prérequis vérifiés suffisants à cette étape' }), true);
+  assert.equal(isDocumentedControlDecision({ control_type: 'invalid', decision_justification: 'Décision documentée' }), false);
+});
 
 test('draft and unknown CCPs never enable surveillance', () => {
   assert.equal(isOperationalCcp({ status: 'draft' }), false);

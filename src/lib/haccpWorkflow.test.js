@@ -37,6 +37,8 @@ test('analysis guidance covers absent steps, unanalysed steps, missing decisions
     planWith([]),
     planWith([{ ...hazard, control_type: 'undetermined' }]),
     planWith([{ ...hazard, decision_justification: ' ' }]),
+    planWith([{ ...hazard, decision_justification: 'court' }]),
+    planWith([{ ...hazard, decision_justification: 'à compléter' }]),
     planWith([{ ...hazard, control_type: 'process_change' }]),
     planWith([hazard], { steps: [{ hazards: [hazard] }, { hazards: [] }] }),
   ]) {

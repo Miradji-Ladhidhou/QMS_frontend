@@ -23,6 +23,11 @@ export default function HaccpQuickGuide() {
         </ol>
         <p className="text-xs text-slate-500">Dans l’outil : « Nouveau plan », puis ouvrez sa fiche.
           Renseignez l’équipe et le périmètre, utilisez « Compléter le dossier » et ajoutez les étapes dans « Dangers ».</p>
+        <p className="text-xs text-slate-500">Pour chaque danger, « Analyser ce danger » ouvre une seule fenêtre guidée :
+          décrivez le danger, choisissez et justifiez la maîtrise, puis complétez le suivi si vous retenez un CCP.
+          Les boutons Retour conservent votre saisie. La décision est enregistrée avant le suivi ; vous pouvez aussi
+          enregistrer le danger seulement et reprendre plus tard. Les preuves et l’approbation restent obligatoires
+          avant la mise en service.</p>
         <h3 className="font-semibold text-slate-900">2. Conduire l’analyse : les 7 principes HACCP</h3>
         <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-primary">
           <li>

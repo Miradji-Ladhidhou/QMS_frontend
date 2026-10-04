@@ -606,6 +606,8 @@ export const PAGE_GUIDES = {
       <p>
         Complétez le <strong>dossier HACCP</strong>, analysez les dangers et justifiez la décision de maîtrise.
         Suivez les quatre espaces : <strong>Dossier → Dangers → Préparer les CCP → Relevés</strong>.
+        Dans Dangers, <strong>Analyser ce danger</strong> vous guide dans une même fenêtre :
+        danger, décision de maîtrise, puis suivi uniquement si un CCP est retenu.
         Les propositions IA deviennent des <strong>brouillons CCP</strong> : seuls les CCP approuvés et les CCP existants conservés autorisent la surveillance.
       </p>
     ),

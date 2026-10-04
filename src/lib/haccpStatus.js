@@ -43,6 +43,17 @@ export function isOperationalCcp(ccp) {
   return ccp.status === 'approved' || ccp.status === 'legacy';
 }
 
+export function isDocumentedControlDecision(hazard) {
+  const text = typeof hazard.decision_justification === 'string' ? hazard.decision_justification.trim() : '';
+  return ['prp', 'ccp', 'process_change'].includes(hazard.control_type) &&
+    text.length >= 8 &&
+    !/^(?:n\/?a|none|tbd|todo|à compléter|a completer|non renseigné|non renseigne|à confirmer|a confirmer|aucun)$/i.test(text);
+}
+
+export function canPrepareCcp(hazard) {
+  return hazard.control_type === 'ccp' && isDocumentedControlDecision(hazard);
+}
+
 export const CCP_VALIDATION_FIELDS = [
   ['critical_limits', 'Limites critiques'],
   ['validation_source', 'Source des limites'],
