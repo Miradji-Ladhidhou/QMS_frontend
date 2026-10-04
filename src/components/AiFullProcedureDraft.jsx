@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { AlertTriangle, FileText, Loader2 } from 'lucide-react';
 import { useProcedureFullDraftJob } from '../lib/useProcedureFullDraftJob.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 
 // Option distincte d'AiProcedureDraft.jsx, pas un remplacement : lance le pipeline multi-appels
 // (voir POST /procedures/generate-full-draft, services/procedureFullDraftJob.js côté backend)
@@ -11,7 +12,8 @@ import { useProcedureFullDraftJob } from '../lib/useProcedureFullDraftJob.js';
 //
 // title : réutilisé tel quel comme sujet, pas de champ dupliqué. onGenerated(content) : appelé
 // une fois le job terminé, pour préremplir l'éditeur de sections (même contrat qu'AiProcedureDraft).
-export default function AiFullProcedureDraft({ title, onGenerated }) {
+export default withAiModule('procedures', AiFullProcedureDraft);
+function AiFullProcedureDraft({ title, onGenerated }) {
   const { job, starting, error, isRunning, progress, start } = useProcedureFullDraftJob();
 
   const canGenerate = title && title.trim().length >= 3;

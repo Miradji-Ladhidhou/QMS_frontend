@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 import { HAZARD_TYPE_LABELS } from '../lib/haccpStatus.js';
 
 // Suggestions IA pour l'analyse des dangers d'une étape (voir POST
@@ -8,7 +9,8 @@ import { HAZARD_TYPE_LABELS } from '../lib/haccpStatus.js';
 // AiCapaSuggestion.jsx (une seule suggestion, préremplit un formulaire), l'utilisateur coche
 // celles qu'il veut garder puis les enregistre toutes en un clic — chacune devient une ligne
 // haccp_hazards distincte (POST /haccp/steps/:stepId/hazards, ai_generated: true).
-export default function AiHazardSuggestion({ stepId, onAdded }) {
+export default withAiModule('haccp', AiHazardSuggestion);
+function AiHazardSuggestion({ stepId, onAdded }) {
   const [hazards, setHazards] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');

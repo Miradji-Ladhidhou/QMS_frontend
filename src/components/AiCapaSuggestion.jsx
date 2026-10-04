@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 import CapaPriorityBadge from './CapaPriorityBadge.jsx';
 
 // Bloc IA partagé par tous les flux "créer une CAPA depuis X" (audits, revues,
@@ -13,7 +14,8 @@ import CapaPriorityBadge from './CapaPriorityBadge.jsx';
 //   identifiée / action préventive / priorité (comme handleOpenCapaForm côté QQOQCCP).
 // onSelectAction(action) : appelé quand l'utilisateur choisit une action suggérée, pour
 //   préremplir uniquement l'action corrective.
-export default function AiCapaSuggestion({ context, onGenerated, onSelectAction }) {
+export default withAiModule('capas', AiCapaSuggestion);
+function AiCapaSuggestion({ context, onGenerated, onSelectAction }) {
   const [suggestion, setSuggestion] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [generating, setGenerating] = useState(false);

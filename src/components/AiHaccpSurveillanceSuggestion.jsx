@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 import { HAZARD_TYPE_LABELS, CONTROL_TYPE_LABELS } from '../lib/haccpStatus.js';
 
-export default function AiHaccpSurveillanceSuggestion({ plan, canManage, onOpenCcpEditor, onOpenHazardEditor, onSaved }) {
+export default withAiModule('haccp', AiHaccpSurveillanceSuggestion);
+function AiHaccpSurveillanceSuggestion({ plan, canManage, onOpenCcpEditor, onOpenHazardEditor, onSaved }) {
   const [suggestions, setSuggestions] = useState(null);
   const [summary, setSummary] = useState('');
   const [generating, setGenerating] = useState(false);

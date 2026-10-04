@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, FileCheck, Loader2, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
+import { AiModuleGate } from '../lib/aiModules.jsx';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -596,6 +597,7 @@ export default function QqoqccpDetail() {
   // avec un brouillon généré par l'IA à partir de cette analyse (voir Procedures.jsx).
   function renderProcedureAction() {
     return (
+      <AiModuleGate module="procedures">
       <button
         type="button"
         onClick={() => navigate(`/procedures?fromQqoqccp=${analysis.id}`)}
@@ -604,6 +606,7 @@ export default function QqoqccpDetail() {
         <FileCheck size={18} />
         Créer une procédure depuis cette analyse
       </button>
+      </AiModuleGate>
     );
   }
 
@@ -786,6 +789,7 @@ export default function QqoqccpDetail() {
       </div>
 
       <div className="mt-5">
+        <AiModuleGate module="qqoqccp">
         <div
           className="inline-block"
           title={!canGenerate ? `Remplissez au moins ${MIN_FIELDS_FOR_GENERATE} des 7 questions avant de générer une proposition.` : undefined}
@@ -819,6 +823,7 @@ export default function QqoqccpDetail() {
             {filledCount}/{MIN_FIELDS_FOR_GENERATE} question{MIN_FIELDS_FOR_GENERATE > 1 ? 's' : ''} minimum remplie{filledCount > 1 ? 's' : ''}.
           </p>
         )}
+        </AiModuleGate>
         {generateError && <p className="mt-2 text-sm text-red-600">{generateError}</p>}
       </div>
 

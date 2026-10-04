@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 
 // Suite logique d'AiCcpSignificanceSuggestion.jsx : une fois un danger jugé significatif,
 // suggère les limites critiques et les procédures de surveillance/action corrective/
 // vérification/enregistrement de son point critique de maîtrise (CCP) — POST
 // /ai/haccp-ccp-suggestion, backend/src/services/groq.js. Même rendu qu'AiCapaSuggestion.jsx :
 // une seule suggestion, préremplit le formulaire via onGenerated.
-export default function AiCcpDefinitionSuggestion({ hazardType, description, existingControls, likelihood, severity, justification, onGenerated }) {
+export default withAiModule('haccp', AiCcpDefinitionSuggestion);
+function AiCcpDefinitionSuggestion({ hazardType, description, existingControls, likelihood, severity, justification, onGenerated }) {
   const [suggestion, setSuggestion] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');

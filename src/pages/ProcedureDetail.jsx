@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { Archive, ArrowLeft, Check, Download, FileText, FileType, Loader2, Pencil, Plus, RefreshCw, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
+import { AiModuleGate } from '../lib/aiModules.jsx';
 import { api } from '../lib/api.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -804,6 +805,7 @@ export default function ProcedureDetail() {
               </div>
             ) : (
               canManage && (
+                <AiModuleGate module="procedures">
                 <div className="mb-3">
                   <button
                     type="button"
@@ -815,6 +817,7 @@ export default function ProcedureDetail() {
                   </button>
                   {sheetError && <p className="mt-1 text-sm text-red-600">{sheetError}</p>}
                 </div>
+                </AiModuleGate>
               )
             )}
 
@@ -1012,6 +1015,7 @@ export default function ProcedureDetail() {
                 </Link>
                 <div className="flex shrink-0 items-center gap-1">
                   {!draftVersion && procedure.status !== 'obsolete' && (
+                    <AiModuleGate module="procedures">
                     <button
                       type="button"
                       onClick={() => handleSuggestRevision(capa.id)}
@@ -1026,6 +1030,7 @@ export default function ProcedureDetail() {
                         <Sparkles size={16} />
                       )}
                     </button>
+                    </AiModuleGate>
                   )}
                   <button
                     type="button"

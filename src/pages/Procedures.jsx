@@ -18,6 +18,7 @@ import { exportToPdf, exportToXlsx, exportToWord, exportToDrive } from '../lib/p
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
+import { AiModuleGate, useAiModule } from '../lib/aiModules.jsx';
 import { useFolderNavigation } from '../lib/useFolderNavigation.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -89,6 +90,7 @@ function ProcedureTemplateSettingsModal({ onClose }) {
 // QQOQCCP via qqoqccpId). Jamais republié automatiquement : reste un brouillon normal tant que
 // "Créer la procédure" n'a pas été soumis.
 function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, initialAiGenerated, onClose, onCreated }) {
+  const aiEnabled = useAiModule('procedures');
   const [number, setNumber] = useState('');
   const [title, setTitle] = useState(initialTitle || '');
   const [process, setProcess] = useState('');
@@ -126,9 +128,9 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
   }
 
   useEffect(() => {
-    if (qqoqccpId) generateFromQqoqccp();
+    if (qqoqccpId && aiEnabled) generateFromQqoqccp();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qqoqccpId]);
+  }, [qqoqccpId, aiEnabled]);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -276,6 +278,7 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
               </div>
 
               {qqoqccpId ? (
+                <AiModuleGate module="procedures">
                 <div>
                   <button
                     type="button"
@@ -287,6 +290,7 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
                     {generatingFromQqoqccp ? 'Génération depuis l\'analyse en cours...' : aiGenerated ? 'Régénérer depuis l\'analyse QQOQCCP' : 'Générer depuis l\'analyse QQOQCCP'}
                   </button>
                 </div>
+                </AiModuleGate>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   <AiProcedureDraft title={title} process={process} onGenerated={handleAiGenerated} />
@@ -595,6 +599,7 @@ export default function Procedures() {
             <Plus size={18} />
             Création manuelle
           </button>
+          <AiModuleGate module="procedures">
           <button
             type="button"
             onClick={() => setIsFullDraftModalOpen(true)}
@@ -603,6 +608,7 @@ export default function Procedures() {
             <FileText size={18} />
             Génération IA
           </button>
+          </AiModuleGate>
         </div>
       </div>
       <PageGuide id="procedures" />
@@ -719,6 +725,7 @@ export default function Procedures() {
                     <Plus size={18} />
                     Création manuelle
                   </button>
+                  <AiModuleGate module="procedures">
                   <button
                     type="button"
                     onClick={() => setIsFullDraftModalOpen(true)}
@@ -727,6 +734,7 @@ export default function Procedures() {
                     <FileText size={18} />
                     Génération IA
                   </button>
+                  </AiModuleGate>
                 </div>
               </div>
             </section>

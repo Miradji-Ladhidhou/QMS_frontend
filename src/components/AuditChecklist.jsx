@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ListChecks, Loader2, Pencil, Plus, Sparkles, Trash2, X, ClipboardPaste, Check } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { AiModuleGate } from '../lib/aiModules.jsx';
 import { CHECKLIST_ANSWERS, conformityTone, summarizeChecklist } from '../lib/auditChecklist.js';
 import AutoTextarea from './AutoTextarea.jsx';
 
@@ -380,6 +381,7 @@ export default function AuditChecklist({ auditId, canManage, onChanged }) {
         </h2>
         {canManage && (
           <div className="flex flex-wrap gap-2">
+            <AiModuleGate module="audits">
             <button
               type="button"
               onClick={() => setModal('ai')}
@@ -388,6 +390,7 @@ export default function AuditChecklist({ auditId, canManage, onChanged }) {
               <Sparkles size={15} />
               Générer avec l'IA
             </button>
+            </AiModuleGate>
             <button type="button" onClick={() => setModal('paste')} className="flex items-center gap-1.5 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">
               <ClipboardPaste size={15} />
               Coller une liste
@@ -455,7 +458,7 @@ export default function AuditChecklist({ auditId, canManage, onChanged }) {
         </form>
       )}
 
-      {modal === 'ai' && <AiGenerateModal auditId={auditId} onClose={() => setModal(null)} onAdded={handleAdded} />}
+      {modal === 'ai' && <AiModuleGate module="audits"><AiGenerateModal auditId={auditId} onClose={() => setModal(null)} onAdded={handleAdded} /></AiModuleGate>}
       {modal === 'paste' && <PasteListModal auditId={auditId} onClose={() => setModal(null)} onAdded={handleAdded} />}
     </section>
   );

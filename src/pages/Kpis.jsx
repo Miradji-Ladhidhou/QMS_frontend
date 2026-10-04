@@ -52,6 +52,7 @@ import {
 } from 'recharts';
 import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
+import { AiModuleGate, useAiModule } from '../lib/aiModules.jsx';
 import { useUsers } from '../lib/useUsers.js';
 import {
   EMPTY_SERIES_SETTINGS_FORM,
@@ -1846,6 +1847,7 @@ function ImportResultSummary({ data, unit, seriesLabel }) {
 // Assistant d'import générique en 3 étapes : dépôt du fichier, configuration (ou réemploi)
 // de la recette de calcul avec aperçu, puis application réelle et résumé.
 function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
+  const aiEnabled = useAiModule('kpis');
   const [step, setStep] = useState(1);
   const fileInputRef = useRef(null);
 
@@ -2033,7 +2035,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
   }
 
   useEffect(() => {
-    if (!importData?.import?.id) return;
+    if (!aiEnabled || !importData?.import?.id) return;
     const importKey = `${importData.import.id}:${importData.sheet_used || ''}`;
     if (aiAnalyzedImportKey === importKey || aiSuggestionLoading) return;
     setAiAnalyzedImportKey(importKey);
@@ -2041,7 +2043,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     // L'IA doit analyser automatiquement le fichier original dès son dépôt. Le bouton manuel
     // reste disponible en étape 2 pour relancer après modification de la consigne.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importData?.import?.id, importData?.sheet_used, aiAnalyzedImportKey]);
+  }, [importData?.import?.id, importData?.sheet_used, aiAnalyzedImportKey, aiEnabled]);
 
   function applyAiSuggestion() {
     if (!aiSuggestion) return;
@@ -2255,6 +2257,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                   />
                 </div>
 
+                <AiModuleGate module="kpis">
                 <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3">
                   <label className="block text-sm font-medium text-blue-900">Consigne pour l’analyse IA</label>
                   <p className="mt-1 text-xs text-blue-700">Écris ce que tu veux mesurer. L’analyse démarrera automatiquement après le dépôt du fichier original.</p>
@@ -2266,6 +2269,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                     className="mt-2 w-full rounded-md border border-blue-200 bg-white px-3 py-2 text-sm text-slate-700 placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                   />
                 </div>
+                </AiModuleGate>
 
                 {file && !importData && (
                   <button
@@ -2478,6 +2482,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                   />
                 )}
 
+                <AiModuleGate module="kpis">
                 <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div><p className="text-sm font-medium text-blue-900">Deuxième import : analyse IA du fichier original</p><p className="text-xs text-blue-700">Décris ce que tu veux mesurer avant l’analyse. L’IA transforme le fichier en proposition de données KPI, sans appliquer ni créer d’action automatiquement.</p></div>
@@ -2498,6 +2503,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                     {selectedAiSeries.length > 1 && <p className="mt-2 font-medium text-primary">{selectedAiSeries.length} séries seront créées sur le même graphique.</p>}
                   </div>}
                 </div>
+                </AiModuleGate>
 
                 {!configForm.period_column && (
                   <div className="mt-4">

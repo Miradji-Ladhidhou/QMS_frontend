@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { AiModuleGate } from '../lib/aiModules.jsx';
 import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
 import { buildCapaExportColumns, buildCapaExportRows } from '../lib/capaExport.js';
@@ -360,6 +361,7 @@ function EmbeddedQqoqccpModal({ seedTitle, seedQuoi, onClose, onFinish }) {
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
+              <AiModuleGate module="qqoqccp">
               <button
                 type="button"
                 onClick={handleGenerate}
@@ -370,6 +372,7 @@ function EmbeddedQqoqccpModal({ seedTitle, seedQuoi, onClose, onFinish }) {
                 {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                 {generating ? 'Génération...' : 'Générer une synthèse IA'}
               </button>
+              </AiModuleGate>
               <button
                 type="button"
                 onClick={handleUseManualSummary}

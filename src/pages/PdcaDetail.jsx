@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
+import { AiModuleGate } from '../lib/aiModules.jsx';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -529,6 +530,7 @@ function PhaseCard({
           )}
           <div className="flex flex-wrap items-center gap-2">
             {state === 'current' && onGenerate && (
+              <AiModuleGate module="pdca">
               <button
                 type="button"
                 onClick={onGenerate}
@@ -538,6 +540,7 @@ function PhaseCard({
                 {generating ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
                 {generating ? 'Génération...' : "Générer avec l'IA"}
               </button>
+              </AiModuleGate>
             )}
             <button
               type="button"

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ShieldCheck, XCircle } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 
 const SEVERITY_STYLES = {
   minor: { icon: AlertTriangle, className: 'text-amber-600' },
@@ -98,7 +99,8 @@ function AnomalyItem({ procedureId, versionId, anomaly, onApplyCorrection }) {
 // anomalie peut générer une correction ciblée pour SA section et l'appliquer d'un clic. Absent
 // dans la vue lecture seule du brouillon (avant d'ouvrir l'éditeur) : la vérification y reste
 // juste informative, cohérent avec ce qui existait déjà à cet endroit.
-export default function ProcedureComplianceCheck({ procedureId, versionId, onApplyCorrection }) {
+export default withAiModule('procedures', ProcedureComplianceCheck);
+function ProcedureComplianceCheck({ procedureId, versionId, onApplyCorrection }) {
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');

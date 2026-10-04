@@ -33,6 +33,7 @@ import SortSelect from '../components/SortSelect.jsx';
 import Pagination from '../components/Pagination.jsx';
 import AiQuotaSettings from '../components/AiQuotaSettings.jsx';
 import GroqQuotaSettings from '../components/GroqQuotaSettings.jsx';
+import AiModuleSettings from '../components/AiModuleSettings.jsx';
 
 const TENANT_SORT_OPTIONS = [
   { key: 'created_at', label: 'date de création' },
@@ -51,6 +52,7 @@ const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', member: 'Membre' };
 const ACTION_LABELS = {
   ai_quota_updated: 'Quota IA modifié',
   groq_limits_updated: 'Plafonds Groq modifiés',
+  ai_modules_updated: 'Modules IA modifiés',
   tenant_suspended: 'Tenant suspendu',
   tenant_reactivated: 'Tenant réactivé',
   tenant_created: 'Tenant créé',
@@ -879,6 +881,7 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
             </div>
 
             <AiQuotaSettings tenantId={tenantId} />
+            <AiModuleSettings tenantId={tenantId} />
 
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Connexion Google Drive</h3>

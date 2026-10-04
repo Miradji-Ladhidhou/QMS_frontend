@@ -22,6 +22,7 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import PreviousReviewBlock from '../components/managementReview/PreviousReviewBlock.jsx';
 import ReviewActionCard from '../components/managementReview/ReviewActionCard.jsx';
 import ReviewAiDraftModal from '../components/managementReview/ReviewAiDraftModal.jsx';
+import { AiModuleGate } from '../lib/aiModules.jsx';
 import ReviewValidateModal from '../components/managementReview/ReviewValidateModal.jsx';
 import ReviewMailingModal from '../components/managementReview/ReviewMailingModal.jsx';
 import ReviewParticipantsField, { parseReviewParticipants } from '../components/managementReview/ReviewParticipantsField.jsx';
@@ -1170,6 +1171,7 @@ export default function ManagementReviewDetail() {
       )}
 
       {canManage && !review.is_validated && (
+        <AiModuleGate module="management_reviews">
         <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-violet-200 bg-violet-50/50 p-3 sm:p-4">
           <p className="min-w-0 text-sm text-slate-700">
             <span className="font-medium text-slate-900">Brouillon IA :</span> conclusions, opportunités d'amélioration et décisions proposées d'après les données d'entrée.
@@ -1183,6 +1185,7 @@ export default function ManagementReviewDetail() {
             Générer un brouillon
           </button>
         </div>
+        </AiModuleGate>
       )}
 
       <div className="mt-4 space-y-3">
@@ -1351,7 +1354,7 @@ export default function ManagementReviewDetail() {
         </div>
       )}
 
-      {isAiDraftOpen && <ReviewAiDraftModal reviewId={id} review={review} onClose={() => setIsAiDraftOpen(false)} onApplied={handleAiApplied} />}
+      {isAiDraftOpen && <AiModuleGate module="management_reviews"><ReviewAiDraftModal reviewId={id} review={review} onClose={() => setIsAiDraftOpen(false)} onApplied={handleAiApplied} /></AiModuleGate>}
 
       {capaModalAction && (
         <CreateCapaFromActionModal

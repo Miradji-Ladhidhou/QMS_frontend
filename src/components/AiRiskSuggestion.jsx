@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 import AutoTextarea from './AutoTextarea.jsx';
 import { IMPACT_LABELS, LIKELIHOOD_LABELS, RISK_TYPE_LABELS } from '../lib/riskStatus.js';
 
@@ -8,7 +9,8 @@ import { IMPACT_LABELS, LIKELIHOOD_LABELS, RISK_TYPE_LABELS } from '../lib/riskS
 // backend/src/services/groq.js) — même mécanique que AiHazardSuggestion.jsx (HACCP) : cases à
 // cocher, un seul bouton "Enregistrer" qui envoie les suggestions cochées d'un coup, chacune
 // devenant une ligne risks distincte (POST /risks, ai_generated: true).
-export default function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }) {
+export default withAiModule('risks', AiRiskSuggestion);
+function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }) {
   const [risks, setRisks] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');

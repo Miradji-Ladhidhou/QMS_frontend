@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GitCompare, Loader2, Minus, Pencil, Plus } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 
 const CHANGE_TYPE_STYLES = {
   added: { icon: Plus, className: 'text-emerald-600' },
@@ -12,7 +13,8 @@ const CHANGE_TYPE_LABELS = { added: 'Ajout', removed: 'Suppression', modified: '
 
 // Comparaison IA affichée au validateur pour contextualiser sa décision — ne persiste rien
 // (voir POST /:id/versions/:versionId/compare).
-export default function ProcedureVersionComparison({ procedureId, versionId }) {
+export default withAiModule('procedures', ProcedureVersionComparison);
+function ProcedureVersionComparison({ procedureId, versionId }) {
   const [result, setResult] = useState(null);
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState('');

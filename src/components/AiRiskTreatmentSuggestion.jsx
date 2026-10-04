@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 import { LIKELIHOOD_LABELS, IMPACT_LABELS } from '../lib/riskStatus.js';
 
 // Complète la couverture IA du registre des risques : AiRiskSuggestion.jsx aide à
@@ -10,7 +11,8 @@ import { LIKELIHOOD_LABELS, IMPACT_LABELS } from '../lib/riskStatus.js';
 // Même rendu que AiCapaSuggestion.jsx (une seule suggestion, préremplit le formulaire via
 // onGenerated) plutôt qu'une liste à cocher comme AiRiskSuggestion.jsx : il n'y a ici qu'UN
 // risque à traiter, pas plusieurs candidats parmi lesquels choisir.
-export default function AiRiskTreatmentSuggestion({ title, description, category, type, likelihood, impact, currentControls, onGenerated }) {
+export default withAiModule('risks', AiRiskTreatmentSuggestion);
+function AiRiskTreatmentSuggestion({ title, description, category, type, likelihood, impact, currentControls, onGenerated }) {
   const [suggestion, setSuggestion] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');

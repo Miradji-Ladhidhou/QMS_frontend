@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FileText, Loader2, Settings as SettingsIcon, X } from 'lucide-react';
 import { useProcedureFullDraftJob } from '../lib/useProcedureFullDraftJob.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 import AutoTextarea from './AutoTextarea.jsx';
 
 // Parcours dédié "Nouvelle procédure — génération complète" depuis la liste des procédures :
@@ -23,7 +24,8 @@ import AutoTextarea from './AutoTextarea.jsx';
 // onOpenTemplateSettings : ferme cette modale et ouvre celle des paramètres du gabarit (voir
 // Procedures.jsx) — la personnalisation se passe désormais directement sur la page Procédures,
 // plus dans Paramètres ailleurs dans l'app (voir le plan de refonte).
-export default function NewProcedureFullDraftModal({ template, onClose, onGenerated, onOpenTemplateSettings }) {
+export default withAiModule('procedures', NewProcedureFullDraftModal);
+function NewProcedureFullDraftModal({ template, onClose, onGenerated, onOpenTemplateSettings }) {
   const [subject, setSubject] = useState('');
   const { job, starting, error, isRunning, progress, start } = useProcedureFullDraftJob();
 

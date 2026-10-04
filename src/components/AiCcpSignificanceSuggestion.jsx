@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 import { CONTROL_TYPE_LABELS } from '../lib/haccpStatus.js';
 
 // Complète la couverture IA du module HACCP : AiHazardSuggestion.jsx aide à identifier les
@@ -15,7 +16,8 @@ import { CONTROL_TYPE_LABELS } from '../lib/haccpStatus.js';
 // peut être que supposée par l'IA plutôt que vérifiée — un test manuel a montré qu'elle
 // suppose alors l'existence d'une cuisson en aval même quand rien ne l'indique. Optionnel :
 // undefined si le danger est sur la dernière étape du plan.
-export default function AiCcpSignificanceSuggestion({
+export default withAiModule('haccp', AiCcpSignificanceSuggestion);
+function AiCcpSignificanceSuggestion({
   hazardType,
   description,
   existingControls,

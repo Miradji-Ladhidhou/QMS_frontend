@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { withAiModule } from '../lib/aiModules.jsx';
 
 // Même bloc/style qu'AiCapaSuggestion.jsx (bouton violet, encadré en pointillés) — appelé
 // avant même que la procédure existe (voir POST /procedures/generate-draft), le résultat ne
@@ -8,7 +9,8 @@ import { api } from '../lib/api.js';
 //
 // title/process : valeurs actuelles du formulaire de création. onGenerated(content) : appelé
 // à la réception, pour préremplir l'éditeur de sections.
-export default function AiProcedureDraft({ title, process, onGenerated }) {
+export default withAiModule('procedures', AiProcedureDraft);
+function AiProcedureDraft({ title, process, onGenerated }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [hasGenerated, setHasGenerated] = useState(false);
