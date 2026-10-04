@@ -45,6 +45,7 @@ import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const CAPA_RESOURCE_TYPE = 'capa';
@@ -990,6 +991,7 @@ export default function Capas() {
         </div>
       </div>
       <PageGuide id="capas" />
+      <ModuleQuickProcedure id="capas" />
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <CounterCard label="Ouvertes" value={counters.open} accent="text-blue-700" />

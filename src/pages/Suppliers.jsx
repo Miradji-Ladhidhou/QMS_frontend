@@ -25,6 +25,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 import Pagination from '../components/Pagination.jsx';
 import SupplierSummaryPanel from '../components/suppliers/SupplierSummaryPanel.jsx';
 import SupplierSettingsModal from '../components/suppliers/SupplierSettingsModal.jsx';
@@ -543,6 +544,7 @@ export default function Suppliers() {
         </div>
       </div>
       <PageGuide id="suppliers" />
+      <ModuleQuickProcedure id="suppliers" />
       <SupplierSummaryPanel summary={summary} activeFilter={attentionFilter} onFilter={setAttentionFilter} />
       {attentionFilter && (
         <button type="button" onClick={() => setAttentionFilter(null)} className="mt-3 flex min-h-[40px] items-center gap-1 text-sm font-medium text-primary hover:underline">

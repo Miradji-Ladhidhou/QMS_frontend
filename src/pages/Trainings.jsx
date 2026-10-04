@@ -53,6 +53,7 @@ import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import NewFolderModal from '../components/NewFolderModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 import Pagination from '../components/Pagination.jsx';
 import QuizEditorModal from '../components/trainingQuiz/QuizEditorModal.jsx';
 import SendQuizModal from '../components/trainingQuiz/SendQuizModal.jsx';
@@ -1786,6 +1787,7 @@ export default function Trainings() {
         </div>
       </div>
       <PageGuide id="trainings" />
+      <ModuleQuickProcedure id="trainings" />
 
       <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Formations" value={trainings.length} accent="text-slate-900" />

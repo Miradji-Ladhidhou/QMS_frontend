@@ -23,6 +23,7 @@ import Pagination from '../components/Pagination.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const QQOQCCP_RESOURCE_TYPE = 'qqoqccp';
@@ -328,6 +329,7 @@ export default function Qqoqccp() {
         </div>
       </div>
       <PageGuide id="qqoqccp" />
+      <ModuleQuickProcedure id="qqoqccp" />
 
       <div className="mt-4">
         <SortSelect

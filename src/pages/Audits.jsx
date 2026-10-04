@@ -25,6 +25,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 import Pagination from '../components/Pagination.jsx';
 import AuditorQualification from '../components/AuditorQualification.jsx';
 import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
@@ -479,6 +480,7 @@ export default function Audits() {
         </div>
       </div>
       <PageGuide id="audits" />
+      <ModuleQuickProcedure id="audits" />
 
       {!qualifications.loading && (
         <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600">

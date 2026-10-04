@@ -28,6 +28,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 import Pagination from '../components/Pagination.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -506,6 +507,7 @@ export default function Complaints() {
         </div>
       </div>
       <PageGuide id="complaints" />
+      <ModuleQuickProcedure id="complaints" />
 
       <div className="mt-4 flex flex-wrap gap-2">
         <label className="relative min-w-56 flex-1 sm:max-w-md">

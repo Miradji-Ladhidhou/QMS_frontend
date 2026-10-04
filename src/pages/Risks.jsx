@@ -34,6 +34,7 @@ import SortSelect from '../components/SortSelect.jsx';
 import AiRiskSuggestion from '../components/AiRiskSuggestion.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 import Pagination from '../components/Pagination.jsx';
 import RiskThresholdBanner from '../components/risks/RiskThresholdBanner.jsx';
 import RiskKpiSuggestions from '../components/risks/RiskKpiSuggestions.jsx';
@@ -769,6 +770,7 @@ export default function Risks() {
         </div>
       </div>
       <PageGuide id="risks" />
+      <ModuleQuickProcedure id="risks" />
       <RiskThresholdBanner
         risks={risks}
         isAdmin={currentUser?.role === 'admin'}
