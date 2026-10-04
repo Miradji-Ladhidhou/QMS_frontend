@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { supabase } from './supabase.js';
+import { isMaintenanceResponse } from './apiErrors.js';
 
 export const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL}/api`,
@@ -33,7 +34,7 @@ let loggingOut = false;
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 503 && !window.location.pathname.startsWith('/maintenance')) {
+    if (isMaintenanceResponse(error.response) && !window.location.pathname.startsWith('/maintenance')) {
       const maintenanceMessage = error.response.data?.error;
       if (maintenanceMessage) sessionStorage.setItem('maintenance-message', maintenanceMessage);
       window.location.assign('/maintenance');
