@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
 import { LIKELIHOOD_LABELS, IMPACT_LABELS } from '../lib/riskStatus.js';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 
 // Complète la couverture IA du registre des risques : AiRiskSuggestion.jsx aide à
 // l'identification (créer des risques depuis un service), celui-ci aide au traitement d'un
@@ -12,26 +12,20 @@ import { LIKELIHOOD_LABELS, IMPACT_LABELS } from '../lib/riskStatus.js';
 // onGenerated) plutôt qu'une liste à cocher comme AiRiskSuggestion.jsx : il n'y a ici qu'UN
 // risque à traiter, pas plusieurs candidats parmi lesquels choisir.
 export default withAiModule('risks', AiRiskTreatmentSuggestion);
-function AiRiskTreatmentSuggestion({ title, description, category, type, likelihood, impact, currentControls, onGenerated }) {
+function AiRiskTreatmentSuggestion({ riskId, title, description, category, type, likelihood, impact, currentControls, onGenerated }) {
   const [suggestion, setSuggestion] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
   const canGenerate = Boolean(title && title.trim());
+  const input = { resourceId: riskId, title, description, category, type, likelihood, impact, current_controls: currentControls };
+  useSavedAiResult(canGenerate ? '/ai/risk-treatment-suggestion' : null, input, setSuggestion, setError);
 
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post('/ai/risk-treatment-suggestion', {
-        title,
-        description,
-        category,
-        type,
-        likelihood,
-        impact,
-        current_controls: currentControls,
-      });
+      const { data } = await generateAi('/ai/risk-treatment-suggestion', input, Boolean(suggestion));
       setSuggestion(data);
       onGenerated?.(data);
     } catch (err) {
@@ -74,7 +68,7 @@ function AiRiskTreatmentSuggestion({ title, description, category, type, likelih
           <div className="mb-3 flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
               <Sparkles size={12} />
-              Généré par IA — déjà appliqué au formulaire ci-dessous
+              Suggestion IA enregistrée
             </span>
             {LIKELIHOOD_LABELS[suggestion.residual_likelihood] && IMPACT_LABELS[suggestion.residual_impact] && (
               <span className="text-xs font-medium text-slate-500">
@@ -85,6 +79,10 @@ function AiRiskTreatmentSuggestion({ title, description, category, type, likelih
           </div>
 
           <p className="text-sm text-slate-700">{suggestion.treatment_plan}</p>
+          <button type="button" onClick={() => onGenerated?.(suggestion)}
+            className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
+            Appliquer au formulaire — sans appel IA
+          </button>
 
           {suggestion.rationale && <p className="mt-2 text-xs italic text-slate-500">{suggestion.rationale}</p>}
         </div>

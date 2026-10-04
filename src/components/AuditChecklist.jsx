@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ListChecks, Loader2, Pencil, Plus, Sparkles, Trash2, X, ClipboardPaste, Check } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { AiModuleGate } from '../lib/aiModules.jsx';
 import { CHECKLIST_ANSWERS, conformityTone, summarizeChecklist } from '../lib/auditChecklist.js';
 import AutoTextarea from './AutoTextarea.jsx';
+import { generateAi, saveAiResult, useSavedAiResult } from '../lib/aiGenerations.js';
 
 const INPUT_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -120,19 +121,22 @@ function ChecklistItem({ item, index, canManage, onPatch, onDelete }) {
 }
 
 // Fenêtre de génération par l'IA : nombre de questions → propositions à relire (cocher, corriger) → ajout.
-// Rien n'est enregistré tant que l'auditeur n'a pas validé.
+// La proposition est persistée ; les questions ne sont ajoutées qu'après validation humaine.
 function AiGenerateModal({ auditId, onClose, onAdded }) {
+  const savingRef = useRef(false);
   const [count, setCount] = useState('10');
   const [suggestions, setSuggestions] = useState(null); // [{ text, keep }]
   const [generating, setGenerating] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  useSavedAiResult(`/audits/${auditId}/checklist/generate`, { count: Number(count) },
+    (data) => setSuggestions(data?.questions.map((text) => ({ text, keep: true })) || null), setError);
 
   async function generate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post(`/audits/${auditId}/checklist/generate`, { count: Number(count) });
+      const { data } = await generateAi(`/audits/${auditId}/checklist/generate`, { count: Number(count) }, Boolean(suggestions));
       setSuggestions(data.questions.map((text) => ({ text, keep: true })));
     } catch (err) {
       setError(err.response?.data?.error || "Impossible de générer les questions.");
@@ -144,16 +148,24 @@ function AiGenerateModal({ auditId, onClose, onAdded }) {
   const kept = (suggestions || []).filter((suggestion) => suggestion.keep && suggestion.text.trim());
 
   async function add() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setError('');
     setSaving(true);
     try {
-      await api.post(`/audits/${auditId}/checklist/items/bulk`, { questions: kept.map((suggestion) => suggestion.text.trim()), source: 'ai' });
+      const { data: generation } = await saveAiResult(`/audits/${auditId}/checklist/generate`, { count: Number(count) },
+        { questions: kept.map((suggestion) => suggestion.text.trim()) });
+      await api.post(`/audits/${auditId}/checklist/items/bulk`, {
+        questions: kept.map((suggestion) => suggestion.text.trim()), source: 'ai', ai_generation_id: generation.id,
+      });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'ajouter les questions.");
       setSaving(false);
+      savingRef.current = false;
       return;
     }
     setSaving(false);
+    savingRef.current = false;
     onAdded();
   }
 
@@ -221,7 +233,7 @@ function AiGenerateModal({ auditId, onClose, onAdded }) {
               <button
                 type="button"
                 onClick={add}
-                disabled={saving || kept.length === 0}
+                disabled={saving || generating || kept.length === 0}
                 className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
               >
                 <Check size={16} />
@@ -229,14 +241,11 @@ function AiGenerateModal({ auditId, onClose, onAdded }) {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setSuggestions(null);
-                  setError('');
-                }}
-                disabled={saving}
+                onClick={generate}
+                disabled={saving || generating}
                 className="rounded-md border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
-                Regénérer
+                {generating ? 'Génération en cours...' : 'Régénérer avec l’IA'}
               </button>
             </div>
           </div>

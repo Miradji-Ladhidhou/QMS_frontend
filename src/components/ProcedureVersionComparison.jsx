@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { GitCompare, Loader2, Minus, Pencil, Plus } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 
 const CHANGE_TYPE_STYLES = {
   added: { icon: Plus, className: 'text-emerald-600' },
@@ -11,19 +11,19 @@ const CHANGE_TYPE_STYLES = {
 
 const CHANGE_TYPE_LABELS = { added: 'Ajout', removed: 'Suppression', modified: 'Modification' };
 
-// Comparaison IA affichée au validateur pour contextualiser sa décision — ne persiste rien
-// (voir POST /:id/versions/:versionId/compare).
+// Comparaison persistée, affichée au validateur pour contextualiser sa décision.
 export default withAiModule('procedures', ProcedureVersionComparison);
 function ProcedureVersionComparison({ procedureId, versionId }) {
   const [result, setResult] = useState(null);
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState('');
+  useSavedAiResult(`/procedures/${procedureId}/versions/${versionId}/compare`, {}, setResult, setError);
 
   async function handleCompare() {
     setError('');
     setComparing(true);
     try {
-      const { data } = await api.post(`/procedures/${procedureId}/versions/${versionId}/compare`);
+      const { data } = await generateAi(`/procedures/${procedureId}/versions/${versionId}/compare`, {}, Boolean(result));
       setResult(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de comparer les versions.');
@@ -48,7 +48,7 @@ function ProcedureVersionComparison({ procedureId, versionId }) {
         ) : (
           <>
             <GitCompare size={16} />
-            Comparer avec la version précédente
+            {result ? 'Régénérer la comparaison avec l’IA' : 'Comparer avec la version précédente'}
           </>
         )}
       </button>

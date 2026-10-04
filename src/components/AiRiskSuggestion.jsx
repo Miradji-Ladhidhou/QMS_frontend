@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
 import AutoTextarea from './AutoTextarea.jsx';
+import AiResultDeleteButton from './AiResultDeleteButton.jsx';
 import { IMPACT_LABELS, LIKELIHOOD_LABELS, RISK_TYPE_LABELS } from '../lib/riskStatus.js';
+import { generateAi, saveAiResult, useLatestAiDraft, useSavedAiResult } from '../lib/aiGenerations.js';
 
 // Suggestions IA de risques/opportunités pour un service (voir POST /risks/service-suggestion,
 // backend/src/services/groq.js) — même mécanique que AiHazardSuggestion.jsx (HACCP) : cases à
@@ -17,15 +19,34 @@ function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }
   const [checkedIndexes, setCheckedIndexes] = useState([]);
   const [addedIndexes, setAddedIndexes] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [savedInput, setSavedInput] = useState(null);
+  const generationId = useRef(null);
+  const savingRef = useRef(false);
+  const input = { service_name: serviceName, context, evidence,
+    source: serviceId ? { type: 'service', id: serviceId } : undefined };
 
   const canGenerate = serviceName && context && context.trim().length >= 10;
+  useSavedAiResult(canGenerate ? '/risks/service-suggestion' : null,
+    input, (data, generation) => {
+      generationId.current = generation?.id || null;
+      setRisks(data?.risks || null);
+      setSavedInput(data ? input : null);
+    }, setError);
+  useLatestAiDraft(serviceName && !canGenerate ? '/risks/service-suggestion' : null,
+    (draft) => {
+      setRisks(draft.result.risks);
+      setSavedInput(draft.input);
+      generationId.current = draft.id;
+    }, setError, serviceName);
 
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post('/risks/service-suggestion', { service_name: serviceName, context, evidence });
+      const { data, headers } = await generateAi('/risks/service-suggestion', input, Boolean(risks));
+      generationId.current = headers['x-ai-generation-id'];
       setRisks(data.risks || []);
+      setSavedInput(input);
       setCheckedIndexes([]);
       setAddedIndexes([]);
     } catch (err) {
@@ -44,8 +65,19 @@ function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }
   }
 
   async function handleSaveSelected() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError('');
+    try {
+      const { data } = await saveAiResult('/risks/service-suggestion', savedInput || input, { risks });
+      generationId.current = data.id;
+    } catch (err) {
+      setError(err.response?.data?.error || 'Impossible de sauvegarder les suggestions modifiées.');
+      setSaving(false);
+      savingRef.current = false;
+      return;
+    }
 
     const newlyAdded = [];
     let lastError = '';
@@ -65,6 +97,7 @@ function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }
           current_controls: risk.existing_controls || undefined,
           treatment_plan: risk.suggested_controls || undefined,
           ai_generated: true,
+          ai_generation_id: generationId.current,
         });
         newlyAdded.push(index);
       } catch (err) {
@@ -79,6 +112,7 @@ function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }
     }
     if (lastError) setError(lastError);
     setSaving(false);
+    savingRef.current = false;
   }
 
   return (
@@ -87,7 +121,7 @@ function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }
       <button
         type="button"
         onClick={handleGenerate}
-        disabled={!canGenerate || generating}
+        disabled={!canGenerate || generating || saving}
         className="flex items-center gap-2 rounded-md border border-purple-300 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
       >
         {generating ? (
@@ -109,6 +143,9 @@ function AiRiskSuggestion({ serviceId, serviceName, context, evidence, onAdded }
       </button>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {risks && <AiResultDeleteButton endpoint="/risks/service-suggestion" input={savedInput || input}
+        disabled={generating || saving} onDeleted={() => { setRisks(null); setCheckedIndexes([]); setAddedIndexes([]); }}
+        onError={setError} />}
 
       {risks && risks.length > 0 && (
         <>

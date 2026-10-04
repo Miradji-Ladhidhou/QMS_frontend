@@ -3,6 +3,7 @@ import { AlertTriangle, Check, Loader2, RefreshCw, Sparkles } from 'lucide-react
 import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
 import { HAZARD_TYPE_LABELS, CONTROL_TYPE_LABELS } from '../lib/haccpStatus.js';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 
 export default withAiModule('haccp', AiHaccpSurveillanceSuggestion);
 function AiHaccpSurveillanceSuggestion({ plan, canManage, onOpenCcpEditor, onOpenHazardEditor, onSaved }) {
@@ -37,11 +38,8 @@ function AiHaccpSurveillanceSuggestion({ plan, canManage, onOpenCcpEditor, onOpe
     setSaveMessage('');
   }, [analysisSignature]);
 
-  async function handleGenerate() {
-    setError('');
-    setGenerating(true);
-    try {
-      const { data } = await api.post('/ai/haccp-surveillance-suggestion', {
+  const input = {
+        planId: plan.id,
         planTitle: plan.title,
         productDescription: plan.product_description || '',
         scope: plan.scope || '',
@@ -62,7 +60,17 @@ function AiHaccpSurveillanceSuggestion({ plan, canManage, onOpenCcpEditor, onOpe
             has_ccp: Boolean(hazard.ccp),
           })),
         })),
-      });
+      };
+  useSavedAiResult(canManage && hazards.length ? '/ai/haccp-surveillance-suggestion' : null, input, (data) => {
+    setSuggestions(data?.suggestions || null);
+    setSummary(data?.summary || '');
+  }, setError);
+
+  async function handleGenerate() {
+    setError('');
+    setGenerating(true);
+    try {
+      const { data } = await generateAi('/ai/haccp-surveillance-suggestion', input, Boolean(suggestions));
       setSuggestions(data.suggestions || []);
       setSummary(data.summary || '');
       setSelectedIds([]);

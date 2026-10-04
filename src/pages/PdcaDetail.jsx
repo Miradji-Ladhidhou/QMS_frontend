@@ -4,6 +4,7 @@ import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, ArrowRight, Check, ClipboardCheck, Loader2, Pencil, Sparkles, Trash2, X } from 'lucide-react';
 import { AiModuleGate } from '../lib/aiModules.jsx';
 import { api } from '../lib/api.js';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 import { useUsers } from '../lib/useUsers.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -321,6 +322,7 @@ function CreatePdcaCapaModal({ pdcaId, pdca, users, services, priorityDelays, on
           </div>
 
           <AiCapaSuggestion
+            source={{ type: 'pdca', id: pdca.id }}
             context={`Projet PDCA : ${pdca.title}${pdca.description ? `. ${pdca.description}` : ''}${pdca.act_content ? ` Conclusion (Act) : ${pdca.act_content}` : ''}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}
@@ -633,6 +635,16 @@ export default function PdcaDetail() {
 
   const canEdit = canManage || pdca?.created_by === currentUser?.id;
   const canDelete = currentUser?.role === 'admin' || pdca?.created_by === currentUser?.id;
+  const [savedPhase, setSavedPhase] = useState(null);
+  useSavedAiResult(canEdit && pdca && pdca.status !== 'closed' ? `/pdca/${id}/generate` : null,
+    { phase: pdca?.status }, (data) => {
+      if (!data) {
+        setSavedPhase(null);
+        return;
+      }
+      setSavedPhase(pdca.status);
+      if (!pdca[`${pdca.status}_content`]) setDrafts((prev) => ({ ...prev, [pdca.status]: data.content }));
+    }, setError);
 
   async function handleSavePhase(phase) {
     setError('');
@@ -679,7 +691,8 @@ export default function PdcaDetail() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post(`/pdca/${id}/generate`);
+      const { data } = await generateAi(`/pdca/${id}/generate`, {}, savedPhase === pdca.status);
+      setSavedPhase(pdca.status);
       setDrafts((prev) => ({ ...prev, [pdca.status]: data.content }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de générer une suggestion IA.');

@@ -366,6 +366,7 @@ function CreateCapaFromEvaluationModal({ supplierId, supplierName, evaluation, u
           </div>
 
           <AiCapaSuggestion
+            source={{ type: 'supplier_evaluation', id: evaluation.id }}
             context={`Évaluation fournisseur ${supplierName} — décision : ${EVALUATION_DECISION_LABELS[evaluation.decision]}. Notes : qualité ${evaluation.quality_score}/5, délais ${evaluation.delivery_score}/5, prix ${evaluation.price_score}/5, réactivité ${evaluation.responsiveness_score}/5.${evaluation.comment ? ` Commentaire : ${evaluation.comment}` : ''}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}

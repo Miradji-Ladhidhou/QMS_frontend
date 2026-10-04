@@ -647,6 +647,7 @@ function CreateCapaFromActionModal({ reviewId, action, users, services, priority
           </div>
 
           <AiCapaSuggestion
+            source={{ type: 'review_action', id: action.id }}
             context={`Action décidée en revue de direction : ${action.description}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}

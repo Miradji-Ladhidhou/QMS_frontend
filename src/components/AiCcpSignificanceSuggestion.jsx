@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
 import { CONTROL_TYPE_LABELS } from '../lib/haccpStatus.js';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 
 // Complète la couverture IA du module HACCP : AiHazardSuggestion.jsx aide à identifier les
 // dangers d'une étape, celui-ci aide à trancher si un danger déjà décrit est significatif
@@ -18,6 +18,7 @@ import { CONTROL_TYPE_LABELS } from '../lib/haccpStatus.js';
 // undefined si le danger est sur la dernière étape du plan.
 export default withAiModule('haccp', AiCcpSignificanceSuggestion);
 function AiCcpSignificanceSuggestion({
+  hazardId,
   hazardType,
   description,
   existingControls,
@@ -31,19 +32,15 @@ function AiCcpSignificanceSuggestion({
   const [error, setError] = useState('');
 
   const canGenerate = Boolean(description && description.trim());
+  const input = { resourceId: hazardId, hazardType, description, existingControls, likelihood, severity,
+    laterSteps: laterSteps?.map((s) => ({ name: s.name, description: s.description })) };
+  useSavedAiResult(canGenerate ? '/ai/haccp-significance-suggestion' : null, input, setSuggestion, setError);
 
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post('/ai/haccp-significance-suggestion', {
-        hazardType,
-        description,
-        existingControls,
-        likelihood,
-        severity,
-        laterSteps: laterSteps?.map((s) => ({ name: s.name, description: s.description })),
-      });
+      const { data } = await generateAi('/ai/haccp-significance-suggestion', input, Boolean(suggestion));
       setSuggestion(data);
       onGenerated?.(data);
     } catch (err) {
@@ -86,7 +83,7 @@ function AiCcpSignificanceSuggestion({
           <div className="mb-2 flex items-center justify-between gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
               <Sparkles size={12} />
-              Généré par IA — déjà appliqué au formulaire ci-dessus
+              Suggestion IA enregistrée
             </span>
             <span
               className={`rounded-full px-2.5 py-1 text-xs font-medium ${
@@ -97,6 +94,10 @@ function AiCcpSignificanceSuggestion({
             </span>
           </div>
           <p className="text-sm text-slate-700">{suggestion.justification}</p>
+          <button type="button" onClick={() => onGenerated?.(suggestion)}
+            className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
+            Appliquer au formulaire — sans appel IA
+          </button>
           {suggestion.decision_justification && <p className="mt-2 text-sm text-slate-700">{suggestion.decision_justification}</p>}
         </div>
       )}

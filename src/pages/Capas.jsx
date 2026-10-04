@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { api } from '../lib/api.js';
+import { generateAi } from '../lib/aiGenerations.js';
 import { AiModuleGate } from '../lib/aiModules.jsx';
 import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS, CAPA_STATUS_LABELS } from '../lib/capaStatus.js';
@@ -307,7 +308,7 @@ function EmbeddedQqoqccpModal({ seedTitle, seedQuoi, onClose, onFinish }) {
       Object.values(timers.current).forEach(clearTimeout);
       timers.current = {};
       await api.patch(`/qqoqccp/${analysisId}`, form);
-      const { data } = await api.post(`/qqoqccp/${analysisId}/generate`);
+      const { data } = await generateAi(`/qqoqccp/${analysisId}/generate`);
       onFinish(data.ai_synthesis, analysisId);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de générer une synthèse IA — utilisez le résumé simple.');

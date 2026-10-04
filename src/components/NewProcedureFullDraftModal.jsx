@@ -27,12 +27,13 @@ import AutoTextarea from './AutoTextarea.jsx';
 export default withAiModule('procedures', NewProcedureFullDraftModal);
 function NewProcedureFullDraftModal({ template, onClose, onGenerated, onOpenTemplateSettings }) {
   const [subject, setSubject] = useState('');
-  const { job, starting, error, isRunning, progress, start } = useProcedureFullDraftJob();
+  const { job, starting, error, isRunning, progress, start, restored, previousJob } = useProcedureFullDraftJob(subject);
 
   useEffect(() => {
-    if (job?.status === 'completed') onGenerated?.(job.result.title || subject, job.result);
+    if (job && !subject) setSubject(job.subject);
+    if (job?.status === 'completed' && !restored) onGenerated?.(job.result.title || subject, job.result);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [job?.status]);
+  }, [job?.id, job?.status]);
 
   function handleClose() {
     if (isRunning && !window.confirm('Une génération est en cours. Fermer maintenant sans récupérer le résultat ?')) {
@@ -96,7 +97,7 @@ function NewProcedureFullDraftModal({ template, onClose, onGenerated, onOpenTemp
           </button>
         </div>
 
-        {!isRunning && !job && (
+        {!isRunning && (!job || job.status === 'failed' || (job.status === 'completed' && restored)) && (
           <button
             type="button"
             onClick={() => start(subject)}
@@ -104,7 +105,7 @@ function NewProcedureFullDraftModal({ template, onClose, onGenerated, onOpenTemp
             className="mt-4 flex w-full items-center justify-center gap-2 rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
           >
             {starting ? <Loader2 size={18} className="animate-spin" /> : <FileText size={18} />}
-            {starting ? 'Lancement...' : 'Générer le document complet'}
+            {starting ? 'Lancement...' : job ? 'Régénérer le document complet avec l’IA' : 'Générer le document complet'}
           </button>
         )}
         {!canGenerate && !isRunning && (
@@ -127,6 +128,18 @@ function NewProcedureFullDraftModal({ template, onClose, onGenerated, onOpenTemp
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
             {job.error || 'La génération a échoué.'}
           </p>
+        )}
+        {job?.status === 'completed' && restored && (
+          <button type="button" onClick={() => onGenerated?.(job.result.title, job.result)}
+            className="mt-3 text-sm font-medium text-purple-700 hover:text-purple-800">
+            Utiliser le document complet enregistré — sans appel IA
+          </button>
+        )}
+        {job?.status === 'failed' && previousJob?.result && (
+          <button type="button" onClick={() => onGenerated?.(previousJob.result.title, previousJob.result)}
+            className="mt-3 text-sm font-medium text-purple-700 hover:text-purple-800">
+            Utiliser le dernier document complet enregistré — sans appel IA
+          </button>
         )}
         {error && <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
       </div>

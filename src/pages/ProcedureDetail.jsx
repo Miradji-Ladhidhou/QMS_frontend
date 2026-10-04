@@ -4,6 +4,7 @@ import { useSmartBack } from '../lib/useSmartBack.js';
 import { Archive, ArrowLeft, Check, Download, FileText, FileType, Loader2, Pencil, Plus, RefreshCw, Send, Sparkles, Trash2, X, XCircle } from 'lucide-react';
 import { AiModuleGate } from '../lib/aiModules.jsx';
 import { api } from '../lib/api.js';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
@@ -29,6 +30,37 @@ import PageGuide from '../components/PageGuide.jsx';
 // refonte de la mise en page des procédures) : ce sont des sections ordinaires, amorcées par
 // ProcedureSectionsEditor.jsx à partir du gabarit du tenant dès que "sections" démarre vide.
 const EMPTY_CONTENT = { sections: [], documents_associes: [] };
+
+function RevisionSuggestionButton({ procedureId, capaId, loading, onSuggest }) {
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  useSavedAiResult(`/procedures/${procedureId}/suggest-revision-from-capa`, { capa_id: capaId }, setResult, setError);
+  async function suggest(regenerate = false) {
+    const data = await onSuggest(capaId, regenerate ? null : result, regenerate);
+    if (data) setResult(data);
+  }
+  return (
+    <div className="max-w-xs">
+      <div className="flex items-center justify-end gap-1">
+        <button type="button" onClick={() => suggest()} disabled={loading}
+          aria-label={result ? 'Utiliser la révision enregistrée sans IA' : 'Suggérer une révision depuis ce CAPA'}
+          title={result ? 'Utiliser la révision enregistrée sans IA' : 'Suggérer une révision depuis ce CAPA'}
+          className="rounded-md p-1.5 text-purple-500 hover:bg-purple-50 hover:text-purple-700 disabled:opacity-50">
+          {loading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+        </button>
+        {result && (
+          <button type="button" onClick={() => suggest(true)} disabled={loading}
+            aria-label="Régénérer la révision avec l’IA" title="Régénérer la révision avec l’IA"
+            className="rounded-md p-1.5 text-purple-500 hover:bg-purple-50 hover:text-purple-700 disabled:opacity-50">
+            <RefreshCw size={16} />
+          </button>
+        )}
+      </div>
+      {result && <p className="text-xs text-slate-500">{result.rationale}</p>}
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  );
+}
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -491,7 +523,7 @@ export default function ProcedureDetail() {
     setSheetError('');
     setGeneratingSheet(true);
     try {
-      await api.post(`/procedures/${id}/versions/${currentVersion.id}/distribution-sheet`, {});
+      await generateAi(`/procedures/${id}/versions/${currentVersion.id}/distribution-sheet`, {}, Boolean(currentVersion.distribution_sheet));
       await loadProcedure();
     } catch (err) {
       setSheetError(err.response?.data?.error || 'Impossible de générer la fiche de diffusion.');
@@ -533,14 +565,15 @@ export default function ProcedureDetail() {
     return { ...base, sections };
   }
 
-  async function handleSuggestRevision(capaId) {
+  async function handleSuggestRevision(capaId, savedResult = null, regenerate = false) {
     setLinksError('');
     setSuggestingRevisionFor(capaId);
     try {
-      const { data } = await api.post(`/procedures/${id}/suggest-revision-from-capa`, { capa_id: capaId });
+      const data = savedResult || (await generateAi(`/procedures/${id}/suggest-revision-from-capa`, { capa_id: capaId }, regenerate)).data;
       setSuggestedRevisionContent(applySuggestedChanges(currentVersion?.content, data.suggested_changes || []));
       setSuggestedRevisionRationale(data.rationale || '');
       setIsNewVersionModalOpen(true);
+      return data;
     } catch (err) {
       setLinksError(err.response?.data?.error || 'Impossible de générer une suggestion de révision.');
     } finally {
@@ -1016,20 +1049,8 @@ export default function ProcedureDetail() {
                 <div className="flex shrink-0 items-center gap-1">
                   {!draftVersion && procedure.status !== 'obsolete' && (
                     <AiModuleGate module="procedures">
-                    <button
-                      type="button"
-                      onClick={() => handleSuggestRevision(capa.id)}
-                      disabled={suggestingRevisionFor === capa.id}
-                      aria-label="Suggérer une révision depuis ce CAPA"
-                      title="Suggérer une révision depuis ce CAPA"
-                      className="rounded-md p-1.5 text-purple-500 hover:bg-purple-50 hover:text-purple-700 disabled:opacity-50"
-                    >
-                      {suggestingRevisionFor === capa.id ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <Sparkles size={16} />
-                      )}
-                    </button>
+                    <RevisionSuggestionButton procedureId={id} capaId={capa.id}
+                      loading={suggestingRevisionFor === capa.id} onSuggest={handleSuggestRevision} />
                     </AiModuleGate>
                   )}
                   <button

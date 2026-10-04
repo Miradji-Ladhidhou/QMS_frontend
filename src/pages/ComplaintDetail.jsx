@@ -385,6 +385,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
           </div>
 
           <AiCapaSuggestion
+            source={{ type: 'complaint', id: complaintId }}
             context={`Réclamation client de ${complaint.customer_name} : ${complaint.description}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}

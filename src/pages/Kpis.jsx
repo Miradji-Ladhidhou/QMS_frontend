@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertCircle,
@@ -2025,7 +2026,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     setAiSuggestionLoading(true);
     setConfigError('');
     try {
-      const { data } = await api.post(`/kpi-imports/${importData.import.id}/ai-suggestion`, { prompt: aiPrompt });
+      const { data } = await generateAi(`/kpi-imports/${importData.import.id}/ai-suggestion`, { prompt: aiPrompt }, Boolean(aiSuggestion));
       setAiSuggestion(data);
     } catch (err) {
       setConfigError(err.response?.data?.error || 'Impossible de proposer une recette IA.');
@@ -2034,16 +2035,8 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
     }
   }
 
-  useEffect(() => {
-    if (!aiEnabled || !importData?.import?.id) return;
-    const importKey = `${importData.import.id}:${importData.sheet_used || ''}`;
-    if (aiAnalyzedImportKey === importKey || aiSuggestionLoading) return;
-    setAiAnalyzedImportKey(importKey);
-    requestAiSuggestion();
-    // L'IA doit analyser automatiquement le fichier original dès son dépôt. Le bouton manuel
-    // reste disponible en étape 2 pour relancer après modification de la consigne.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [importData?.import?.id, importData?.sheet_used, aiAnalyzedImportKey, aiEnabled]);
+  useSavedAiResult(aiEnabled && importData?.import?.id ? `/kpi-imports/${importData.import.id}/ai-suggestion` : null,
+    {}, setAiSuggestion, setConfigError);
 
   function applyAiSuggestion() {
     if (!aiSuggestion) return;
@@ -2486,7 +2479,7 @@ function ImportWizardModal({ kpi, canManage, onClose, onImported }) {
                 <div className="mt-4 rounded-md border border-blue-200 bg-blue-50 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div><p className="text-sm font-medium text-blue-900">Deuxième import : analyse IA du fichier original</p><p className="text-xs text-blue-700">Décris ce que tu veux mesurer avant l’analyse. L’IA transforme le fichier en proposition de données KPI, sans appliquer ni créer d’action automatiquement.</p></div>
-                    <button type="button" onClick={requestAiSuggestion} disabled={aiSuggestionLoading} className="rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-60">{aiSuggestionLoading ? 'Analyse des séries…' : 'Proposer les séries automatiquement'}</button>
+                    <button type="button" onClick={requestAiSuggestion} disabled={aiSuggestionLoading} className="rounded-md border border-blue-300 bg-white px-3 py-2 text-xs font-medium text-blue-800 hover:bg-blue-100 disabled:opacity-60">{aiSuggestionLoading ? 'Analyse des séries…' : aiSuggestion ? 'Régénérer les séries avec l’IA' : 'Proposer les séries avec l’IA'}</button>
                   </div>
                   <textarea value={aiPrompt} onChange={(event) => setAiPrompt(event.target.value)} placeholder="Ex : calcule le taux de conformité par mois en utilisant la colonne Résultat, considère Conforme comme positif et ignore les lignes vides." rows={3} className="mt-3 w-full rounded-md border border-blue-200 bg-white px-3 py-2 text-xs text-slate-700 placeholder:text-slate-500 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20" />
                   {aiSuggestion && <div className="mt-2 rounded border border-blue-200 bg-white p-2 text-xs text-slate-700">

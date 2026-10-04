@@ -1,13 +1,12 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
 import CapaPriorityBadge from './CapaPriorityBadge.jsx';
+import AiResultDeleteButton from './AiResultDeleteButton.jsx';
+import { generateAi, useLatestAiDraft, useSavedAiResult } from '../lib/aiGenerations.js';
 
 // Bloc IA partagé par tous les flux "créer une CAPA depuis X" (audits, revues,
-// réclamations, risques, fournisseurs) — même rendu que la suggestion QQOQCCP
-// (QqoqccpDetail.jsx), qui reste la seule à persister la sienne en base (voir
-// backend/src/routes/ai.js) : ici la suggestion ne vit que le temps de la modale.
+// réclamations, risques, fournisseurs), restauré depuis la base à l'ouverture.
 //
 // context : texte libre décrivant la situation, assemblé par l'appelant.
 // onGenerated(suggestion) : appelé une fois à la réception, pour préremplir cause
@@ -15,20 +14,31 @@ import CapaPriorityBadge from './CapaPriorityBadge.jsx';
 // onSelectAction(action) : appelé quand l'utilisateur choisit une action suggérée, pour
 //   préremplir uniquement l'action corrective.
 export default withAiModule('capas', AiCapaSuggestion);
-function AiCapaSuggestion({ context, onGenerated, onSelectAction }) {
+function AiCapaSuggestion({ context, source, onGenerated, onSelectAction }) {
   const [suggestion, setSuggestion] = useState(null);
   const [selectedIndex, setSelectedIndex] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const [savedInput, setSavedInput] = useState(null);
 
   const canGenerate = context && context.trim().length >= 10;
+  const input = { context, source };
+  useSavedAiResult(canGenerate ? '/ai/capa-suggestion' : null, input, (data) => {
+    setSuggestion(data);
+    setSavedInput(data ? input : null);
+  }, setError);
+  useLatestAiDraft(!source && !canGenerate ? '/ai/capa-suggestion' : null, (draft) => {
+    setSuggestion(draft.result);
+    setSavedInput(draft.input);
+  }, setError);
 
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post('/ai/capa-suggestion', { context });
+      const { data } = await generateAi('/ai/capa-suggestion', input, Boolean(suggestion));
       setSuggestion(data);
+      setSavedInput(input);
       setSelectedIndex(null);
       onGenerated?.(data);
     } catch (err) {
@@ -70,6 +80,8 @@ function AiCapaSuggestion({ context, onGenerated, onSelectAction }) {
       </button>
       {!canGenerate && <p className="mt-1 text-xs text-slate-400">Complétez le contexte ci-dessus pour activer la suggestion IA.</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {suggestion && <AiResultDeleteButton endpoint="/ai/capa-suggestion" input={savedInput || input}
+        disabled={generating} onDeleted={() => { setSuggestion(null); setSelectedIndex(null); }} onError={setError} />}
 
       {suggestion && (
         <div className="mt-3 rounded-xl border-2 border-dashed border-purple-300 bg-purple-50/40 p-4">
@@ -82,6 +94,10 @@ function AiCapaSuggestion({ context, onGenerated, onSelectAction }) {
           </div>
 
           <p className="text-sm text-slate-700">{suggestion.synthesis}</p>
+          <button type="button" onClick={() => onGenerated?.(suggestion)}
+            className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
+            Appliquer au formulaire — sans appel IA
+          </button>
 
           {suggestion.root_causes?.length > 0 && (
             <div className="mt-3">

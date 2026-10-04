@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { generateAi, useLatestAiDraft, useSavedAiResult } from '../lib/aiGenerations.js';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle,
@@ -109,15 +110,19 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
     setContent((prev) => mergeAiGeneratedSections(prev, draft));
     setAiGenerated(true);
   }
+  useLatestAiDraft(!qqoqccpId && !initialContent ? '/procedures/generate-draft' : null, (draft) => {
+    if (title || process || content !== EMPTY_CONTENT) return;
+    setTitle(draft.input.title || '');
+    setProcess(draft.input.process || '');
+    handleAiGenerated(draft.result);
+  }, setError);
 
-  // Déclenché automatiquement à l'ouverture quand la procédure naît d'une analyse QQOQCCP
-  // (voir QqoqccpDetail.jsx) : préremplit le titre depuis l'analyse elle-même (pas besoin que
-  // l'IA en invente un) et le contenu depuis un brouillon informé par le diagnostic complet.
+  // Uniquement sur demande ; l'ouverture restaure le brouillon existant sans appeler l'IA.
   async function generateFromQqoqccp() {
     setError('');
     setGeneratingFromQqoqccp(true);
     try {
-      const { data } = await api.post('/procedures/generate-draft-from-qqoqccp', { qqoqccp_id: qqoqccpId });
+      const { data } = await generateAi('/procedures/generate-draft-from-qqoqccp', { qqoqccp_id: qqoqccpId }, aiGenerated);
       if (data.title) setTitle(data.title);
       handleAiGenerated(data);
     } catch (err) {
@@ -127,10 +132,12 @@ function NewProcedureModal({ template, qqoqccpId, initialTitle, initialContent, 
     }
   }
 
-  useEffect(() => {
-    if (qqoqccpId && aiEnabled) generateFromQqoqccp();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [qqoqccpId, aiEnabled]);
+  useSavedAiResult(qqoqccpId && aiEnabled ? '/procedures/generate-draft-from-qqoqccp' : null,
+    { qqoqccp_id: qqoqccpId }, (data) => {
+      if (!data) return;
+      if (data.title) setTitle(data.title);
+      handleAiGenerated(data);
+    }, setError);
 
   async function handleSubmit(event) {
     event.preventDefault();

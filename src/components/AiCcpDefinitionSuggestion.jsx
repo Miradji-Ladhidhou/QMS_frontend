@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 
 // Suite logique d'AiCcpSignificanceSuggestion.jsx : une fois un danger jugé significatif,
 // suggère les limites critiques et les procédures de surveillance/action corrective/
@@ -9,25 +9,20 @@ import { withAiModule } from '../lib/aiModules.jsx';
 // /ai/haccp-ccp-suggestion, backend/src/services/groq.js. Même rendu qu'AiCapaSuggestion.jsx :
 // une seule suggestion, préremplit le formulaire via onGenerated.
 export default withAiModule('haccp', AiCcpDefinitionSuggestion);
-function AiCcpDefinitionSuggestion({ hazardType, description, existingControls, likelihood, severity, justification, onGenerated }) {
+function AiCcpDefinitionSuggestion({ hazardId, hazardType, description, existingControls, likelihood, severity, justification, onGenerated }) {
   const [suggestion, setSuggestion] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
   const canGenerate = Boolean(description && description.trim());
+  const input = { resourceId: hazardId, hazardType, description, existingControls, likelihood, severity, justification };
+  useSavedAiResult(canGenerate ? '/ai/haccp-ccp-suggestion' : null, input, setSuggestion, setError);
 
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post('/ai/haccp-ccp-suggestion', {
-        hazardType,
-        description,
-        existingControls,
-        likelihood,
-        severity,
-        justification,
-      });
+      const { data } = await generateAi('/ai/haccp-ccp-suggestion', input, Boolean(suggestion));
       setSuggestion(data);
       onGenerated?.(data);
     } catch (err) {
@@ -69,9 +64,13 @@ function AiCcpDefinitionSuggestion({ hazardType, description, existingControls, 
         <div className="mt-3 rounded-xl border-2 border-dashed border-purple-300 bg-purple-50/40 p-4">
           <span className="inline-flex items-center gap-1.5 rounded-full bg-purple-100 px-2.5 py-1 text-xs font-medium text-purple-700">
             <Sparkles size={12} />
-            Généré par IA — déjà appliqué aux champs ci-dessous
+            Suggestion IA enregistrée
           </span>
           <p className="mt-2 text-sm text-slate-700">{suggestion.critical_limits}</p>
+          <button type="button" onClick={() => onGenerated?.(suggestion)}
+            className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
+            Appliquer au formulaire — sans appel IA
+          </button>
         </div>
       )}
     </div>

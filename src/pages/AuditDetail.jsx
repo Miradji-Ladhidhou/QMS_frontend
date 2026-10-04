@@ -777,6 +777,7 @@ function CreateCapaFromFindingModal({ auditId, finding, users, services, priorit
           </div>
 
           <AiCapaSuggestion
+            source={{ type: 'audit_finding', id: finding.id }}
             context={`Constat d'audit : ${finding.description}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}

@@ -14,12 +14,12 @@ import { withAiModule } from '../lib/aiModules.jsx';
 // une fois le job terminé, pour préremplir l'éditeur de sections (même contrat qu'AiProcedureDraft).
 export default withAiModule('procedures', AiFullProcedureDraft);
 function AiFullProcedureDraft({ title, onGenerated }) {
-  const { job, starting, error, isRunning, progress, start } = useProcedureFullDraftJob();
+  const { job, starting, error, isRunning, progress, start, restored, previousJob } = useProcedureFullDraftJob(title);
 
   const canGenerate = title && title.trim().length >= 3;
 
   useEffect(() => {
-    if (job?.status === 'completed') onGenerated?.(job.result);
+    if (job?.status === 'completed' && !restored) onGenerated?.(job.result);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [job?.status]);
 
@@ -32,7 +32,7 @@ function AiFullProcedureDraft({ title, onGenerated }) {
         className="flex items-center gap-2 rounded-md border border-purple-300 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
       >
         {starting || isRunning ? <Loader2 size={16} className="animate-spin" /> : <FileText size={16} />}
-        {isRunning ? 'Génération en cours...' : 'Document complet (IA)'}
+        {isRunning ? 'Génération en cours...' : job?.status === 'completed' ? 'Régénérer le document complet avec l’IA' : 'Document complet (IA)'}
       </button>
       {!canGenerate && <p className="mt-1 text-xs text-slate-400">Renseignez au moins le titre pour activer la génération IA.</p>}
 
@@ -59,6 +59,18 @@ function AiFullProcedureDraft({ title, onGenerated }) {
 
       {job?.status === 'failed' && <p className="mt-2 text-sm text-red-600">{job.error || 'La génération a échoué.'}</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {job?.status === 'completed' && restored && (
+        <button type="button" onClick={() => onGenerated?.(job.result)}
+          className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
+          Utiliser le document complet enregistré — sans appel IA
+        </button>
+      )}
+      {job?.status === 'failed' && previousJob?.result && (
+        <button type="button" onClick={() => onGenerated?.(previousJob.result)}
+          className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
+          Utiliser le dernier document complet enregistré — sans appel IA
+        </button>
+      )}
     </div>
   );
 }

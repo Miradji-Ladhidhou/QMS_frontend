@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check, Loader2, RefreshCw, Sparkles } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
 import { HAZARD_TYPE_LABELS } from '../lib/haccpStatus.js';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
+import AiResultDeleteButton from './AiResultDeleteButton.jsx';
 
 // Suggestions IA pour l'analyse des dangers d'une étape (voir POST
 // /haccp/steps/:stepId/hazard-suggestion, backend/src/services/groq.js). Contrairement à
@@ -17,12 +19,19 @@ function AiHazardSuggestion({ stepId, onAdded }) {
   const [checkedIndexes, setCheckedIndexes] = useState([]);
   const [addedIndexes, setAddedIndexes] = useState([]);
   const [saving, setSaving] = useState(false);
+  const generationId = useRef(null);
+  const savingRef = useRef(false);
+  useSavedAiResult(`/haccp/steps/${stepId}/hazard-suggestion`, {}, (data, generation) => {
+    setHazards(data?.hazards || null);
+    generationId.current = generation?.id || null;
+  }, setError);
 
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post(`/haccp/steps/${stepId}/hazard-suggestion`);
+      const { data, headers } = await generateAi(`/haccp/steps/${stepId}/hazard-suggestion`, {}, Boolean(hazards));
+      generationId.current = headers['x-ai-generation-id'];
       setHazards(data.hazards || []);
       setCheckedIndexes([]);
       setAddedIndexes([]);
@@ -38,6 +47,8 @@ function AiHazardSuggestion({ stepId, onAdded }) {
   }
 
   async function handleSaveSelected() {
+    if (savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
     setError('');
 
@@ -54,6 +65,7 @@ function AiHazardSuggestion({ stepId, onAdded }) {
           likelihood: hazard.likelihood,
           severity: hazard.severity,
           ai_generated: true,
+          ai_generation_id: generationId.current,
           control_type: 'undetermined',
         });
         newlyAdded.push(index);
@@ -69,6 +81,7 @@ function AiHazardSuggestion({ stepId, onAdded }) {
     }
     if (lastError) setError(lastError);
     setSaving(false);
+    savingRef.current = false;
   }
 
   return (
@@ -76,7 +89,7 @@ function AiHazardSuggestion({ stepId, onAdded }) {
       <button
         type="button"
         onClick={handleGenerate}
-        disabled={generating}
+        disabled={generating || saving}
         className="flex items-center gap-2 rounded-md border border-purple-300 px-3 py-2 text-sm font-medium text-purple-700 transition-colors hover:bg-purple-50 disabled:opacity-50"
       >
         {generating ? (
@@ -98,6 +111,9 @@ function AiHazardSuggestion({ stepId, onAdded }) {
       </button>
 
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {hazards && <AiResultDeleteButton endpoint={`/haccp/steps/${stepId}/hazard-suggestion`} input={{}}
+        disabled={generating || saving} onDeleted={() => { setHazards(null); setCheckedIndexes([]); setAddedIndexes([]); }}
+        onError={setError} />}
       {hazards && <p className="mt-2 text-xs text-slate-500">Les mesures suggérées ne sont pas enregistrées comme déjà existantes. Vérifiez les dangers et documentez les mesures réellement en place dans leur formulaire.</p>}
 
       {hazards && hazards.length > 0 && (

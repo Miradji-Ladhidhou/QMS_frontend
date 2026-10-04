@@ -336,6 +336,7 @@ function HazardFormModal({ stepId, hazard, suggestion, laterSteps, onClose, onSa
         </div>
 
         <AiCcpSignificanceSuggestion
+          hazardId={hazard?.id}
           hazardType={form.hazard_type}
           description={form.description}
           existingControls={form.existing_controls}
@@ -444,6 +445,7 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
         )}
         {hazard && !suggestion && (
           <AiCcpDefinitionSuggestion
+            hazardId={hazard.id}
             hazardType={hazard.hazard_type}
             description={hazard.description}
             existingControls={hazard.existing_controls}
@@ -619,6 +621,7 @@ function CreateCapaFromLogModal({ log, ccp, users, services, priorityDelays, onC
         </div>
 
         <AiCapaSuggestion
+          source={{ type: 'haccp_log', id: log.id }}
           context={`Dérive de surveillance HACCP sur le point critique ${ccp.ccp_number || ''} (limites critiques : ${ccp.critical_limits}). Valeur relevée hors limites : ${log.recorded_value}.${log.corrective_action_taken ? ` Action corrective déjà prise sur le terrain : ${log.corrective_action_taken}.` : ''}`}
           onGenerated={handleAiGenerated}
           onSelectAction={handleAiSelectAction}

@@ -492,6 +492,7 @@ function CreateAccidentCapaModal({ accidentId, accident, users, services, priori
           </div>
 
           <AiCapaSuggestion
+            source={{ type: 'accident', id: accident.id }}
             context={`${accident.incident_type === 'near_miss' ? 'Presqu’accident' : 'Accident du travail'} : ${accident.title}${accident.description ? `. ${accident.description}` : ''}${accident.immediate_cause ? ` Cause immédiate : ${accident.immediate_cause}` : ''}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}

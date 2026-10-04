@@ -252,6 +252,7 @@ function EditRiskModal({ risk, users, services, onClose, onUpdated }) {
           </div>
 
           <AiRiskTreatmentSuggestion
+            riskId={risk.id}
             title={form.title}
             description={form.description}
             category={form.category}
@@ -498,6 +499,7 @@ function CreateCapaFromRiskModal({ riskId, risk, users, services, priorityDelays
           </div>
 
           <AiCapaSuggestion
+            source={{ type: 'risk', id: riskId }}
             context={`Risque : ${risk.title}${risk.description ? `. ${risk.description}` : ''}${risk.treatment_plan ? ` Plan de traitement envisagé : ${risk.treatment_plan}` : ''}`}
             onGenerated={handleAiGenerated}
             onSelectAction={handleAiSelectAction}

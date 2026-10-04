@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Loader2, RefreshCw, Sparkles } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
+import AiResultDeleteButton from './AiResultDeleteButton.jsx';
 
 // Même bloc/style qu'AiCapaSuggestion.jsx (bouton violet, encadré en pointillés) — appelé
 // avant même que la procédure existe (voir POST /procedures/generate-draft), le résultat ne
@@ -14,15 +15,21 @@ function AiProcedureDraft({ title, process, onGenerated }) {
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
   const [hasGenerated, setHasGenerated] = useState(false);
+  const [savedDraft, setSavedDraft] = useState(null);
 
   const canGenerate = title && title.trim().length >= 3;
+  useSavedAiResult(canGenerate ? '/procedures/generate-draft' : null, { title, process }, (data) => {
+    setHasGenerated(Boolean(data));
+    setSavedDraft(data);
+  }, setError);
 
   async function handleGenerate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post('/procedures/generate-draft', { title, process });
+      const { data } = await generateAi('/procedures/generate-draft', { title, process }, hasGenerated);
       setHasGenerated(true);
+      setSavedDraft(data);
       onGenerated?.(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de générer un brouillon IA.');
@@ -58,6 +65,14 @@ function AiProcedureDraft({ title, process, onGenerated }) {
       </button>
       {!canGenerate && <p className="mt-1 text-xs text-slate-400">Renseignez au moins le titre pour activer la génération IA.</p>}
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+      {savedDraft && <AiResultDeleteButton endpoint="/procedures/generate-draft" input={{ title, process }}
+        disabled={generating} onDeleted={() => { setSavedDraft(null); setHasGenerated(false); }} onError={setError} />}
+      {savedDraft && (
+        <button type="button" onClick={() => onGenerated?.(savedDraft)}
+          className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
+          Utiliser le brouillon enregistré ({savedDraft.sections?.length || 0} sections) — sans appel IA
+        </button>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AlertTriangle, CheckCircle2, Loader2, Sparkles, ShieldCheck, XCircle } from 'lucide-react';
-import { api } from '../lib/api.js';
 import { withAiModule } from '../lib/aiModules.jsx';
+import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 
 const SEVERITY_STYLES = {
   minor: { icon: AlertTriangle, className: 'text-amber-600' },
@@ -20,16 +20,14 @@ function AnomalyItem({ procedureId, versionId, anomaly, onApplyCorrection }) {
   const [correction, setCorrection] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
+  const input = { section_key: anomaly.section_key, issue: anomaly.issue, severity: anomaly.severity };
+  useSavedAiResult(`/procedures/${procedureId}/versions/${versionId}/compliance-fix`, input, setCorrection, setError);
 
   async function handleGenerateFix() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post(`/procedures/${procedureId}/versions/${versionId}/compliance-fix`, {
-        section_key: anomaly.section_key,
-        issue: anomaly.issue,
-        severity: anomaly.severity,
-      });
+      const { data } = await generateAi(`/procedures/${procedureId}/versions/${versionId}/compliance-fix`, input, Boolean(correction));
       setCorrection(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de générer une correction.');
@@ -91,8 +89,7 @@ function AnomalyItem({ procedureId, versionId, anomaly, onApplyCorrection }) {
   );
 }
 
-// Vérification IA avant soumission — ne persiste rien (voir POST
-// /:id/versions/:versionId/check-compliance), une simple aide pour l'auteur.
+// Vérification persistée avant soumission ; ne valide jamais la version.
 //
 // onApplyCorrection(sectionKey, correctedContent) optionnel : quand fourni (monté dans
 // EditVersionModal, qui a accès à content/setContent — voir ProcedureDetail.jsx), chaque
@@ -104,12 +101,13 @@ function ProcedureComplianceCheck({ procedureId, versionId, onApplyCorrection })
   const [result, setResult] = useState(null);
   const [checking, setChecking] = useState(false);
   const [error, setError] = useState('');
+  useSavedAiResult(`/procedures/${procedureId}/versions/${versionId}/check-compliance`, {}, setResult, setError);
 
   async function handleCheck() {
     setError('');
     setChecking(true);
     try {
-      const { data } = await api.post(`/procedures/${procedureId}/versions/${versionId}/check-compliance`);
+      const { data } = await generateAi(`/procedures/${procedureId}/versions/${versionId}/check-compliance`, {}, Boolean(result));
       setResult(data);
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de vérifier la conformité.');
@@ -134,7 +132,7 @@ function ProcedureComplianceCheck({ procedureId, versionId, onApplyCorrection })
         ) : (
           <>
             <ShieldCheck size={16} />
-            Vérifier la conformité
+            {result ? 'Régénérer la vérification avec l’IA' : 'Vérifier la conformité'}
           </>
         )}
       </button>

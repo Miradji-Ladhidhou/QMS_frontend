@@ -4,6 +4,7 @@ import { useSmartBack } from '../lib/useSmartBack.js';
 import { ArrowLeft, Check, ClipboardCheck, ClipboardPlus, FileCheck, Loader2, RefreshCw, Sparkles, Trash2, X } from 'lucide-react';
 import { AiModuleGate } from '../lib/aiModules.jsx';
 import { api } from '../lib/api.js';
+import { generateAi } from '../lib/aiGenerations.js';
 import { useUsers } from '../lib/useUsers.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
@@ -439,7 +440,7 @@ export default function QqoqccpDetail() {
     setGenerateError('');
     setGenerating(true);
     try {
-      const { data } = await api.post(`/qqoqccp/${id}/generate`);
+      const { data } = await generateAi(`/qqoqccp/${id}/generate`, {}, hasSuggestion);
       setAnalysis(data);
     } catch (err) {
       setGenerateError(err.response?.data?.error || 'Impossible de générer une proposition IA.');

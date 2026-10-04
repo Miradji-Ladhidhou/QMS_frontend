@@ -1,25 +1,39 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Check, Loader2, Sparkles, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import AutoTextarea from '../AutoTextarea.jsx';
+import { generateAi, saveAiResult, useSavedAiResult } from '../../lib/aiGenerations.js';
 
 const INPUT_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
 
 // Brouillon IA d'une revue : conclusions, opportunités d'amélioration et décisions, d'après les données d'entrée
 // de la période et le suivi des actions précédentes. La direction relit, corrige et choisit ce qu'elle retient ;
-// rien n'est enregistré avant « Appliquer ». Un texte existant n'est jamais écrasé : le brouillon s'ajoute à la suite.
+// le brouillon est persisté séparément. Un texte existant n'est jamais écrasé : le brouillon s'ajoute à la suite.
 export default function ReviewAiDraftModal({ reviewId, review, onClose, onApplied }) {
   const [draft, setDraft] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState('');
+  const applyingRef = useRef(false);
+  function restore(data) {
+    if (!data) {
+      setDraft(null);
+      return;
+    }
+    setDraft({
+      conclusions: { keep: Boolean(data.conclusions), text: data.conclusions },
+      improvement_opportunities: { keep: Boolean(data.improvement_opportunities), text: data.improvement_opportunities },
+      decisions: data.decisions.map((text) => ({ keep: true, text })),
+    });
+  }
+  useSavedAiResult(`/management-reviews/${reviewId}/ai-draft`, {}, restore, setError);
 
   async function generate() {
     setError('');
     setGenerating(true);
     try {
-      const { data } = await api.post(`/management-reviews/${reviewId}/ai-draft`);
+      const { data } = await generateAi(`/management-reviews/${reviewId}/ai-draft`, {}, Boolean(draft));
       setDraft({
         conclusions: { keep: Boolean(data.conclusions), text: data.conclusions },
         improvement_opportunities: { keep: Boolean(data.improvement_opportunities), text: data.improvement_opportunities },
@@ -36,12 +50,23 @@ export default function ReviewAiDraftModal({ reviewId, review, onClose, onApplie
   const nothingKept = draft && !draft.conclusions.keep && !draft.improvement_opportunities.keep && keptDecisions.length === 0;
 
   // Ajoute le brouillon à la suite du texte déjà présent (séparé par une ligne vide), sans jamais l'écraser.
-  const appendTo = (existing, addition) => [existing, addition.trim()].filter(Boolean).join('\n\n');
+  const appendTo = (existing, addition) => {
+    const text = addition.trim();
+    if (existing && (`\n\n${existing}\n\n`).includes(`\n\n${text}\n\n`)) return existing;
+    return [existing, text].filter(Boolean).join('\n\n');
+  };
 
   async function apply() {
+    if (applyingRef.current) return;
+    applyingRef.current = true;
     setError('');
     setApplying(true);
     try {
+      const { data: generation } = await saveAiResult(`/management-reviews/${reviewId}/ai-draft`, {}, {
+        conclusions: draft.conclusions.text,
+        improvement_opportunities: draft.improvement_opportunities.text,
+        decisions: draft.decisions.map((decision) => decision.text.trim()).filter(Boolean),
+      });
       const patch = {};
       if (draft.conclusions.keep && draft.conclusions.text.trim()) patch.conclusions = appendTo(review.conclusions, draft.conclusions.text);
       if (draft.improvement_opportunities.keep && draft.improvement_opportunities.text.trim()) {
@@ -51,13 +76,17 @@ export default function ReviewAiDraftModal({ reviewId, review, onClose, onApplie
       if (Object.keys(patch).length > 0) ({ data: updated } = await api.patch(`/management-reviews/${reviewId}`, patch));
       const createdActions = [];
       for (const decision of keptDecisions) {
-        const { data } = await api.post(`/management-reviews/${reviewId}/actions`, { description: decision.text.trim(), source: 'ai' });
+        const { data } = await api.post(`/management-reviews/${reviewId}/actions`, {
+          description: decision.text.trim(), source: 'ai', ai_generation_id: generation.id,
+        });
         createdActions.push(data);
       }
       onApplied({ updated, createdActions });
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'appliquer le brouillon.");
       setApplying(false);
+    } finally {
+      applyingRef.current = false;
     }
   }
 
@@ -153,7 +182,7 @@ export default function ReviewAiDraftModal({ reviewId, review, onClose, onApplie
               <button
                 type="button"
                 onClick={apply}
-                disabled={applying || nothingKept}
+                disabled={applying || generating || nothingKept}
                 className="flex flex-1 items-center justify-center gap-2 rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60"
               >
                 <Check size={16} />
@@ -161,14 +190,11 @@ export default function ReviewAiDraftModal({ reviewId, review, onClose, onApplie
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setDraft(null);
-                  setError('');
-                }}
-                disabled={applying}
+                onClick={generate}
+                disabled={applying || generating}
                 className="rounded-md border border-slate-300 px-4 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
-                Regénérer
+                {generating ? 'Génération en cours...' : 'Régénérer avec l’IA'}
               </button>
             </div>
           </div>
