@@ -7,6 +7,7 @@ import { useUsers } from '../lib/useUsers.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import { getWordDownload } from '../lib/pdfExport.js';
 import { describeDue, formatInterval } from '../lib/haccpMonitoring.js';
+import { applyCcpSuggestion, ccpSuggestionGuidance, nextCcpNumber } from '../lib/haccpCcpSuggestion.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
@@ -386,29 +387,34 @@ function HazardFormModal({ stepId, hazard, suggestion, laterSteps, onClose, onSa
   );
 }
 
-function CcpFormModal({ hazardId, hazard, ccp, suggestion, focusField, users, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    ccp_number: ccp?.ccp_number || '',
-    critical_limits: suggestion?.critical_limits || ccp?.critical_limits || '',
-    monitoring_procedure: suggestion?.monitoring_procedure || ccp?.monitoring_procedure || '',
-    monitoring_frequency: suggestion?.monitoring_frequency || ccp?.monitoring_frequency || '',
-    limit_min: suggestion || ccp?.limit_min === null || ccp?.limit_min === undefined ? '' : String(ccp.limit_min),
-    limit_max: suggestion || ccp?.limit_max === null || ccp?.limit_max === undefined ? '' : String(ccp.limit_max),
-    limit_unit: suggestion ? '' : ccp?.limit_unit || '',
-    monitoring_interval_hours: suggestion || ccp?.monitoring_interval_hours === null || ccp?.monitoring_interval_hours === undefined ? '' : String(Number(ccp.monitoring_interval_hours)),
-    monitoring_responsible: ccp?.monitoring_responsible || '',
-    corrective_action_procedure: suggestion?.corrective_action_procedure || ccp?.corrective_action_procedure || '',
-    verification_procedure: suggestion?.verification_procedure || ccp?.verification_procedure || '',
-    verification_frequency: suggestion?.verification_frequency || ccp?.verification_frequency || '',
-    record_keeping_procedure: suggestion?.record_keeping_procedure || ccp?.record_keeping_procedure || '',
-    validation_source: suggestion ? '' : ccp?.validation_source || '',
-    validation_evidence: suggestion ? '' : ccp?.validation_evidence || '',
-    ai_generated: Boolean(suggestion || ccp?.ai_generated),
+function CcpFormModal({ hazardId, hazard, ccp, suggestion, focusField, users, suggestedNumber, stepName, onClose, onSaved }) {
+  const [form, setForm] = useState(() => {
+    const initial = {
+      ccp_number: ccp?.ccp_number || suggestedNumber,
+      critical_limits: ccp?.critical_limits || '',
+      monitoring_procedure: ccp?.monitoring_procedure || '',
+      monitoring_frequency: ccp?.monitoring_frequency || '',
+      limit_min: ccp?.limit_min == null ? '' : String(ccp.limit_min),
+      limit_max: ccp?.limit_max == null ? '' : String(ccp.limit_max),
+      limit_unit: ccp?.limit_unit || '',
+      monitoring_interval_hours: ccp?.monitoring_interval_hours == null ? '' : String(Number(ccp.monitoring_interval_hours)),
+      monitoring_responsible: ccp?.monitoring_responsible || '',
+      corrective_action_procedure: ccp?.corrective_action_procedure || '',
+      verification_procedure: ccp?.verification_procedure || '',
+      verification_frequency: ccp?.verification_frequency || '',
+      record_keeping_procedure: ccp?.record_keeping_procedure || '',
+      validation_source: ccp?.validation_source || '',
+      validation_evidence: ccp?.validation_evidence || '',
+      ai_generated: Boolean(ccp?.ai_generated),
+    };
+    return suggestion ? applyCcpSuggestion(initial, suggestion, suggestedNumber) : initial;
   });
+  const [appliedSuggestion, setAppliedSuggestion] = useState(suggestion || null);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const formRef = useRef(null);
   const issues = ccpValidationIssues(form);
+  const guidance = ccpSuggestionGuidance(appliedSuggestion, form);
 
   function focusValidationField(field) {
     const input = formRef.current?.elements.namedItem(field);
@@ -469,6 +475,13 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, focusField, users, on
             Proposition IA préremplie. Vérifiez et ajustez les valeurs, notamment les limites chiffrées, avant d’enregistrer.
           </p>
         )}
+        {appliedSuggestion && (
+          <div className="rounded-md border border-purple-200 bg-purple-50 p-3 text-sm text-purple-900" role="status">
+            <p>Les champs techniques ont été préremplis. Relisez les limites, les fréquences et les procédures avant d’enregistrer.</p>
+            <p className="mt-1">Le responsable, les sources et les preuves déjà saisis sont conservés : confirmez qu’ils correspondent toujours à ce CCP. Les éléments manquants restent à compléter avec des informations réelles.</p>
+            {!form.limit_min && !form.limit_max && <p className="mt-1">Limites chiffrées non déduites : critères multiples ou ambigus. Choisissez la mesure suivie et ses bornes ; le texte complet des limites reste à respecter.</p>}
+          </div>
+        )}
         {hazard && !suggestion && (
           <AiCcpDefinitionSuggestion
             hazardId={hazard.id}
@@ -478,24 +491,10 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, focusField, users, on
             likelihood={hazard.likelihood}
             severity={hazard.severity}
             justification={hazard.justification}
+            stepName={stepName}
             onGenerated={(suggestion) => {
-              setForm((prev) => ({
-                ...prev,
-                critical_limits: suggestion.critical_limits || prev.critical_limits,
-                monitoring_procedure: suggestion.monitoring_procedure || prev.monitoring_procedure,
-                monitoring_frequency: suggestion.monitoring_frequency || prev.monitoring_frequency,
-                corrective_action_procedure: suggestion.corrective_action_procedure || prev.corrective_action_procedure,
-                verification_procedure: suggestion.verification_procedure || prev.verification_procedure,
-                verification_frequency: suggestion.verification_frequency || prev.verification_frequency,
-                record_keeping_procedure: suggestion.record_keeping_procedure || prev.record_keeping_procedure,
-                ai_generated: true,
-                limit_min: '',
-                limit_max: '',
-                limit_unit: '',
-                monitoring_interval_hours: '',
-                validation_source: '',
-                validation_evidence: '',
-              }));
+              setForm((prev) => applyCcpSuggestion(prev, suggestion, suggestedNumber));
+              setAppliedSuggestion(suggestion);
             }}
           />
         )}
@@ -556,6 +555,14 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, focusField, users, on
           <AutoTextarea name="validation_evidence" rows={3} value={form.validation_evidence} onChange={(e) => updateField('validation_evidence', e.target.value)} placeholder="Ex. : Essai sur 3 livraisons avec sonde étalonnée : températures conformes consignées sur les fiches de réception." className={`${FIELD_CLASS} mt-1`} />
           <span className="mt-1 block text-xs font-normal text-slate-500">Au moins 20 caractères avant approbation : décrivez les preuves réelles et leurs références. La longueur seule ne garantit pas leur validité.</span>
         </label>
+        {appliedSuggestion && (
+          <aside className="space-y-2 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+            <p className="font-semibold">Aide à la validation — pas une preuve de conformité</p>
+            <p><strong>Sources à consulter :</strong> {guidance.source}</p>
+            <p><strong>Preuves à réunir :</strong> {guidance.evidence}</p>
+            <p>Cette aide n’est pas copiée dans les champs de validation. Renseignez uniquement les références consultées et les preuves réellement disponibles.</p>
+          </aside>
+        )}
         <button type="submit" disabled={submitting} className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
           {submitting ? 'Enregistrement...' : 'Enregistrer le brouillon CCP'}
         </button>
@@ -1384,6 +1391,8 @@ export default function HaccpDetail() {
           hazard={ccpModal.hazard}
           ccp={ccpModal.ccp}
           users={users}
+          suggestedNumber={nextCcpNumber(plan.steps)}
+          stepName={plan.steps.find((step) => step.hazards.some((hazard) => hazard.id === ccpModal.hazardId))?.name}
           onClose={() => setCcpModal(null)}
           onSaved={() => {
             setCcpModal(null);

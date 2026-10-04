@@ -1,5 +1,6 @@
 import { Wand2 } from 'lucide-react';
-import { formatInterval, suggestIntervalHours, suggestLimits } from '../../lib/haccpMonitoring.js';
+import { formatInterval, suggestIntervalHours } from '../../lib/haccpMonitoring.js';
+import { suggestPrimaryCcpLimits } from '../../lib/haccpCcpSuggestion.js';
 
 const FIELD_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -9,7 +10,7 @@ const FIELD_CLASS =
 // main. L'intervalle déclenche le rappel « relevé en retard ». Les propositions se calculent d'après le texte déjà saisi
 // (limites critiques, fréquence) mais ne sont appliquées qu'au clic.
 export default function CcpLimitsFields({ form, updateField }) {
-  const limitsSuggestion = suggestLimits(form.critical_limits);
+  const limitsSuggestion = suggestPrimaryCcpLimits(form.critical_limits);
   const intervalSuggestion = suggestIntervalHours(form.monitoring_frequency);
   const hasLimits = form.limit_min !== '' || form.limit_max !== '';
 
@@ -19,6 +20,11 @@ export default function CcpLimitsFields({ form, updateField }) {
       <p className="text-xs text-slate-500">
         Avec une limite chiffrée, chaque relevé est jugé automatiquement (« dans / hors limites ») et une courbe est tracée. Bornes incluses : 4 °C est dans « max 4 ».
       </p>
+      {limitsSuggestion?.partial && (
+        <p className="rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+          La température est proposée comme mesure chiffrée principale. Le verdict automatique ne contrôle pas la durée ni les autres critères : vérifiez-les séparément selon le texte complet des limites critiques. Le rappel est une fréquence de relevé, pas un contrôle du temps cumulé d’exposition.
+        </p>
+      )}
 
       <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <div>

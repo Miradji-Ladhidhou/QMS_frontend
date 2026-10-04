@@ -9,13 +9,13 @@ import { generateAi, useSavedAiResult } from '../lib/aiGenerations.js';
 // /ai/haccp-ccp-suggestion, backend/src/services/groq.js. Même rendu qu'AiCapaSuggestion.jsx :
 // une seule suggestion, préremplit le formulaire via onGenerated.
 export default withAiModule('haccp', AiCcpDefinitionSuggestion);
-function AiCcpDefinitionSuggestion({ hazardId, hazardType, description, existingControls, likelihood, severity, justification, onGenerated }) {
+function AiCcpDefinitionSuggestion({ hazardId, hazardType, description, existingControls, likelihood, severity, justification, stepName, onGenerated }) {
   const [suggestion, setSuggestion] = useState(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState('');
 
   const canGenerate = Boolean(description && description.trim());
-  const input = { resourceId: hazardId, hazardType, description, existingControls, likelihood, severity, justification };
+  const input = { resourceId: hazardId, hazardType, description, existingControls, likelihood, severity, justification, stepName };
   useSavedAiResult(canGenerate ? '/ai/haccp-ccp-suggestion' : null, input, setSuggestion, setError);
 
   async function handleGenerate() {
@@ -67,6 +67,7 @@ function AiCcpDefinitionSuggestion({ hazardId, hazardType, description, existing
             Suggestion IA enregistrée
           </span>
           <p className="mt-2 text-sm text-slate-700">{suggestion.critical_limits}</p>
+          <p className="mt-2 text-xs text-purple-800">Application des procédures et fréquences proposées, du numéro CCP et des limites simples déductibles. Le responsable et les preuves existantes sont conservés ; une aide indique les références et preuves à vérifier.</p>
           <button type="button" onClick={() => onGenerated?.(suggestion)}
             className="mt-2 text-sm font-medium text-purple-700 hover:text-purple-800">
             Appliquer au formulaire — sans appel IA
