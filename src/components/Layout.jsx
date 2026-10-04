@@ -45,6 +45,7 @@ import { getTenantLogoPublicUrl } from '../lib/storage.js';
 import NotificationBell from './NotificationBell.jsx';
 import AppLogo from './AppLogo.jsx';
 import AiQuotaBar from './AiQuotaBar.jsx';
+import { APP_MODULE_LABELS } from '../lib/appModules.jsx';
 
 // Déconnexion automatique après une heure sans interaction (souris, clavier, scroll, tactile) —
 // voir useInactivityLogout.js.
@@ -352,6 +353,31 @@ export default function Layout() {
   const location = useLocation();
   const now = useNow();
   const timeZone = tenant?.timezone || 'UTC';
+  const routeModule = Object.entries({
+    '/planning': 'planning',
+    '/tasks': 'planning',
+    '/documents': 'documents',
+    '/capas': 'capas',
+    '/complaints': 'complaints',
+    '/trainings': 'trainings',
+    '/employees': 'employees',
+    '/kpis': 'kpis',
+    '/qqoqccp': 'qqoqccp',
+    '/audits': 'audits',
+    '/risks': 'risks',
+    '/haccp': 'haccp',
+    '/suppliers': 'suppliers',
+    '/management-reviews': 'management-reviews',
+    '/procedures': 'procedures',
+    '/accidents': 'accidents',
+    '/pdca': 'pdca',
+    '/nonconforming-outputs': 'nonconforming-outputs',
+    '/customer-satisfaction': 'customer-satisfaction',
+    '/my-approvals': 'my-approvals',
+    '/services': 'services',
+  }).find(([prefix]) => location.pathname === prefix || location.pathname.startsWith(`${prefix}/`))?.[1]
+    || (location.pathname === '/' ? 'dashboard' : null);
+  const disabledRouteModule = tenant && routeModule && tenant.app_modules?.[routeModule] === false ? routeModule : null;
   // Paramétrable via Paramètres > Informations de l'entreprise (voir CompanySettings.jsx) —
   // formaté avec le fuseau du tenant plutôt que celui du navigateur, pour rester cohérent avec
   // les échéances (CAPA, formations...) que le backend calcule selon ce même fuseau.
@@ -483,17 +509,22 @@ export default function Layout() {
             (item) =>
               !item.hiddenFromSidebar &&
               (!item.adminOnly || role === 'admin') &&
+              (!item.key || tenant?.app_modules?.[item.key] !== false) &&
               (item.adminOnly || item.alwaysVisible || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
           ).map((item) => {
             // Un onglet de page fusionnée dont la clé de visibilité est masquée pour ce rôle ne
             // doit pas apparaître dans le sous-menu — même filtre que ce que la page fusionnée
             // elle-même applique à ses propres onglets (voir ex. DocumentsHub.jsx#visibleTabs).
             const visibleChildren = item.children?.filter(
-              (child) => !child.menuKey || !visibleMenuKeys || visibleMenuKeys.includes(child.menuKey)
+              (child) =>
+                (!child.menuKey || tenant?.app_modules?.[child.menuKey] !== false) &&
+                (!child.menuKey || !visibleMenuKeys || visibleMenuKeys.includes(child.menuKey))
             );
             // Sous-menu inutile s'il ne resterait qu'un seul onglet visible (le lien principal
             // y mène déjà) — repli silencieux sur un lien simple dans ce cas.
-            const hasGroup = visibleChildren && visibleChildren.length > 1;
+            const hasGroup = visibleChildren && (
+              visibleChildren.length > 1 || visibleChildren.some((child) => !child.menuKey)
+            );
             const expanded = hasGroup && isGroupExpanded(item);
 
             return (
@@ -597,7 +628,12 @@ export default function Layout() {
         <AiQuotaBar />
         <Suspense fallback={<ContentLoading />}>
           <div key={location.pathname} className="page-transition">
-            <Outlet />
+            {disabledRouteModule ? (
+              <section className="rounded-lg border border-amber-200 bg-amber-50 p-5" role="status">
+                <h1 className="font-semibold text-amber-900">{APP_MODULE_LABELS[disabledRouteModule]} non inclus</h1>
+                <p className="mt-1 text-sm text-amber-800">Ce module n’est pas inclus dans le forfait de votre entreprise. Contactez votre administrateur.</p>
+              </section>
+            ) : <Outlet />}
           </div>
         </Suspense>
       </main>

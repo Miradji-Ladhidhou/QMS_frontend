@@ -4,6 +4,7 @@ import { AiLimitInput } from './AiPlanSettings.jsx';
 import AiQuotaSettings from './AiQuotaSettings.jsx';
 import AiModuleSettings from './AiModuleSettings.jsx';
 import AiUsageDashboard from './AiUsageDashboard.jsx';
+import AppModuleSettings from './AppModuleSettings.jsx';
 
 export default function AiCompanySettings({ tenantId, onPlanApplied }) {
   const [settings, setSettings] = useState(null);
@@ -39,7 +40,7 @@ export default function AiCompanySettings({ tenantId, onPlanApplied }) {
     if (savedDefaultLimit !== undefined) setDefaultLimit(savedDefaultLimit === null ? '' : String(savedDefaultLimit));
   }, [tenantId, savedDefaultLimit]);
   async function save(applyPlan) {
-    if (applyPlan && !window.confirm('Appliquer ce forfait remplace les accès IA, le quota entreprise et le quota par défaut des nouveaux salariés. Les quotas individuels existants et la consommation sont conservés. Continuer ?')) return;
+    if (applyPlan && !window.confirm('Appliquer ce forfait remplace les modules métier, les accès IA, le quota entreprise et le quota par défaut des nouveaux salariés. Les quotas individuels existants et la consommation sont conservés. Continuer ?')) return;
     setSaving(true); setError(''); setMessage('');
     try {
       if (applyPlan) {
@@ -65,7 +66,8 @@ export default function AiCompanySettings({ tenantId, onPlanApplied }) {
   const basePlan = plans.find((plan) => plan.key === settings?.ai_plan_key);
   const customized = basePlan && (settings.ai_monthly_limit !== basePlan.monthly_limit ||
     settings.ai_default_user_limit !== basePlan.default_user_limit ||
-    Object.keys(basePlan.modules).some((key) => settings.ai_modules[key] !== basePlan.modules[key]));
+    Object.keys(basePlan.modules).some((key) => settings.ai_modules[key] !== basePlan.modules[key]) ||
+    Object.keys(basePlan.app_modules).some((key) => settings.app_modules[key] !== basePlan.app_modules[key]));
   return <section className="space-y-4">
     <h3 className="text-sm font-semibold text-slate-900">Forfait et accès</h3>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
@@ -94,6 +96,7 @@ export default function AiCompanySettings({ tenantId, onPlanApplied }) {
       </form>
     </>}
     <AiQuotaSettings key={`quota:${revision}`} tenantId={tenantId} />
+    <AppModuleSettings key={`app-modules:${revision}`} tenantId={tenantId} />
     <AiModuleSettings key={`modules:${revision}`} tenantId={tenantId} />
     <AiUsageDashboard tenantId={tenantId} />
   </section>;

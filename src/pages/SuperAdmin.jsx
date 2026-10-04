@@ -55,6 +55,7 @@ const ACTION_LABELS = {
   ai_quota_updated: 'Quota IA modifié',
   groq_limits_updated: 'Plafonds Groq modifiés',
   ai_modules_updated: 'Modules IA modifiés',
+  app_modules_updated: 'Modules métier modifiés',
   ai_plan_updated: 'Forfait IA modifié',
   ai_plan_applied: 'Forfait IA appliqué',
   ai_default_user_limit_updated: 'Quota IA des futurs salariés modifié',
@@ -399,7 +400,7 @@ function CreateTenantModal({ onClose, onCreated }) {
             <option value="">Configuration manuelle</option>
             {plans.filter((item) => item.configured).map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
           </select>
-          <p className="mt-1 text-xs text-slate-500">Le forfait applique les accès IA, le quota entreprise et le quota du premier administrateur et des futurs salariés.</p>
+          <p className="mt-1 text-xs text-slate-500">Le forfait applique les modules métier, les accès IA et les quotas de l’entreprise et des futurs salariés.</p>
           {plansError && <p role="alert" className="text-xs text-red-700">{plansError}</p>}
         </div>
         <div className="border-t border-slate-200 pt-3">
