@@ -3,6 +3,7 @@ import { Upload } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useTenant } from '../lib/useTenant.js';
 import { getTenantLogoPublicUrl } from '../lib/storage.js';
+import AiUsageDashboard from './AiUsageDashboard.jsx';
 
 // Liste complète des fuseaux IANA fournie par le navigateur — évite de maintenir une liste à
 // la main, et garantit qu'Intl.DateTimeFormat sait toujours interpréter la valeur choisie.
@@ -201,6 +202,7 @@ export default function CompanySettings({ isAdmin }) {
           </button>
         )}
       </form>
+      {isAdmin && <div className="mt-6"><AiUsageDashboard /></div>}
     </div>
   );
 }

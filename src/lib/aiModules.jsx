@@ -19,10 +19,27 @@ export function useAiModule(module) {
 
 export function withAiModule(module, Component) {
   return function AiModuleContent(props) {
-    return useAiModule(module) ? <Component {...props} /> : null;
+    return useAiModule(module) ? <Component {...props} /> : <AiModuleNotice module={module} />;
   };
 }
 
 export function AiModuleGate({ module, children }) {
-  return useAiModule(module) ? children : null;
+  return useAiModule(module) ? children : <AiModuleNotice module={module} />;
+}
+
+export function AiModuleNotice({ module }) {
+  const tenant = useTenant();
+  if (!tenant) return null;
+  return <p className="text-xs text-slate-500" role="note">
+    {AI_MODULE_LABELS[module]?.split(' — ')[0] || 'Module'} : assistance IA non incluse dans les accès de votre entreprise.
+    {' '}Contactez votre administrateur. Les fonctions manuelles restent disponibles.
+  </p>;
+}
+
+export function AiModuleFields({ settings, onChange, disabled = false }) {
+  return Object.entries(AI_MODULE_LABELS).map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm">
+    <input type="checkbox" checked={settings[key]} disabled={disabled}
+      onChange={(event) => onChange({ ...settings, [key]: event.target.checked })} />
+    {label}
+  </label>);
 }

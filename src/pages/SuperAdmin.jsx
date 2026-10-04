@@ -31,14 +31,15 @@ import { exportTableCsv } from '../lib/pdfExport.js';
 import SortableTh from '../components/SortableTh.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import Pagination from '../components/Pagination.jsx';
-import AiQuotaSettings from '../components/AiQuotaSettings.jsx';
 import GroqQuotaSettings from '../components/GroqQuotaSettings.jsx';
-import AiModuleSettings from '../components/AiModuleSettings.jsx';
+import AiCompanySettings from '../components/AiCompanySettings.jsx';
+import AiPlanSettings from '../components/AiPlanSettings.jsx';
+import AiQuotaAlerts from '../components/AiQuotaAlerts.jsx';
 
 const TENANT_SORT_OPTIONS = [
   { key: 'created_at', label: 'date de création' },
   { key: 'name', label: 'nom' },
-  { key: 'plan', label: 'plan' },
+  { key: 'plan', label: 'forfait' },
   { key: 'user_count', label: 'utilisateurs' },
   { key: 'is_suspended', label: 'statut' },
 ];
@@ -47,12 +48,16 @@ const LINE_COLOR = '#1F3864';
 const GRID_COLOR = '#e2e8f0';
 const MUTED_COLOR = '#94a3b8';
 
-const PLAN_LABELS = { free: 'Free', starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise' };
+const PLAN_LABELS = { manual: 'Configuration manuelle', essential: 'Essentiel', pro: 'Pro', premium: 'Premium' };
+const LEGACY_PLAN_LABELS = { free: 'Free', starter: 'Starter', pro: 'Pro', enterprise: 'Enterprise' };
 const ROLE_LABELS = { admin: 'Admin', manager: 'Manager', member: 'Membre' };
 const ACTION_LABELS = {
   ai_quota_updated: 'Quota IA modifié',
   groq_limits_updated: 'Plafonds Groq modifiés',
   ai_modules_updated: 'Modules IA modifiés',
+  ai_plan_updated: 'Forfait IA modifié',
+  ai_plan_applied: 'Forfait IA appliqué',
+  ai_default_user_limit_updated: 'Quota IA des futurs salariés modifié',
   tenant_suspended: 'Tenant suspendu',
   tenant_reactivated: 'Tenant réactivé',
   tenant_created: 'Tenant créé',
@@ -138,6 +143,7 @@ const TABS = [
   { id: 'stats', label: 'Statistiques' },
   { id: 'audit', label: "Journal d'audit" },
   { id: 'system', label: 'Système' },
+  { id: 'ai-plans', label: 'Forfaits' },
   { id: 'platform', label: 'Plateforme' },
   { id: 'support', label: 'Support' },
 ];
@@ -330,11 +336,20 @@ function ConfirmTypedModal({ title, message, expectedText, onConfirm, onClose })
 // cet écran, l'ajout d'utilisateurs supplémentaires reste le rôle d'InviteUserForm ci-dessous.
 function CreateTenantModal({ onClose, onCreated }) {
   const [name, setName] = useState('');
-  const [plan, setPlan] = useState('free');
+  const [plan, setPlan] = useState('');
+  const [plans, setPlans] = useState([]);
+  const [plansError, setPlansError] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
   const [adminFullName, setAdminFullName] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    api.get('/ai-quota/plans').then(({ data }) => { if (active) setPlans(data); })
+      .catch((err) => { if (active) setPlansError(err.response?.data?.error || 'Impossible de charger les forfaits.'); });
+    return () => { active = false; };
+  }, []);
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -347,7 +362,7 @@ function CreateTenantModal({ onClose, onCreated }) {
     try {
       ({ data } = await api.post('/super-admin/tenants', {
         name,
-        plan,
+        ai_plan_key: plan || null,
         admin: { email: adminEmail, full_name: adminFullName },
       }));
     } catch (err) {
@@ -374,18 +389,18 @@ function CreateTenantModal({ onClose, onCreated }) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs font-medium text-slate-600">Plan</label>
+          <label className="mb-1 block text-xs font-medium text-slate-600">Forfait</label>
           <select
+            aria-label="Forfait de la nouvelle entreprise"
             value={plan}
             onChange={(event) => setPlan(event.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none"
           >
-            {Object.entries(PLAN_LABELS).map(([value, label]) => (
-              <option key={value} value={value}>
-                {label}
-              </option>
-            ))}
+            <option value="">Configuration manuelle</option>
+            {plans.filter((item) => item.configured).map((item) => <option key={item.key} value={item.key}>{item.name}</option>)}
           </select>
+          <p className="mt-1 text-xs text-slate-500">Le forfait applique les accès IA, le quota entreprise et le quota du premier administrateur et des futurs salariés.</p>
+          {plansError && <p role="alert" className="text-xs text-red-700">{plansError}</p>}
         </div>
         <div className="border-t border-slate-200 pt-3">
           <p className="mb-2 text-xs font-medium text-slate-600">Administrateur du tenant</p>
@@ -616,13 +631,12 @@ function UserRow({ user, currentUserId, onUpdate, onDelete }) {
   );
 }
 
-function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, onDeleted, togglingId }) {
+function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, onDeleted, togglingId, onPlanApplied }) {
   const [detail, setDetail] = useState(null);
   const [error, setError] = useState('');
   const [editingTenant, setEditingTenant] = useState(false);
   const [editName, setEditName] = useState('');
   const [editSlug, setEditSlug] = useState('');
-  const [editPlan, setEditPlan] = useState('free');
   const [savingTenant, setSavingTenant] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [actionError, setActionError] = useState('');
@@ -655,7 +669,6 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
   function startEditTenant() {
     setEditName(detail.tenant.name);
     setEditSlug(detail.tenant.slug);
-    setEditPlan(detail.tenant.plan);
     setEditingTenant(true);
   }
 
@@ -667,7 +680,6 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
       const { data } = await api.patch(`/super-admin/tenants/${tenantId}`, {
         name: editName,
         slug: editSlug,
-        plan: editPlan,
       });
       setDetail((prev) => ({ ...prev, tenant: { ...prev.tenant, ...data } }));
       setEditingTenant(false);
@@ -775,17 +787,7 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
                     className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
                   />
                 </div>
-                <select
-                  value={editPlan}
-                  onChange={(event) => setEditPlan(event.target.value)}
-                  className="w-full rounded-md border border-slate-300 px-2.5 py-1.5 text-sm focus:border-primary focus:outline-none"
-                >
-                  {Object.entries(PLAN_LABELS).map(([value, label]) => (
-                    <option key={value} value={value}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                <p className="text-xs text-slate-500">Le forfait se règle uniquement dans « Forfait et accès » ci-dessous.</p>
                 <div className="flex gap-2">
                   <button
                     type="submit"
@@ -880,8 +882,14 @@ function TenantDetailModal({ tenantId, currentUserId, onClose, onToggleSuspend, 
               </div>
             </div>
 
-            <AiQuotaSettings tenantId={tenantId} />
-            <AiModuleSettings tenantId={tenantId} />
+            {detail.tenant.legacy_plan && <p className="text-xs text-slate-400">
+              Ancien plan conservé pour historique : {LEGACY_PLAN_LABELS[detail.tenant.legacy_plan] || detail.tenant.legacy_plan}.
+              Il ne pilote plus les accès ni les statistiques.
+            </p>}
+            <AiCompanySettings tenantId={tenantId} onPlanApplied={(settings) => {
+              setDetail((previous) => ({ ...previous, tenant: { ...previous.tenant, ai_plan_key: settings.ai_plan_key, plan: settings.ai_plan_key } }));
+              onPlanApplied?.(tenantId, settings.ai_plan_key);
+            }} />
 
             <div>
               <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-slate-500">Connexion Google Drive</h3>
@@ -1127,7 +1135,7 @@ function TenantsTab({ tenants, loading, error, onOpenDetail, onToggleSuspend, on
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
                   <SortableTh label="Tenant" sortKey="name" activeKey={sortKey} direction={direction} onSort={toggleSort} />
-                  <SortableTh label="Plan" sortKey="plan" activeKey={sortKey} direction={direction} onSort={toggleSort} />
+                  <SortableTh label="Forfait" sortKey="plan" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Utilisateurs" sortKey="user_count" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Créé le" sortKey="created_at" activeKey={sortKey} direction={direction} onSort={toggleSort} />
                   <SortableTh label="Statut" sortKey="is_suspended" activeKey={sortKey} direction={direction} onSort={toggleSort} />
@@ -1218,7 +1226,7 @@ function StatsTab() {
         </div>
 
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-          <h3 className="mb-3 text-sm font-semibold text-slate-900">Répartition par plan</h3>
+          <h3 className="mb-3 text-sm font-semibold text-slate-900">Répartition par forfait</h3>
           <ul className="space-y-2">
             {Object.entries(stats.by_plan).map(([plan, count]) => (
               <li key={plan} className="flex items-center justify-between text-sm">
@@ -2106,6 +2114,7 @@ export default function SuperAdmin() {
             qui n'est pas super admin — la route backend le rejette de toute façon (403), mais
             autant ne pas déclencher l'appel du tout. */}
         {currentUser?.is_super_admin && <HealthWidget />}
+        {currentUser?.is_super_admin && <AiQuotaAlerts onOpenTenant={setDetailTenantId} />}
 
         <div className="mt-4 flex flex-wrap gap-1.5 border-b border-slate-200 pb-4">
           {TABS.map((tab) => (
@@ -2140,6 +2149,7 @@ export default function SuperAdmin() {
           {activeTab === 'stats' && <StatsTab />}
           {activeTab === 'audit' && <AuditTab />}
           {activeTab === 'system' && <SystemTab />}
+          {activeTab === 'ai-plans' && <AiPlanSettings />}
           {activeTab === 'platform' && <PlatformTab />}
           {activeTab === 'support' && <SupportTab />}
         </div>
@@ -2153,6 +2163,8 @@ export default function SuperAdmin() {
           onToggleSuspend={handleToggleSuspend}
           onDeleted={handleTenantDeleted}
           togglingId={togglingId}
+          onPlanApplied={(tenantId, plan) => setTenants((previous) => previous.map((item) =>
+            item.id === tenantId ? { ...item, plan, ai_plan_key: plan } : item))}
         />
       )}
 

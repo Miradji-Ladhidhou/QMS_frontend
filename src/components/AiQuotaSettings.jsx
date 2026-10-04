@@ -50,6 +50,8 @@ export default function AiQuotaSettings({ tenantId }) {
   async function save(limit, userId) {
     const { data } = await api.patch(`/ai-quota/tenants/${tenantId}`, { limit, ...(userId ? { user_id: userId } : {}) });
     setQuota(data);
+    window.dispatchEvent(new Event('ai-quota-refresh'));
+    window.dispatchEvent(new CustomEvent('ai-settings-updated', { detail: { tenantId } }));
   }
   return <section className="space-y-2">
     <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quotas IA mensuels</h3>
@@ -58,6 +60,9 @@ export default function AiQuotaSettings({ tenantId }) {
     {!quota && !error && <p className="text-sm text-slate-500">Chargement…</p>}
     {quota && <>
       <LimitForm label="Entreprise" quota={quota.tenant} onSave={save} />
+      {quota.tenant.limit !== null && (quota.users.some((user) => user.limit === null) ||
+        quota.users.reduce((sum, user) => sum + (user.limit || 0), 0) > quota.tenant.limit) &&
+        <p className="text-xs text-amber-700">Les plafonds individuels ne garantissent pas une part réservée. Leur somme dépasse le quota entreprise ou certains comptes sont illimités : le quota commun peut être épuisé avant les quotas individuels.</p>}
       {quota.users.map((user) => <LimitForm key={user.id} label={user.full_name || 'Utilisateur'} quota={user} userId={user.id} onSave={save} />)}
     </>}
   </section>;

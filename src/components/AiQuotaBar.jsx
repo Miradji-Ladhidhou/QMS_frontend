@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { quotaProgress } from '../lib/aiQuota.js';
+import { quotaProgress, quotaWarning } from '../lib/aiQuota.js';
 
 export function QuotaMeter({ label, quota }) {
   const progress = quotaProgress(quota);
   const reached = quota.remaining === 0;
+  const warning = quotaWarning(quota);
   return (
     <div className="min-w-0 flex-1">
       <div className="mb-1 flex flex-wrap justify-between gap-x-3 text-xs">
@@ -17,7 +18,7 @@ export function QuotaMeter({ label, quota }) {
           <div style={{ width: `${progress}%` }} className={`h-full rounded-full ${reached ? 'bg-red-500' : progress >= 80 ? 'bg-amber-500' : 'bg-primary'}`} />
         </div>
       ) : <p className="text-xs text-slate-500">Aucune limite configurée</p>}
-      {reached && <p className="mt-1 text-xs font-medium text-red-700">Limite atteinte : nouvelles actions IA bloquées.</p>}
+      {warning && <p role="status" className={`mt-1 text-xs font-medium ${warning.level === 'warning' ? 'text-amber-700' : 'text-red-700'}`}>{warning.text}</p>}
     </div>
   );
 }

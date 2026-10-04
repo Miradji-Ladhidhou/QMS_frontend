@@ -13,12 +13,13 @@ export default function GroqQuotaSettings() {
   const [quota, setQuota] = useState(null);
   const [values, setValues] = useState(null);
   const [error, setError] = useState('');
+  const [snapshotError, setSnapshotError] = useState('');
   const [message, setMessage] = useState('');
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   async function load() {
     setLoading(true);
-    setError('');
+    setSnapshotError('');
     try {
       const { data } = await api.get('/ai-quota/groq');
       setQuota(data);
@@ -31,15 +32,27 @@ export default function GroqQuotaSettings() {
   }
   useEffect(() => {
     let active = true;
-    api.get('/ai-quota/groq').then(({ data }) => {
-      if (active) {
-        setQuota(data);
-        setValues(Object.fromEntries(FIELDS.map(([key]) => [key, data.limits[key] === null ? '' : String(data.limits[key])])));
+    let loadingSnapshot = false;
+    async function refresh() {
+      if (loadingSnapshot) return;
+      loadingSnapshot = true;
+      try {
+        const { data } = await api.get('/ai-quota/groq');
+        if (active) {
+          setQuota(data);
+          setValues((previous) => previous || Object.fromEntries(FIELDS.map(([key]) => [key, data.limits[key] === null ? '' : String(data.limits[key])])));
+          setError('');
+        }
+      } catch (err) {
+        if (active) setSnapshotError(err.response?.data?.error || 'Impossible de charger les plafonds Groq.');
+      } finally {
+        loadingSnapshot = false;
       }
-    }).catch((err) => {
-      if (active) setError(err.response?.data?.error || 'Impossible de charger les plafonds Groq.');
-    });
-    return () => { active = false; };
+    }
+    refresh();
+    const timer = setInterval(refresh, 30000);
+    window.addEventListener('focus', refresh);
+    return () => { active = false; clearInterval(timer); window.removeEventListener('focus', refresh); };
   }, []);
   async function save(event) {
     event.preventDefault();
@@ -76,9 +89,12 @@ export default function GroqQuotaSettings() {
       Pour votre offre gpt-oss-120b : 30 RPM, 1 000 RPD, 8 000 TPM et 200 000 TPD.
       QMS ajuste le budget de sortie à la place disponible après le prompt et attend au plus 65 secondes si la fenêtre minute est pleine.
     </p>
+    <p className="text-xs text-slate-500">Alertes à 80 % et 95 %. Compteurs actualisés toutes les 30 secondes sans écraser vos saisies.
+      Les limites Groq se libèrent progressivement après 60 secondes ou 24 heures, pas au renouvellement mensuel des actions.</p>
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
+    {snapshotError && <p role="alert" className="text-sm text-red-700">{snapshotError}</p>}
     {message && <p role="status" className="text-sm text-emerald-700">{message}</p>}
-    {!quota && !error && <p className="text-xs text-slate-500">Chargement…</p>}
+    {!quota && !error && !snapshotError && <p className="text-xs text-slate-500">Chargement…</p>}
     {quota && values && <form onSubmit={save} className="space-y-3">
       <div className="grid gap-4 sm:grid-cols-2">
         {FIELDS.map(([key, label]) => <div key={key} className="space-y-2">

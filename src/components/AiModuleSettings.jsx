@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../lib/api.js';
-import { AI_MODULE_LABELS } from '../lib/aiModules.jsx';
+import { AiModuleFields } from '../lib/aiModules.jsx';
 
 export default function AiModuleSettings({ tenantId }) {
   const [settings, setSettings] = useState(null);
@@ -24,6 +24,7 @@ export default function AiModuleSettings({ tenantId }) {
       const { data } = await api.patch(`/ai-quota/tenants/${tenantId}/modules`, settings);
       setSettings(data);
       window.dispatchEvent(new Event('tenant-refresh'));
+      window.dispatchEvent(new CustomEvent('ai-settings-updated', { detail: { tenantId } }));
       setMessage('Accès IA enregistrés.');
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de modifier les modules IA.');
@@ -38,11 +39,7 @@ export default function AiModuleSettings({ tenantId }) {
     {message && <p role="status" className="text-sm text-emerald-700">{message}</p>}
     {!settings && !error && <p className="text-sm text-slate-500">Chargement…</p>}
     {settings && <form onSubmit={save} className="space-y-3 rounded-md border border-slate-200 p-3">
-      {Object.entries(AI_MODULE_LABELS).map(([key, label]) => <label key={key} className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={settings[key]} disabled={saving}
-          onChange={(event) => setSettings((previous) => ({ ...previous, [key]: event.target.checked }))} />
-        {label}
-      </label>)}
+      <AiModuleFields settings={settings} onChange={setSettings} disabled={saving} />
       <button disabled={saving} className="rounded-md bg-primary px-3 py-2 text-xs text-white disabled:opacity-50">
         {saving ? 'Enregistrement…' : 'Enregistrer les accès IA'}
       </button>
