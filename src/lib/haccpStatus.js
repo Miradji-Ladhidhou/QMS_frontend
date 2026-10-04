@@ -56,16 +56,21 @@ export const CCP_VALIDATION_FIELDS = [
   ['record_keeping_procedure', 'Enregistrements'],
 ];
 
-export function missingCcpValidationFields(ccp) {
+export function ccpValidationIssues(ccp) {
   return CCP_VALIDATION_FIELDS.flatMap(([field, label]) => {
     const text = typeof ccp[field] === 'string' ? ccp[field].trim() : '';
-    if (!text) return [label];
+    if (!text) return [{ field, message: label }];
     if (field === 'monitoring_responsible') return [];
-    const minLength = field === 'validation_evidence' ? 20 : field === 'validation_source' ? 5 : 8;
-    if (text.length < minLength) return [`${label} (au moins ${minLength} caractères)`];
+    const isFrequency = field === 'monitoring_frequency' || field === 'verification_frequency';
+    const minLength = field === 'validation_evidence' ? 20 : field === 'validation_source' ? 5 : isFrequency ? 1 : 8;
+    if (text.length < minLength) return [{ field, message: `${label} (au moins ${minLength} caractères)` }];
     if (/^(?:n\/?a|none|tbd|todo|à compléter|a completer|non renseigné|non renseigne|à confirmer|a confirmer|aucun)$/i.test(text)) {
-      return [`${label} (contenu à documenter)`];
+      return [{ field, message: `${label} (contenu à documenter)` }];
     }
     return [];
   });
+}
+
+export function missingCcpValidationFields(ccp) {
+  return ccpValidationIssues(ccp).map((issue) => issue.message);
 }

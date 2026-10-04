@@ -35,6 +35,7 @@ import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortSelect from '../components/SortSelect.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import HaccpQuickGuide from '../components/haccp/HaccpQuickGuide.jsx';
 import { daysUntil } from '../lib/riskReview.js';
 
 const CATEGORIES_BASE_URL = '/module-categories';
@@ -485,6 +486,7 @@ export default function Haccp() {
         </div>
       </div>
       <PageGuide id="haccp" />
+      <HaccpQuickGuide />
 
       {dueCounts && (dueCounts.overdue > 0 || dueCounts.repeated_deviation > 0) && (
         <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800">

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSmartBack } from '../lib/useSmartBack.js';
 import { AlertTriangle, ArrowLeft, ClipboardCheck, ClipboardList, Loader2, Pencil, Plus, Trash2, X } from 'lucide-react';
@@ -10,7 +10,7 @@ import { describeDue, formatInterval } from '../lib/haccpMonitoring.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
-import { PLAN_STATUS_LABELS, HAZARD_TYPE_LABELS, CONTROL_TYPE_LABELS, CCP_APPROVAL_LABELS, isOperationalCcp } from '../lib/haccpStatus.js';
+import { PLAN_STATUS_LABELS, HAZARD_TYPE_LABELS, CONTROL_TYPE_LABELS, CCP_APPROVAL_LABELS, CCP_VALIDATION_FIELDS, ccpValidationIssues, isOperationalCcp } from '../lib/haccpStatus.js';
 import { RISK_LEVEL_LABELS, RISK_LEVEL_STYLES, riskLevel } from '../lib/riskStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
 import PlanStatusBadge from '../components/PlanStatusBadge.jsx';
@@ -386,7 +386,7 @@ function HazardFormModal({ stepId, hazard, suggestion, laterSteps, onClose, onSa
   );
 }
 
-function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSaved }) {
+function CcpFormModal({ hazardId, hazard, ccp, suggestion, focusField, users, onClose, onSaved }) {
   const [form, setForm] = useState({
     ccp_number: ccp?.ccp_number || '',
     critical_limits: suggestion?.critical_limits || ccp?.critical_limits || '',
@@ -407,6 +407,20 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
   });
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const formRef = useRef(null);
+  const issues = ccpValidationIssues(form);
+
+  function focusValidationField(field) {
+    const input = formRef.current?.elements.namedItem(field);
+    if (input instanceof HTMLElement) {
+      input.focus({ preventScroll: true });
+      input.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }
+
+  useEffect(() => {
+    if (focusField) focusValidationField(focusField);
+  }, [focusField]);
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -434,10 +448,22 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
   return (
     <ModalShell title={ccp ? 'Modifier le point critique (CCP)' : 'Nouveau point critique (CCP)'} onClose={onClose} wide>
       {error && <p className="mb-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <form ref={formRef} onSubmit={handleSubmit} className="space-y-4">
         <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
           Enregistrement en brouillon. {ccp && isOperationalCcp(ccp) ? 'Modifier ce CCP suspend sa surveillance jusqu’à une nouvelle approbation.' : 'La surveillance sera autorisée après approbation explicite et vérification des preuves.'}
         </p>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
+          <p className="text-sm font-semibold text-slate-800">Préparation : {CCP_VALIDATION_FIELDS.length - issues.length}/{CCP_VALIDATION_FIELDS.length} éléments renseignés</p>
+          <p className="mt-1 text-xs text-slate-600">Vous pouvez enregistrer un brouillon sans compléter tous les éléments d’approbation. L’approbation reste une étape distincte après vérification des preuves.</p>
+          {issues.length > 0 ? <ul className="mt-2 flex flex-wrap gap-2">
+            {issues.map(({ field, message }) => <li key={field}>
+              <button type="button" onClick={() => focusValidationField(field)}
+                className="min-h-[36px] rounded-md border border-amber-300 bg-white px-2 py-1 text-left text-xs text-amber-900 hover:bg-amber-50">
+                {message}
+              </button>
+            </li>)}
+          </ul> : <p className="mt-2 text-xs text-emerald-700">Champs requis renseignés. Enregistrez, puis vérifiez et approuvez depuis la surveillance.</p>}
+        </div>
         {suggestion && (
           <p className="rounded-md border border-purple-200 bg-purple-50 px-3 py-2 text-sm text-purple-800">
             Proposition IA préremplie. Vérifiez et ajustez les valeurs, notamment les limites chiffrées, avant d’enregistrer.
@@ -479,20 +505,20 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Limites critiques</label>
-          <AutoTextarea rows={2} required value={form.critical_limits} onChange={(e) => updateField('critical_limits', e.target.value)} placeholder="Ex. : Température à cœur ≥ 63 °C pendant 30 secondes" className={FIELD_CLASS} />
+          <AutoTextarea name="critical_limits" rows={2} required value={form.critical_limits} onChange={(e) => updateField('critical_limits', e.target.value)} placeholder="Ex. : Température à cœur ≥ 63 °C pendant 30 secondes" className={FIELD_CLASS} />
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Procédure de surveillance</label>
-          <AutoTextarea rows={2} required value={form.monitoring_procedure} onChange={(e) => updateField('monitoring_procedure', e.target.value)} placeholder="Ex. : Mesurer au cœur du produit avec une sonde désinfectée et étalonnée." className={FIELD_CLASS} />
+          <AutoTextarea name="monitoring_procedure" rows={2} required value={form.monitoring_procedure} onChange={(e) => updateField('monitoring_procedure', e.target.value)} placeholder="Ex. : Mesurer au cœur du produit avec une sonde désinfectée et étalonnée." className={FIELD_CLASS} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence de surveillance</label>
-            <input type="text" placeholder="Ex. : À chaque livraison, pour chaque lot" value={form.monitoring_frequency} onChange={(e) => updateField('monitoring_frequency', e.target.value)} className={FIELD_CLASS} />
+            <input name="monitoring_frequency" type="text" placeholder="Ex. : Par lot, quotidien" value={form.monitoring_frequency} onChange={(e) => updateField('monitoring_frequency', e.target.value)} className={FIELD_CLASS} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Responsable de la surveillance</label>
-            <select value={form.monitoring_responsible} onChange={(e) => updateField('monitoring_responsible', e.target.value)} className={FIELD_CLASS}>
+            <select name="monitoring_responsible" value={form.monitoring_responsible} onChange={(e) => updateField('monitoring_responsible', e.target.value)} className={FIELD_CLASS}>
               <option value="">À désigner</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
@@ -505,29 +531,29 @@ function CcpFormModal({ hazardId, hazard, ccp, suggestion, users, onClose, onSav
         <CcpLimitsFields form={form} updateField={updateField} />
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Actions correctives prévues</label>
-          <AutoTextarea rows={2} value={form.corrective_action_procedure} onChange={(e) => updateField('corrective_action_procedure', e.target.value)} placeholder="Ex. : Isoler le lot et prévenir le responsable si la température dépasse la limite." className={FIELD_CLASS} />
+          <AutoTextarea name="corrective_action_procedure" rows={2} value={form.corrective_action_procedure} onChange={(e) => updateField('corrective_action_procedure', e.target.value)} placeholder="Ex. : Isoler le lot et prévenir le responsable si la température dépasse la limite." className={FIELD_CLASS} />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Procédure de vérification</label>
-            <AutoTextarea rows={2} value={form.verification_procedure} onChange={(e) => updateField('verification_procedure', e.target.value)} placeholder="Ex. : Vérifier l’étalonnage de la sonde et contrôler un relevé sur les fiches." className={FIELD_CLASS} />
+            <AutoTextarea name="verification_procedure" rows={2} value={form.verification_procedure} onChange={(e) => updateField('verification_procedure', e.target.value)} placeholder="Ex. : Vérifier l’étalonnage de la sonde et contrôler un relevé sur les fiches." className={FIELD_CLASS} />
           </div>
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">Fréquence de vérification</label>
-            <input type="text" placeholder="Ex. : Étalonnage mensuel et revue hebdomadaire des relevés" value={form.verification_frequency} onChange={(e) => updateField('verification_frequency', e.target.value)} className={FIELD_CLASS} />
+            <input name="verification_frequency" type="text" placeholder="Ex. : Par lot, mensuel" value={form.verification_frequency} onChange={(e) => updateField('verification_frequency', e.target.value)} className={FIELD_CLASS} />
           </div>
         </div>
         <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Enregistrements à conserver</label>
-          <AutoTextarea rows={2} value={form.record_keeping_procedure} onChange={(e) => updateField('record_keeping_procedure', e.target.value)} placeholder="Ex. : Fiche de réception datée avec température relevée et signature du contrôleur." className={FIELD_CLASS} />
+          <AutoTextarea name="record_keeping_procedure" rows={2} value={form.record_keeping_procedure} onChange={(e) => updateField('record_keeping_procedure', e.target.value)} placeholder="Ex. : Fiche de réception datée avec température relevée et signature du contrôleur." className={FIELD_CLASS} />
         </div>
         <label className="block text-sm font-medium text-slate-700">
           Source des limites et des mesures de maîtrise
-          <AutoTextarea rows={2} value={form.validation_source} onChange={(e) => updateField('validation_source', e.target.value)} placeholder="Ex. : GBPH restauration, chapitre « réception des produits réfrigérés » — précisez la version et la page consultées." className={`${FIELD_CLASS} mt-1`} />
+          <AutoTextarea name="validation_source" rows={2} value={form.validation_source} onChange={(e) => updateField('validation_source', e.target.value)} placeholder="Ex. : GBPH restauration, chapitre « réception des produits réfrigérés » — précisez la version et la page consultées." className={`${FIELD_CLASS} mt-1`} />
         </label>
         <label className="block text-sm font-medium text-slate-700">
           Preuves de validation et confirmation de cohérence
-          <AutoTextarea rows={3} value={form.validation_evidence} onChange={(e) => updateField('validation_evidence', e.target.value)} placeholder="Ex. : Essai sur 3 livraisons avec sonde étalonnée : températures conformes consignées sur les fiches de réception." className={`${FIELD_CLASS} mt-1`} />
+          <AutoTextarea name="validation_evidence" rows={3} value={form.validation_evidence} onChange={(e) => updateField('validation_evidence', e.target.value)} placeholder="Ex. : Essai sur 3 livraisons avec sonde étalonnée : températures conformes consignées sur les fiches de réception." className={`${FIELD_CLASS} mt-1`} />
           <span className="mt-1 block text-xs font-normal text-slate-500">Au moins 20 caractères avant approbation : décrivez les preuves réelles et leurs références. La longueur seule ne garantit pas leur validité.</span>
         </label>
         <button type="submit" disabled={submitting} className="w-full rounded-md bg-primary py-3 font-medium text-white transition-colors hover:bg-primary-700 disabled:opacity-60">
@@ -877,7 +903,7 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
       {selectedCcp && (
         <>
           <div className="mt-3">
-            <CcpApprovalCard key={selectedCcp.id} ccp={selectedCcp} canManage={canManage} onEdit={() => onOpenCcpEditor(selectedCcp.hazard)} onApproved={onReadingSaved} />
+            <CcpApprovalCard key={selectedCcp.id} ccp={selectedCcp} canManage={canManage} onEdit={(field) => onOpenCcpEditor(selectedCcp.hazard, undefined, field)} onApproved={onReadingSaved} />
           </div>
           {isOperationalCcp(selectedCcp) && (
           <>
@@ -1304,8 +1330,8 @@ export default function HaccpDetail() {
           canManage={canManage}
           onCapaCreated={refreshPlan}
           onReadingSaved={refreshPlan}
-          onOpenCcpEditor={(hazard, suggestion) => {
-            setCcpModal({ hazardId: hazard.id, hazard, ccp: hazard.ccp || undefined, suggestion });
+          onOpenCcpEditor={(hazard, suggestion, focusField) => {
+            setCcpModal({ hazardId: hazard.id, hazard, ccp: hazard.ccp || undefined, suggestion, focusField });
           }}
           onOpenHazardEditor={(hazard, suggestion) => {
             const step = plan.steps.find((item) => item.hazards.some((itemHazard) => itemHazard.id === hazard.id));
@@ -1364,6 +1390,7 @@ export default function HaccpDetail() {
             loadPlan();
           }}
           suggestion={ccpModal.suggestion}
+          focusField={ccpModal.focusField}
         />
       )}
     </div>

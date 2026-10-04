@@ -204,7 +204,8 @@ export const PAGE_GUIDES = {
           en retard et les points critiques en <strong>dérive répétée</strong> (3 relevés hors limites en 7 jours).
         </p>
         <p>
-          Un plan devient <strong>actif</strong> quand chaque danger significatif a son CCP ; sa revue annuelle est alors programmée et une version du plan
+          Un plan devient <strong>actif</strong> après documentation du dossier et des décisions de maîtrise, avec des CCP opérationnels lorsque nécessaires.
+          Un danger significatif n’impose pas automatiquement un CCP. Sa revue annuelle est alors programmée et une version du plan
           est conservée. « Exporter l'analyse complète » produit le rapport d'audit en PDF ; le Word d'un plan s'exporte depuis sa fiche.
         </p>
       </>

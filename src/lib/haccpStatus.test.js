@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CCP_VALIDATION_FIELDS, isOperationalCcp, missingCcpValidationFields } from './haccpStatus.js';
+import { CCP_VALIDATION_FIELDS, ccpValidationIssues, isOperationalCcp, missingCcpValidationFields } from './haccpStatus.js';
 
 test('draft and unknown CCPs never enable surveillance', () => {
   assert.equal(isOperationalCcp({ status: 'draft' }), false);
@@ -30,10 +30,18 @@ test('approval completeness matches server minimum lengths and rejects placehold
   ]);
   assert.deepEqual(missingCcpValidationFields({ ...complete, validation_source: 'abcd', monitoring_frequency: 'daily' }), [
     'Source des limites (au moins 5 caractères)',
-    'Fréquence de surveillance (au moins 8 caractères)',
   ]);
   assert.deepEqual(missingCcpValidationFields({ ...complete, verification_procedure: 'à compléter' }), [
     'Procédure de vérification (contenu à documenter)',
   ]);
   assert.deepEqual(missingCcpValidationFields({ ...complete, validation_source: '12345', validation_evidence: '12345678901234567890', monitoring_frequency: '12345678' }), []);
+});
+
+test('short frequencies are accepted but blanks and placeholders still block approval', () => {
+  const complete = Object.fromEntries(CCP_VALIDATION_FIELDS.map(([field]) => [field, 'Documented validation evidence']));
+  assert.deepEqual(missingCcpValidationFields({ ...complete, monitoring_frequency: 'Par lot', verification_frequency: 'Mensuel' }), []);
+  assert.deepEqual(ccpValidationIssues({ ...complete, monitoring_frequency: ' ', verification_frequency: 'TBD' }), [
+    { field: 'monitoring_frequency', message: 'Fréquence de surveillance' },
+    { field: 'verification_frequency', message: 'Fréquence de vérification (contenu à documenter)' },
+  ]);
 });
