@@ -2,17 +2,12 @@ import { useState } from 'react';
 import { FileCheck2, X } from 'lucide-react';
 import { api } from '../../lib/api.js';
 import AutoTextarea from '../AutoTextarea.jsx';
+import { HACCP_DOSSIER_FIELDS as FIELDS } from '../../lib/haccpWorkflow.js';
 
-const FIELDS = [
-  ['product_characteristics', 'Caractéristiques du produit', 'Composition, allergènes, conditionnement, durée de vie et conditions de conservation.'],
-  ['intended_use', 'Usage prévu', 'Mode de consommation et préparation attendue.'],
-  ['consumer_groups', 'Consommateurs concernés', 'Public visé, populations sensibles et restrictions éventuelles.'],
-  ['prerequisites', 'Programmes prérequis', 'Hygiène, nettoyage, nuisibles, maintenance, fournisseurs, formation : références des procédures et preuves de leur application.'],
-  ['flow_diagram_reference', 'Diagramme du procédé', 'Référence et version du diagramme couvrant toutes les étapes et les flux.'],
-  ['flow_diagram_verification', 'Confirmation du diagramme sur site', 'Qui a confirmé le diagramme, à quelle date et selon quelles observations ?'],
-  ['validation_review_notes', 'Validation des mesures de maîtrise', 'Preuves que les mesures peuvent maîtriser les dangers : études, textes applicables ou validation du procédé.'],
-  ['verification_review_notes', 'Vérification du système', 'Résultats de revue des relevés, audits, contrôles et suivi des actions correctives.'],
-  ['no_ccp_justification', 'Conclusion si aucun CCP identifié', 'Justification issue de l’analyse, mesures de maîtrise retenues et conclusion de l’équipe HACCP. Ne pas créer de CCP artificiel.'],
+const GROUPS = [
+  { title: '1. Décrire le produit et le procédé', fields: FIELDS.slice(0, 6) },
+  { title: '2. Documenter les preuves et la vérification', fields: FIELDS.slice(6, 8) },
+  { title: '3. Si aucun CCP n’est retenu', fields: FIELDS.slice(8) },
 ];
 
 export default function HaccpDossierCard({ plan, canManage, onSaved }) {
@@ -20,7 +15,7 @@ export default function HaccpDossierCard({ plan, canManage, onSaved }) {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const completed = FIELDS.filter(([field]) => Boolean(plan[field]?.trim())).length;
+  const completed = FIELDS.slice(0, 8).filter(([field]) => Boolean(plan[field]?.trim())).length;
 
   function openEditor() {
     setForm(Object.fromEntries(FIELDS.map(([field]) => [field, plan[field] || ''])));
@@ -51,7 +46,7 @@ export default function HaccpDossierCard({ plan, canManage, onSaved }) {
             <FileCheck2 size={16} /> Dossier HACCP et preuves
           </h2>
           <p className="mt-1 text-xs text-slate-500">
-            {completed}/{FIELDS.length} rubriques renseignées — indicateur de saisie, pas de conformité.
+            Dossier du plan : {completed}/8 rubriques renseignées. La conclusion « aucun CCP » est séparée et conditionnelle. Ce compteur ne certifie pas la conformité.
           </p>
         </div>
         {canManage && <button type="button" onClick={openEditor} className="min-h-[40px] rounded-md border border-slate-300 px-3 text-sm text-slate-700 hover:bg-slate-50">Compléter le dossier</button>}
@@ -77,12 +72,17 @@ export default function HaccpDossierCard({ plan, canManage, onSaved }) {
               <button type="button" disabled={saving} onClick={() => setEditing(false)} aria-label="Fermer le dossier" className="p-2 text-slate-500"><X size={20} /></button>
             </div>
             <form onSubmit={save} className="space-y-4">
-              {FIELDS.map(([field, label, help]) => (
-                <label key={field} className="block text-sm font-medium text-slate-700">
-                  {label}
-                  <AutoTextarea rows={2} value={form[field]} onChange={(event) => setForm((previous) => ({ ...previous, [field]: event.target.value }))} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-normal focus:outline-none focus:ring-2 focus:ring-primary" />
-                  <span className="mt-1 block text-xs font-normal text-slate-500">{help}</span>
-                </label>
+              {GROUPS.map((group) => (
+                <fieldset key={group.title} className="space-y-4 rounded-lg border border-slate-200 p-4">
+                  <legend className="px-1 text-sm font-semibold text-slate-900">{group.title}</legend>
+                  {group.fields.map(([field, label, help]) => (
+                    <label key={field} className="block text-sm font-medium text-slate-700">
+                      {label}
+                      <AutoTextarea rows={2} value={form[field]} onChange={(event) => setForm((previous) => ({ ...previous, [field]: event.target.value }))} className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 font-normal focus:outline-none focus:ring-2 focus:ring-primary" />
+                      <span className="mt-1 block text-xs font-normal text-slate-500">{help}</span>
+                    </label>
+                  ))}
+                </fieldset>
               ))}
               {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
               <button type="submit" disabled={saving} className="min-h-[44px] w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-60">{saving ? 'Enregistrement...' : 'Enregistrer le dossier'}</button>

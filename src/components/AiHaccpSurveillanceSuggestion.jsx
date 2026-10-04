@@ -166,7 +166,7 @@ function AiHaccpSurveillanceSuggestion({ plan, canManage, onOpenCcpEditor, onOpe
       </div>
 
       {hazards.length === 0 && (
-        <p className="mt-3 text-xs text-slate-500">Ajoutez et enregistrez d’abord les dangers dans l’onglet Analyse.</p>
+        <p className="mt-3 text-xs text-slate-500">Ajoutez et enregistrez d’abord les dangers dans l’espace « Dangers ».</p>
       )}
       {!canManage && <p className="mt-3 text-xs text-slate-500">La génération et l’application des propositions sont réservées aux responsables HACCP.</p>}
       {error && <p role="alert" className="mt-3 rounded-md border border-red-200 bg-white px-3 py-2 text-sm text-red-700">{error}</p>}

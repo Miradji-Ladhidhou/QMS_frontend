@@ -22,7 +22,7 @@ export default function HaccpQuickGuide() {
           <li><strong>Confirmer le diagramme sur site.</strong> Comparez-le au fonctionnement réel et corrigez-le avec l’équipe.</li>
         </ol>
         <p className="text-xs text-slate-500">Dans l’outil : « Nouveau plan », puis ouvrez sa fiche.
-          Renseignez l’équipe et le périmètre, utilisez « Compléter le dossier » et ajoutez les étapes dans « Analyse des dangers ».</p>
+          Renseignez l’équipe et le périmètre, utilisez « Compléter le dossier » et ajoutez les étapes dans « Dangers ».</p>
         <h3 className="font-semibold text-slate-900">2. Conduire l’analyse : les 7 principes HACCP</h3>
         <ol className="list-decimal space-y-3 pl-5 marker:font-semibold marker:text-primary">
           <li>
@@ -35,7 +35,7 @@ export default function HaccpQuickGuide() {
             <strong>Déterminer les points critiques (CCP).</strong> Justifiez où une maîtrise est essentielle pour prévenir,
             éliminer ou réduire un danger significatif à un niveau acceptable. Un danger significatif ne signifie pas automatiquement un CCP.
             Si une maîtrise nécessaire n’existe pas, modifiez le procédé et réévaluez-le avant mise en service.
-            Dans « Analyse des dangers », documentez la décision : prérequis, CCP ou procédé à modifier.
+            Dans « Dangers », documentez la décision : prérequis, CCP ou procédé à modifier.
           </li>
           <li>
             <strong>Établir des limites critiques validées.</strong> Pour chaque CCP, définissez des critères mesurables ou observables,
@@ -65,10 +65,10 @@ export default function HaccpQuickGuide() {
         </ol>
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
           <p className="font-semibold">3. Mettre en service dans l’outil</p>
-          <p className="mt-1">Enregistrez les CCP en brouillon. Dans leur onglet « Surveillance », rejoignez les champs manquants
+          <p className="mt-1">Enregistrez les CCP en brouillon. Dans « Préparer les CCP », rejoignez les champs manquants
             avec « Compléter ». Après examen des preuves et de la cohérence, un administrateur ou manager autorisé confirme
             et approuve chaque CCP. Activez ensuite le plan lorsque le dossier et les décisions sont complets.
-            Les CCP opérationnels des plans actifs apparaissent dans « Relevés du jour ».</p>
+            L’espace « Relevés » sépare le suivi quotidien de la préparation. Les CCP opérationnels des plans actifs apparaissent dans « Relevés du jour ».</p>
           <p className="mt-1">L’IA ne constitue pas une preuve. Le compteur de champs renseignés et le statut « Actif » ne certifient
             pas la conformité. Modifier un CCP opérationnel impose une nouvelle approbation.</p>
         </div>

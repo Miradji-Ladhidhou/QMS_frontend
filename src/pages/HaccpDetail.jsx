@@ -7,6 +7,7 @@ import { useUsers } from '../lib/useUsers.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import { getWordDownload } from '../lib/pdfExport.js';
 import { describeDue, formatInterval } from '../lib/haccpMonitoring.js';
+import { getHaccpWorkflow, HACCP_WORKFLOW_STAGES } from '../lib/haccpWorkflow.js';
 import { applyCcpSuggestion, ccpSuggestionGuidance, nextCcpNumber } from '../lib/haccpCcpSuggestion.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -814,13 +815,16 @@ function HazardCard({ hazard, canManage, onEditHazard, onDeleteHazard, onAddCcp,
   );
 }
 
-function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onCapaCreated, onReadingSaved, onOpenCcpEditor, onOpenHazardEditor }) {
+function SurveillanceTab({ plan, mode, initialCcpId, users, services, priorityDelays, canManage, onCapaCreated, onReadingSaved, onOpenCcpEditor, onOpenHazardEditor, onPrepare, onAnalyze }) {
   const navigate = useNavigate();
-  const allCcps = plan.steps.flatMap((step) =>
+  const preparation = mode === 'ccps';
+  const planCcps = plan.steps.flatMap((step) =>
     step.hazards.filter((h) => h.ccp).map((h) => ({ ...h.ccp, hazard: h, hazardDescription: h.description, stepName: step.name }))
   );
-  const [selectedCcpId, setSelectedCcpId] = useState(allCcps[0]?.id || '');
+  const allCcps = preparation ? planCcps : planCcps.filter(isOperationalCcp);
+  const [selectedCcpId, setSelectedCcpId] = useState(initialCcpId || allCcps[0]?.id || '');
   const [logs, setLogs] = useState([]);
+  const [historyOpen, setHistoryOpen] = useState(!preparation);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [error, setError] = useState('');
   const [capaLog, setCapaLog] = useState(null);
@@ -834,7 +838,7 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
     let cancelled = false;
     setLogs([]);
     setError('');
-    if (!effectiveCcpId) {
+    if (!effectiveCcpId || (preparation && !historyOpen)) {
       setLoadingLogs(false);
       return;
     }
@@ -844,7 +848,7 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
       .catch((err) => { if (!cancelled) setError(err.response?.data?.error || 'Impossible de charger les relevés de surveillance.'); })
       .finally(() => { if (!cancelled) setLoadingLogs(false); });
     return () => { cancelled = true; };
-  }, [effectiveCcpId]);
+  }, [effectiveCcpId, preparation, historyOpen]);
 
   function handleReadingSaved(log) {
     setLogs((prev) => [log, ...prev]);
@@ -876,18 +880,25 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
 
   return (
     <div className="mt-4">
-      <AiHaccpSurveillanceSuggestion
-        plan={plan}
-        canManage={canManage}
-        onSaved={onReadingSaved}
-        onOpenCcpEditor={onOpenCcpEditor}
-        onOpenHazardEditor={onOpenHazardEditor}
-      />
+      {preparation && (
+        <details className="mb-4 rounded-xl border border-purple-200 bg-white p-4">
+          <summary className="cursor-pointer text-sm font-medium text-purple-700">Besoin d’aide ? Consulter les propositions IA</summary>
+          <p className="my-3 text-xs text-slate-500">Facultatif : les propositions préparent des brouillons, jamais une approbation ni une preuve.</p>
+          <AiHaccpSurveillanceSuggestion
+            plan={plan}
+            canManage={canManage}
+            onSaved={onReadingSaved}
+            onOpenCcpEditor={onOpenCcpEditor}
+            onOpenHazardEditor={onOpenHazardEditor}
+          />
+        </details>
+      )}
 
       {allCcps.length === 0 ? (
-        <p className="rounded-md border border-dashed border-slate-300 py-10 text-center text-sm text-slate-500">
-          Aucun CCP défini. Si l’analyse en identifie un, préparez-le puis approuvez-le. Sinon, documentez les mesures de maîtrise et la conclusion « aucun CCP » dans le dossier HACCP.
-        </p>
+        <div className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-600">
+          <p>{preparation ? 'Aucun CCP défini. Créez les CCP retenus depuis les dangers. Si aucun CCP n’est nécessaire, justifiez cette conclusion dans le dossier.' : 'Aucun CCP opérationnel à relever. Les brouillons doivent être complétés et approuvés ; un plan sans CCP ne nécessite pas de relevé CCP.'}</p>
+          {preparation ? <button type="button" onClick={onAnalyze} className="mt-3 min-h-[44px] rounded-md border border-slate-300 bg-white px-3 font-medium text-primary">Ouvrir les dangers</button> : <button type="button" onClick={() => onPrepare()} className="mt-3 min-h-[44px] rounded-md border border-slate-300 bg-white px-3 font-medium text-primary">Consulter les CCP à préparer</button>}
+        </div>
       ) : (
         <>
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -895,24 +906,29 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
           {allCcps.map((ccp) => (
             <option key={ccp.id} value={ccp.id}>
               {ccp.ccp_number ? `${ccp.ccp_number} — ` : ''}
-              {ccp.hazardDescription} ({ccp.stepName}) — {CCP_APPROVAL_LABELS[ccp.status] || 'Statut à vérifier'}
+              {ccp.stepName} — {CCP_APPROVAL_LABELS[ccp.status] || 'Statut à vérifier'}
             </option>
           ))}
         </select>
-        <Link to="/haccp/today" className="flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
+        {!preparation && <Link to="/haccp/today" className="flex min-h-[44px] shrink-0 items-center justify-center gap-1.5 rounded-md border border-slate-300 px-3 text-sm font-medium text-slate-700 hover:bg-slate-50">
           <ClipboardList size={15} />
           Relevés du jour
-        </Link>
+        </Link>}
       </div>
+      <p className="mt-2 break-words text-sm text-slate-700">{selectedCcp?.hazardDescription}</p>
 
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       {selectedCcp && (
         <>
-          <div className="mt-3">
+          {preparation ? <div className="mt-3">
             <CcpApprovalCard key={selectedCcp.id} ccp={selectedCcp} canManage={canManage} onEdit={(field) => onOpenCcpEditor(selectedCcp.hazard, undefined, field)} onApproved={onReadingSaved} />
-          </div>
-          {isOperationalCcp(selectedCcp) && (
+          </div> : <p className="mt-3 text-xs text-slate-600">
+            {CCP_APPROVAL_LABELS[selectedCcp.status]}.
+            {selectedCcp.status === 'legacy' && ' Suivi historique conservé ; les preuves de validation restent à documenter.'}
+            <button type="button" onClick={() => onPrepare(selectedCcp.id)} className="ml-2 min-h-[40px] font-medium text-primary underline">Consulter la fiche CCP</button>
+          </p>}
+          {!preparation && isOperationalCcp(selectedCcp) && (
           <>
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <CcpStatusChip ccp={selectedCcp} />
@@ -946,7 +962,8 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
         </>
       )}
 
-      <div className="mt-4 space-y-2">
+      <details open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)} className="mt-4 space-y-2">
+        <summary className="min-h-[40px] cursor-pointer text-sm font-semibold text-slate-900">{preparation ? 'Consulter l’historique conservé de ce CCP' : 'Historique des relevés'}</summary>
         {loadingLogs ? (
           <div className="h-16 animate-pulse rounded-xl border border-slate-200 bg-white" />
         ) : logs.length === 0 ? (
@@ -1000,7 +1017,7 @@ function SurveillanceTab({ plan, users, services, priorityDelays, canManage, onC
             </div>
           ))
         )}
-      </div>
+      </details>
 
       {capaLog && selectedCcp && (
         <CreateCapaFromLogModal
@@ -1035,7 +1052,9 @@ export default function HaccpDetail() {
   const [priorityDelays, setPriorityDelays] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('analysis');
+  const [activeTab, setActiveTab] = useState('dossier');
+  const [focusedCcpId, setFocusedCcpId] = useState('');
+  const stageHeadingRef = useRef(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [exportingPdf, setExportingPdf] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
@@ -1161,6 +1180,8 @@ export default function HaccpDetail() {
     return <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>;
   }
   if (!plan) return null;
+  const workflow = getHaccpWorkflow(plan);
+  const currentStage = HACCP_WORKFLOW_STAGES.find((stage) => stage.id === activeTab);
 
   return (
     <div>
@@ -1173,7 +1194,7 @@ export default function HaccpDetail() {
         <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{plan.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
           {canManage ? (
-            <select value={plan.status} onChange={handleStatusChange} className="min-h-[40px] rounded-md border border-slate-300 px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:min-h-0 sm:text-sm">
+            <select aria-label="Statut du plan" value={plan.status} onChange={handleStatusChange} className="min-h-[40px] rounded-md border border-slate-300 px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:min-h-0 sm:text-sm">
               {Object.entries(PLAN_STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
@@ -1196,10 +1217,42 @@ export default function HaccpDetail() {
           )}
         </div>
       </div>
-      <PageGuide id="haccpDetail" />
-
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
+      <section aria-label="Parcours HACCP" className="mt-4 rounded-xl border border-primary-100 bg-white p-4 shadow-sm sm:p-5">
+        <h2 className="text-base font-semibold text-slate-900">Votre plan, étape par étape</h2>
+        <p className="mt-1 text-sm text-slate-600">Préparez le dossier et les CCP, puis passez aux relevés. Vous pouvez revenir à chaque étape.</p>
+        <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-600">
+          <span className="rounded-full bg-slate-100 px-3 py-1">Dossier : {workflow.dossierCompleted}/{workflow.dossierTotal} rubriques</span>
+          <span className="rounded-full bg-slate-100 px-3 py-1">{workflow.hazards} dangers · {workflow.undecided} décisions à documenter</span>
+          <span className="rounded-full bg-slate-100 px-3 py-1">{workflow.pendingCcps} CCP non opérationnels · {workflow.operationalCcps} opérationnels</span>
+        </div>
+        <div className="mt-4 rounded-lg bg-primary-50 p-3">
+          <p className="text-sm font-semibold text-slate-900">Prochaine étape conseillée</p>
+          <p className="mt-1 text-sm text-slate-600">{workflow.next.message}</p>
+          <button type="button" onClick={() => {
+            setActiveTab(workflow.next.stage);
+            requestAnimationFrame(() => stageHeadingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+          }} className="mt-3 min-h-[44px] rounded-md bg-primary px-4 py-2 text-sm font-medium text-white">{workflow.next.label}</button>
+          {!canManage && <p className="mt-2 text-xs text-slate-500">La préparation et l’approbation sont réservées aux responsables HACCP. Les relevés restent accessibles selon vos droits.</p>}
+        </div>
+        <p className="mt-3 text-xs text-slate-500">Ces repères indiquent la saisie et les statuts, pas la conformité du plan. Un danger significatif n’est pas automatiquement un CCP.</p>
+      </section>
+
+      <nav aria-label="Étapes du plan HACCP" className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {HACCP_WORKFLOW_STAGES.map((stage, index) => (
+          <button key={stage.id} type="button" aria-current={activeTab === stage.id ? 'step' : undefined} onClick={() => setActiveTab(stage.id)}
+            className={`min-h-[52px] rounded-lg border px-3 py-3 text-left text-sm font-medium ${activeTab === stage.id ? 'border-primary bg-primary text-white' : 'border-slate-200 bg-white text-slate-600 hover:border-primary hover:text-primary'}`}>
+            {index + 1}. {stage.title}
+          </button>
+        ))}
+      </nav>
+      <div ref={stageHeadingRef} className="mt-4 scroll-mt-24">
+        <h2 className="text-base font-semibold text-slate-900">{currentStage.title}</h2>
+        <p className="mt-1 text-sm text-slate-600">{currentStage.description}</p>
+      </div>
+
+      {activeTab === 'dossier' && <>
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">
         <div>
           <p className="text-xs text-slate-500">Produit concerné</p>
@@ -1217,34 +1270,18 @@ export default function HaccpDetail() {
           <p className="text-xs text-slate-500">Périmètre</p>
           <p className="text-sm font-medium text-slate-800">{plan.scope || '—'}</p>
         </div>
+        {canManage && <button type="button" onClick={() => setIsEditModalOpen(true)} className="min-h-[40px] text-left text-sm font-medium text-primary underline sm:col-span-4">Modifier le produit, le périmètre ou l’équipe</button>}
       </div>
 
-      <HaccpReviewCard plan={plan} canManage={canManage} onPlanChanged={(updated) => setPlan((prev) => ({ ...prev, ...updated }))} />
       <HaccpDossierCard plan={plan} canManage={canManage} onSaved={(updated) => setPlan((prev) => ({ ...prev, ...updated }))} />
+      <details className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-medium text-slate-700">Revue, versions et éléments liés</summary>
+      <HaccpReviewCard plan={plan} canManage={canManage} onPlanChanged={(updated) => setPlan((prev) => ({ ...prev, ...updated }))} />
       <HaccpLinksCard planId={plan.id} canManage={canManage} refreshKey={linksKey} />
+      </details>
+      </>}
 
-      <div className="mt-5 flex gap-1 border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setActiveTab('analysis')}
-          className={`min-h-[44px] border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'analysis' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Analyse des dangers
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('surveillance')}
-          className={`min-h-[44px] border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-            activeTab === 'surveillance' ? 'border-primary text-primary' : 'border-transparent text-slate-500 hover:text-slate-700'
-          }`}
-        >
-          Surveillance
-        </button>
-      </div>
-
-      {activeTab === 'analysis' ? (
+      {activeTab === 'analysis' && (
         <div className="mt-4 space-y-4">
           {plan.steps.length === 0 && (
             <p className="rounded-md border border-dashed border-slate-300 py-8 text-center text-sm text-slate-500">
@@ -1287,9 +1324,10 @@ export default function HaccpDetail() {
               )}
 
               {canManage && (
-                <div className="mt-3">
+                <details className="mt-3">
+                  <summary className="min-h-[40px] cursor-pointer text-xs font-medium text-primary">Besoin d’aide pour identifier les dangers ?</summary>
                   <AiHazardSuggestion stepId={step.id} onAdded={loadPlan} />
-                </div>
+                </details>
               )}
 
               {step.hazards.length > 0 && (
@@ -1328,9 +1366,18 @@ export default function HaccpDetail() {
             </button>
           )}
         </div>
-      ) : (
+      )}
+      {(activeTab === 'ccps' || activeTab === 'surveillance') && (
         <SurveillanceTab
+          key={`${plan.id}-${activeTab}`}
           plan={plan}
+          mode={activeTab}
+          initialCcpId={focusedCcpId}
+          onPrepare={(ccpId = '') => {
+            setFocusedCcpId(ccpId);
+            setActiveTab('ccps');
+          }}
+          onAnalyze={() => setActiveTab('analysis')}
           users={users}
           services={services}
           priorityDelays={priorityDelays}
@@ -1346,6 +1393,11 @@ export default function HaccpDetail() {
           }}
         />
       )}
+
+      <details className="mt-5 rounded-xl border border-slate-200 bg-white p-4">
+        <summary className="cursor-pointer text-sm font-medium text-slate-600">Comprendre le fonctionnement HACCP</summary>
+        <PageGuide id="haccpDetail" />
+      </details>
 
       {isEditModalOpen && (
         <EditPlanModal

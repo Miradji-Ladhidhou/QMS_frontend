@@ -595,7 +595,7 @@ export const PAGE_GUIDES = {
           surveillance. Un CCP sans limites chiffrées se relève avec « Conforme » / « Non conforme ». Après 3 relevés hors limites en 7 jours sur un même
           CCP, le responsable et l'auteur du plan sont prévenus : c'est la cause qu'il faut traiter (CAPA ou risque), pas seulement l'incident.
         </p>
-        <p>Pas de réseau en atelier ? Imprimez la <strong>fiche de relevés vierge</strong> depuis la page du plan (onglet Surveillance) et reportez les valeurs ensuite.</p>
+        <p>Pas de réseau en atelier ? Imprimez la <strong>fiche de relevés vierge</strong> depuis la page du plan (espace Relevés) et reportez les valeurs ensuite.</p>
       </>
     ),
     example: "chambre froide n°2, limite ≤ 4 °C : vous saisissez 5,2 → « Hors limites » → action corrective : « lot mis en quarantaine, groupe froid signalé ».",
@@ -605,6 +605,7 @@ export const PAGE_GUIDES = {
     body: (
       <p>
         Complétez le <strong>dossier HACCP</strong>, analysez les dangers et justifiez la décision de maîtrise.
+        Suivez les quatre espaces : <strong>Dossier → Dangers → Préparer les CCP → Relevés</strong>.
         Les propositions IA deviennent des <strong>brouillons CCP</strong> : seuls les CCP approuvés et les CCP existants conservés autorisent la surveillance.
       </p>
     ),
@@ -625,7 +626,7 @@ export const PAGE_GUIDES = {
           <strong>Revue du plan :</strong> la revue annuelle est programmée à l'activation (rappel 7 jours avant, le jour même, puis chaque semaine de
           retard). « Marquer revu » conserve une <strong>version</strong> du plan ; « Versions » montre ce qui a changé, quand et par qui.{' '}
           <strong>Éléments liés</strong> rattache fournisseurs, procédures et formations requises — l'application vérifie que les responsables de surveillance
-          sont formés. <strong>Exporter</strong> : PDF ou Word du plan ; fiche PDF de chaque point critique et fiche de relevés vierge à imprimer (onglet Surveillance).
+          sont formés. <strong>Exporter</strong> : PDF ou Word du plan ; fiche PDF de chaque point critique et fiche de relevés vierge à imprimer (espace Relevés).
         </p>
       </>
     ),
