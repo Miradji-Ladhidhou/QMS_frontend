@@ -69,7 +69,7 @@ export default function ProblemResolutionGuide() {
         <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
           <Lightbulb size={28} aria-hidden="true" />
         </div>
-        <h1 className="text-3xl font-bold text-slate-900">Comment puis-je vous aider ?</h1>
+        <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Comment puis-je vous aider ?</h1>
         <p className="mt-2 text-slate-600">
           Décrivez votre problème pour découvrir les modules les plus adaptés.
         </p>
@@ -85,7 +85,7 @@ export default function ProblemResolutionGuide() {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Décrivez votre problème ou recherchez un sujet..."
-            className="min-h-16 w-full border-0 bg-transparent text-base text-slate-900 outline-none focus:ring-0"
+            className="min-h-16 min-w-0 w-full border-0 bg-transparent text-base text-slate-900 outline-none focus:ring-0"
           />
         </div>
         <div className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Exemples de problèmes">
@@ -94,7 +94,7 @@ export default function ProblemResolutionGuide() {
               key={example.label}
               type="button"
               onClick={() => setQuery(example.query)}
-              className="rounded-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-primary hover:text-primary"
+              className="min-h-11 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-primary hover:text-primary"
             >
               {example.label}
             </button>
@@ -112,7 +112,7 @@ export default function ProblemResolutionGuide() {
             <h2 className="text-xl font-semibold text-slate-900">Voici les modules qui peuvent vous aider</h2>
             <p className="mt-1 text-sm text-slate-600">Les résultats tiennent compte des modules accessibles dans votre espace.</p>
           </div>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid gap-4 lg:grid-cols-2">
             {recommendations.map((module) => {
               const Icon = MODULE_ICONS[module.id] || AlertTriangle;
               return (
@@ -131,7 +131,7 @@ export default function ProblemResolutionGuide() {
                   <p className="mt-4 flex-1 text-sm leading-6 text-slate-600">{module.description}</p>
                   <Link
                     to={module.path}
-                    className="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white transition hover:bg-primary-700"
+                    className="mt-5 inline-flex min-h-11 items-center justify-center rounded-lg bg-primary px-4 py-2 text-center text-sm font-semibold text-white transition hover:bg-primary-700"
                   >
                     Ouvrir {module.label}
                   </Link>
