@@ -470,7 +470,7 @@ export default function Layout() {
 
       <aside
         id="sidebar-navigation"
-        className={`fixed inset-y-0 left-0 z-50 h-dvh w-64 shrink-0 flex-col overflow-hidden bg-primary text-white md:sticky md:top-0 md:flex md:self-start ${
+        className={`fixed left-0 top-0 z-50 h-dvh w-[calc(100vw-1rem)] max-w-sm shrink-0 flex-col overflow-hidden bg-primary text-white md:sticky md:top-0 md:flex md:w-64 md:max-w-none md:self-start ${
           isMenuOpen ? 'flex' : 'hidden'
         }`}
       >
@@ -503,6 +503,7 @@ export default function Layout() {
           </div>
         </div>
 
+        <div className="sidebar-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain md:contents">
         <div className="mx-3 mb-3 flex shrink-0 items-baseline gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white/80">
           <span className="text-base font-semibold tabular-nums text-white">{timeLabel}</span>
           <span title={dateLabel} className="truncate text-xs capitalize">{dateLabel}</span>
@@ -522,7 +523,7 @@ export default function Layout() {
           </div>
         )}
 
-        <nav aria-label="Navigation principale" className="flex min-h-0 flex-1 flex-col px-3 pb-3">
+        <nav aria-label="Navigation principale" className="flex min-h-0 flex-col px-3 pb-3 md:flex-1">
           <div className="mb-2 shrink-0 space-y-1">
             {topItems.map((item) => (
               <NavLink
@@ -541,7 +542,7 @@ export default function Layout() {
               </NavLink>
             ))}
           </div>
-          <div className="sidebar-scroll-area min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto overscroll-y-contain">
+          <div className="sidebar-scroll-area shrink-0 space-y-2 md:min-h-0 md:flex-1 md:shrink md:overflow-x-hidden md:overflow-y-auto md:overscroll-y-contain">
           {sidebarCategories.map((category) => {
             const active = category.id === activeCategoryId;
             const expanded = expandedCategories.has(category.id);
@@ -626,6 +627,7 @@ export default function Layout() {
             </button>
           </div>
         </nav>
+        </div>
       </aside>
 
       <main className="min-w-0 flex-1 px-4 py-4 sm:px-6 md:px-8 md:py-6">
