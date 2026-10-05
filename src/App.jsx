@@ -23,6 +23,7 @@ import Maintenance from './pages/Maintenance.jsx';
 // gain que seule une fraction des visiteurs (déjà connectés) utilise réellement.
 const Dashboard = lazy(() => import('./pages/Dashboard.jsx'));
 const ProblemResolutionGuide = lazy(() => import('./pages/ProblemResolutionGuide.jsx'));
+const LiensUtiles = lazy(() => import('./pages/LiensUtiles.jsx'));
 const Planning = lazy(() => import('./pages/Planning.jsx'));
 // Documents.jsx, Procedures.jsx, MyApprovals.jsx et QualityPolicy.jsx ne sont plus chargées
 // directement en tant que routes : elles sont maintenant quatre onglets assemblés par
@@ -154,6 +155,7 @@ export default function App() {
                     <Route path="/" element={<Layout />}>
                       <Route index element={<Dashboard />} />
                       <Route path="guide-resolution" element={<ProblemResolutionGuide />} />
+                      <Route path="liens-utiles" element={<LiensUtiles />} />
                       <Route path="planning" element={<Planning />} />
                       <Route path="documents" element={<Documents />} />
                       <Route path="documents/:id" element={<DocumentDetail />} />

@@ -13,6 +13,7 @@ import {
   FileText,
   GraduationCap,
   HelpCircle,
+  Link2,
   LayoutDashboard,
   Lightbulb,
   LogOut,
@@ -272,9 +273,11 @@ export const NAV_ITEMS = [
   { to: '/quality-policy', label: 'Politique qualité', icon: ScrollText, alwaysVisible: true },
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
-  // rester joignable quel que soit ce que l'admin a caché pour ce rôle.
+  // rester joignable quel que soit ce que l'admin a caché pour ce rôle. Placé avec les liens
+  // fixes en haut du menu, sous Dashboard, via SIDEBAR_TOP_PATHS.
   { to: '/guide-resolution', label: 'Guide de résolution', icon: Lightbulb, alwaysVisible: true },
   { to: '/prise-en-main', label: 'Aide & prise en main', icon: BookOpen, alwaysVisible: true },
+  { to: '/liens-utiles', label: 'Liens utiles', icon: Link2, alwaysVisible: true },
   // Configurables comme les autres (Paramètres > Visibilité), mais masquées par défaut pour
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
   // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations

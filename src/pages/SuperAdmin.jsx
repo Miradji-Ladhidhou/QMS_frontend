@@ -35,6 +35,7 @@ import GroqQuotaSettings from '../components/GroqQuotaSettings.jsx';
 import AiCompanySettings from '../components/AiCompanySettings.jsx';
 import AiPlanSettings from '../components/AiPlanSettings.jsx';
 import AiQuotaAlerts from '../components/AiQuotaAlerts.jsx';
+import UsefulLinksSettings from '../components/UsefulLinksSettings.jsx';
 
 const TENANT_SORT_OPTIONS = [
   { key: 'created_at', label: 'date de création' },
@@ -70,6 +71,7 @@ const ACTION_LABELS = {
   db_backup_created: 'Sauvegarde créée',
   db_backup_downloaded: 'Sauvegarde téléchargée',
   db_restored_from_drive: 'Base restaurée depuis Google Drive',
+  useful_links_updated: 'Catalogue des liens utiles modifié',
 };
 const MODULE_LABELS = {
   documents: 'Documents',
@@ -146,6 +148,7 @@ const TABS = [
   { id: 'system', label: 'Système' },
   { id: 'ai-plans', label: 'Forfaits' },
   { id: 'platform', label: 'Plateforme' },
+  { id: 'useful-links', label: 'Liens utiles' },
   { id: 'support', label: 'Support' },
 ];
 
@@ -2152,6 +2155,7 @@ export default function SuperAdmin() {
           {activeTab === 'system' && <SystemTab />}
           {activeTab === 'ai-plans' && <AiPlanSettings />}
           {activeTab === 'platform' && <PlatformTab />}
+          {activeTab === 'useful-links' && <UsefulLinksSettings />}
           {activeTab === 'support' && <SupportTab />}
         </div>
       </main>

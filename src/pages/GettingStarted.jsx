@@ -298,6 +298,20 @@ const SECTIONS = [
     ),
   },
   {
+    icon: BookOpenCheck,
+    title: 'Liens utiles',
+    body: (
+      <p>
+        Retrouvez des <strong>références en français</strong> pour les modules de l’application, regroupées par thème
+        avec les organismes sources. La page reste accessible dans le menu latéral ; les ressources externes s’ouvrent
+        dans un nouvel onglet.{' '}
+        <Link to="/liens-utiles" className="font-medium text-primary hover:underline">
+          Consulter les liens utiles
+        </Link>.
+      </p>
+    ),
+  },
+  {
     icon: Settings,
     title: 'Paramètres (admin)',
     body: (
@@ -351,7 +365,7 @@ const CHECKLIST = [
 const SECTION_GROUPS = [
   {
     title: 'S’orienter et organiser',
-    sectionTitles: ['Dashboard', 'Planning', 'Services et organisation', 'Qui voit quoi : catégories et visibilité', 'Les rôles', 'Paramètres (admin)'],
+    sectionTitles: ['Dashboard', 'Planning', 'Services et organisation', 'Liens utiles', 'Qui voit quoi : catégories et visibilité', 'Les rôles', 'Paramètres (admin)'],
   },
   {
     title: 'Documents et validations',

@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import { getActiveSidebarCategory, getSidebarCategories, getSidebarPermanentItems, getSidebarTopItems, isSidebarItemActive, SIDEBAR_PERMANENT_PATHS } from './sidebarNavigation.js';
 
 const expectedPaths = [
-  ['/guide-resolution', '/kpis', '/planning', '/pdca', '/management-reviews'],
+  ['/kpis', '/planning', '/pdca', '/management-reviews'],
   ['/documents', '/procedures', '/capas', '/nonconforming-outputs', '/audits', '/complaints', '/customer-satisfaction', '/my-approvals', '/quality-policy'],
   ['/risks', '/accidents', '/haccp', '/qqoqccp'],
   ['/trainings', '/employees', '/services', '/suppliers'],
 ];
-const alwaysVisiblePaths = ['/quality-policy', '/settings', '/guide-resolution', '/prise-en-main'];
-const items = ['/', ...expectedPaths.flat(), ...SIDEBAR_PERMANENT_PATHS].map((to) => ({
+const alwaysVisiblePaths = ['/quality-policy', '/settings', '/guide-resolution', '/prise-en-main', '/liens-utiles'];
+const items = ['/', '/guide-resolution', ...expectedPaths.flat(), ...SIDEBAR_PERMANENT_PATHS].map((to) => ({
   to,
   ...(alwaysVisiblePaths.includes(to)
     ? { alwaysVisible: true }
@@ -21,12 +21,13 @@ test('all sidebar links occur exactly once in the requested order', () => {
   const categories = getSidebarCategories(items, { role: 'admin' });
   assert.deepEqual(categories.map((category) => category.items.map((item) => item.to)), expectedPaths);
   const permanentItems = getSidebarPermanentItems(items, { role: 'admin' });
-  assert.deepEqual(permanentItems.map((item) => item.to), ['/settings', '/prise-en-main']);
+  assert.deepEqual(permanentItems.map((item) => item.to), ['/settings', '/prise-en-main', '/liens-utiles']);
   const topItems = getSidebarTopItems(items, { role: 'admin' });
-  assert.deepEqual(topItems.map((item) => item.to), ['/']);
+  assert.deepEqual(topItems.map((item) => item.to), ['/', '/guide-resolution']);
+  assert.deepEqual(getSidebarTopItems([...items].reverse(), { role: 'admin' }).map((item) => item.to), ['/', '/guide-resolution']);
   const allItems = [...topItems, ...categories.flatMap((category) => category.items), ...permanentItems];
-  assert.equal(allItems.length, 25);
-  assert.equal(new Set(allItems.map((item) => item.to)).size, 25);
+  assert.equal(allItems.length, 26);
+  assert.equal(new Set(allItems.map((item) => item.to)).size, 26);
   assert.equal(categories.length, 4);
   assert.deepEqual(categories.map((category) => category.label), ['PILOTAGE', 'QUALITÉ', 'RISQUES & SÉCURITÉ', 'RESSOURCES']);
 });
@@ -44,7 +45,7 @@ test('active category follows every module, including details and nested tools',
   assert.equal(getActiveSidebarCategory(categories, '/trainings/matrix'), 'ressources');
   assert.equal(getActiveSidebarCategory(categories, '/haccp/today'), 'risques');
   assert.equal(getActiveSidebarCategory(categories, '/kpis/modules'), 'pilotage');
-  assert.equal(getActiveSidebarCategory(categories, '/guide-resolution'), 'pilotage');
+  assert.equal(getActiveSidebarCategory(categories, '/guide-resolution'), undefined);
   assert.equal(getActiveSidebarCategory(categories, '/services'), 'ressources');
   assert.equal(getActiveSidebarCategory(categories, '/quality-policy'), 'qualite');
   assert.equal(getActiveSidebarCategory(categories, '/unknown'), undefined);
@@ -66,10 +67,10 @@ test('visibility rules preserve role/user restrictions and always-visible links'
   for (const role of ['admin', 'manager', 'member']) {
     const categories = getSidebarCategories(items, { role, visibleMenuKeys: ['documents', 'trainings'] });
     assert.deepEqual(categories.flatMap((category) => category.items.map((item) => item.to)), [
-      '/guide-resolution', '/documents', '/quality-policy', '/trainings',
+      '/documents', '/quality-policy', '/trainings',
     ]);
     assert.deepEqual(getSidebarPermanentItems(items, { role, visibleMenuKeys: ['documents', 'trainings'] }).map((item) => item.to), [
-      '/settings', '/prise-en-main',
+      '/settings', '/prise-en-main', '/liens-utiles',
     ]);
     assert.equal(categories.some((category) => category.id === 'risques'), false);
   }
@@ -88,7 +89,7 @@ test('disabled company modules stay hidden even when their menu key is visible',
     role: 'admin',
     visibleMenuKeys: ['services'],
     appModules: { services: false },
-  }).map((item) => item.to), ['/settings', '/prise-en-main']);
+  }).map((item) => item.to), ['/settings', '/prise-en-main', '/liens-utiles']);
   const disabledServices = getSidebarCategories(items, {
     role: 'admin',
     visibleMenuKeys: ['services'],
@@ -105,12 +106,12 @@ test('legacy hidden groups and admin-only rules are preserved', () => {
   ];
   for (const role of ['manager', 'member']) {
     const categories = getSidebarCategories(additionalItems, { role });
-    assert.equal(categories.flatMap((category) => category.items).length, 22);
-    assert.equal(getSidebarPermanentItems(additionalItems, { role }).length, 2);
+    assert.equal(categories.flatMap((category) => category.items).length, 21);
+    assert.equal(getSidebarPermanentItems(additionalItems, { role }).length, 3);
   }
   const adminCategories = getSidebarCategories(additionalItems, { role: 'admin' });
-  assert.equal(adminCategories.flatMap((category) => category.items).length, 23);
-  assert.equal(getSidebarPermanentItems(additionalItems, { role: 'admin' }).length, 2);
+  assert.equal(adminCategories.flatMap((category) => category.items).length, 22);
+  assert.equal(getSidebarPermanentItems(additionalItems, { role: 'admin' }).length, 3);
 });
 
 test('empty categories disappear without an Administration accordion', () => {
@@ -122,10 +123,21 @@ test('empty categories disappear without an Administration accordion', () => {
 
 test('pinned Dashboard preserves menu and company visibility rules', () => {
   for (const role of ['admin', 'manager', 'member']) {
-    assert.equal(getSidebarTopItems(items, { role, visibleMenuKeys: ['dashboard'] }).length, 1);
-    assert.deepEqual(getSidebarTopItems(items, { role, visibleMenuKeys: [] }), []);
+    assert.deepEqual(getSidebarTopItems(items, { role, visibleMenuKeys: ['dashboard'] }).map((item) => item.to), ['/', '/guide-resolution']);
+    assert.deepEqual(getSidebarTopItems(items, { role, visibleMenuKeys: [] }).map((item) => item.to), ['/guide-resolution']);
     assert.deepEqual(getSidebarTopItems(items, {
       role, visibleMenuKeys: ['dashboard'], appModules: { dashboard: false },
-    }), []);
+    }).map((item) => item.to), ['/guide-resolution']);
+  }
+});
+
+test('pinned Guide de résolution stays available to every role outside categories', () => {
+  for (const role of ['admin', 'manager', 'member']) {
+    const options = { role, visibleMenuKeys: [] };
+    assert.deepEqual(getSidebarPermanentItems(items, options).map((item) => item.to), [
+      '/settings', '/prise-en-main', '/liens-utiles',
+    ]);
+    assert.deepEqual(getSidebarTopItems(items, options).map((item) => item.to), ['/guide-resolution']);
+    assert.equal(getActiveSidebarCategory(getSidebarCategories(items, options), '/guide-resolution'), undefined);
   }
 });

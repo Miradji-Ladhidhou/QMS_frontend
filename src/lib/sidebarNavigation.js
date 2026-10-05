@@ -2,7 +2,7 @@ export const SIDEBAR_CATEGORIES = [
   {
     id: 'pilotage',
     label: 'PILOTAGE',
-    paths: ['/guide-resolution', '/kpis', '/planning', '/pdca', '/management-reviews'],
+    paths: ['/kpis', '/planning', '/pdca', '/management-reviews'],
   },
   {
     id: 'qualite',
@@ -21,7 +21,8 @@ export const SIDEBAR_CATEGORIES = [
   },
 ];
 
-export const SIDEBAR_PERMANENT_PATHS = ['/settings', '/prise-en-main'];
+export const SIDEBAR_PERMANENT_PATHS = ['/settings', '/prise-en-main', '/liens-utiles'];
+export const SIDEBAR_TOP_PATHS = ['/', '/guide-resolution'];
 
 export function isSidebarItemActive(item, pathname) {
   return pathname === item.to || (!item.end && item.to !== '/' && pathname.startsWith(`${item.to}/`));
@@ -51,7 +52,8 @@ export function getSidebarPermanentItems(items, options) {
 }
 
 export function getSidebarTopItems(items, options) {
-  return getVisibleSidebarItems(items, options).filter((item) => item.to === '/');
+  const visibleItems = getVisibleSidebarItems(items, options);
+  return SIDEBAR_TOP_PATHS.flatMap((path) => visibleItems.filter((item) => item.to === path));
 }
 
 export function getActiveSidebarCategory(categories, pathname) {
