@@ -14,6 +14,7 @@ import {
   GraduationCap,
   HelpCircle,
   LayoutDashboard,
+  Lightbulb,
   LogOut,
   Menu,
   MessageSquareWarning,
@@ -272,6 +273,7 @@ export const NAV_ITEMS = [
   // Jamais configurable, comme Paramètres plus bas — mais ouvert à tous les rôles, pas
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
   // rester joignable quel que soit ce que l'admin a caché pour ce rôle.
+  { to: '/guide-resolution', label: 'Guide de résolution', icon: Lightbulb, alwaysVisible: true },
   { to: '/prise-en-main', label: 'Prise en main', icon: BookOpen, alwaysVisible: true },
   // Configurables comme les autres (Paramètres > Visibilité), mais masquées par défaut pour
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté

@@ -8,9 +8,9 @@ const expectedPaths = [
   ['/risks', '/accidents', '/haccp', '/qqoqccp'],
   ['/trainings', '/employees', '/suppliers'],
   ['/quality-policy'],
-  ['/services', '/settings', '/prise-en-main'],
+  ['/services', '/settings', '/guide-resolution', '/prise-en-main'],
 ];
-const alwaysVisiblePaths = ['/quality-policy', '/settings', '/prise-en-main'];
+const alwaysVisiblePaths = ['/quality-policy', '/settings', '/guide-resolution', '/prise-en-main'];
 const items = expectedPaths.flat().map((to) => ({
   to,
   ...(alwaysVisiblePaths.includes(to)
@@ -19,10 +19,10 @@ const items = expectedPaths.flat().map((to) => ({
   ...(to === '/' ? { end: true } : {}),
 }));
 
-test('all 24 existing module links occur exactly once in the requested order', () => {
+test('all sidebar links occur exactly once in the requested order', () => {
   const categories = getSidebarCategories(items, { role: 'admin' });
   assert.deepEqual(categories.map((category) => category.items.map((item) => item.to)), expectedPaths);
-  assert.equal(new Set(categories.flatMap((category) => category.items.map((item) => item.to))).size, 24);
+  assert.equal(new Set(categories.flatMap((category) => category.items.map((item) => item.to))).size, 25);
   assert.equal(categories.length, 6);
 });
 
@@ -53,7 +53,7 @@ test('visibility rules preserve role/user restrictions and always-visible links'
   for (const role of ['admin', 'manager', 'member']) {
     const categories = getSidebarCategories(items, { role, visibleMenuKeys: ['documents', 'trainings'] });
     assert.deepEqual(categories.flatMap((category) => category.items.map((item) => item.to)), [
-      '/documents', '/trainings', '/quality-policy', '/settings', '/prise-en-main',
+      '/documents', '/trainings', '/quality-policy', '/settings', '/guide-resolution', '/prise-en-main',
     ]);
     assert.equal(categories.some((category) => category.id === 'risques'), false);
   }
@@ -78,10 +78,10 @@ test('legacy hidden groups and admin-only rules are preserved', () => {
   ];
   for (const role of ['manager', 'member']) {
     const categories = getSidebarCategories(additionalItems, { role });
-    assert.equal(categories.flatMap((category) => category.items).length, 24);
+    assert.equal(categories.flatMap((category) => category.items).length, 25);
   }
   const adminCategories = getSidebarCategories(additionalItems, { role: 'admin' });
-  assert.equal(adminCategories.flatMap((category) => category.items).length, 25);
+  assert.equal(adminCategories.flatMap((category) => category.items).length, 26);
 });
 
 test('empty categories disappear but Administration remains for logout', () => {

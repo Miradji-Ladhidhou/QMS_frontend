@@ -27,7 +27,7 @@ export const SIDEBAR_CATEGORIES = [
   {
     id: 'administration',
     label: 'ADMINISTRATION',
-    paths: ['/services', '/settings', '/prise-en-main'],
+    paths: ['/services', '/settings', '/guide-resolution', '/prise-en-main'],
   },
 ];
 
