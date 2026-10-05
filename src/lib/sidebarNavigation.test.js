@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { getActiveSidebarCategory, getSidebarCategories, isSidebarItemActive, SIDEBAR_CATEGORIES } from './sidebarNavigation.js';
 
 const expectedPaths = [
-  ['/', '/kpis', '/planning', '/pdca', '/management-reviews'],
+  ['/', '/guide-resolution', '/kpis', '/planning', '/pdca', '/management-reviews'],
   ['/documents', '/procedures', '/capas', '/nonconforming-outputs', '/audits', '/complaints', '/customer-satisfaction', '/my-approvals'],
   ['/risks', '/accidents', '/haccp', '/qqoqccp'],
   ['/trainings', '/employees', '/suppliers'],
   ['/quality-policy'],
-  ['/services', '/settings', '/guide-resolution', '/prise-en-main'],
+  ['/services', '/settings', '/prise-en-main'],
 ];
 const alwaysVisiblePaths = ['/quality-policy', '/settings', '/guide-resolution', '/prise-en-main'];
 const items = expectedPaths.flat().map((to) => ({
@@ -39,6 +39,7 @@ test('active category follows every module, including details and nested tools',
   assert.equal(getActiveSidebarCategory(categories, '/trainings/matrix'), 'ressources');
   assert.equal(getActiveSidebarCategory(categories, '/haccp/today'), 'risques');
   assert.equal(getActiveSidebarCategory(categories, '/kpis/modules'), 'pilotage');
+  assert.equal(getActiveSidebarCategory(categories, '/guide-resolution'), 'pilotage');
   assert.equal(getActiveSidebarCategory(categories, '/unknown'), undefined);
 });
 
@@ -53,7 +54,7 @@ test('visibility rules preserve role/user restrictions and always-visible links'
   for (const role of ['admin', 'manager', 'member']) {
     const categories = getSidebarCategories(items, { role, visibleMenuKeys: ['documents', 'trainings'] });
     assert.deepEqual(categories.flatMap((category) => category.items.map((item) => item.to)), [
-      '/documents', '/trainings', '/quality-policy', '/settings', '/guide-resolution', '/prise-en-main',
+      '/guide-resolution', '/documents', '/trainings', '/quality-policy', '/settings', '/prise-en-main',
     ]);
     assert.equal(categories.some((category) => category.id === 'risques'), false);
   }

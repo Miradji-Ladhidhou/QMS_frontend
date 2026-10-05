@@ -10,6 +10,7 @@ export const AI_MODULE_LABELS = {
   management_reviews: 'Revues de direction — brouillon IA',
   procedures: 'Procédures — rédaction, conformité et diffusion',
   kpis: 'KPIs — assistance aux imports',
+  problem_guide: 'Guide de résolution — recherche assistée',
 };
 
 export function useAiModule(module) {

@@ -2,7 +2,7 @@ export const SIDEBAR_CATEGORIES = [
   {
     id: 'pilotage',
     label: 'PILOTAGE',
-    paths: ['/', '/kpis', '/planning', '/pdca', '/management-reviews'],
+    paths: ['/', '/guide-resolution', '/kpis', '/planning', '/pdca', '/management-reviews'],
   },
   {
     id: 'qualite',
@@ -27,7 +27,7 @@ export const SIDEBAR_CATEGORIES = [
   {
     id: 'administration',
     label: 'ADMINISTRATION',
-    paths: ['/services', '/settings', '/guide-resolution', '/prise-en-main'],
+    paths: ['/services', '/settings', '/prise-en-main'],
   },
 ];
 

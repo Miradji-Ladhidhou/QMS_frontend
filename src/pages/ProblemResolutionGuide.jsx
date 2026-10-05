@@ -22,9 +22,11 @@ import {
   Wrench,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getProblemRecommendations, getRelevanceLabel } from '../lib/problemGuide.js';
+import { getRelevanceLabel } from '../lib/problemGuide.js';
 import { useMenuVisibility } from '../lib/useMenuVisibility.js';
 import { useTenant } from '../lib/useTenant.js';
+import { useCurrentUser } from '../lib/useCurrentUser.js';
+import { useProblemSearch } from '../lib/useProblemSearch.js';
 
 const MODULE_ICONS = {
   complaints: MessageSquareWarning,
@@ -57,11 +59,9 @@ const EXAMPLES = [
 export default function ProblemResolutionGuide() {
   const [query, setQuery] = useState('');
   const tenant = useTenant();
+  const user = useCurrentUser();
   const visibleMenuKeys = useMenuVisibility();
-  const hasAccessData = Boolean(tenant) && Array.isArray(visibleMenuKeys);
-  const recommendations = hasAccessData
-    ? getProblemRecommendations(query, { appModules: tenant.app_modules, visibleMenuKeys })
-    : [];
+  const { ready: hasAccessData, recommendations, pending, error, retry } = useProblemSearch(query, tenant, user, visibleMenuKeys);
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -82,6 +82,7 @@ export default function ProblemResolutionGuide() {
           <input
             id="problem-search"
             type="search"
+            maxLength={1200}
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Décrivez votre problème ou recherchez un sujet..."
@@ -102,6 +103,15 @@ export default function ProblemResolutionGuide() {
         </div>
       </section>
 
+      {pending && <p role="status" className="text-center text-sm text-slate-600">Recherche en cours...</p>}
+      {error && (
+        <div role="alert" className="text-center text-sm text-slate-700">
+          <p>{error}</p>
+          <button type="button" onClick={retry} className="mt-2 min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2">
+            Réessayer
+          </button>
+        </div>
+      )}
       {!hasAccessData ? (
         <p role="status" className="text-center text-sm text-slate-600">
           Chargement des modules et de vos accès...
@@ -140,7 +150,7 @@ export default function ProblemResolutionGuide() {
             })}
           </div>
         </section>
-      ) : query.trim() ? (
+      ) : query.trim() && !pending && !error ? (
         <p aria-live="polite" className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-8 text-center text-slate-600">
           Aucun module accessible ne correspond à cette recherche. Essayez avec d’autres mots.
         </p>

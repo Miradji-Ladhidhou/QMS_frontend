@@ -1,3 +1,5 @@
+import { PROBLEM_CONCEPTS } from './problemConcepts.js';
+
 export const PROBLEM_GUIDE_MODULES = [
   {
     id: 'complaints',
@@ -188,7 +190,7 @@ export const PROBLEM_GUIDE_MODULES = [
   },
 ];
 
-function normalizeText(value) {
+export function normalizeProblemQuery(value) {
   return value
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
@@ -199,26 +201,102 @@ function normalizeText(value) {
     .replace(/\s+/g, ' ');
 }
 
-export function getProblemRecommendations(query, { appModules, visibleMenuKeys } = {}) {
-  const normalizedQuery = normalizeText(query || '');
-  if (!normalizedQuery || !Array.isArray(visibleMenuKeys)) return [];
+const STOP_WORDS = new Set('le la les un une des de du d au aux a et est sont en pendant lors notre nos mon mes ce cet cette ces nous on qui que avec pour dans'.split(' '));
+export const LOCAL_RELEVANCE_THRESHOLD = 90;
+export const MIN_RECOMMENDATION_SCORE = 50;
 
-  const queryWords = new Set(normalizedQuery.split(' '));
+function wordsOf(value) {
+  return normalizeProblemQuery(value).split(' ').filter((word) => word && !STOP_WORDS.has(word));
+}
 
-  return PROBLEM_GUIDE_MODULES
-    .filter((module) => appModules?.[module.id] !== false && visibleMenuKeys.includes(module.id))
-    .map((module) => {
-      const score = module.keywords.reduce((total, [keyword, weight]) => {
-        const normalizedKeyword = normalizeText(keyword);
-        const matches = normalizedKeyword.includes(' ')
-          ? normalizedQuery.includes(normalizedKeyword)
-          : queryWords.has(normalizedKeyword);
-        return matches ? total + weight : total;
-      }, 0);
-      return { ...module, score };
-    })
-    .filter((module) => module.score >= 50)
-    .sort((left, right) => right.score - left.score || left.label.localeCompare(right.label, 'fr'));
+function isOneEditAway(left, right) {
+  if (Math.abs(left.length - right.length) > 1) return false;
+  let i = 0;
+  let j = 0;
+  let edits = 0;
+  while (i < left.length && j < right.length) {
+    if (left[i] === right[j]) { i++; j++; continue; }
+    if (++edits > 1) return false;
+    if (left.length >= right.length) i++;
+    if (right.length >= left.length) j++;
+  }
+  return edits + (i < left.length || j < right.length ? 1 : 0) <= 1;
+}
+
+function wordMatch(word, expected) {
+  if (word === expected) return 1;
+  if (['risque', 'risques', 'danger', 'dangers'].includes(expected)) return 0;
+  if (expected.length >= 5 && word.length >= 5 && isOneEditAway(word, expected)) return 0.9;
+  return 0;
+}
+
+function phraseMatch(words, phrase) {
+  const expected = wordsOf(phrase);
+  if (!expected.length) return 0;
+  let best = 0;
+  for (let start = 0; start <= words.length - expected.length; start++) {
+    let quality = 1;
+    for (let index = 0; index < expected.length; index++) {
+      quality = Math.min(quality, wordMatch(words[start + index], expected[index]));
+    }
+    best = Math.max(best, quality);
+  }
+  return best;
+}
+
+export function getAvailableProblemModules({ appModules, visibleMenuKeys } = {}) {
+  if (!Array.isArray(visibleMenuKeys)) return [];
+  return PROBLEM_GUIDE_MODULES.filter((module) =>
+    appModules?.[module.id] !== false && visibleMenuKeys.includes(module.id));
+}
+
+export function getProblemRecommendations(query, access = {}) {
+  const words = wordsOf(query || '');
+  if (!words.length) return [];
+  const available = getAvailableProblemModules(access);
+  const scores = new Map(available.map((module) => [module.id, {
+    ...module,
+    score: Math.max(0, ...module.keywords.map(([keyword, weight]) => Math.round(phraseMatch(words, keyword) * weight))),
+  }]));
+  for (const concept of PROBLEM_CONCEPTS) {
+    const quality = Math.max(...concept.variants.map((groups) =>
+      Math.min(...groups.map((synonyms) => Math.max(...synonyms.map((phrase) => phraseMatch(words, phrase)))))));
+    if (!quality) continue;
+    for (const association of concept.modules) {
+      const module = scores.get(association.id);
+      if (!module || (association.requires && !association.requires.some((phrase) => phraseMatch(words, phrase)))) continue;
+      const score = Math.round(association.score * quality);
+      if (score >= module.score) scores.set(module.id, {
+        ...module, score, stage: association.stage,
+        description: association.description || module.description,
+      });
+    }
+  }
+  return [...scores.values()].filter((module) => module.score >= MIN_RECOMMENDATION_SCORE).sort(compareRecommendations);
+}
+
+function compareRecommendations(left, right) {
+  return right.score - left.score || left.label.localeCompare(right.label, 'fr');
+}
+
+export function needsProblemFallback(recommendations) {
+  return !recommendations.some((module) => module.score >= LOCAL_RELEVANCE_THRESHOLD);
+}
+
+export function mergeProblemRecommendations(local, remote, access) {
+  const available = new Map(getAvailableProblemModules(access).map((module) => [module.id, module]));
+  const merged = new Map();
+  for (const result of [...local, ...remote]) {
+    const module = available.get(result?.id);
+    if (!module || !Number.isFinite(result.score) || result.score < MIN_RECOMMENDATION_SCORE) continue;
+    const score = Math.min(120, result.score);
+    const previous = merged.get(module.id);
+    if (!previous || score > previous.score) merged.set(module.id, {
+      ...module, score,
+      description: local.find((item) => item.id === module.id)?.description || module.description,
+    });
+  }
+  return [...merged.values()].sort(compareRecommendations);
 }
 
 export function getRelevanceLabel(score) {
