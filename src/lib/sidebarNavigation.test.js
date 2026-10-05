@@ -1,17 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getActiveSidebarCategory, getSidebarCategories, isSidebarItemActive, SIDEBAR_CATEGORIES } from './sidebarNavigation.js';
+import { getActiveSidebarCategory, getSidebarCategories, getSidebarPermanentItems, getSidebarTopItems, isSidebarItemActive, SIDEBAR_PERMANENT_PATHS } from './sidebarNavigation.js';
 
 const expectedPaths = [
-  ['/', '/guide-resolution', '/kpis', '/planning', '/pdca', '/management-reviews'],
-  ['/documents', '/procedures', '/capas', '/nonconforming-outputs', '/audits', '/complaints', '/customer-satisfaction', '/my-approvals'],
+  ['/guide-resolution', '/kpis', '/planning', '/pdca', '/management-reviews'],
+  ['/documents', '/procedures', '/capas', '/nonconforming-outputs', '/audits', '/complaints', '/customer-satisfaction', '/my-approvals', '/quality-policy'],
   ['/risks', '/accidents', '/haccp', '/qqoqccp'],
-  ['/trainings', '/employees', '/suppliers'],
-  ['/quality-policy'],
-  ['/services', '/settings', '/prise-en-main'],
+  ['/trainings', '/employees', '/services', '/suppliers'],
 ];
 const alwaysVisiblePaths = ['/quality-policy', '/settings', '/guide-resolution', '/prise-en-main'];
-const items = expectedPaths.flat().map((to) => ({
+const items = ['/', ...expectedPaths.flat(), ...SIDEBAR_PERMANENT_PATHS].map((to) => ({
   to,
   ...(alwaysVisiblePaths.includes(to)
     ? { alwaysVisible: true }
@@ -22,8 +20,15 @@ const items = expectedPaths.flat().map((to) => ({
 test('all sidebar links occur exactly once in the requested order', () => {
   const categories = getSidebarCategories(items, { role: 'admin' });
   assert.deepEqual(categories.map((category) => category.items.map((item) => item.to)), expectedPaths);
-  assert.equal(new Set(categories.flatMap((category) => category.items.map((item) => item.to))).size, 25);
-  assert.equal(categories.length, 6);
+  const permanentItems = getSidebarPermanentItems(items, { role: 'admin' });
+  assert.deepEqual(permanentItems.map((item) => item.to), ['/settings', '/prise-en-main']);
+  const topItems = getSidebarTopItems(items, { role: 'admin' });
+  assert.deepEqual(topItems.map((item) => item.to), ['/']);
+  const allItems = [...topItems, ...categories.flatMap((category) => category.items), ...permanentItems];
+  assert.equal(allItems.length, 25);
+  assert.equal(new Set(allItems.map((item) => item.to)).size, 25);
+  assert.equal(categories.length, 4);
+  assert.deepEqual(categories.map((category) => category.label), ['PILOTAGE', 'QUALITÉ', 'RISQUES & SÉCURITÉ', 'RESSOURCES']);
 });
 
 test('active category follows every module, including details and nested tools', () => {
@@ -40,7 +45,14 @@ test('active category follows every module, including details and nested tools',
   assert.equal(getActiveSidebarCategory(categories, '/haccp/today'), 'risques');
   assert.equal(getActiveSidebarCategory(categories, '/kpis/modules'), 'pilotage');
   assert.equal(getActiveSidebarCategory(categories, '/guide-resolution'), 'pilotage');
+  assert.equal(getActiveSidebarCategory(categories, '/services'), 'ressources');
+  assert.equal(getActiveSidebarCategory(categories, '/quality-policy'), 'qualite');
   assert.equal(getActiveSidebarCategory(categories, '/unknown'), undefined);
+  assert.equal(getActiveSidebarCategory(categories, '/'), undefined);
+  for (const path of SIDEBAR_PERMANENT_PATHS) {
+    assert.equal(getActiveSidebarCategory(categories, path), undefined);
+    assert.equal(getActiveSidebarCategory(categories, `${path}/example-id`), undefined);
+  }
 });
 
 test('active links use path boundaries and Dashboard matches only the root', () => {
@@ -54,7 +66,10 @@ test('visibility rules preserve role/user restrictions and always-visible links'
   for (const role of ['admin', 'manager', 'member']) {
     const categories = getSidebarCategories(items, { role, visibleMenuKeys: ['documents', 'trainings'] });
     assert.deepEqual(categories.flatMap((category) => category.items.map((item) => item.to)), [
-      '/guide-resolution', '/documents', '/trainings', '/quality-policy', '/settings', '/prise-en-main',
+      '/guide-resolution', '/documents', '/quality-policy', '/trainings',
+    ]);
+    assert.deepEqual(getSidebarPermanentItems(items, { role, visibleMenuKeys: ['documents', 'trainings'] }).map((item) => item.to), [
+      '/settings', '/prise-en-main',
     ]);
     assert.equal(categories.some((category) => category.id === 'risques'), false);
   }
@@ -69,6 +84,17 @@ test('disabled company modules stay hidden even when their menu key is visible',
   assert.equal(categories.some((category) => category.items.some((item) => item.to === '/documents')), false);
   assert.equal(getActiveSidebarCategory(categories, '/documents/id'), undefined);
   assert.equal(getActiveSidebarCategory(categories, '/trainings/matrix'), 'ressources');
+  assert.deepEqual(getSidebarPermanentItems(items, {
+    role: 'admin',
+    visibleMenuKeys: ['services'],
+    appModules: { services: false },
+  }).map((item) => item.to), ['/settings', '/prise-en-main']);
+  const disabledServices = getSidebarCategories(items, {
+    role: 'admin',
+    visibleMenuKeys: ['services'],
+    appModules: { services: false },
+  });
+  assert.equal(getActiveSidebarCategory(disabledServices, '/services'), undefined);
 });
 
 test('legacy hidden groups and admin-only rules are preserved', () => {
@@ -79,13 +105,27 @@ test('legacy hidden groups and admin-only rules are preserved', () => {
   ];
   for (const role of ['manager', 'member']) {
     const categories = getSidebarCategories(additionalItems, { role });
-    assert.equal(categories.flatMap((category) => category.items).length, 25);
+    assert.equal(categories.flatMap((category) => category.items).length, 22);
+    assert.equal(getSidebarPermanentItems(additionalItems, { role }).length, 2);
   }
   const adminCategories = getSidebarCategories(additionalItems, { role: 'admin' });
-  assert.equal(adminCategories.flatMap((category) => category.items).length, 26);
+  assert.equal(adminCategories.flatMap((category) => category.items).length, 23);
+  assert.equal(getSidebarPermanentItems(additionalItems, { role: 'admin' }).length, 2);
 });
 
-test('empty categories disappear but Administration remains for logout', () => {
+test('empty categories disappear without an Administration accordion', () => {
   const categories = getSidebarCategories([], { role: 'member', visibleMenuKeys: [] });
-  assert.deepEqual(categories, [{ ...SIDEBAR_CATEGORIES[5], items: [] }]);
+  assert.deepEqual(categories, []);
+  assert.deepEqual(getSidebarPermanentItems([], { role: 'member', visibleMenuKeys: [] }), []);
+  assert.deepEqual(getSidebarTopItems([], { role: 'member', visibleMenuKeys: [] }), []);
+});
+
+test('pinned Dashboard preserves menu and company visibility rules', () => {
+  for (const role of ['admin', 'manager', 'member']) {
+    assert.equal(getSidebarTopItems(items, { role, visibleMenuKeys: ['dashboard'] }).length, 1);
+    assert.deepEqual(getSidebarTopItems(items, { role, visibleMenuKeys: [] }), []);
+    assert.deepEqual(getSidebarTopItems(items, {
+      role, visibleMenuKeys: ['dashboard'], appModules: { dashboard: false },
+    }), []);
+  }
 });

@@ -47,7 +47,7 @@ import NotificationBell from './NotificationBell.jsx';
 import AppLogo from './AppLogo.jsx';
 import AiQuotaBar from './AiQuotaBar.jsx';
 import { APP_MODULE_LABELS } from '../lib/appModules.jsx';
-import { getActiveSidebarCategory, getSidebarCategories } from '../lib/sidebarNavigation.js';
+import { getActiveSidebarCategory, getSidebarCategories, getSidebarPermanentItems, getSidebarTopItems } from '../lib/sidebarNavigation.js';
 
 // Déconnexion automatique après une heure sans interaction (souris, clavier, scroll, tactile) —
 // voir useInactivityLogout.js.
@@ -274,7 +274,7 @@ export const NAV_ITEMS = [
   // seulement admin (voir alwaysVisible dans le filtre ci-dessous) : une page d'aide doit
   // rester joignable quel que soit ce que l'admin a caché pour ce rôle.
   { to: '/guide-resolution', label: 'Guide de résolution', icon: Lightbulb, alwaysVisible: true },
-  { to: '/prise-en-main', label: 'Prise en main', icon: BookOpen, alwaysVisible: true },
+  { to: '/prise-en-main', label: 'Aide & prise en main', icon: BookOpen, alwaysVisible: true },
   // Configurables comme les autres (Paramètres > Visibilité), mais masquées par défaut pour
   // manager/member tant que l'admin n'a rien changé (voir DEFAULT_HIDDEN_FOR_ROLE côté
   // backend) — leurs données GET sont déjà ouvertes à tous les rôles, seules les mutations
@@ -339,11 +339,14 @@ export default function Layout() {
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
-  const sidebarCategories = getSidebarCategories(NAV_ITEMS, {
+  const sidebarOptions = {
     role,
     appModules: tenant?.app_modules,
     visibleMenuKeys,
-  });
+  };
+  const sidebarCategories = getSidebarCategories(NAV_ITEMS, sidebarOptions);
+  const permanentItems = getSidebarPermanentItems(NAV_ITEMS, sidebarOptions);
+  const topItems = getSidebarTopItems(NAV_ITEMS, sidebarOptions);
   const activeCategoryId = getActiveSidebarCategory(sidebarCategories, location.pathname);
   const now = useNow();
   const timeZone = tenant?.timezone || 'UTC';
@@ -379,6 +382,11 @@ export default function Layout() {
   const dateLabel = new Intl.DateTimeFormat('fr-FR', { timeZone, day: 'numeric', month: 'long', year: 'numeric' }).format(now);
 
   useEffect(() => {
+    if (!activeCategoryId) return;
+    setExpandedCategories((prev) => new Set([...prev, activeCategoryId]));
+  }, [activeCategoryId, location.pathname]);
+
+  useEffect(() => {
     api
       .get('/workflows/mine')
       .then(({ data }) => setPendingApprovalsCount(data.length))
@@ -391,15 +399,25 @@ export default function Layout() {
 
   useEffect(() => {
     if (!isMenuOpen) return;
+    const mobileQuery = window.matchMedia('(max-width: 767px)');
+    const previousOverflow = document.body.style.overflow;
+    function updateScrollLock() {
+      document.body.style.overflow = mobileQuery.matches ? 'hidden' : previousOverflow;
+    }
+    updateScrollLock();
+    mobileQuery.addEventListener('change', updateScrollLock);
     function handleKeyDown(event) {
       if (event.key === 'Escape') setIsMenuOpen(false);
     }
     document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      mobileQuery.removeEventListener('change', updateScrollLock);
+      document.body.style.overflow = previousOverflow;
+    };
   }, [isMenuOpen]);
 
   function toggleCategory(id) {
-    if (id === activeCategoryId) return;
     setExpandedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -419,7 +437,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 md:flex">
+    <div className="relative min-h-screen bg-slate-50 md:flex">
       <header className="sticky top-0 z-30 flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
         <div className="flex min-w-0 items-center gap-2">
           {logoUrl ? (
@@ -449,11 +467,11 @@ export default function Layout() {
 
       <aside
         id="sidebar-navigation"
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col overflow-y-auto overflow-x-hidden bg-primary text-white transition-transform duration-200 ease-in-out md:sticky md:top-0 md:h-screen md:translate-x-0 ${
-          isMenuOpen ? 'translate-x-0' : '-translate-x-full invisible md:visible'
+        className={`fixed inset-y-0 left-0 z-50 h-dvh w-64 shrink-0 flex-col overflow-hidden bg-primary text-white md:sticky md:top-0 md:flex md:self-start ${
+          isMenuOpen ? 'flex' : 'hidden'
         }`}
       >
-        <div className="flex items-center justify-between px-6 py-5">
+        <div className="flex shrink-0 items-center justify-between px-6 py-5">
           <div className="flex min-w-0 items-center gap-2">
             {logoUrl ? (
               <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 rounded bg-white/10 object-contain p-0.5" />
@@ -480,13 +498,13 @@ export default function Layout() {
           </div>
         </div>
 
-        <div className="mx-3 mb-3 flex items-baseline gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white/80">
+        <div className="mx-3 mb-3 flex shrink-0 items-baseline gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white/80">
           <span className="text-base font-semibold tabular-nums text-white">{timeLabel}</span>
           <span className="truncate text-xs capitalize">{dateLabel}</span>
         </div>
 
         {currentUser && (
-          <div className="mx-3 mb-3 flex items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2.5">
+          <div className="mx-3 mb-3 flex shrink-0 items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2.5">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">
               {initialsOf(currentUser.full_name)}
             </div>
@@ -499,10 +517,29 @@ export default function Layout() {
           </div>
         )}
 
-        <nav aria-label="Navigation principale" className="flex-1 space-y-2 px-3 pb-6">
+        <nav aria-label="Navigation principale" className="flex min-h-0 flex-1 flex-col px-3 pb-3">
+          <div className="mb-2 shrink-0 space-y-1">
+            {topItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={closeMenu}
+                className={({ isActive }) =>
+                  `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
+                    isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`
+                }
+              >
+                <item.icon size={20} className="shrink-0" />
+                <span className="min-w-0 flex-1">{item.label}</span>
+              </NavLink>
+            ))}
+          </div>
+          <div className="sidebar-scroll-area min-h-0 flex-1 space-y-2 overflow-x-hidden overflow-y-auto overscroll-y-contain">
           {sidebarCategories.map((category) => {
             const active = category.id === activeCategoryId;
-            const expanded = active || expandedCategories.has(category.id);
+            const expanded = expandedCategories.has(category.id);
             return (
               <section key={category.id} className="border-t border-white/10 pt-1">
                 <button
@@ -510,8 +547,6 @@ export default function Layout() {
                   onClick={() => toggleCategory(category.id)}
                   aria-expanded={expanded}
                   aria-controls={`sidebar-${category.id}`}
-                  aria-disabled={active}
-                  title={active ? 'La catégorie du module actif reste ouverte' : undefined}
                   className={`flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold leading-relaxed transition-colors ${
                     active ? 'text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
@@ -541,33 +576,48 @@ export default function Layout() {
                       )}
                     </NavLink>
                   ))}
-                  {category.id === 'administration' && (
-                    <>
-                      {currentUser?.is_super_admin && (
-                        <NavLink
-                          to="/super-admin"
-                          onClick={closeMenu}
-                          className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-                        >
-                          <ShieldCheck size={20} className="shrink-0" />
-                          Super Admin
-                        </NavLink>
-                      )}
-                      <button
-                        type="button"
-                        onClick={handleLogout}
-                        disabled={isLoggingOut}
-                        className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
-                      >
-                        {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
-                        {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
-                      </button>
-                    </>
-                  )}
                 </div>
               </section>
             );
           })}
+          </div>
+          <div className="mt-2 shrink-0 space-y-1 border-t border-white/10 pt-2">
+            {permanentItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                onClick={closeMenu}
+                className={({ isActive }) =>
+                  `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
+                    isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                  }`
+                }
+              >
+                <item.icon size={20} className="shrink-0" />
+                <span className="min-w-0 flex-1">{item.label}</span>
+              </NavLink>
+            ))}
+            {currentUser?.is_super_admin && (
+              <NavLink
+                to="/super-admin"
+                onClick={closeMenu}
+                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+              >
+                <ShieldCheck size={20} className="shrink-0" />
+                Super Admin
+              </NavLink>
+            )}
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
+            >
+              {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
+              {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
+            </button>
+          </div>
         </nav>
       </aside>
 
