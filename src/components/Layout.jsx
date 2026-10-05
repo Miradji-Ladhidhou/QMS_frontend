@@ -478,7 +478,9 @@ export default function Layout() {
             ) : (
               <AppLogo className="h-8 w-8 shrink-0 rounded" />
             )}
-            <span className="truncate text-xl font-semibold">{tenant?.name || 'QMS SaaS'}</span>
+            <span title={tenant?.name || 'QMS SaaS'} className="min-w-0 flex-1 break-words text-base font-semibold leading-tight">
+              {tenant?.name || 'QMS SaaS'}
+            </span>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <button
@@ -500,7 +502,7 @@ export default function Layout() {
 
         <div className="mx-3 mb-3 flex shrink-0 items-baseline gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white/80">
           <span className="text-base font-semibold tabular-nums text-white">{timeLabel}</span>
-          <span className="truncate text-xs capitalize">{dateLabel}</span>
+          <span title={dateLabel} className="truncate text-xs capitalize">{dateLabel}</span>
         </div>
 
         {currentUser && (
@@ -509,7 +511,7 @@ export default function Layout() {
               {initialsOf(currentUser.full_name)}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-medium text-white">{currentUser.full_name}</p>
+              <p title={currentUser.full_name} className="truncate text-sm font-medium text-white">{currentUser.full_name}</p>
               {/* Le nom de l'entreprise est déjà affiché en haut à côté du logo — pas la peine
                   de le répéter ici, cette carte ne porte plus que l'identité de la personne. */}
               <p className="truncate text-xs text-white/60">{ROLE_LABELS[currentUser.role] || currentUser.role}</p>
