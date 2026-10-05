@@ -1,5 +1,5 @@
 import { Suspense, useEffect, useState } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   BookOpen,
@@ -46,6 +46,7 @@ import NotificationBell from './NotificationBell.jsx';
 import AppLogo from './AppLogo.jsx';
 import AiQuotaBar from './AiQuotaBar.jsx';
 import { APP_MODULE_LABELS } from '../lib/appModules.jsx';
+import { getActiveSidebarCategory, getSidebarCategories } from '../lib/sidebarNavigation.js';
 
 // Déconnexion automatique après une heure sans interaction (souris, clavier, scroll, tactile) —
 // voir useInactivityLogout.js.
@@ -100,6 +101,8 @@ function initialsOf(fullName) {
 // adminOnly n'ont pas besoin de key : réservées à l'admin de façon fixe, jamais configurables.
 // Exporté pour MenuVisibilitySettings.jsx (Paramètres > Visibilité), qui a besoin des mêmes
 // libellés/icônes pour lister les sections configurables sans les redéfinir à côté.
+// Les catégories utilisent uniquement les liens individuels visibles de ce catalogue ;
+// leur ordre et leur regroupement sont définis dans sidebarNavigation.js.
 export const NAV_ITEMS = [
   { key: 'dashboard', to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { key: 'planning', to: '/planning', label: 'Planning', icon: CalendarClock },
@@ -114,10 +117,8 @@ export const NAV_ITEMS = [
   // caché pour un rôle, y compris si 'documents', 'procedures' ou 'my-approvals' sont masqués —
   // DocumentsHub.jsx n'affiche alors plus que l'onglet Politique qualité. Voir aussi le
   // commentaire équivalent sur 'prise-en-main' plus bas.
-  // matchPaths : NavLink ne matche que sur `to`, donc changer d'onglet dans DocumentsHub.jsx
-  // (vers /procedures, /my-approvals ou /quality-policy) faisait perdre la surbrillance de ce
-  // lien puisque l'URL ne commence plus par /documents — voir isNavItemActive ci-dessous, qui
-  // remplace la détection automatique de NavLink par ces chemins connus.
+  // matchPaths : métadonnées historiques du lien fusionné, masqué dans le menu actuel.
+  // Chaque module possède désormais son lien et utilise la détection native de NavLink.
   // children : mêmes onglets que DocumentsHub.jsx#TABS (to/label/icon/menuKey identiques) —
   // affichés en sous-menu dépliable pour qu'on sache ce qu'il y a dans "Documents" sans avoir
   // à l'ouvrir, et pour sauter directement sur un onglet. quality-policy sans menuKey : jamais
@@ -294,16 +295,6 @@ export const NAV_ITEMS = [
   { to: '/settings', label: 'Paramètres', icon: Settings, alwaysVisible: true },
 ];
 
-// Remplace la détection d'activation automatique de NavLink (qui ne compare que `to`) pour les
-// liens fusionnés ci-dessus : un onglet de page fusionnée (ex. /procedures dans DocumentsHub.jsx)
-// doit garder en surbrillance le lien de menu qui l'a ouvert (ex. "Documents") même si son URL
-// ne commence pas par /documents. `end` (Dashboard uniquement) reste une comparaison stricte.
-function isNavItemActive(item, pathname) {
-  if (item.end) return pathname === item.to;
-  const paths = item.matchPaths || [item.to];
-  return paths.some((path) => pathname === path || pathname.startsWith(`${path}/`));
-}
-
 export default function Layout() {
   useInactivityLogout(INACTIVITY_TIMEOUT_MS);
   useEffect(() => {
@@ -342,15 +333,16 @@ export default function Layout() {
   const logoUrl = getTenantLogoPublicUrl(tenant?.logo_url);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
-  // Sous-menus des pages fusionnées : par défaut un groupe se déplie tout seul quand on est
-  // dessus (voir isGroupExpanded) — mais un clic sur le chevron doit pouvoir aussi bien l'ouvrir
-  // que le refermer, y compris sur le groupe actif. `to` -> booléen explicite qui prime alors
-  // sur ce comportement par défaut (Map plutôt que Set : true = forcé ouvert, false = forcé
-  // fermé, absent = comportement par défaut).
-  const [groupOverrides, setGroupOverrides] = useState(() => new Map());
+  const [expandedCategories, setExpandedCategories] = useState(() => new Set());
   const [pendingApprovalsCount, setPendingApprovalsCount] = useState(0);
   const navigate = useNavigate();
   const location = useLocation();
+  const sidebarCategories = getSidebarCategories(NAV_ITEMS, {
+    role,
+    appModules: tenant?.app_modules,
+    visibleMenuKeys,
+  });
+  const activeCategoryId = getActiveSidebarCategory(sidebarCategories, location.pathname);
   const now = useNow();
   const timeZone = tenant?.timezone || 'UTC';
   const routeModule = Object.entries({
@@ -395,21 +387,21 @@ export default function Layout() {
     setIsMenuOpen(false);
   }
 
-  // Par défaut, un groupe se déplie tout seul quand on est sur une de ses pages — mais un choix
-  // explicite (chevron cliqué) prime toujours dessus, sinon un groupe actif ne pouvait plus se
-  // refermer (isNavItemActive restant vrai quoi qu'on fasse tant qu'on n'a pas changé de page).
-  function isGroupExpanded(item) {
-    if (groupOverrides.has(item.to)) return groupOverrides.get(item.to);
-    return isNavItemActive(item, location.pathname);
-  }
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    function handleKeyDown(event) {
+      if (event.key === 'Escape') setIsMenuOpen(false);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isMenuOpen]);
 
-  function toggleGroup(event, item) {
-    event.preventDefault();
-    event.stopPropagation();
-    const currentlyExpanded = isGroupExpanded(item);
-    setGroupOverrides((prev) => {
-      const next = new Map(prev);
-      next.set(item.to, !currentlyExpanded);
+  function toggleCategory(id) {
+    if (id === activeCategoryId) return;
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -445,7 +437,7 @@ export default function Layout() {
             <RefreshCw size={20} />
           </button>
           <NotificationBell variant="mobile" />
-          <button type="button" onClick={() => setIsMenuOpen(true)} aria-label="Ouvrir le menu" className="-mr-2 p-2">
+          <button type="button" onClick={() => setIsMenuOpen(true)} aria-label="Ouvrir le menu" aria-expanded={isMenuOpen} aria-controls="sidebar-navigation" className="-mr-2 flex min-h-11 min-w-11 items-center justify-center p-2">
             <Menu size={24} />
           </button>
         </div>
@@ -454,8 +446,9 @@ export default function Layout() {
       {isMenuOpen && <div className="fixed inset-0 z-40 bg-black/40 md:hidden" onClick={closeMenu} />}
 
       <aside
+        id="sidebar-navigation"
         className={`fixed inset-y-0 left-0 z-50 flex w-64 shrink-0 flex-col overflow-y-auto overflow-x-hidden bg-primary text-white transition-transform duration-200 ease-in-out md:sticky md:top-0 md:h-screen md:translate-x-0 ${
-          isMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          isMenuOpen ? 'translate-x-0' : '-translate-x-full invisible md:visible'
         }`}
       >
         <div className="flex items-center justify-between px-6 py-5">
@@ -479,7 +472,7 @@ export default function Layout() {
             <div className="hidden md:block">
               <NotificationBell variant="sidebar" />
             </div>
-            <button type="button" onClick={closeMenu} aria-label="Fermer le menu" className="p-1 md:hidden">
+            <button type="button" onClick={closeMenu} aria-label="Fermer le menu" className="flex min-h-11 min-w-11 items-center justify-center p-2 md:hidden">
               <X size={22} />
             </button>
           </div>
@@ -504,124 +497,76 @@ export default function Layout() {
           </div>
         )}
 
-        <nav className="flex-1 space-y-1 px-3">
-          {NAV_ITEMS.filter(
-            (item) =>
-              !item.hiddenFromSidebar &&
-              (!item.adminOnly || role === 'admin') &&
-              (!item.key || tenant?.app_modules?.[item.key] !== false) &&
-              (item.adminOnly || item.alwaysVisible || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
-          ).map((item) => {
-            // Un onglet de page fusionnée dont la clé de visibilité est masquée pour ce rôle ne
-            // doit pas apparaître dans le sous-menu — même filtre que ce que la page fusionnée
-            // elle-même applique à ses propres onglets (voir ex. DocumentsHub.jsx#visibleTabs).
-            const visibleChildren = item.children?.filter(
-              (child) =>
-                (!child.menuKey || tenant?.app_modules?.[child.menuKey] !== false) &&
-                (!child.menuKey || !visibleMenuKeys || visibleMenuKeys.includes(child.menuKey))
-            );
-            // Sous-menu inutile s'il ne resterait qu'un seul onglet visible (le lien principal
-            // y mène déjà) — repli silencieux sur un lien simple dans ce cas.
-            const hasGroup = visibleChildren && (
-              visibleChildren.length > 1 || visibleChildren.some((child) => !child.menuKey)
-            );
-            const expanded = hasGroup && isGroupExpanded(item);
-
+        <nav aria-label="Navigation principale" className="flex-1 space-y-2 px-3 pb-6">
+          {sidebarCategories.map((category) => {
+            const active = category.id === activeCategoryId;
+            const expanded = active || expandedCategories.has(category.id);
             return (
-              <div key={item.to}>
-                <div
-                  className={`flex items-center rounded-md text-sm font-medium transition-colors ${hasGroup ? 'pr-1' : ''} ${
-                    isNavItemActive(item, location.pathname) ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+              <section key={category.id} className="border-t border-white/10 pt-1">
+                <button
+                  type="button"
+                  onClick={() => toggleCategory(category.id)}
+                  aria-expanded={expanded}
+                  aria-controls={`sidebar-${category.id}`}
+                  aria-disabled={active}
+                  title={active ? 'La catégorie du module actif reste ouverte' : undefined}
+                  className={`flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold leading-relaxed transition-colors ${
+                    active ? 'text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
                 >
-                  <NavLink to={item.to} end={item.end} onClick={closeMenu} className="flex flex-1 items-center gap-3 px-3 py-2.5">
-                    <item.icon size={20} />
-                    <span className="flex-1">{item.label}</span>
-                    {item.to === '/my-approvals' && pendingApprovalsCount > 0 && (
-                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
-                        {pendingApprovalsCount}
-                      </span>
-                    )}
-                  </NavLink>
-                  {hasGroup && (
-                    <button
-                      type="button"
-                      onClick={(event) => toggleGroup(event, item)}
-                      aria-label={expanded ? `Réduire ${item.label}` : `Voir le contenu de ${item.label}`}
-                      aria-expanded={expanded}
-                      className="shrink-0 rounded-md p-1.5 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+                  <span className="flex-1">{category.label}</span>
+                  {expanded ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
+                </button>
+                <div id={`sidebar-${category.id}`} hidden={!expanded} className="space-y-1">
+                  {category.items.map((item) => (
+                    <NavLink
+                      key={item.to}
+                      to={item.to}
+                      end={item.end}
+                      onClick={closeMenu}
+                      className={({ isActive }) =>
+                        `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
+                          isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                        }`
+                      }
                     >
-                      {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-                    </button>
+                      <item.icon size={20} className="shrink-0" />
+                      <span className="min-w-0 flex-1">{item.label}</span>
+                      {item.to === '/my-approvals' && pendingApprovalsCount > 0 && (
+                        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
+                          {pendingApprovalsCount}
+                        </span>
+                      )}
+                    </NavLink>
+                  ))}
+                  {category.id === 'administration' && (
+                    <>
+                      {currentUser?.is_super_admin && (
+                        <NavLink
+                          to="/super-admin"
+                          onClick={closeMenu}
+                          className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                        >
+                          <ShieldCheck size={20} className="shrink-0" />
+                          Super Admin
+                        </NavLink>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleLogout}
+                        disabled={isLoggingOut}
+                        className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
+                      >
+                        {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
+                        {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
+                      </button>
+                    </>
                   )}
                 </div>
-
-                {expanded && (
-                  // Panneau creusé (bg-black/15) plutôt qu'un simple filet vertical : l'ancien
-                  // rendu réutilisait les mêmes teintes que le lien parent (bg-white/15 sur
-                  // actif, text-white/70-80 sinon), rendant les deux niveaux difficiles à
-                  // distinguer d'un coup d'œil. L'onglet actif devient une pastille blanche
-                  // pleine (texte couleur primaire, même traitement que le badge de
-                  // "Mes approbations" ci-dessus) — nettement différente du surlignage
-                  // translucide du lien parent, pour qu'on distingue "la section" de
-                  // "l'onglet précis" dans la section.
-                  <div className="mt-1 space-y-0.5 rounded-lg bg-black/15 p-1">
-                    {visibleChildren.map((child) => (
-                      <NavLink
-                        key={child.to}
-                        to={child.to}
-                        onClick={closeMenu}
-                        className={({ isActive }) =>
-                          `flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors ${
-                            isActive ? 'bg-white text-primary font-medium shadow-sm' : 'text-white/60 hover:bg-white/10 hover:text-white'
-                          }`
-                        }
-                      >
-                        {({ isActive }) => (
-                          <>
-                            <child.icon size={16} />
-                            <span className="flex-1">{child.label}</span>
-                            {child.to === '/my-approvals' && pendingApprovalsCount > 0 && (
-                              <span
-                                className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
-                                  isActive ? 'bg-primary text-white' : 'bg-white text-primary'
-                                }`}
-                              >
-                                {pendingApprovalsCount}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </NavLink>
-                    ))}
-                  </div>
-                )}
-              </div>
+              </section>
             );
           })}
         </nav>
-
-        <div className="space-y-1 px-3 pb-6 pt-3">
-          {currentUser?.is_super_admin && (
-            <Link
-              to="/super-admin"
-              onClick={closeMenu}
-              className="flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
-            >
-              <ShieldCheck size={20} />
-              Super Admin
-            </Link>
-          )}
-          <button
-            type="button"
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
-          >
-            {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
-            {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
-          </button>
-        </div>
       </aside>
 
       <main className="min-w-0 flex-1 px-4 py-4 sm:px-6 md:px-8 md:py-6">
