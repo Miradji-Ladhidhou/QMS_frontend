@@ -527,7 +527,7 @@ export default function Layout() {
                 onClick={closeMenu}
                 className={({ isActive }) =>
                   `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                    isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
@@ -548,7 +548,9 @@ export default function Layout() {
                   aria-expanded={expanded}
                   aria-controls={`sidebar-${category.id}`}
                   className={`flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold leading-relaxed transition-colors ${
-                    active ? 'text-white' : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    expanded ? 'sticky top-0 z-10 shadow-md' : ''
+                  } ${
+                    active ? 'bg-primary-500 text-white' : 'bg-primary text-white/70 hover:bg-primary-500 hover:text-white'
                   }`}
                 >
                   <span className="flex-1">{category.label}</span>
@@ -563,7 +565,7 @@ export default function Layout() {
                       onClick={closeMenu}
                       className={({ isActive }) =>
                         `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                          isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                          isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
                         }`
                       }
                     >
@@ -590,7 +592,7 @@ export default function Layout() {
                 onClick={closeMenu}
                 className={({ isActive }) =>
                   `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                    isActive ? 'bg-white/15 text-white' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
