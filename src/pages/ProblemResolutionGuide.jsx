@@ -12,7 +12,6 @@ import {
   Lightbulb,
   MessageSquareWarning,
   PackageX,
-  Search,
   ShieldAlert,
   Siren,
   Smile,
@@ -25,8 +24,8 @@ import { Link } from 'react-router-dom';
 import { getRelevanceLabel } from '../lib/problemGuide.js';
 import { useMenuVisibility } from '../lib/useMenuVisibility.js';
 import { useTenant } from '../lib/useTenant.js';
-import { useCurrentUser } from '../lib/useCurrentUser.js';
-import { useProblemSearch } from '../lib/useProblemSearch.js';
+import { getSectorProblems, getSectorRecommendations, PROBLEM_SECTORS } from '../lib/problemSectorCatalog.js';
+import { getSectorProblemGuide } from '../lib/problemSectorGuides.js';
 
 const MODULE_ICONS = {
   complaints: MessageSquareWarning,
@@ -48,20 +47,19 @@ const MODULE_ICONS = {
   haccp: Thermometer,
 };
 
-const EXAMPLES = [
-  { label: 'Retard de livraison', query: 'Nous avons beaucoup de retards de livraison' },
-  { label: 'Réclamation', query: 'J’ai reçu une réclamation client' },
-  { label: 'Non-conformité', query: 'Un produit est non conforme' },
-  { label: 'Risque', query: 'Nous avons identifié un risque' },
-  { label: 'Formation', query: 'Un salarié doit être formé' },
-];
-
 export default function ProblemResolutionGuide() {
-  const [query, setQuery] = useState('');
+  const [sectorId, setSectorId] = useState('');
+  const [problemId, setProblemId] = useState('');
   const tenant = useTenant();
-  const user = useCurrentUser();
   const visibleMenuKeys = useMenuVisibility();
-  const { ready: hasAccessData, recommendations, pending, error, retry } = useProblemSearch(query, tenant, user, visibleMenuKeys);
+  const hasAccessData = Boolean(tenant) && Array.isArray(visibleMenuKeys);
+  const problems = getSectorProblems(sectorId);
+  const recommendations = hasAccessData
+    ? getSectorRecommendations(sectorId, problemId, { appModules: tenant.app_modules, visibleMenuKeys })
+    : [];
+  const guide = hasAccessData
+    ? getSectorProblemGuide(sectorId, problemId, { appModules: tenant.app_modules, visibleMenuKeys })
+    : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -71,52 +69,71 @@ export default function ProblemResolutionGuide() {
         </div>
         <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">Comment puis-je vous aider ?</h1>
         <p className="mt-2 text-slate-600">
-          Décrivez votre problème pour découvrir les modules les plus adaptés.
+          Sélectionnez votre secteur d’activité et votre problème pour découvrir les modules les plus adaptés.
         </p>
       </header>
 
-      <section aria-label="Rechercher une solution" className="mx-auto max-w-3xl">
-        <label htmlFor="problem-search" className="sr-only">Décrivez votre problème</label>
-        <div className="flex items-center gap-3 rounded-2xl border border-slate-300 bg-white px-4 shadow-sm focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20">
-          <Search className="shrink-0 text-slate-500" size={22} aria-hidden="true" />
-          <input
-            id="problem-search"
-            type="search"
-            maxLength={1200}
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Décrivez votre problème ou recherchez un sujet..."
-            className="min-h-16 min-w-0 w-full border-0 bg-transparent text-base text-slate-900 outline-none focus:ring-0"
-          />
+      <section aria-label="Choisir une situation" className="mx-auto grid max-w-3xl gap-4 lg:grid-cols-2">
+        <div className="min-w-0">
+          <label htmlFor="problem-sector" className="mb-2 block text-sm font-semibold text-slate-700">Secteur d’activité</label>
+          <select
+            id="problem-sector"
+            value={sectorId}
+            onChange={(event) => { setSectorId(event.target.value); setProblemId(''); }}
+            className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900"
+          >
+            <option value="">Sélectionnez votre secteur</option>
+            {PROBLEM_SECTORS.map((sector) => <option key={sector.id} value={sector.id}>{sector.label}</option>)}
+          </select>
         </div>
-        <div className="mt-4 flex flex-wrap justify-center gap-2" aria-label="Exemples de problèmes">
-          {EXAMPLES.map((example) => (
-            <button
-              key={example.label}
-              type="button"
-              onClick={() => setQuery(example.query)}
-              className="min-h-11 rounded-full border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition hover:border-primary hover:text-primary"
-            >
-              {example.label}
-            </button>
-          ))}
+        <div className="min-w-0">
+          <label htmlFor="problem-type" className="mb-2 block text-sm font-semibold text-slate-700">Type de problème</label>
+          <select
+            id="problem-type"
+            value={problemId}
+            disabled={!sectorId}
+            onChange={(event) => setProblemId(event.target.value)}
+            aria-describedby={!sectorId ? 'problem-type-help' : undefined}
+            className="min-h-12 w-full min-w-0 rounded-xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-900 disabled:bg-slate-100"
+          >
+            <option value="">Sélectionnez un problème</option>
+            {problems.map((problem) => <option key={problem.id} value={problem.id}>{problem.label}</option>)}
+          </select>
+          {!sectorId && <p id="problem-type-help" className="mt-2 text-sm text-slate-600">Choisissez d’abord un secteur d’activité.</p>}
         </div>
       </section>
 
-      {pending && <p role="status" className="text-center text-sm text-slate-600">Recherche en cours...</p>}
-      {error && (
-        <div role="alert" className="text-center text-sm text-slate-700">
-          <p>{error}</p>
-          <button type="button" onClick={retry} className="mt-2 min-h-11 rounded-lg border border-slate-300 bg-white px-4 py-2">
-            Réessayer
-          </button>
-        </div>
+      {guide && (
+        <section aria-label="Guide personnalisé" aria-live="polite" className="rounded-xl border border-slate-300 bg-white p-5">
+          <div className="flex items-center gap-2 text-primary">
+            <BookOpen size={22} aria-hidden="true" />
+            <h2 className="text-lg font-semibold">Votre guide pour cette situation</h2>
+          </div>
+          <p className="mt-3 text-sm leading-6 text-slate-700">{guide.introduction}</p>
+          <p className="mt-2 text-sm leading-6 text-slate-700"><strong>À réunir :</strong> {guide.facts}.</p>
+          {guide.notice && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm leading-6 text-amber-900">{guide.notice}</p>}
+          {guide.steps.length > 0 && (
+            <ol className="mt-4 space-y-3">
+              {guide.steps.map((step, index) => (
+                <li key={step.id} className="flex gap-3">
+                  <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">{index + 1}</span>
+                  <div className="min-w-0">
+                    <h3 className="text-sm font-semibold text-slate-900">{step.title}</h3>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">{step.description}</p>
+                    <Link to={step.path} className="inline-flex min-h-11 items-center py-2 text-sm font-semibold text-primary hover:underline">Ouvrir {step.label}</Link>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
       )}
+
       {!hasAccessData ? (
         <p role="status" className="text-center text-sm text-slate-600">
           Chargement des modules et de vos accès...
         </p>
-      ) : query.trim() && recommendations.length > 0 ? (
+      ) : problemId && recommendations.length > 0 ? (
         <section aria-live="polite" aria-label="Modules recommandés" className="space-y-4">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">Voici les modules qui peuvent vous aider</h2>
@@ -150,9 +167,9 @@ export default function ProblemResolutionGuide() {
             })}
           </div>
         </section>
-      ) : query.trim() && !pending && !error ? (
+      ) : problemId ? (
         <p aria-live="polite" className="rounded-xl border border-dashed border-slate-300 bg-white px-5 py-8 text-center text-slate-600">
-          Aucun module accessible ne correspond à cette recherche. Essayez avec d’autres mots.
+          Aucun module adapté à ce problème n’est accessible dans votre espace. Contactez votre administrateur pour vérifier vos accès.
         </p>
       ) : null}
     </div>
