@@ -18,7 +18,6 @@ import {
   Users,
   Users2,
 } from 'lucide-react';
-import AppLogo from '../components/AppLogo.jsx';
 
 const MODULES = [
   {
@@ -105,13 +104,14 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-white">
       <header className="border-b border-slate-100">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <div className="flex items-center gap-2">
-            <AppLogo className="h-8 w-8 rounded-lg" />
-            <span className="text-lg font-semibold text-slate-900">
-              QMS <span className="font-normal text-slate-400">SaaS</span>
-            </span>
-          </div>
+        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-4 sm:flex-row sm:px-6">
+          <img
+            src="/brand/logo-horizontal.png"
+            width={1200}
+            height={360}
+            className="h-auto w-56"
+            alt="QMS SaaS — Système de management de la qualité"
+          />
           <div className="flex items-center gap-2 sm:gap-3">
             <Link
               to="/login"

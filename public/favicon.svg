@@ -1,5 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="14" fill="#1F3864"/>
-  <circle cx="28" cy="30" r="14" fill="none" stroke="#FFFFFF" stroke-width="6"/>
-  <path d="M36 40 L45 49 L58 32" fill="none" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="12" fill="#fff"/><polygon points="51.00,28.00 54.88,30.54 53.31,37.41 48.71,38.01 47.92,39.50 50.01,43.64 45.21,48.80 40.93,47.02 39.50,47.92 39.24,52.55 32.50,54.62 29.68,50.94 28.00,51.00 25.46,54.88 18.59,53.31 17.99,48.71 16.50,47.92 12.36,50.01 7.20,45.21 8.98,40.93 8.08,39.50 3.45,39.24 1.38,32.50 5.06,29.68 5.00,28.00 1.12,25.46 2.69,18.59 7.29,17.99 8.08,16.50 5.99,12.36 10.79,7.20 15.07,8.98 16.50,8.08 16.76,3.45 23.50,1.38 26.32,5.06 28.00,5.00 30.54,1.12 37.41,2.69 38.01,7.29 39.50,8.08 43.64,5.99 48.80,10.79 47.02,15.07 47.92,16.50 52.55,16.76 54.62,23.50 50.94,26.32" fill="#1F3864"/><circle cx="28" cy="28" r="18" fill="#fff" stroke="#3C9296" stroke-width="4"/><path d="M19 28 L26 35 L39 21" fill="none" stroke="#3C9296" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/><path d="M36 36 L55 53 L48 57 L31 41 Z" fill="#1F3864"/></svg>
