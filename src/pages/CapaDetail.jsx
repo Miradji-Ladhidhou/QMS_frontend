@@ -92,6 +92,14 @@ function formatDateTime(dateStr) {
   return new Date(dateStr).toLocaleString('fr-FR');
 }
 
+function withEvidenceSelection(url, evidenceIds) {
+  if (evidenceIds === null) return url;
+  const params = new URLSearchParams();
+  evidenceIds.forEach((evidenceId) => params.append('evidenceIds', evidenceId));
+  params.append('evidenceSelection', 'true');
+  return `${url}?${params.toString()}`;
+}
+
 function CapaLifecycle({ status }) {
   const activeIndex = CAPA_LIFECYCLE_STEPS.findIndex((step) => step.key === status);
 
@@ -278,6 +286,7 @@ export default function CapaDetail() {
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
+  const [exportEvidenceIds, setExportEvidenceIds] = useState(null);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
   const [services, setServices] = useState([]);
@@ -333,6 +342,7 @@ export default function CapaDetail() {
   }
 
   useEffect(() => {
+    setExportEvidenceIds(null);
     loadCapa();
     api
       .get('/capas/priority-delays')
@@ -498,7 +508,7 @@ export default function CapaDetail() {
     setExportingPdf(true);
     setExportError('');
     try {
-      await getPdfDownload(`/capas/${id}/pdf`, `${capa.number || capa.id}.pdf`);
+      await getPdfDownload(withEvidenceSelection(`/capas/${id}/pdf`, exportEvidenceIds), `${capa.number || capa.id}.pdf`);
     } catch {
       setExportError("Impossible d'exporter cette CAPA en PDF.");
     } finally {
@@ -526,7 +536,7 @@ export default function CapaDetail() {
     setExportingWord(true);
     setExportError('');
     try {
-      await getWordDownload(`/capas/${id}/word`, `${capa.number || capa.id}.docx`);
+      await getWordDownload(withEvidenceSelection(`/capas/${id}/word`, exportEvidenceIds), `${capa.number || capa.id}.docx`);
     } catch {
       setExportError('Impossible de générer le document Word.');
     } finally {
@@ -539,7 +549,11 @@ export default function CapaDetail() {
     setExportError('');
     setDriveSuccess('');
     try {
-      await getPdfAndSaveToDrive(`/capas/${id}/pdf`, 'CAPA', `${capa.number ? `${capa.number} — ` : ''}${capa.title}`);
+      await getPdfAndSaveToDrive(
+        withEvidenceSelection(`/capas/${id}/pdf`, exportEvidenceIds),
+        'CAPA',
+        `${capa.number ? `${capa.number} — ` : ''}${capa.title}`
+      );
       setDriveSuccess('Enregistré sur le Drive partagé.');
     } catch (err) {
       setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
@@ -687,7 +701,12 @@ export default function CapaDetail() {
         </dl>
       </div>
 
-      <DriveEvidencePanel moduleKey="capas" recordId={capa.id} />
+      <DriveEvidencePanel
+        moduleKey="capas"
+        recordId={capa.id}
+        exportSelectionEnabled
+        onExportSelectionChange={setExportEvidenceIds}
+      />
 
       <form
         onSubmit={handleSaveTreatment}

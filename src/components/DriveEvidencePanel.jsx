@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Image, Loader2, Trash2, X } from 'lucide-react';
+import { Camera, Check, Image, Loader2, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 
@@ -44,7 +44,19 @@ async function normalizePhoto(file) {
   }
 }
 
-function EvidencePhotoCard({ item, moduleKey, recordId, canDelete, selected, onToggleSelection, onOpen, onDelete }) {
+function EvidencePhotoCard({
+  item,
+  moduleKey,
+  recordId,
+  canDelete,
+  selected,
+  onToggleSelection,
+  exportSelectionEnabled,
+  exportSelected,
+  onToggleExportSelection,
+  onOpen,
+  onDelete,
+}) {
   const imageRef = useRef(null);
   const [imageUrl, setImageUrl] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -146,6 +158,19 @@ function EvidencePhotoCard({ item, moduleKey, recordId, canDelete, selected, onT
           {formatSize(item.file_size)} · {new Date(item.created_at).toLocaleDateString('fr-FR')}
         </span>
       </button>
+      {exportSelectionEnabled && (
+        <button
+          type="button"
+          onClick={() => onToggleExportSelection(item.id)}
+          aria-pressed={exportSelected}
+          className={`mt-2 inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium ${
+            exportSelected ? 'bg-primary/10 text-primary' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          {exportSelected && <Check size={13} />}
+          {exportSelected ? 'Incluse dans l’export' : 'Inclure dans l’export'}
+        </button>
+      )}
     </li>
   );
 }
@@ -155,6 +180,8 @@ export default function DriveEvidencePanel({
   recordId,
   title = 'Photos de preuve',
   captionPlaceholder = 'Ex. Défaut constaté avant correction',
+  exportSelectionEnabled = false,
+  onExportSelectionChange,
 }) {
   const currentUser = useCurrentUser();
   const cameraInputRef = useRef(null);
@@ -166,6 +193,7 @@ export default function DriveEvidencePanel({
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null);
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [exportSelectedIds, setExportSelectedIds] = useState(null);
   const [deletingSelected, setDeletingSelected] = useState(false);
 
   async function loadEvidence() {
@@ -173,6 +201,7 @@ export default function DriveEvidencePanel({
     try {
       const { data } = await api.get(`/evidence/${moduleKey}/${recordId}`);
       setItems(data);
+      if (exportSelectionEnabled) setExportSelectedIds(new Set(data.map((item) => item.id)));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de charger les photos de preuve.');
     } finally {
@@ -190,6 +219,10 @@ export default function DriveEvidencePanel({
   useEffect(() => () => {
     if (preview?.owned) URL.revokeObjectURL(preview.url);
   }, [preview]);
+
+  useEffect(() => {
+    if (exportSelectionEnabled) onExportSelectionChange?.(exportSelectedIds ? [...exportSelectedIds] : null);
+  }, [exportSelectionEnabled, exportSelectedIds, onExportSelectionChange]);
 
   async function uploadPhoto(event) {
     const file = event.target.files?.[0];
@@ -209,6 +242,9 @@ export default function DriveEvidencePanel({
       form.append('caption', caption);
       const { data } = await api.post(`/evidence/${moduleKey}/${recordId}`, form);
       setItems((current) => [...current, data]);
+      if (exportSelectionEnabled) {
+        setExportSelectedIds((current) => new Set([...(current || []), data.id]));
+      }
       setCaption('');
     } catch (err) {
       setError(err.response?.data?.error || err.message || "Impossible d'envoyer cette photo sur Google Drive.");
@@ -247,6 +283,11 @@ export default function DriveEvidencePanel({
         next.delete(item.id);
         return next;
       });
+      setExportSelectedIds((current) => {
+        const next = new Set(current || []);
+        next.delete(item.id);
+        return next;
+      });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer cette photo.');
     }
@@ -254,6 +295,15 @@ export default function DriveEvidencePanel({
 
   function togglePhotoSelection(itemId) {
     setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  function toggleExportSelection(itemId) {
+    setExportSelectedIds((current) => {
       const next = new Set(current);
       if (next.has(itemId)) next.delete(itemId);
       else next.add(itemId);
@@ -281,6 +331,7 @@ export default function DriveEvidencePanel({
 
     setItems((current) => current.filter((item) => !deletedIds.has(item.id)));
     setSelectedIds((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+    setExportSelectedIds((current) => new Set([...(current || [])].filter((id) => !deletedIds.has(id))));
     if (failures.length > 0) {
       setError(`Certaines photos n’ont pas pu être supprimées : ${failures.join(' · ')}`);
     }
@@ -354,6 +405,29 @@ export default function DriveEvidencePanel({
         <p className="mt-4 text-sm text-slate-500">Aucune photo ajoutée.</p>
       ) : (
         <>
+          {exportSelectionEnabled && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md bg-slate-50 px-3 py-2">
+              <p className="text-xs text-slate-600" aria-live="polite">
+                {(exportSelectedIds?.size || 0)}/{items.length} photo{items.length > 1 ? 's' : ''} incluse{items.length > 1 ? 's' : ''} dans les exports PDF et Word
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setExportSelectedIds(new Set(items.map((item) => item.id)))}
+                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  Tout inclure
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExportSelectedIds(new Set())}
+                  className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-100"
+                >
+                  Tout exclure
+                </button>
+              </div>
+            </div>
+          )}
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
             <p className="text-xs text-slate-600" aria-live="polite">
               {selectedIds.size > 0 ? `${selectedIds.size} photo${selectedIds.size > 1 ? 's' : ''} sélectionnée${selectedIds.size > 1 ? 's' : ''}` : 'Sélectionnez des photos pour les supprimer en lot.'}
@@ -382,6 +456,9 @@ export default function DriveEvidencePanel({
               canDelete={item.uploaded_by === currentUser?.id || currentUser?.role === 'admin'}
               selected={selectedIds.has(item.id)}
               onToggleSelection={togglePhotoSelection}
+              exportSelectionEnabled={exportSelectionEnabled}
+              exportSelected={exportSelectedIds?.has(item.id) || false}
+              onToggleExportSelection={toggleExportSelection}
               onOpen={showPhoto}
               onDelete={deletePhoto}
             />
