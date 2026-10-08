@@ -27,6 +27,7 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import RiskHistoryCard from '../components/risks/RiskHistoryCard.jsx';
 import RiskLinksCard from '../components/risks/RiskLinksCard.jsx';
 import RiskMarkReviewedModal from '../components/risks/RiskMarkReviewedModal.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -856,6 +857,8 @@ export default function RiskDetail() {
           <p className={`text-sm ${risk.treatment_plan ? 'text-slate-700' : 'text-slate-400'}`}>{risk.treatment_plan || 'Aucun plan renseigné'}</p>
         </div>
       </div>
+
+      <DriveEvidencePanel moduleKey="risks" recordId={risk.id} />
 
       <div className="mt-4">
         {risk.linked_capa ? (

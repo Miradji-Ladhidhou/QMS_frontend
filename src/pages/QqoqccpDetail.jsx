@@ -19,6 +19,7 @@ import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import PageGuide from '../components/PageGuide.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 
 // Mêmes noms de champs que qqoqccp_analyses (schema.sql) et que le corps attendu par
 // PATCH /api/qqoqccp/:id — voir backend/src/routes/qqoqccp.js.
@@ -788,6 +789,8 @@ export default function QqoqccpDetail() {
           </div>
         ))}
       </div>
+
+      <DriveEvidencePanel moduleKey="qqoqccp" recordId={analysis.id} />
 
       <div className="mt-5">
         <AiModuleGate module="qqoqccp">

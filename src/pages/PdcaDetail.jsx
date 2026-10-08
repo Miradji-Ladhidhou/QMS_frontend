@@ -21,6 +21,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -884,6 +885,8 @@ export default function PdcaDetail() {
           );
         })}
       </div>
+
+      <DriveEvidencePanel moduleKey="pdca" recordId={pdca.id} />
 
       <div className="mt-4">
         {pdca.linked_capa ? (

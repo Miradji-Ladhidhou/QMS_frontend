@@ -44,7 +44,12 @@ async function normalizePhoto(file) {
   }
 }
 
-export default function DriveEvidencePanel({ moduleKey, recordId }) {
+export default function DriveEvidencePanel({
+  moduleKey,
+  recordId,
+  title = 'Photos de preuve',
+  captionPlaceholder = 'Ex. Défaut constaté avant correction',
+}) {
   const currentUser = useCurrentUser();
   const [items, setItems] = useState([]);
   const [caption, setCaption] = useState('');
@@ -127,7 +132,7 @@ export default function DriveEvidencePanel({ moduleKey, recordId }) {
     <section className="mt-5 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
       <div className="flex items-center gap-2">
         <Image size={17} className="text-slate-500" />
-        <h2 className="text-sm font-semibold text-slate-900">Photos de preuve</h2>
+        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
         <span className="text-xs text-slate-500">({items.length}/10 · Google Drive)</span>
       </div>
       <p className="mt-1 text-xs text-slate-500">Les photos sont stockées dans le Drive de l’entreprise; seules leurs métadonnées sont conservées dans QMS.</p>
@@ -141,7 +146,7 @@ export default function DriveEvidencePanel({ moduleKey, recordId }) {
             value={caption}
             onChange={(event) => setCaption(event.target.value)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary"
-            placeholder="Ex. Défaut constaté avant correction"
+            placeholder={captionPlaceholder}
           />
         </div>
         <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90 ${uploading || items.length >= 10 ? 'pointer-events-none opacity-60' : ''}`}>

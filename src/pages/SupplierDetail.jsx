@@ -19,6 +19,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 import SupplierScoreChart from '../components/suppliers/SupplierScoreChart.jsx';
 import SupplierDocumentsCard from '../components/suppliers/SupplierDocumentsCard.jsx';
 
@@ -720,6 +721,12 @@ export default function SupplierDetail() {
 
       <SupplierScoreChart evaluations={supplier.evaluations} thresholds={supplier.policy.thresholds} />
       <SupplierDocumentsCard supplierId={id} documents={supplier.documents} canManage={canManage} onChange={(documents) => setSupplier((prev) => ({ ...prev, documents }))} />
+      <DriveEvidencePanel
+        moduleKey="suppliers"
+        recordId={supplier.id}
+        title="Photos de réception et anomalies"
+        captionPlaceholder="Ex. Produit endommagé à la réception — commande ou lot"
+      />
 
       {supplier.evaluations[0]?.decision === 'to_replace' && !supplier.evaluations[0]?.linked_capa && (
         <div className="mt-4 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
@@ -782,6 +789,12 @@ export default function SupplierDetail() {
 
               {evaluation.weights && <p className="mt-2 text-xs text-slate-400">Poids : {describeWeights(evaluation.weights)}</p>}
               {evaluation.comment && <p className="mt-2 break-words text-sm text-slate-700">{evaluation.comment}</p>}
+              <DriveEvidencePanel
+                moduleKey="supplier-evaluations"
+                recordId={evaluation.id}
+                title="Photos de cette évaluation"
+                captionPlaceholder="Ex. Défaut constaté pendant l’évaluation"
+              />
 
               {evaluation.linked_capa ? (
                 <Link
