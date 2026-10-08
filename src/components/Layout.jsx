@@ -385,12 +385,12 @@ export default function Layout() {
   const dateLabel = new Intl.DateTimeFormat('fr-FR', { timeZone, day: 'numeric', month: 'long', year: 'numeric' }).format(now);
 
   useEffect(() => {
-    if (!activeCategoryId) return;
-    setExpandedCategories((prev) => (
-      window.matchMedia('(min-width: 768px)').matches
-        ? new Set([activeCategoryId])
-        : new Set([...prev, activeCategoryId])
-    ));
+    const isDesktop = window.matchMedia('(min-width: 768px)').matches;
+    if (isDesktop) {
+      setExpandedCategories(activeCategoryId ? new Set([activeCategoryId]) : new Set());
+    } else if (activeCategoryId) {
+      setExpandedCategories((prev) => new Set([...prev, activeCategoryId]));
+    }
   }, [activeCategoryId, location.pathname]);
 
   useEffect(() => {
@@ -558,7 +558,7 @@ export default function Layout() {
                 onClick={closeMenu}
                 className={({ isActive }) =>
                   `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors md:whitespace-nowrap ${
-                    isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    isActive ? 'bg-white text-primary shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
@@ -569,7 +569,6 @@ export default function Layout() {
           </div>
           <div className="sidebar-scroll-area shrink-0 space-y-2 md:flex md:min-w-max md:items-center md:gap-1 md:space-y-0">
           {sidebarCategories.map((category) => {
-            const active = category.id === activeCategoryId;
             const expanded = expandedCategories.has(category.id);
             return (
               <section key={category.id} className="border-t border-white/10 pt-1 md:border-0 md:pt-0">
@@ -579,9 +578,9 @@ export default function Layout() {
                   aria-expanded={expanded}
                   aria-controls={`sidebar-${category.id}`}
                   className={`flex min-h-11 w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs font-semibold leading-relaxed transition-colors ${
-                    expanded ? 'sticky top-0 z-10 shadow-md' : ''
-                  } ${
-                    active ? 'bg-primary-500 text-white' : 'bg-primary text-white/70 hover:bg-primary-500 hover:text-white'
+                    expanded
+                      ? 'sticky top-0 z-10 bg-primary-500 text-white shadow-md ring-1 ring-inset ring-white/30'
+                      : 'bg-primary text-white/70 hover:bg-white/10 hover:text-white'
                   }`}
                 >
                   <span className="flex-1 whitespace-nowrap">{category.label}</span>
@@ -596,7 +595,7 @@ export default function Layout() {
                       onClick={closeMenu}
                       className={({ isActive }) =>
                         `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
-                          isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                          isActive ? 'bg-white text-primary shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white'
                         }`
                       }
                     >
@@ -623,7 +622,7 @@ export default function Layout() {
                 onClick={closeMenu}
                 className={({ isActive }) =>
                   `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors md:whitespace-nowrap ${
-                    isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    isActive ? 'bg-white text-primary shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
               >
@@ -649,7 +648,7 @@ export default function Layout() {
             <nav
               key={category.id}
               aria-label={`Navigation ${category.label.toLocaleLowerCase('fr')}`}
-              className="sidebar-horizontal-scroll hidden items-center gap-1 overflow-x-auto border-t border-white/10 px-4 py-2 md:flex"
+              className="hidden flex-wrap items-center gap-1 border-t border-white/10 px-4 py-2 md:flex"
             >
               {category.items.map((item) => (
                 <NavLink
@@ -659,7 +658,7 @@ export default function Layout() {
                   onClick={closeMenu}
                   className={({ isActive }) =>
                     `flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                      isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                      isActive ? 'bg-white text-primary shadow-sm' : 'text-white/80 hover:bg-white/10 hover:text-white'
                     }`
                   }
                 >

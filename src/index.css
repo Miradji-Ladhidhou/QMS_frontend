@@ -6,15 +6,6 @@
    à lire sur les écrans mobiles ou les cartes denses. Les couleurs métier (statuts, alertes)
    restent prioritaires et ne sont pas modifiées ici. */
 @layer utilities {
-  .sidebar-horizontal-scroll {
-    scrollbar-width: none;
-    -ms-overflow-style: none;
-  }
-
-  .sidebar-horizontal-scroll::-webkit-scrollbar {
-    display: none;
-  }
-
   .sidebar-scroll-area {
     scrollbar-gutter: stable;
     scrollbar-color: rgb(255 255 255 / 0.5) rgb(255 255 255 / 0.1);
