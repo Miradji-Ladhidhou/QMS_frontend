@@ -386,7 +386,11 @@ export default function Layout() {
 
   useEffect(() => {
     if (!activeCategoryId) return;
-    setExpandedCategories((prev) => new Set([...prev, activeCategoryId]));
+    setExpandedCategories((prev) => (
+      window.matchMedia('(min-width: 768px)').matches
+        ? new Set([activeCategoryId])
+        : new Set([...prev, activeCategoryId])
+    ));
   }, [activeCategoryId, location.pathname]);
 
   useEffect(() => {
@@ -422,6 +426,9 @@ export default function Layout() {
 
   function toggleCategory(id) {
     setExpandedCategories((prev) => {
+      if (window.matchMedia('(min-width: 768px)').matches) {
+        return prev.has(id) ? new Set() : new Set([id]);
+      }
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -440,15 +447,24 @@ export default function Layout() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-50 md:flex">
+    <div className="relative min-h-screen bg-slate-50 md:flex md:flex-col">
       <header className="sticky top-0 z-30 flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
-        <div className="flex min-w-0 items-center gap-2">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
           {logoUrl ? (
             <img src={logoUrl} alt="" className="h-7 w-7 shrink-0 rounded bg-white/10 object-contain p-0.5" />
           ) : (
             <AppLogo className="h-7 w-7 shrink-0 rounded" />
           )}
-          <span className="truncate text-lg font-semibold">{tenant?.name || 'QMS SaaS'}</span>
+          <span className="min-w-0 flex-1 truncate text-lg font-semibold">{tenant?.name || 'QMS SaaS'}</span>
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            aria-label={isLoggingOut ? 'Déconnexion en cours' : 'Déconnexion'}
+            className="flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-md p-2 text-white/80 hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
+          >
+            {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
+          </button>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <button
@@ -470,20 +486,29 @@ export default function Layout() {
 
       <aside
         id="sidebar-navigation"
-        className={`fixed left-0 top-0 z-50 h-dvh w-[calc(100vw-1rem)] max-w-sm shrink-0 flex-col overflow-hidden bg-primary text-white md:sticky md:top-0 md:flex md:w-64 md:max-w-none md:self-start ${
-          isMenuOpen ? 'flex' : 'hidden'
+        className={`fixed left-0 top-0 z-50 h-dvh w-[calc(100vw-1rem)] max-w-sm shrink-0 flex-col overflow-hidden bg-primary text-white md:sticky md:top-0 md:z-30 md:h-auto md:w-full md:max-w-none md:self-auto md:overflow-visible ${
+          isMenuOpen ? 'flex' : 'hidden md:!flex'
         }`}
       >
         <div className="flex shrink-0 items-center justify-between px-6 py-5">
-          <div className="flex min-w-0 items-center gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {logoUrl ? (
               <img src={logoUrl} alt="" className="h-8 w-8 shrink-0 rounded bg-white/10 object-contain p-0.5" />
             ) : (
               <AppLogo className="h-8 w-8 shrink-0 rounded" />
             )}
-            <span title={tenant?.name || 'QMS SaaS'} className="min-w-0 flex-1 break-words text-base font-semibold leading-tight">
+            <span title={tenant?.name || 'QMS SaaS'} className="min-w-0 max-w-64 truncate text-base font-semibold leading-tight">
               {tenant?.name || 'QMS SaaS'}
             </span>
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className="flex min-h-11 shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
+            >
+              {isLoggingOut ? <Loader2 size={18} className="animate-spin" /> : <LogOut size={18} />}
+              {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
+            </button>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <button
@@ -504,13 +529,13 @@ export default function Layout() {
         </div>
 
         <div className="sidebar-scroll-area min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain md:contents">
-        <div className="mx-3 mb-3 flex shrink-0 items-baseline gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white/80">
+        <div className="mx-3 mb-3 flex shrink-0 items-baseline gap-2 rounded-md border border-white/10 bg-white/5 px-3 py-2 text-white/80 md:hidden">
           <span className="text-base font-semibold tabular-nums text-white">{timeLabel}</span>
           <span title={dateLabel} className="truncate text-xs capitalize">{dateLabel}</span>
         </div>
 
         {currentUser && (
-          <div className="mx-3 mb-3 flex shrink-0 items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2.5">
+          <div className="mx-3 mb-3 flex shrink-0 items-center gap-3 rounded-md border border-white/10 bg-white/5 px-3 py-2.5 md:hidden">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/15 text-sm font-semibold text-white">
               {initialsOf(currentUser.full_name)}
             </div>
@@ -523,8 +548,8 @@ export default function Layout() {
           </div>
         )}
 
-        <nav aria-label="Navigation principale" className="flex min-h-0 flex-col px-3 pb-3 md:flex-1">
-          <div className="mb-2 shrink-0 space-y-1">
+        <nav aria-label="Navigation principale" className="flex min-h-0 flex-col px-3 pb-3 md:min-h-0 md:flex-row md:flex-wrap md:items-center md:gap-1 md:overflow-visible md:px-4 md:pb-2">
+          <div className="mb-2 shrink-0 space-y-1 md:mb-0 md:flex md:gap-1 md:space-y-0">
             {topItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -532,7 +557,7 @@ export default function Layout() {
                 end={item.end}
                 onClick={closeMenu}
                 className={({ isActive }) =>
-                  `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
+                  `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors md:whitespace-nowrap ${
                     isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
@@ -542,12 +567,12 @@ export default function Layout() {
               </NavLink>
             ))}
           </div>
-          <div className="sidebar-scroll-area shrink-0 space-y-2 md:min-h-0 md:flex-1 md:shrink md:overflow-x-hidden md:overflow-y-auto md:overscroll-y-contain">
+          <div className="sidebar-scroll-area shrink-0 space-y-2 md:flex md:min-w-max md:items-center md:gap-1 md:space-y-0">
           {sidebarCategories.map((category) => {
             const active = category.id === activeCategoryId;
             const expanded = expandedCategories.has(category.id);
             return (
-              <section key={category.id} className="border-t border-white/10 pt-1">
+              <section key={category.id} className="border-t border-white/10 pt-1 md:border-0 md:pt-0">
                 <button
                   type="button"
                   onClick={() => toggleCategory(category.id)}
@@ -559,10 +584,10 @@ export default function Layout() {
                     active ? 'bg-primary-500 text-white' : 'bg-primary text-white/70 hover:bg-primary-500 hover:text-white'
                   }`}
                 >
-                  <span className="flex-1">{category.label}</span>
+                  <span className="flex-1 whitespace-nowrap">{category.label}</span>
                   {expanded ? <ChevronDown size={16} className="shrink-0" /> : <ChevronRight size={16} className="shrink-0" />}
                 </button>
-                <div id={`sidebar-${category.id}`} hidden={!expanded} className="space-y-1">
+                <div id={`sidebar-${category.id}`} hidden={!expanded} className="space-y-1 md:hidden">
                   {category.items.map((item) => (
                     <NavLink
                       key={item.to}
@@ -589,7 +614,7 @@ export default function Layout() {
             );
           })}
           </div>
-          <div className="mt-2 shrink-0 space-y-1 border-t border-white/10 pt-2">
+          <div className="mt-2 shrink-0 space-y-1 border-t border-white/10 pt-2 md:mt-0 md:flex md:items-center md:gap-1 md:space-y-0 md:border-l md:border-t-0 md:pl-2 md:pt-0">
             {permanentItems.map((item) => (
               <NavLink
                 key={item.to}
@@ -597,7 +622,7 @@ export default function Layout() {
                 end={item.end}
                 onClick={closeMenu}
                 className={({ isActive }) =>
-                  `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${
+                  `flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium transition-colors md:whitespace-nowrap ${
                     isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
                   }`
                 }
@@ -610,23 +635,45 @@ export default function Layout() {
               <NavLink
                 to="/super-admin"
                 onClick={closeMenu}
-                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white"
+                className="flex min-h-11 items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white md:whitespace-nowrap"
               >
                 <ShieldCheck size={20} className="shrink-0" />
                 Super Admin
               </NavLink>
             )}
-            <button
-              type="button"
-              onClick={handleLogout}
-              disabled={isLoggingOut}
-              className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white disabled:cursor-wait disabled:opacity-70"
-            >
-              {isLoggingOut ? <Loader2 size={20} className="animate-spin" /> : <LogOut size={20} />}
-              {isLoggingOut ? 'Déconnexion...' : 'Déconnexion'}
-            </button>
           </div>
         </nav>
+        {sidebarCategories
+          .filter((category) => expandedCategories.has(category.id))
+          .map((category) => (
+            <nav
+              key={category.id}
+              aria-label={`Navigation ${category.label.toLocaleLowerCase('fr')}`}
+              className="sidebar-horizontal-scroll hidden items-center gap-1 overflow-x-auto border-t border-white/10 px-4 py-2 md:flex"
+            >
+              {category.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.end}
+                  onClick={closeMenu}
+                  className={({ isActive }) =>
+                    `flex min-h-10 shrink-0 items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                      isActive ? 'bg-primary-100 text-primary' : 'text-white/80 hover:bg-white/10 hover:text-white'
+                    }`
+                  }
+                >
+                  <item.icon size={18} className="shrink-0" />
+                  <span>{item.label}</span>
+                  {item.to === '/my-approvals' && pendingApprovalsCount > 0 && (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1.5 text-xs font-semibold text-primary">
+                      {pendingApprovalsCount}
+                    </span>
+                  )}
+                </NavLink>
+              ))}
+            </nav>
+          ))}
         </div>
       </aside>
 
