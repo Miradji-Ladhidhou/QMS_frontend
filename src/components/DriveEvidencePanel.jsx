@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Camera, Image, Loader2, Trash2, X } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
@@ -44,6 +44,112 @@ async function normalizePhoto(file) {
   }
 }
 
+function EvidencePhotoCard({ item, moduleKey, recordId, canDelete, selected, onToggleSelection, onOpen, onDelete }) {
+  const imageRef = useRef(null);
+  const [imageUrl, setImageUrl] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    let objectUrl;
+
+    async function loadThumbnail() {
+      setLoading(true);
+      try {
+        const { data } = await api.get(`/evidence/${moduleKey}/${recordId}/${item.id}/content`, {
+          responseType: 'blob',
+          signal: controller.signal,
+        });
+        if (!active) return;
+        objectUrl = URL.createObjectURL(data);
+        setImageUrl(objectUrl);
+      } catch (error) {
+        if (active && error.code !== 'ERR_CANCELED') setLoadError(true);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    const target = imageRef.current;
+    if (!target) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      loadThumbnail();
+    } else {
+      const observer = new IntersectionObserver((entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          observer.disconnect();
+          loadThumbnail();
+        }
+      }, { rootMargin: '0px 120px' });
+      observer.observe(target);
+      return () => {
+        active = false;
+        observer.disconnect();
+        controller.abort();
+        if (objectUrl) URL.revokeObjectURL(objectUrl);
+      };
+    }
+
+    return () => {
+      active = false;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [item.id, moduleKey, recordId]);
+
+  return (
+    <li className="w-64 shrink-0 snap-start">
+      <div className="group relative overflow-hidden rounded-lg border border-slate-200 bg-slate-50 shadow-sm">
+        <button
+          ref={imageRef}
+          type="button"
+          onClick={() => imageUrl ? onOpen(item, imageUrl) : onOpen(item)}
+          className="relative block aspect-[4/3] w-full overflow-hidden bg-slate-100 text-left focus-visible:outline-primary"
+          aria-label={`Afficher la photo ${item.caption || item.file_name}`}
+        >
+          {imageUrl ? (
+            <img src={imageUrl} alt={item.caption || item.file_name} loading="lazy" className="h-full w-full object-cover transition-transform duration-200 group-hover:scale-[1.03]" />
+          ) : (
+            <span className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-500">
+              {loading ? <Loader2 size={22} className="animate-spin" /> : <Image size={25} />}
+              <span className="text-xs">{loadError ? 'Aperçu indisponible' : loading ? 'Chargement…' : 'Charger la photo'}</span>
+            </span>
+          )}
+        </button>
+        {canDelete && (
+          <div className="absolute inset-x-2 top-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => onToggleSelection(item.id)}
+              aria-pressed={selected}
+              aria-label={`${selected ? 'Désélectionner' : 'Sélectionner'} ${item.caption || item.file_name}`}
+              className={`flex h-8 w-8 items-center justify-center rounded-md border text-sm font-bold shadow ${selected ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white/95 text-slate-700 hover:bg-white'}`}
+            >
+              {selected ? '✓' : ''}
+            </button>
+            <button
+              type="button"
+              onClick={() => onDelete(item)}
+              aria-label={`Supprimer ${item.file_name}`}
+              className="rounded-full bg-white/95 p-2 text-slate-600 shadow hover:bg-red-50 hover:text-red-600"
+            >
+              <Trash2 size={15} />
+            </button>
+          </div>
+        )}
+      </div>
+      <button type="button" onClick={() => imageUrl ? onOpen(item, imageUrl) : onOpen(item)} className="mt-2 block w-full min-w-0 text-left">
+        <span className="block truncate text-sm font-medium text-slate-800">{item.caption || item.file_name}</span>
+        <span className="mt-0.5 block truncate text-xs text-slate-500">
+          {formatSize(item.file_size)} · {new Date(item.created_at).toLocaleDateString('fr-FR')}
+        </span>
+      </button>
+    </li>
+  );
+}
+
 export default function DriveEvidencePanel({
   moduleKey,
   recordId,
@@ -57,6 +163,8 @@ export default function DriveEvidencePanel({
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
   const [preview, setPreview] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [deletingSelected, setDeletingSelected] = useState(false);
 
   async function loadEvidence() {
     setError('');
@@ -71,13 +179,14 @@ export default function DriveEvidencePanel({
   }
 
   useEffect(() => {
+    setSelectedIds(new Set());
     loadEvidence();
     // Component identity changes with the record.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [moduleKey, recordId]);
 
   useEffect(() => () => {
-    if (preview?.url) URL.revokeObjectURL(preview.url);
+    if (preview?.owned) URL.revokeObjectURL(preview.url);
   }, [preview]);
 
   async function uploadPhoto(event) {
@@ -111,9 +220,17 @@ export default function DriveEvidencePanel({
     try {
       const { data } = await api.get(`/evidence/${moduleKey}/${recordId}/${item.id}/content`, { responseType: 'blob' });
       const url = URL.createObjectURL(data);
-      setPreview({ url, name: item.file_name });
+      setPreview({ url, name: item.file_name, owned: true });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de lire cette photo depuis Google Drive.');
+    }
+  }
+
+  function showPhoto(item, imageUrl) {
+    if (imageUrl) {
+      setPreview({ url: imageUrl, name: item.file_name, owned: false });
+    } else {
+      openPhoto(item);
     }
   }
 
@@ -123,9 +240,49 @@ export default function DriveEvidencePanel({
     try {
       await api.delete(`/evidence/${moduleKey}/${recordId}/${item.id}`);
       setItems((current) => current.filter((entry) => entry.id !== item.id));
+      setSelectedIds((current) => {
+        const next = new Set(current);
+        next.delete(item.id);
+        return next;
+      });
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de supprimer cette photo.');
     }
+  }
+
+  function togglePhotoSelection(itemId) {
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(itemId)) next.delete(itemId);
+      else next.add(itemId);
+      return next;
+    });
+  }
+
+  async function deleteSelectedPhotos() {
+    const selectedItems = items.filter((item) => selectedIds.has(item.id));
+    if (selectedItems.length === 0 || deletingSelected) return;
+    if (!window.confirm(`Supprimer ${selectedItems.length} photo${selectedItems.length > 1 ? 's' : ''} sélectionnée${selectedItems.length > 1 ? 's' : ''} de Google Drive ?`)) return;
+
+    setDeletingSelected(true);
+    setError('');
+    const deletedIds = new Set();
+    const failures = [];
+    for (const item of selectedItems) {
+      try {
+        await api.delete(`/evidence/${moduleKey}/${recordId}/${item.id}`);
+        deletedIds.add(item.id);
+      } catch (err) {
+        failures.push(`${item.file_name} : ${err.response?.data?.error || 'suppression impossible'}`);
+      }
+    }
+
+    setItems((current) => current.filter((item) => !deletedIds.has(item.id)));
+    setSelectedIds((current) => new Set([...current].filter((id) => !deletedIds.has(id))));
+    if (failures.length > 0) {
+      setError(`Certaines photos n’ont pas pu être supprimées : ${failures.join(' · ')}`);
+    }
+    setDeletingSelected(false);
   }
 
   return (
@@ -168,22 +325,41 @@ export default function DriveEvidencePanel({
       ) : items.length === 0 ? (
         <p className="mt-4 text-sm text-slate-500">Aucune photo ajoutée.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-slate-100">
+        <>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-slate-600" aria-live="polite">
+              {selectedIds.size > 0 ? `${selectedIds.size} photo${selectedIds.size > 1 ? 's' : ''} sélectionnée${selectedIds.size > 1 ? 's' : ''}` : 'Sélectionnez des photos pour les supprimer en lot.'}
+            </p>
+            <div className="flex items-center gap-2">
+              {selectedIds.size > 0 && (
+                <>
+                  <button type="button" onClick={() => setSelectedIds(new Set())} disabled={deletingSelected} className="rounded-md border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+                    Tout désélectionner
+                  </button>
+                  <button type="button" onClick={deleteSelectedPhotos} disabled={deletingSelected} className="inline-flex items-center gap-1.5 rounded-md bg-red-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-60">
+                    {deletingSelected ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    {deletingSelected ? 'Suppression…' : `Supprimer (${selectedIds.size})`}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+          <ul className="mt-2 flex snap-x snap-mandatory gap-3 overflow-x-auto overscroll-x-contain pb-3">
           {items.map((item) => (
-            <li key={item.id} className="flex items-center gap-3 py-2">
-              <Image size={16} className="shrink-0 text-slate-400" />
-              <button type="button" onClick={() => openPhoto(item)} className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-sm font-medium text-primary hover:underline">{item.caption || item.file_name}</span>
-                <span className="text-xs text-slate-500">{item.file_name} · {formatSize(item.file_size)} · {new Date(item.created_at).toLocaleDateString('fr-FR')}</span>
-              </button>
-              {item.uploaded_by === currentUser?.id || currentUser?.role === 'admin' ? (
-                <button type="button" onClick={() => deletePhoto(item)} aria-label={`Supprimer ${item.file_name}`} className="rounded p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600">
-                  <Trash2 size={15} />
-                </button>
-              ) : null}
-            </li>
+            <EvidencePhotoCard
+              key={item.id}
+              item={item}
+              moduleKey={moduleKey}
+              recordId={recordId}
+              canDelete={item.uploaded_by === currentUser?.id || currentUser?.role === 'admin'}
+              selected={selectedIds.has(item.id)}
+              onToggleSelection={togglePhotoSelection}
+              onOpen={showPhoto}
+              onDelete={deletePhoto}
+            />
           ))}
-        </ul>
+          </ul>
+        </>
       )}
       {preview && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-label={`Photo ${preview.name}`}>
