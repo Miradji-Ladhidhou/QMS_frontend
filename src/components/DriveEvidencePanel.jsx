@@ -157,6 +157,8 @@ export default function DriveEvidencePanel({
   captionPlaceholder = 'Ex. Défaut constaté avant correction',
 }) {
   const currentUser = useCurrentUser();
+  const cameraInputRef = useRef(null);
+  const photoInputRef = useRef(null);
   const [items, setItems] = useState([]);
   const [caption, setCaption] = useState('');
   const [loading, setLoading] = useState(true);
@@ -306,19 +308,45 @@ export default function DriveEvidencePanel({
             placeholder={captionPlaceholder}
           />
         </div>
-        <label className={`inline-flex cursor-pointer items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90 ${uploading || items.length >= 10 ? 'pointer-events-none opacity-60' : ''}`}>
-          {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
-          {uploading ? 'Envoi sur Drive…' : 'Prendre ou choisir une photo'}
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          <button
+            type="button"
+            onClick={() => cameraInputRef.current?.click()}
+            disabled={uploading || items.length >= 10}
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-primary px-3 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {uploading ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+            {uploading ? 'Envoi sur Drive…' : 'Prendre une photo'}
+          </button>
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            disabled={uploading || items.length >= 10}
+            className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Image size={16} />
+            Choisir une photo
+          </button>
           <input
+            ref={cameraInputRef}
             type="file"
             accept="image/*"
             capture="environment"
             onChange={uploadPhoto}
             disabled={uploading || items.length >= 10}
-            className="sr-only"
-            aria-label="Prendre ou choisir une photo de preuve"
+            className="hidden"
+            aria-label="Prendre une photo de preuve"
           />
-        </label>
+          <input
+            ref={photoInputRef}
+            type="file"
+            accept="image/*"
+            onChange={uploadPhoto}
+            disabled={uploading || items.length >= 10}
+            className="hidden"
+            aria-label="Choisir une photo de preuve"
+          />
+        </div>
       </div>
       {loading ? (
         <p className="mt-4 text-sm text-slate-500">Chargement des photos…</p>
