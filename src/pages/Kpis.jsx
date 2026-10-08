@@ -26,7 +26,6 @@ import {
   FolderInput,
   FolderPlus,
   History,
-  Image as ImageIcon,
   LineChart as LineChartIcon,
   MoreVertical,
   Pencil,
@@ -51,7 +50,6 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { toPng } from 'html-to-image';
 import { api } from '../lib/api.js';
 import { AiModuleGate, useAiModule } from '../lib/aiModules.jsx';
 import { useUsers } from '../lib/useUsers.js';
@@ -1028,6 +1026,14 @@ function getRecordSortValue(record, key) {
   return record[key];
 }
 
+function exportKpiHistoryXlsx(kpi, chartType) {
+  return getXlsxDownload(
+    `/kpis/${kpi.id}/records/export-xlsx`,
+    { chartType: chartType || 'line' },
+    `${sanitizeFilename(kpi.name)}-tableur-historique-${new Date().toISOString().slice(0, 10)}.xlsx`
+  );
+}
+
 function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, chartType = 'line' }) {
   const [history, setHistory] = useState(null);
   const [historyPage, setHistoryPage] = useState(1);
@@ -1046,22 +1052,10 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
   }, [kpi.id, historyPage]);
 
   async function handleExportXlsx() {
+    setHistoryError('');
     setExportingXlsx(true);
     try {
-      const response = await api.post(
-        `/kpis/${kpi.id}/records/export-xlsx`,
-        { chartType: chartType || 'line' },
-        { responseType: 'blob' }
-      );
-      const filename = `${sanitizeFilename(kpi.name)}-tableur-historique-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(link.href);
+      await exportKpiHistoryXlsx(kpi, chartType);
     } catch {
       setHistoryError("Impossible d'exporter l'historique vers Excel.");
     } finally {
@@ -1176,10 +1170,10 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
             onClick={handleExportXlsx}
             disabled={exportingXlsx}
             className="inline-flex items-center gap-1 rounded border border-emerald-300 bg-white px-2 py-0.5 text-xs font-medium text-emerald-700 shadow-2xs transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-50"
-            title="Exporter tout l'historique de ce KPI vers Excel"
+            title="Exporter tout l'historique avec un graphique Excel modifiable"
           >
             <FileSpreadsheet size={13} className="text-emerald-600" />
-            <span>{exportingXlsx ? 'Exportation…' : 'Tout exporter vers Excel'}</span>
+            <span>{exportingXlsx ? 'Exportation…' : 'Excel avec graphique'}</span>
           </button>
           <span className="text-slate-400">|</span>
           <span className="text-slate-500 font-mono">
@@ -1190,6 +1184,9 @@ function RecordHistoryTable({ kpi, canManage, onEditRecord, onDeleteRecord, char
           Page {historyPage} / {history.pagination.total_pages || 1}
         </div>
       </div>
+      <p className="border-b border-slate-200 px-3 py-2 text-xs text-slate-600">
+        L’export Excel contient tous les relevés, toutes les pages et un graphique modifiable.
+      </p>
 
       <div className="max-h-[500px] overflow-auto">
         {showSeriesColumn ? (
@@ -3573,11 +3570,11 @@ function KpiCard({
   const [imports, setImports] = useState(null);
   const [importsLoading, setImportsLoading] = useState(false);
   const [exportMenuOpen, setExportMenuOpen] = useState(false);
+  const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportError, setExportError] = useState('');
   const [moduleEvidence, setModuleEvidence] = useState(null);
   const [moduleEvidenceLoading, setModuleEvidenceLoading] = useState(false);
   const [moduleEvidenceError, setModuleEvidenceError] = useState('');
-  const chartRef = useRef(null);
   const records = [...kpi.records].sort((a, b) => (a.period_date > b.period_date ? 1 : -1));
   const seriesConfigs = kpi.calculation_configs || [];
   const seriesById = new Map(seriesConfigs.map((c) => [c.id, c]));
@@ -3671,7 +3668,6 @@ function KpiCard({
   const isModuleBased = kpi.calculation_type === 'module';
   const isSnapshot = isModuleBased && seriesConfigs[0]?.period_column === '__snapshot__';
   const isCountGrouped = seriesConfigs.length === 1 && seriesConfigs[0].calc_type === 'count_grouped';
-  const canExportChart = isCountGrouped || hasEnoughForChart;
   const latestRecord = records[records.length - 1];
 
   async function loadModuleEvidence() {
@@ -3717,29 +3713,17 @@ function KpiCard({
     if (record) onViewProof(kpi, record);
   }
 
-  async function exportChartPng() {
-    setExportError('');
-    if (!chartRef.current) return;
-
-    try {
-      const dataUrl = await toPng(chartRef.current, { backgroundColor: '#ffffff', pixelRatio: 2 });
-      const link = document.createElement('a');
-      link.href = dataUrl;
-      link.download = `${sanitizeFilename(kpi.name)}-graphique.png`;
-      link.click();
-    } catch {
-      setExportError("Impossible d'exporter le graphique.");
-    }
-  }
-
-  async function handleExportChartPng() {
+  async function handleExportXlsx() {
     setExportMenuOpen(false);
-    if (!showChart) {
-      setShowChart(true);
-      requestAnimationFrame(() => requestAnimationFrame(exportChartPng));
-      return;
+    setExportError('');
+    setExportingXlsx(true);
+    try {
+      await exportKpiHistoryXlsx(kpi, chartType);
+    } catch {
+      setExportError("Impossible d'exporter l'Excel avec graphique.");
+    } finally {
+      setExportingXlsx(false);
     }
-    await exportChartPng();
   }
 
   function buildDataExportPayload() {
@@ -3776,8 +3760,8 @@ function KpiCard({
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
-      <div className="flex items-start gap-3">
-        <div className="flex min-w-0 flex-1 items-start gap-2">
+      <div className="flex flex-col items-start gap-3 lg:flex-row">
+        <div className="flex w-full min-w-0 flex-1 items-start gap-2">
           {canManage && (
             <input
               type="checkbox"
@@ -3832,6 +3816,14 @@ function KpiCard({
                 </span>
                 <span className="text-xs text-slate-400">{records.length} relevé{records.length > 1 ? 's' : ''}</span>
               </div>
+              <p className="mt-2 text-xs font-medium text-primary">
+                {showDetails ? 'Replier les détails' : 'Ouvrir : graphique et données'}
+              </p>
+              {!showDetails && (
+                <p className="mt-1 text-xs text-slate-600">
+                  Excel avec graphique : menu « Excel / Word », sans ouvrir la carte.
+                </p>
+              )}
             </div>
 
             <div className="flex shrink-0 items-center gap-2 self-center">
@@ -3887,15 +3879,18 @@ function KpiCard({
           </button>
         </div>
 
-        <div className="flex shrink-0 items-start gap-1">
+        <div className="flex shrink-0 items-start gap-1 self-end lg:self-auto">
           <div className="relative">
             <button
               type="button"
               onClick={() => setExportMenuOpen((prev) => !prev)}
-              aria-label="Exporter"
-              className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+              aria-label="Exporter Excel / Word"
+              aria-expanded={exportMenuOpen}
+              className="flex min-h-[40px] items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100"
             >
               <Download size={18} />
+              {exportingXlsx ? 'Export Excel…' : 'Excel / Word'}
+              <ChevronDown size={13} />
             </button>
 
             {exportMenuOpen && (
@@ -3904,12 +3899,12 @@ function KpiCard({
                 <div className="absolute right-0 top-full z-20 mt-1 w-56 overflow-hidden rounded-md border border-slate-200 bg-white shadow-lg">
                   <button
                     type="button"
-                    onClick={handleExportChartPng}
-                    disabled={!canExportChart}
+                    onClick={handleExportXlsx}
+                    disabled={exportingXlsx}
                     className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
                   >
-                    <ImageIcon size={14} />
-                    Exporter le graphique (PNG)
+                    <FileSpreadsheet size={14} />
+                    {exportingXlsx ? 'Exportation…' : 'Excel avec graphique'}
                   </button>
                   <button
                     type="button"
@@ -3933,9 +3928,11 @@ function KpiCard({
               type="button"
               onClick={() => onToggleMenu(kpi.id)}
               aria-label="Actions"
-              className="rounded-md p-2 text-slate-500 hover:bg-slate-100"
+              aria-expanded={isMenuOpen}
+              className="flex min-h-[40px] items-center gap-1 rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100"
             >
               <MoreVertical size={18} />
+              Actions
             </button>
 
             {isMenuOpen && (
@@ -4254,7 +4251,7 @@ function KpiCard({
         </div>
 
         {showChart && (
-          <div id={`kpi-chart-${kpi.id}`} ref={chartRef} className="mt-3 bg-white">
+          <div id={`kpi-chart-${kpi.id}`} className="mt-3 bg-white">
             {isCountGrouped ? (
               <DistributionView kpi={kpi} />
             ) : (
@@ -4406,14 +4403,21 @@ function KpiCard({
           <button
             type="button"
             onClick={() => setShowHistory((prev) => !prev)}
+            aria-expanded={showHistory}
+            aria-controls={`kpi-history-${kpi.id}`}
             className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
           >
             {showHistory ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-            Voir l'historique
+            {showHistory ? 'Masquer l’historique et l’export Excel' : 'Historique et export Excel'}
           </button>
+          {!showHistory && (
+            <p className="mt-1 text-xs text-slate-600">
+              Ouvrez ce panneau pour consulter tous les relevés et télécharger l’Excel avec graphique.
+            </p>
+          )}
 
           {showHistory && (
-            <div className="mt-2">
+            <div id={`kpi-history-${kpi.id}`} className="mt-2">
               <RecordHistoryTable
                 kpi={kpi}
                 canManage={canManage && !isModuleBased}
@@ -4434,6 +4438,7 @@ function KpiCard({
               setShowImports((prev) => !prev);
               loadImportsIfNeeded();
             }}
+            aria-expanded={showImports}
             className="flex items-center gap-1 text-sm font-medium text-primary hover:underline"
           >
             {showImports ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -4473,13 +4478,13 @@ function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
             <ChevronRight size={12} />
           </span>
         </div>
-        <span className="line-clamp-2 break-words pr-6 text-sm font-semibold text-slate-900 group-hover:text-primary">
+        <span className="line-clamp-2 break-words text-sm font-semibold text-slate-900 group-hover:text-primary">
           {folder.name}
         </span>
       </button>
 
       {canManage && (
-      <div className="absolute right-2 top-2">
+      <div className="relative mt-2 self-end">
         <button
           type="button"
           onClick={(e) => {
@@ -4487,10 +4492,12 @@ function FolderTile({ folder, canManage, onOpen, onRename, onDelete }) {
             setMenuOpen((prev) => !prev);
           }}
           aria-label="Actions sur le dossier"
+          aria-expanded={menuOpen}
           title="Options du dossier"
-          className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          className="flex min-h-[40px] items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-700"
         >
           <MoreVertical size={16} />
+          Options
         </button>
 
         {menuOpen && (
@@ -5366,6 +5373,10 @@ export default function Kpis() {
           </button>
         </div>
       </div>
+      <p className="mt-2 text-xs text-slate-600">
+        « Exporter » en haut génère le rapport de tous les KPI, tous dossiers confondus.
+        Pour l’Excel avec graphique d’un seul KPI, utilisez le menu « Excel / Word » de sa carte.
+      </p>
       <PageGuide id="kpis" />
 
       <FolderBreadcrumb breadcrumb={breadcrumb} onNavigate={navigateToFolder} rootLabel="Tous les KPI" />

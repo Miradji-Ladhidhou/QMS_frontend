@@ -113,7 +113,13 @@ export const PAGE_GUIDES = {
     more: (
       <>
         <p>
-          Un KPI peut porter plusieurs <strong>séries</strong> (courbes) : menu ⋮ de la carte → « Séries (courbes) ». À
+          Ouvrez une carte pour consulter son graphique et ses données. Le panneau <strong>Historique et export Excel</strong>{' '}
+          donne accès aux relevés et à l’<strong>Excel avec graphique</strong>. Le bouton <strong>Excel / Word</strong>{' '}
+          permet aussi de télécharger directement l’Excel avec graphique modifiable et tous les relevés, sans ouvrir la carte,
+          ou les données Word ; <strong>Exporter</strong> en haut de page produit le rapport de tous les KPI.
+        </p>
+        <p>
+          Un KPI peut porter plusieurs <strong>séries</strong> (courbes) : menu <strong>Actions</strong> de la carte → « Séries (courbes) ». À
           partir de <strong>deux séries</strong>, choisissez pour chacune : garder l'<strong>unité</strong>, l'
           <strong>objectif cible</strong> et le <strong>sens de l'objectif</strong> du KPI (<strong>global</strong>), ou
           les définir à part (<strong>propre à la série</strong>) si elle ne se mesure pas comme les autres. Chaque série

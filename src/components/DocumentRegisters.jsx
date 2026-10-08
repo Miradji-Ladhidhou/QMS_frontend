@@ -388,7 +388,7 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
                 title="Exporter le registre vers Excel"
               >
                 <FileSpreadsheet size={16} />
-                <span>{exportingXlsx ? 'Export en cours…' : 'Exporter'}</span>
+                <span>{exportingXlsx ? 'Export en cours…' : 'Exporter Excel'}</span>
               </button>
 
               {canManage && (
@@ -402,7 +402,7 @@ export default function DocumentRegisters({ selectedRegisterId, onSelectRegister
                     <span>Ajouter une ligne</span>
                   </button>
                   <details className="relative">
-                    <summary title="Options du registre" className="flex cursor-pointer list-none items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><MoreHorizontal size={17} /> Options</summary>
+                    <summary title="Options du registre" className="flex cursor-pointer list-none items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"><MoreHorizontal size={17} /> Colonnes et options</summary>
                     <div className="absolute right-0 z-30 mt-1 w-52 rounded-md border border-slate-200 bg-white py-1 shadow-lg">
                       <button type="button" onClick={(event) => { event.currentTarget.closest('details').open = false; setIsManageColumnsOpen(true); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"><Columns3 size={16} /> Gérer les colonnes</button>
                       <button type="button" onClick={(event) => { event.currentTarget.closest('details').open = false; setIsEditRegisterOpen(true); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"><Pencil size={16} /> Modifier le registre</button>

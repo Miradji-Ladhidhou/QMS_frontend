@@ -22,13 +22,13 @@ export default function FolderTile({ folder, canManage, onOpen, onRename, onDele
             <ArrowUpRight size={12} />
           </span>
         </div>
-        <span className="line-clamp-2 break-words pr-6 text-sm font-semibold text-slate-900 group-hover:text-primary">
+        <span className="line-clamp-2 break-words text-sm font-semibold text-slate-900 group-hover:text-primary">
           {folder.name}
         </span>
       </button>
 
       {canManage && (onRename || onDelete) && (
-        <div className="absolute right-2 top-2">
+        <div className="relative mt-2 self-end">
           <button
             type="button"
             onClick={(e) => {
@@ -36,10 +36,12 @@ export default function FolderTile({ folder, canManage, onOpen, onRename, onDele
               setMenuOpen((prev) => !prev);
             }}
             aria-label="Actions sur le dossier"
+            aria-expanded={menuOpen}
             title="Options du dossier"
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700"
+            className="flex min-h-[40px] items-center gap-1 rounded-lg px-2 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
             <MoreVertical size={16} />
+            Options
           </button>
 
           {menuOpen && (

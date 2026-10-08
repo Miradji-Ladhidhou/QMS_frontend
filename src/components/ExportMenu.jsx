@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Cloud, Download, FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-react';
+import { useId, useState } from 'react';
+import { ChevronDown, Cloud, Download, FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-react';
 
 // Regroupe les 1-5 boutons "Exporter CSV/PDF/Excel/Word/Drive" — jusque-là posés côte à côte sur
 // chaque page de liste — derrière un seul bouton "Exporter" et un petit menu déroulant, même
@@ -22,6 +22,14 @@ export default function ExportMenu({
   exportingDrive,
 }) {
   const [open, setOpen] = useState(false);
+  const formatsId = useId();
+  const formats = [
+    onExportCsv && 'CSV',
+    onExportPdf && 'PDF',
+    onExportXlsx && 'Excel',
+    onExportWord && 'Word',
+    onExportDrive && 'Drive',
+  ].filter(Boolean).join(' · ');
   const anyExporting = exportingCsv || exportingPdf || exportingXlsx || exportingWord || exportingDrive;
 
   function handleSelect(action) {
@@ -30,16 +38,22 @@ export default function ExportMenu({
   }
 
   return (
-    <div className="relative flex-1 sm:flex-none">
+    <div className="relative flex-1 sm:flex-none" onKeyDown={(event) => {
+      if (event.key === 'Escape') setOpen(false);
+    }}>
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
         disabled={disabled}
+        aria-expanded={open}
+        aria-describedby={formatsId}
         className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
       >
         {anyExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
         Exporter
+        <ChevronDown size={15} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
+      <p id={formatsId} className="mt-1 text-center text-xs text-slate-600">{formats}</p>
 
       {open && (
         <>

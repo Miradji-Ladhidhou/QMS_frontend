@@ -267,6 +267,9 @@ export default function ModuleKpis() {
                   Filtres et comparaison
                   {onlyIssues && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">À surveiller</span>}
                 </button>
+                {!toolsOpen && (
+                  <p className="mt-1 text-xs text-slate-600">Ouvrez pour choisir les dates et la période de comparaison.</p>
+                )}
 
                 {toolsOpen && (
                   <div className="mt-2 rounded-md bg-slate-50 p-3">
@@ -333,6 +336,9 @@ export default function ModuleKpis() {
                   </span>
                   <ChevronDown size={17} className={`shrink-0 text-slate-400 transition-transform ${auditMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
+                {!auditMenuOpen && (
+                  <p className="mt-1 text-xs text-slate-600">Ouvrez pour sélectionner les indicateurs de chaque domaine à inclure dans l’audit.</p>
+                )}
 
                 {auditMenuOpen && (
                   <div className="mt-2 space-y-2 rounded-md border border-slate-200 p-2">
@@ -347,10 +353,11 @@ export default function ModuleKpis() {
                         );
                       }
                       return (
-                        <details key={domain.key} className="rounded-md border border-slate-100 bg-white" open={domainSelected > 0}>
+                        <details key={domain.key} className="group rounded-md border border-slate-100 bg-white" open={domainSelected > 0}>
                           <summary className="flex min-h-[40px] cursor-pointer list-none items-center gap-2 px-2 text-sm font-medium text-slate-700">
                             <span className="min-w-0 flex-1 truncate">{domain.label}</span>
                             <span className="text-xs text-slate-400">{domainSelected}/{domainTracked.length}</span>
+                            <ChevronDown size={15} className="shrink-0 transition-transform group-open:rotate-180" />
                           </summary>
                           <div className="space-y-1 border-t border-slate-100 px-2 py-2">
                             <label className="flex min-h-[36px] cursor-pointer items-center gap-2 border-b border-slate-100 pb-1 text-xs font-medium text-primary">
@@ -415,6 +422,9 @@ export default function ModuleKpis() {
                       <div className="min-w-0 flex-1">
                         <h2 className="break-words text-sm font-semibold text-slate-900 sm:text-base">{domain.label}</h2>
                         <p className="break-words text-xs text-slate-500">{domain.question}</p>
+                        <p className="mt-1 text-xs font-medium text-primary">
+                          {open ? 'Replier les indicateurs' : 'Ouvrir pour consulter et choisir les indicateurs'}
+                        </p>
                         <div className="mt-1.5 flex flex-wrap gap-1.5">
                           <CountChip count={domain.counts.bad} tone="bad">hors objectif</CountChip>
                           <CountChip count={domain.counts.warning} tone="warning">à surveiller</CountChip>

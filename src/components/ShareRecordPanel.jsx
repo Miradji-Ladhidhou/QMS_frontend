@@ -14,8 +14,7 @@ function nonAdminUsers(users) {
 // Bouton + modal réutilisables pour donner l'accès à UN élément précis (document, CAPA,
 // réclamation...) à un rôle ou une personne qui n'y aurait normalement pas accès — voir
 // record_shares côté backend. Admin/manager uniquement (le backend refuse de toute façon 403 à
-// un membre, ce bouton n'est juste pas montré aux autres). compact : icône seule, pour s'aligner
-// sur les boutons Modifier/Supprimer déjà en icône seule d'une page (ex. ComplaintDetail.jsx).
+// un membre, ce bouton n'est juste pas montré aux autres). compact : bouton avec libellé court.
 export default function ShareRecordPanel({ resourceType, resourceId, compact = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [shares, setShares] = useState(null);
@@ -83,9 +82,10 @@ export default function ShareRecordPanel({ resourceType, resourceId, compact = f
           type="button"
           onClick={() => setIsOpen(true)}
           aria-label="Partager"
-          className="rounded-md p-2 text-slate-500 hover:bg-slate-100 hover:text-primary"
+          className="flex items-center gap-1 rounded-md p-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-primary"
         >
           <Share2 size={16} />
+          Partager
         </button>
       ) : (
         <button

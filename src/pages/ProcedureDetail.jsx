@@ -720,10 +720,11 @@ export default function ProcedureDetail() {
                 type="button"
                 onClick={() => setExportMenuOpen((prev) => !prev)}
                 disabled={exportingPdf || exportingWord}
+                aria-expanded={exportMenuOpen}
                 className="flex items-center gap-2 rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
               >
                 {exportingPdf || exportingWord ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
-                Exporter
+                Exporter PDF / Word
               </button>
               {exportMenuOpen && (
                 <>
