@@ -196,33 +196,44 @@ export default function DriveEvidencePanel({
   const [exportSelectedIds, setExportSelectedIds] = useState(null);
   const [deletingSelected, setDeletingSelected] = useState(false);
 
-  async function loadEvidence() {
-    setError('');
-    try {
-      const { data } = await api.get(`/evidence/${moduleKey}/${recordId}`);
-      setItems(data);
-      if (exportSelectionEnabled) setExportSelectedIds(new Set(data.map((item) => item.id)));
-    } catch (err) {
-      setError(err.response?.data?.error || 'Impossible de charger les photos de preuve.');
-    } finally {
-      setLoading(false);
-    }
-  }
-
   useEffect(() => {
+    let active = true;
+    const controller = new AbortController();
+    setLoading(true);
+    setItems([]);
     setSelectedIds(new Set());
+    setExportSelectedIds(null);
+    setError('');
+    async function loadEvidence() {
+      try {
+        const { data } = await api.get(`/evidence/${moduleKey}/${recordId}`, { signal: controller.signal });
+        if (!active) return;
+        setItems(data);
+        if (exportSelectionEnabled) setExportSelectedIds(new Set(data.map((item) => item.id)));
+      } catch (err) {
+        if (active && err.code !== 'ERR_CANCELED') {
+          setError(err.response?.data?.error || 'Impossible de charger les photos de preuve.');
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
     loadEvidence();
-    // Component identity changes with the record.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [moduleKey, recordId]);
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [moduleKey, recordId, exportSelectionEnabled]);
 
   useEffect(() => () => {
     if (preview?.owned) URL.revokeObjectURL(preview.url);
   }, [preview]);
 
   useEffect(() => {
-    if (exportSelectionEnabled) onExportSelectionChange?.(exportSelectedIds ? [...exportSelectedIds] : null);
-  }, [exportSelectionEnabled, exportSelectedIds, onExportSelectionChange]);
+    if (!exportSelectionEnabled) return;
+    const allIncluded = exportSelectedIds === null || items.every((item) => exportSelectedIds.has(item.id));
+    onExportSelectionChange?.(allIncluded ? null : [...exportSelectedIds], moduleKey, recordId);
+  }, [exportSelectionEnabled, exportSelectedIds, items, onExportSelectionChange, moduleKey, recordId]);
 
   async function uploadPhoto(event) {
     const file = event.target.files?.[0];

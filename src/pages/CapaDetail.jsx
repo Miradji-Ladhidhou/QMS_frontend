@@ -21,6 +21,7 @@ import LinkItemModal from '../components/LinkItemModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
 // un <select>, seul moyen simple de distinguer "non vérifiée" d'un false explicite.
@@ -90,14 +91,6 @@ function getDelayDays(priority, priorityDelays) {
 function formatDateTime(dateStr) {
   if (!dateStr) return '—';
   return new Date(dateStr).toLocaleString('fr-FR');
-}
-
-function withEvidenceSelection(url, evidenceIds) {
-  if (evidenceIds === null) return url;
-  const params = new URLSearchParams();
-  evidenceIds.forEach((evidenceId) => params.append('evidenceIds', evidenceId));
-  params.append('evidenceSelection', 'true');
-  return `${url}?${params.toString()}`;
 }
 
 function CapaLifecycle({ status }) {
@@ -286,7 +279,7 @@ export default function CapaDetail() {
   const [exportingXlsx, setExportingXlsx] = useState(false);
   const [exportingWord, setExportingWord] = useState(false);
   const [exportingDrive, setExportingDrive] = useState(false);
-  const [exportEvidenceIds, setExportEvidenceIds] = useState(null);
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const [driveSuccess, setDriveSuccess] = useState('');
   const [exportError, setExportError] = useState('');
   const [services, setServices] = useState([]);
@@ -342,7 +335,6 @@ export default function CapaDetail() {
   }
 
   useEffect(() => {
-    setExportEvidenceIds(null);
     loadCapa();
     api
       .get('/capas/priority-delays')
@@ -508,7 +500,7 @@ export default function CapaDetail() {
     setExportingPdf(true);
     setExportError('');
     try {
-      await getPdfDownload(withEvidenceSelection(`/capas/${id}/pdf`, exportEvidenceIds), `${capa.number || capa.id}.pdf`);
+      await getPdfDownload(withEvidenceSelection(`/capas/${id}/pdf`), `${capa.number || capa.id}.pdf`);
     } catch {
       setExportError("Impossible d'exporter cette CAPA en PDF.");
     } finally {
@@ -536,7 +528,7 @@ export default function CapaDetail() {
     setExportingWord(true);
     setExportError('');
     try {
-      await getWordDownload(withEvidenceSelection(`/capas/${id}/word`, exportEvidenceIds), `${capa.number || capa.id}.docx`);
+      await getWordDownload(withEvidenceSelection(`/capas/${id}/word`), `${capa.number || capa.id}.docx`);
     } catch {
       setExportError('Impossible de générer le document Word.');
     } finally {
@@ -550,7 +542,7 @@ export default function CapaDetail() {
     setDriveSuccess('');
     try {
       await getPdfAndSaveToDrive(
-        withEvidenceSelection(`/capas/${id}/pdf`, exportEvidenceIds),
+        withEvidenceSelection(`/capas/${id}/pdf`),
         'CAPA',
         `${capa.number ? `${capa.number} — ` : ''}${capa.title}`
       );
@@ -705,7 +697,7 @@ export default function CapaDetail() {
         moduleKey="capas"
         recordId={capa.id}
         exportSelectionEnabled
-        onExportSelectionChange={setExportEvidenceIds}
+        onExportSelectionChange={onExportSelectionChange}
       />
 
       <form

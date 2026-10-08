@@ -28,6 +28,7 @@ import RiskHistoryCard from '../components/risks/RiskHistoryCard.jsx';
 import RiskLinksCard from '../components/risks/RiskLinksCard.jsx';
 import RiskMarkReviewedModal from '../components/risks/RiskMarkReviewedModal.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -620,6 +621,7 @@ function CreateCapaFromRiskModal({ riskId, risk, users, services, priorityDelays
 
 export default function RiskDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/risks');
   const currentUser = useCurrentUser();
@@ -654,8 +656,8 @@ export default function RiskDetail() {
     setError('');
     const baseName = `risque-${risk.title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 50)}`;
     try {
-      if (format === 'pdf') await getPdfDownload(`/risks/${id}/pdf`, `${baseName}.pdf`);
-      else await getWordDownload(`/risks/${id}/word`, `${baseName}.docx`);
+      if (format === 'pdf') await getPdfDownload(withEvidenceSelection(`/risks/${id}/pdf`), `${baseName}.pdf`);
+      else await getWordDownload(withEvidenceSelection(`/risks/${id}/word`), `${baseName}.docx`);
     } catch {
       setError(`Impossible de générer la fiche ${format === 'pdf' ? 'PDF' : 'Word'}.`);
     } finally {
@@ -858,7 +860,7 @@ export default function RiskDetail() {
         </div>
       </div>
 
-      <DriveEvidencePanel moduleKey="risks" recordId={risk.id} />
+      <DriveEvidencePanel moduleKey="risks" recordId={risk.id} exportSelectionEnabled onExportSelectionChange={onExportSelectionChange} />
 
       <div className="mt-4">
         {risk.linked_capa ? (

@@ -12,7 +12,7 @@ import { useTenant } from '../lib/useTenant.js';
 import { PDCA_PHASES, PDCA_STATUS_LABELS } from '../lib/pdcaStatus.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
-import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, getWordDownload } from '../lib/pdfExport.js';
 import { buildExportColumns, buildExportRows } from '../lib/pdcaExport.js';
 import PdcaStatusBadge from '../components/PdcaStatusBadge.jsx';
 import CategoryBadge from '../components/CategoryBadge.jsx';
@@ -22,6 +22,7 @@ import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -584,6 +585,7 @@ function PhaseCard({
 
 export default function PdcaDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/pdca');
   const currentUser = useCurrentUser();
@@ -702,14 +704,12 @@ export default function PdcaDetail() {
     }
   }
 
-  // Fiche imprimable dédiée (pdcaPdf.js) pour le PDF, comme CapaDetail.jsx — Excel/Word
-  // réutilisent au contraire le même export générique en colonnes/lignes que la liste
-  // (Pdca.jsx), réduit à ce seul projet (voir lib/pdcaExport.js).
+  // PDF et Word incluent les photos choisies ; Excel reste un export tabulaire.
   async function handleExportPdf() {
     setExportingPdf(true);
     setError('');
     try {
-      await getPdfDownload(`/pdca/${id}/pdf`, `pdca-${pdca.id}.pdf`);
+      await getPdfDownload(withEvidenceSelection(`/pdca/${id}/pdf`), `pdca-${pdca.id}.pdf`);
     } catch {
       setError('Impossible d’exporter ce projet PDCA en PDF.');
     } finally {
@@ -735,9 +735,7 @@ export default function PdcaDetail() {
     setExportingWord(true);
     setError('');
     try {
-      await exportToWord(`pdca-${pdca.id}.docx`, 'PDCA — Amélioration continue', buildExportColumns(), buildExportRows([pdca]), {
-        generatedBy: currentUser?.full_name,
-      });
+      await getWordDownload(withEvidenceSelection(`/pdca/${id}/word`), `pdca-${pdca.id}.docx`);
     } catch {
       setError('Impossible de générer le document Word.');
     } finally {
@@ -750,7 +748,7 @@ export default function PdcaDetail() {
     setError('');
     setDriveSuccess('');
     try {
-      await getPdfAndSaveToDrive(`/pdca/${id}/pdf`, 'PDCA', pdca.title);
+      await getPdfAndSaveToDrive(withEvidenceSelection(`/pdca/${id}/pdf`), 'PDCA', pdca.title);
       setDriveSuccess('Enregistré sur le Drive partagé.');
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
@@ -886,7 +884,7 @@ export default function PdcaDetail() {
         })}
       </div>
 
-      <DriveEvidencePanel moduleKey="pdca" recordId={pdca.id} />
+      <DriveEvidencePanel moduleKey="pdca" recordId={pdca.id} exportSelectionEnabled onExportSelectionChange={onExportSelectionChange} />
 
       <div className="mt-4">
         {pdca.linked_capa ? (

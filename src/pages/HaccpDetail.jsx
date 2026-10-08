@@ -26,6 +26,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 import CcpLimitsFields from '../components/haccp/CcpLimitsFields.jsx';
 import CcpMonitoringChart from '../components/haccp/CcpMonitoringChart.jsx';
 import CcpStatusChip from '../components/haccp/CcpStatusChip.jsx';
@@ -1191,6 +1192,7 @@ function SurveillanceTab({ plan, mode, initialCcpId, users, services, priorityDe
 
 export default function HaccpDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/haccp');
   const currentUser = useCurrentUser();
@@ -1274,7 +1276,7 @@ export default function HaccpDetail() {
     setError('');
     setExportingPdf(true);
     try {
-      const response = await api.get(`/haccp/plans/${id}/pdf`, { responseType: 'blob' });
+      const response = await api.get(withEvidenceSelection(`/haccp/plans/${id}/pdf`), { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       if (tab) tab.location.href = url;
     } catch {
@@ -1289,7 +1291,7 @@ export default function HaccpDetail() {
     setError('');
     setExportingWord(true);
     try {
-      await getWordDownload(`/haccp/plans/${id}/word`, `haccp-${plan.title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 50)}.docx`);
+      await getWordDownload(withEvidenceSelection(`/haccp/plans/${id}/word`), `haccp-${plan.title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 50)}.docx`);
     } catch {
       setError("Impossible d'exporter ce plan en Word.");
     } finally {
@@ -1403,7 +1405,7 @@ export default function HaccpDetail() {
         <p className="mt-3 text-xs text-slate-500">Ces repères indiquent la saisie et les statuts, pas la conformité du plan. Un danger significatif n’est pas automatiquement un CCP.</p>
       </section>
 
-      <DriveEvidencePanel moduleKey="haccp" recordId={plan.id} />
+      <DriveEvidencePanel moduleKey="haccp" recordId={plan.id} exportSelectionEnabled onExportSelectionChange={onExportSelectionChange} />
 
       <nav aria-label="Étapes du plan HACCP" className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {HACCP_WORKFLOW_STAGES.map((stage, index) => (

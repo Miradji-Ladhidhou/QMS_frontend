@@ -17,6 +17,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 import ExportMenu from '../components/ExportMenu.jsx';
 
 function formatDate(dateStr) {
@@ -615,6 +616,7 @@ function CreateAccidentCapaModal({ accidentId, accident, users, services, priori
 
 export default function AccidentDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/accidents');
   const currentUser = useCurrentUser();
@@ -679,8 +681,8 @@ export default function AccidentDetail() {
     setExportError('');
     try {
       const filename = `accident-${accident.id}.${format === 'word' ? 'docx' : 'pdf'}`;
-      if (format === 'pdf') await getPdfDownload(`/accidents/${id}/report.pdf`, filename);
-      else await getWordDownload(`/accidents/${id}/report.word`, filename);
+      if (format === 'pdf') await getPdfDownload(withEvidenceSelection(`/accidents/${id}/report.pdf`), filename);
+      else await getWordDownload(withEvidenceSelection(`/accidents/${id}/report.word`), filename);
     } catch (err) {
       setExportError(err.response?.data?.error || `Impossible d'exporter cet accident en ${format === 'word' ? 'Word' : 'PDF'}.`);
     } finally {
@@ -762,7 +764,7 @@ export default function AccidentDetail() {
         </div>
       </div>
       <PageGuide id="accidentDetail" />
-      <DriveEvidencePanel moduleKey="accidents" recordId={accident.id} />
+      <DriveEvidencePanel moduleKey="accidents" recordId={accident.id} exportSelectionEnabled onExportSelectionChange={onExportSelectionChange} />
 
       {exportError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p>}
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}

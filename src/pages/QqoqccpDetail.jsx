@@ -10,7 +10,7 @@ import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { isManagerRole } from '../lib/roles.js';
 import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useTenant } from '../lib/useTenant.js';
-import { getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { getPdfAndSaveToDrive, exportToXlsx, getWordDownload } from '../lib/pdfExport.js';
 import { buildExportColumns, buildExportRows } from '../lib/qqoqccpExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import QqoqccpStatusBadge from '../components/QqoqccpStatusBadge.jsx';
@@ -20,6 +20,7 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import PageGuide from '../components/PageGuide.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 
 // Mêmes noms de champs que qqoqccp_analyses (schema.sql) et que le corps attendu par
 // PATCH /api/qqoqccp/:id — voir backend/src/routes/qqoqccp.js.
@@ -327,6 +328,7 @@ function CloseAnalysisModal({ analysisId, onClose, onClosed }) {
 
 export default function QqoqccpDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/qqoqccp');
   const currentUser = useCurrentUser();
@@ -644,7 +646,7 @@ export default function QqoqccpDetail() {
     setExportError('');
     setExportingPdf(true);
     try {
-      const response = await api.get(`/qqoqccp/${id}/pdf`, { responseType: 'blob' });
+      const response = await api.get(withEvidenceSelection(`/qqoqccp/${id}/pdf`), { responseType: 'blob' });
       const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       if (tab) tab.location.href = url;
     } catch {
@@ -655,10 +657,7 @@ export default function QqoqccpDetail() {
     }
   }
 
-  // Contrairement au PDF (fiche imprimable dédiée, GET /qqoqccp/:id/pdf), Excel/Word
-  // réutilisent le même export générique en colonnes/lignes que la liste (Qqoqccp.jsx), réduit
-  // à cette seule analyse (voir lib/qqoqccpExport.js) — analysis est déjà le détail complet
-  // (GET /qqoqccp/:id), pas besoin du ?full=true nécessaire côté liste.
+  // PDF et Word incluent les photos choisies ; Excel reste un export tabulaire.
   async function handleExportXlsx() {
     setExportError('');
     setExportingXlsx(true);
@@ -677,9 +676,7 @@ export default function QqoqccpDetail() {
     setExportError('');
     setExportingWord(true);
     try {
-      await exportToWord(`qqoqccp-${analysis.id}.docx`, 'QQOQCCP', buildExportColumns(), buildExportRows([analysis]), {
-        generatedBy: currentUser?.full_name,
-      });
+      await getWordDownload(withEvidenceSelection(`/qqoqccp/${id}/word`), `qqoqccp-${analysis.id}.docx`);
     } catch {
       setExportError('Impossible de générer le document Word.');
     } finally {
@@ -692,7 +689,7 @@ export default function QqoqccpDetail() {
     setDriveSuccess('');
     setExportingDrive(true);
     try {
-      await getPdfAndSaveToDrive(`/qqoqccp/${id}/pdf`, 'QQOQCCP', analysis.title);
+      await getPdfAndSaveToDrive(withEvidenceSelection(`/qqoqccp/${id}/pdf`), 'QQOQCCP', analysis.title);
       setDriveSuccess('Enregistré sur le Drive partagé.');
     } catch (err) {
       setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
@@ -790,7 +787,7 @@ export default function QqoqccpDetail() {
         ))}
       </div>
 
-      <DriveEvidencePanel moduleKey="qqoqccp" recordId={analysis.id} />
+      <DriveEvidencePanel moduleKey="qqoqccp" recordId={analysis.id} exportSelectionEnabled onExportSelectionChange={onExportSelectionChange} />
 
       <div className="mt-5">
         <AiModuleGate module="qqoqccp">

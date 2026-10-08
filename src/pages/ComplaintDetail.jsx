@@ -21,6 +21,7 @@ import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -506,6 +507,7 @@ function CreateCapaFromComplaintModal({ complaintId, complaint, users, services,
 
 export default function ComplaintDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/complaints');
   const currentUser = useCurrentUser();
@@ -566,7 +568,7 @@ export default function ComplaintDetail() {
     setExportingPdf(true);
     setError('');
     try {
-      await getPdfDownload(`/complaints/${id}/pdf`, `reclamation-${complaint.id}.pdf`);
+      await getPdfDownload(withEvidenceSelection(`/complaints/${id}/pdf`), `reclamation-${complaint.id}.pdf`);
     } catch {
       setError('Impossible d’exporter cette réclamation en PDF.');
     } finally {
@@ -592,7 +594,7 @@ export default function ComplaintDetail() {
     setExportingWord(true);
     setError('');
     try {
-      await getWordDownload(`/complaints/${id}/word`, `reclamation-${complaint.id}.docx`);
+      await getWordDownload(withEvidenceSelection(`/complaints/${id}/word`), `reclamation-${complaint.id}.docx`);
     } catch {
       setError('Impossible de générer le document Word.');
     } finally {
@@ -605,7 +607,7 @@ export default function ComplaintDetail() {
     setError('');
     setDriveSuccess('');
     try {
-      await getPdfAndSaveToDrive(`/complaints/${id}/pdf`, 'RECLAM', complaint.customer_name);
+      await getPdfAndSaveToDrive(withEvidenceSelection(`/complaints/${id}/pdf`), 'RECLAM', complaint.customer_name);
       setDriveSuccess('Enregistré sur le Drive partagé.');
     } catch (err) {
       setError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
@@ -807,7 +809,7 @@ export default function ComplaintDetail() {
         )}
       </div>
 
-      <DriveEvidencePanel moduleKey="complaints" recordId={complaint.id} />
+      <DriveEvidencePanel moduleKey="complaints" recordId={complaint.id} exportSelectionEnabled onExportSelectionChange={onExportSelectionChange} />
 
       {isEditModalOpen && (
         <EditComplaintModal

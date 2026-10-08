@@ -20,6 +20,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 import SupplierScoreChart from '../components/suppliers/SupplierScoreChart.jsx';
 import SupplierDocumentsCard from '../components/suppliers/SupplierDocumentsCard.jsx';
 
@@ -487,6 +488,7 @@ function CreateCapaFromEvaluationModal({ supplierId, supplierName, evaluation, u
 
 export default function SupplierDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/suppliers');
   const currentUser = useCurrentUser();
@@ -531,8 +533,8 @@ export default function SupplierDetail() {
     setError('');
     const baseName = `fournisseur-${supplier.name.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 50)}`;
     try {
-      if (format === 'pdf') await getPdfDownload(`/suppliers/${id}/pdf`, `${baseName}.pdf`);
-      else await getWordDownload(`/suppliers/${id}/word`, `${baseName}.docx`);
+      if (format === 'pdf') await getPdfDownload(withEvidenceSelection(`/suppliers/${id}/pdf`), `${baseName}.pdf`);
+      else await getWordDownload(withEvidenceSelection(`/suppliers/${id}/word`), `${baseName}.docx`);
     } catch {
       setError(`Impossible de générer la fiche ${format === 'pdf' ? 'PDF' : 'Word'}.`);
     } finally {
@@ -724,6 +726,8 @@ export default function SupplierDetail() {
       <DriveEvidencePanel
         moduleKey="suppliers"
         recordId={supplier.id}
+        exportSelectionEnabled
+        onExportSelectionChange={onExportSelectionChange}
         title="Photos de réception et anomalies"
         captionPlaceholder="Ex. Produit endommagé à la réception — commande ou lot"
       />
@@ -792,6 +796,8 @@ export default function SupplierDetail() {
               <DriveEvidencePanel
                 moduleKey="supplier-evaluations"
                 recordId={evaluation.id}
+                exportSelectionEnabled
+                onExportSelectionChange={onExportSelectionChange}
                 title="Photos de cette évaluation"
                 captionPlaceholder="Ex. Défaut constaté pendant l’évaluation"
               />

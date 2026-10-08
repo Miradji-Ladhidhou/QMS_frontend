@@ -23,6 +23,7 @@ import AuditorQualification from '../components/AuditorQualification.jsx';
 import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
 import { qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -260,6 +261,7 @@ function EditAuditModal({ audit, users, services, qualifications, onClose, onUpd
 
 export default function AuditDetail() {
   const { id } = useParams();
+  const { withEvidenceSelection, onExportSelectionChange } = useEvidenceExportSelection(id);
   const navigate = useNavigate();
   const goBack = useSmartBack('/audits');
   const currentUser = useCurrentUser();
@@ -314,15 +316,15 @@ export default function AuditDetail() {
     }
   }
 
-  const handleExportPdf = () => runExport(setExportingPdf, () => getPdfDownload(`/audits/${id}/pdf`, exportFilename('pdf')), "Impossible d'exporter cet audit en PDF.");
+  const handleExportPdf = () => runExport(setExportingPdf, () => getPdfDownload(withEvidenceSelection(`/audits/${id}/pdf`), exportFilename('pdf')), "Impossible d'exporter cet audit en PDF.");
   const handleExportXlsx = () => runExport(setExportingXlsx, () => getXlsxDownload(`/audits/${id}/xlsx`, {}, exportFilename('xlsx')), 'Impossible de générer le fichier Excel.');
-  const handleExportWord = () => runExport(setExportingWord, () => getWordDownload(`/audits/${id}/word`, exportFilename('docx')), 'Impossible de générer le document Word.');
+  const handleExportWord = () => runExport(setExportingWord, () => getWordDownload(withEvidenceSelection(`/audits/${id}/word`), exportFilename('docx')), 'Impossible de générer le document Word.');
 
   async function handleExportDrive() {
     setExportingDrive(true);
     setExportError('');
     try {
-      await getPdfAndSaveToDrive(`/audits/${id}/pdf`, 'AUDIT', audit.title);
+      await getPdfAndSaveToDrive(withEvidenceSelection(`/audits/${id}/pdf`), 'AUDIT', audit.title);
     } catch (err) {
       setExportError(err.response?.data?.error || "Impossible d'enregistrer sur le Drive.");
     } finally {
@@ -588,7 +590,7 @@ export default function AuditDetail() {
         </div>
       )}
 
-      <DriveEvidencePanel moduleKey="audits" recordId={audit.id} />
+      <DriveEvidencePanel moduleKey="audits" recordId={audit.id} exportSelectionEnabled onExportSelectionChange={onExportSelectionChange} />
 
       {isEditModalOpen && (
         <EditAuditModal
