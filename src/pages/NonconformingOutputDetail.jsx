@@ -12,11 +12,14 @@ import {
   NONCONFORMING_OUTPUT_DISPOSITION_LABELS,
 } from '../lib/nonconformingOutputStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
+import { getPdfDownload, getWordDownload } from '../lib/pdfExport.js';
 import NonconformingOutputStatusBadge from '../components/NonconformingOutputStatusBadge.jsx';
 import NonconformingOutputDispositionBadge from '../components/NonconformingOutputDispositionBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -477,6 +480,9 @@ export default function NonconformingOutputDetail() {
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   async function loadOutput() {
     setLoading(true);
@@ -506,6 +512,21 @@ export default function NonconformingOutputDetail() {
       setOutput((prev) => ({ ...prev, ...data }));
     } catch (err) {
       setError(err.response?.data?.error || 'Impossible de mettre à jour le statut.');
+    }
+  }
+
+  async function handleExport(format) {
+    const setter = format === 'pdf' ? setExportingPdf : setExportingWord;
+    setter(true);
+    setExportError('');
+    try {
+      const filename = `non-conformite-${output.id}.${format === 'word' ? 'docx' : 'pdf'}`;
+      if (format === 'pdf') await getPdfDownload(`/nonconforming-outputs/${id}/report.pdf`, filename);
+      else await getWordDownload(`/nonconforming-outputs/${id}/report.word`, filename);
+    } catch (err) {
+      setExportError(err.response?.data?.error || `Impossible d'exporter cette non-conformité en ${format === 'word' ? 'Word' : 'PDF'}.`);
+    } finally {
+      setter(false);
     }
   }
 
@@ -543,6 +564,7 @@ export default function NonconformingOutputDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{output.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportMenu onExportPdf={() => handleExport('pdf')} exportingPdf={exportingPdf} onExportWord={() => handleExport('word')} exportingWord={exportingWord} />
           <NonconformingOutputDispositionBadge disposition={output.disposition} />
           {canManage ? (
             <select
@@ -582,7 +604,9 @@ export default function NonconformingOutputDetail() {
         </div>
       </div>
       <PageGuide id="nonconformingOutputDetail" />
+      <DriveEvidencePanel moduleKey="nonconforming-outputs" recordId={output.id} />
 
+      {exportError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p>}
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       <div className="mt-4 grid grid-cols-2 gap-4 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">

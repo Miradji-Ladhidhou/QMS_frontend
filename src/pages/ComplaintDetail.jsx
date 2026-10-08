@@ -10,7 +10,7 @@ import { useTenant } from '../lib/useTenant.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { COMPLAINT_STATUS_LABELS } from '../lib/complaintStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
-import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { getPdfDownload, getPdfAndSaveToDrive, getWordDownload, exportToXlsx } from '../lib/pdfExport.js';
 import { buildExportColumns, buildExportRows } from '../lib/complaintExport.js';
 import ComplaintStatusBadge from '../components/ComplaintStatusBadge.jsx';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
@@ -20,6 +20,7 @@ import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -560,9 +561,7 @@ export default function ComplaintDetail() {
     }
   }
 
-  // Fiche imprimable dédiée (complaintPdf.js) pour le PDF, comme CapaDetail.jsx/PdcaDetail.jsx —
-  // Excel/Word réutilisent au contraire le même export générique en colonnes/lignes que la
-  // liste (Complaints.jsx), réduit à cette seule réclamation (voir lib/complaintExport.js).
+  // Fiche imprimable dédiée pour PDF et Word; Excel conserve le rapport tabulaire de la liste.
   async function handleExportPdf() {
     setExportingPdf(true);
     setError('');
@@ -593,9 +592,7 @@ export default function ComplaintDetail() {
     setExportingWord(true);
     setError('');
     try {
-      await exportToWord(`reclamation-${complaint.id}.docx`, 'Réclamations clients', buildExportColumns(), buildExportRows([complaint]), {
-        generatedBy: currentUser?.full_name,
-      });
+      await getWordDownload(`/complaints/${id}/word`, `reclamation-${complaint.id}.docx`);
     } catch {
       setError('Impossible de générer le document Word.');
     } finally {
@@ -809,6 +806,8 @@ export default function ComplaintDetail() {
           )
         )}
       </div>
+
+      <DriveEvidencePanel moduleKey="complaints" recordId={complaint.id} />
 
       {isEditModalOpen && (
         <EditComplaintModal

@@ -9,7 +9,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useUsers } from '../lib/useUsers.js';
 import { useTenant } from '../lib/useTenant.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
-import { getPdfDownload, getPdfAndSaveToDrive, exportToXlsx, exportToWord } from '../lib/pdfExport.js';
+import { getPdfDownload, getPdfAndSaveToDrive, getWordDownload, exportToXlsx } from '../lib/pdfExport.js';
 import { buildCapaExportColumns, buildCapaExportRows } from '../lib/capaExport.js';
 import CapaPriorityBadge from '../components/CapaPriorityBadge.jsx';
 import CapaStatusBadge from '../components/CapaStatusBadge.jsx';
@@ -20,6 +20,7 @@ import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import LinkItemModal from '../components/LinkItemModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 
 // Représente le tri-état effectiveness_verified (null/true/false) comme une chaîne pour
 // un <select>, seul moyen simple de distinguer "non vérifiée" d'un false explicite.
@@ -505,9 +506,8 @@ export default function CapaDetail() {
     }
   }
 
-  // Fiche imprimable dédiée (capaPdf.js, voir handleExportPdf/handleExportDrive ci-dessus/
-  // dessous) pour le PDF — Excel/Word réutilisent au contraire le même export générique en
-  // colonnes/lignes que la liste (Capas.jsx), réduit à cette seule CAPA (voir lib/capaExport.js).
+  // Les fiches PDF et Word dédiées incluent leurs photos de preuve; Excel conserve l’export
+  // tabulaire partagé avec la liste des CAPA.
   async function handleExportXlsx() {
     setExportingXlsx(true);
     setExportError('');
@@ -526,9 +526,7 @@ export default function CapaDetail() {
     setExportingWord(true);
     setExportError('');
     try {
-      await exportToWord(`${capa.number || capa.id}.docx`, 'CAPA', buildCapaExportColumns(), buildCapaExportRows([capa]), {
-        generatedBy: currentUser?.full_name,
-      });
+      await getWordDownload(`/capas/${id}/word`, `${capa.number || capa.id}.docx`);
     } catch {
       setExportError('Impossible de générer le document Word.');
     } finally {
@@ -688,6 +686,8 @@ export default function CapaDetail() {
           )}
         </dl>
       </div>
+
+      <DriveEvidencePanel moduleKey="capas" recordId={capa.id} />
 
       <form
         onSubmit={handleSaveTreatment}

@@ -9,12 +9,15 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { CAPA_PRIORITY_LABELS } from '../lib/capaStatus.js';
 import { ACCIDENT_STATUS_LABELS, ACCIDENT_SEVERITY_LABELS } from '../lib/accidentStatus.js';
 import { resolvePersonalCategoryId } from '../lib/personalCategory.js';
+import { getPdfDownload, getWordDownload } from '../lib/pdfExport.js';
 import AccidentStatusBadge from '../components/AccidentStatusBadge.jsx';
 import AccidentSeverityBadge from '../components/AccidentSeverityBadge.jsx';
 import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import AiCapaSuggestion from '../components/AiCapaSuggestion.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
+import ExportMenu from '../components/ExportMenu.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -625,6 +628,9 @@ export default function AccidentDetail() {
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isCapaModalOpen, setIsCapaModalOpen] = useState(false);
+  const [exportingPdf, setExportingPdf] = useState(false);
+  const [exportingWord, setExportingWord] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   // Admin uniquement, sinon le créateur (voir DELETE /accidents/:id côté backend) — un manager
   // qui n'a pas déclaré cet accident peut l'investiguer/le clôturer mais pas le supprimer.
@@ -667,6 +673,21 @@ export default function AccidentDetail() {
     }
   }
 
+  async function handleExport(format) {
+    const setter = format === 'pdf' ? setExportingPdf : setExportingWord;
+    setter(true);
+    setExportError('');
+    try {
+      const filename = `accident-${accident.id}.${format === 'word' ? 'docx' : 'pdf'}`;
+      if (format === 'pdf') await getPdfDownload(`/accidents/${id}/report.pdf`, filename);
+      else await getWordDownload(`/accidents/${id}/report.word`, filename);
+    } catch (err) {
+      setExportError(err.response?.data?.error || `Impossible d'exporter cet accident en ${format === 'word' ? 'Word' : 'PDF'}.`);
+    } finally {
+      setter(false);
+    }
+  }
+
   async function handleDelete() {
     if (!window.confirm(`Supprimer définitivement "${accident.title}" ?`)) return;
     try {
@@ -701,6 +722,7 @@ export default function AccidentDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{accident.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          <ExportMenu onExportPdf={() => handleExport('pdf')} exportingPdf={exportingPdf} onExportWord={() => handleExport('word')} exportingWord={exportingWord} />
           <AccidentSeverityBadge severity={accident.severity} />
           {canManage ? (
             <select
@@ -740,7 +762,9 @@ export default function AccidentDetail() {
         </div>
       </div>
       <PageGuide id="accidentDetail" />
+      <DriveEvidencePanel moduleKey="accidents" recordId={accident.id} />
 
+      {exportError && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{exportError}</p>}
       {error && <p className="mt-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
       <div className="mt-4 grid grid-cols-2 gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4 sm:p-5">

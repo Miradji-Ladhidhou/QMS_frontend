@@ -22,6 +22,7 @@ import AuditChecklist from '../components/AuditChecklist.jsx';
 import AuditorQualification from '../components/AuditorQualification.jsx';
 import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
 import { qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -586,6 +587,8 @@ export default function AuditDetail() {
           ))}
         </div>
       )}
+
+      <DriveEvidencePanel moduleKey="audits" recordId={audit.id} />
 
       {isEditModalOpen && (
         <EditAuditModal

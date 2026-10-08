@@ -25,6 +25,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
+import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 import CcpLimitsFields from '../components/haccp/CcpLimitsFields.jsx';
 import CcpMonitoringChart from '../components/haccp/CcpMonitoringChart.jsx';
 import CcpStatusChip from '../components/haccp/CcpStatusChip.jsx';
@@ -1401,6 +1402,8 @@ export default function HaccpDetail() {
         </div>
         <p className="mt-3 text-xs text-slate-500">Ces repères indiquent la saisie et les statuts, pas la conformité du plan. Un danger significatif n’est pas automatiquement un CCP.</p>
       </section>
+
+      <DriveEvidencePanel moduleKey="haccp" recordId={plan.id} />
 
       <nav aria-label="Étapes du plan HACCP" className="mt-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {HACCP_WORKFLOW_STAGES.map((stage, index) => (
