@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase.js';
 import { api } from '../lib/api.js';
 import AppLogo from '../components/AppLogo.jsx';
@@ -44,6 +44,14 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-8">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-slate-200 p-6 sm:p-8">
+        <Link
+          to="/"
+          className="mb-4 inline-flex min-h-10 items-center gap-1.5 text-sm font-medium text-slate-600 hover:text-primary"
+        >
+          <ArrowLeft size={16} />
+          Retour à l’accueil
+        </Link>
+
         <div className="flex flex-col items-center mb-6">
           <AppLogo className="h-12 w-12 rounded-xl mb-3" />
           <p className="text-lg font-semibold text-slate-900">

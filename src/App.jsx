@@ -1,5 +1,5 @@
-import { lazy, Suspense, useEffect, useState } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { lazy, Suspense, useEffect, useLayoutEffect, useState } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { supabase } from './lib/supabase.js';
 import { CurrentUserProvider } from './lib/CurrentUserProvider.jsx';
 import { TenantProvider } from './lib/TenantProvider.jsx';
@@ -103,6 +103,16 @@ function RouteFallback() {
   );
 }
 
+function ScrollToTop() {
+  const { pathname } = useLocation();
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+
+  return null;
+}
+
 export default function App() {
   const [session, setSession] = useState(undefined);
 
@@ -129,6 +139,7 @@ export default function App() {
   // chemin interne existant (/documents, /capas/:id, etc.) n'est modifié par ce choix.
   return (
     <BrowserRouter>
+      <ScrollToTop />
       <CookieNotice />
       <Suspense fallback={<RouteFallback />}>
         {session ? (
