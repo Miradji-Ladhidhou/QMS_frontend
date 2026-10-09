@@ -332,6 +332,7 @@ export default function Layout() {
   }, []);
 
   const currentUser = useCurrentUser();
+  const canContactSupport = ['admin', 'manager'].includes(currentUser?.role);
   const tenant = useTenant();
   const role = useRole();
   const visibleMenuKeys = useMenuVisibility();
@@ -447,7 +448,7 @@ export default function Layout() {
   }
 
   return (
-    <div className="relative min-h-screen bg-slate-50 md:flex md:flex-col">
+    <div className="relative flex min-h-screen flex-col bg-slate-50">
       <header className="sticky top-0 z-30 flex items-center justify-between bg-primary px-4 py-3 text-white md:hidden">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           {logoUrl ? (
@@ -689,6 +690,37 @@ export default function Layout() {
           </div>
         </Suspense>
       </main>
+
+      <footer className="border-t border-slate-200/70 bg-white py-6">
+        <div className="mx-auto flex w-full max-w-7xl flex-col gap-3 px-5 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <span>© 2026 QMS SaaS</span>
+          <div className="flex flex-wrap gap-x-4 gap-y-2">
+            <NavLink to="/legal/cgu" className="hover:text-slate-600">
+              CGU
+            </NavLink>
+            <NavLink to="/legal/confidentialite" className="hover:text-slate-600">
+              Confidentialité
+            </NavLink>
+            <NavLink to="/legal/mentions-legales" className="hover:text-slate-600">
+              Mentions légales
+            </NavLink>
+            <NavLink to="/prise-en-main" className="hover:text-slate-600">
+              Aide &amp; prise en main
+            </NavLink>
+            {canContactSupport && (
+              <NavLink to="/settings?tab=data-security" className="hover:text-slate-600">
+                Support
+              </NavLink>
+            )}
+            <NavLink to="/settings" className="hover:text-slate-600">
+              Paramètres
+            </NavLink>
+            <a href="mailto:saas.qms@gmail.com?subject=Contact%20QMS%20SaaS" className="hover:text-slate-600">
+              Contact par email
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

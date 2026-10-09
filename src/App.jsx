@@ -13,6 +13,7 @@ import ForgotPassword from './pages/ForgotPassword.jsx';
 import ResetPassword from './pages/ResetPassword.jsx';
 import LegalTerms from './pages/LegalTerms.jsx';
 import LegalPrivacy from './pages/LegalPrivacy.jsx';
+import LegalNotice from './pages/LegalNotice.jsx';
 import CookieNotice from './components/CookieNotice.jsx';
 import Maintenance from './pages/Maintenance.jsx';
 
@@ -159,6 +160,7 @@ export default function App() {
                     <Route path="/maintenance" element={<Maintenance />} />
                     <Route path="/legal/cgu" element={<LegalTerms />} />
                     <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
+                    <Route path="/legal/mentions-legales" element={<LegalNotice />} />
                     {/* Lien de QCM reçu par email : ouvert sans compte, mais disponible aussi quand la
                         personne est déjà connectée (même page, jamais redirigée vers le tableau de bord). */}
                     <Route path="/quiz/:token" element={<PublicQuiz />} />
@@ -226,6 +228,7 @@ export default function App() {
             <Route path="/maintenance" element={<Maintenance />} />
             <Route path="/legal/cgu" element={<LegalTerms />} />
             <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
+            <Route path="/legal/mentions-legales" element={<LegalNotice />} />
             <Route path="/quiz/:token" element={<PublicQuiz />} />
             <Route path="/" element={<Landing />} />
             <Route path="*" element={<Navigate to="/" replace />} />

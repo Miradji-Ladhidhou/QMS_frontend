@@ -340,6 +340,9 @@ export default function Landing() {
             <Link to="/legal/confidentialite" className="hover:text-slate-600">
               Confidentialité
             </Link>
+            <Link to="/legal/mentions-legales" className="hover:text-slate-600">
+              Mentions légales
+            </Link>
           </div>
         </div>
       </footer>
