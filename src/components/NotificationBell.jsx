@@ -108,15 +108,14 @@ export default function NotificationBell({ variant = 'sidebar' }) {
   // "le modal est caché derrière la page"). Rendu en portal dans document.body + positionné en
   // `fixed` depuis le rect du bouton : échappe entièrement à l'overflow et au transform de la
   // sidebar (transition-transform pour le slide-in mobile crée aussi un containing block pour
-  // les descendants fixed, donc rester dans l'arbre ne suffirait pas même avec position: fixed).
+  // les descendants fixed). La position horizontale reste dans le viewport, même si le bouton
+  // se trouve près de son bord droit.
   function toggle() {
     if (!isOpen && buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setPosition(
-        variant === 'sidebar'
-          ? { top: rect.bottom + 8, left: rect.left }
-          : { top: rect.bottom + 8, right: window.innerWidth - rect.right }
-      );
+      const panelWidth = Math.min(320, window.innerWidth * 0.85);
+      const left = Math.max(8, Math.min(rect.left, window.innerWidth - panelWidth - 8));
+      setPosition({ top: rect.bottom + 8, left });
     }
     setIsOpen((prev) => !prev);
   }
@@ -142,7 +141,7 @@ export default function NotificationBell({ variant = 'sidebar' }) {
         createPortal(
           <div
             ref={dropdownRef}
-            style={{ top: position.top, left: position.left, right: position.right }}
+            style={{ top: position.top, left: position.left }}
             className="fixed z-50 w-80 max-w-[85vw] rounded-xl border border-slate-200 bg-white text-slate-900 shadow-lg"
           >
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
