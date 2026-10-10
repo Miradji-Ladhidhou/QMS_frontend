@@ -3,112 +3,114 @@ import LegalSection from '../components/LegalSection.jsx';
 
 export default function LegalTerms() {
   return (
-    <LegalPageLayout title="Conditions générales d'utilisation" updatedAt="[à compléter]">
-      <LegalSection title="1. Objet">
+    <LegalPageLayout title="Conditions d’utilisation du pilote" updatedAt="10 octobre 2026">
+      <LegalSection title="1. Statut du service">
         <p>
-          Les présentes conditions générales d'utilisation (« CGU ») régissent l'accès et l'utilisation du
-          logiciel QMS SaaS (« le Service »), édité par [Nom de la société], [forme juridique], au capital
-          de [montant], immatriculée au RCS de [ville] sous le numéro [SIRET], dont le siège social est
-          situé [adresse] (« l'Éditeur »).
+          QMS SaaS est un projet personnel en phase de préproduction, accessible sur invitation pour des essais.
+          Il ne s’agit pas actuellement d’une offre commerciale, d’un abonnement ou d’un service assorti d’un
+          engagement de disponibilité. Aucun prix ni niveau de service n’est proposé dans le cadre de ce pilote.
         </p>
         <p>
-          Toute création de compte implique l'acceptation pleine et entière des présentes CGU par le client
-          (« le Client ») et par les utilisateurs qu'il autorise à accéder au Service (« les Utilisateurs »).
-        </p>
-      </LegalSection>
-
-      <LegalSection title="2. Description du service">
-        <p>
-          QMS SaaS est un logiciel de gestion d'un système de management de la qualité : gestion documentaire,
-          traitement des non-conformités (CAPA) et des réclamations clients, diagnostic structuré (QQOQCCP),
-          suivi des formations, indicateurs qualité (KPI), audits internes, registre des risques, évaluation
-          des fournisseurs, revues de direction et planning unifié. Le Service est accessible en ligne, en
-          mode multi-locataires, chaque Client disposant d'un espace de données isolé.
+          Ces conditions décrivent uniquement les règles d’utilisation du pilote. Elles ne constituent pas les
+          conditions d’une future offre commerciale, qui devra faire l’objet de documents distincts et validés
+          avant sa commercialisation.
         </p>
       </LegalSection>
 
-      <LegalSection title="3. Compte et accès">
+      <LegalSection title="2. Objet et fonctionnalités">
         <p>
-          L'accès au Service nécessite la création d'un compte associé à une adresse email valide. Le Client
-          est responsable de la confidentialité des identifiants de connexion de ses Utilisateurs et de toute
-          action réalisée depuis leurs comptes.
+          Le pilote permet d’évaluer des fonctions de gestion de la qualité : documents et procédures, actions
+          correctives (CAPA), réclamations, audits, risques, formations, indicateurs, fournisseurs, revues de
+          direction, planning, preuves photographiques et assistance par intelligence artificielle.
         </p>
         <p>
-          Le Client gère lui-même les rôles et permissions de ses Utilisateurs au sein de son espace
-          (propriétaire, administrateur, manager, membre) et reste seul responsable de l'attribution de ces
-          rôles.
-        </p>
-      </LegalSection>
-
-      <LegalSection title="4. Obligations de l'utilisateur">
-        <p>
-          Le Client s'engage à utiliser le Service conformément à sa destination, à ne pas tenter d'accéder
-          aux données d'un autre Client, à ne pas perturber le fonctionnement du Service et à respecter la
-          réglementation applicable, notamment en matière de protection des données personnelles.
+          Les fonctionnalités, interfaces et données de démonstration peuvent évoluer, être réinitialisées ou
+          devenir temporairement indisponibles pendant les essais.
         </p>
       </LegalSection>
 
-      <LegalSection title="5. Propriété intellectuelle">
+      <LegalSection title="3. Accès au pilote">
         <p>
-          Le Service, son code source, ses interfaces et sa documentation sont la propriété exclusive de
-          l'Éditeur ou de ses concédants. Aucune disposition des présentes CGU ne saurait être interprétée
-          comme une cession de droits de propriété intellectuelle au profit du Client.
-        </p>
-        <p>
-          Les données saisies par le Client dans le Service (documents, fiches CAPA, données de formation,
-          indicateurs, analyses) demeurent la propriété du Client.
+          L’accès est accordé sur demande et peut être limité, suspendu ou retiré pendant la phase de test.
+          Chaque utilisateur doit protéger ses identifiants et informer le contact du pilote s’il soupçonne un
+          accès non autorisé.
         </p>
       </LegalSection>
 
-      <LegalSection title="6. Données et confidentialité">
+      <LegalSection title="4. Utilisation des données pendant le pilote">
         <p>
-          Le traitement des données à caractère personnel dans le cadre du Service est décrit dans la{' '}
-          <a href="/legal/confidentialite" className="text-primary hover:underline">
-            politique de confidentialité
-          </a>
-          , qui fait partie intégrante des présentes CGU.
+          Vous pouvez communiquer les informations de contact nécessaires à votre demande d’accès et à
+          l’utilisation du compte pilote. Limitez les informations enregistrées dans les modules aux besoins
+          de l’évaluation. N’y ajoutez pas de données sensibles, de données de santé, de documents
+          confidentiels ou d’informations personnelles concernant des salariés, clients ou fournisseurs sans
+          autorisation et sans cadre adapté.
+        </p>
+        <p>
+          Le pilote ne doit pas être utilisé comme preuve de conformité réglementaire ni comme registre
+          opérationnel officiel. Pour toute question concernant une information enregistrée, contactez{' '}
+          <a href="mailto:saas.qms@gmail.com" className="text-primary hover:underline">saas.qms@gmail.com</a>.
         </p>
       </LegalSection>
 
-      <LegalSection title="7. Disponibilité et maintenance">
+      <LegalSection title="5. Assistance par intelligence artificielle">
         <p>
-          L'Éditeur met en œuvre les moyens raisonnables pour assurer la disponibilité du Service, sans
-          garantir un accès ininterrompu. Des opérations de maintenance planifiées peuvent entraîner des
-          interruptions temporaires, avec information préalable dans la mesure du possible.
+          Lorsqu’une fonction IA est utilisée, les éléments saisis dans cette fonction sont transmis au
+          fournisseur technique Groq afin de produire une proposition. Les propositions peuvent être
+          incomplètes ou inexactes : elles doivent être vérifiées et adaptées par l’utilisateur. Elles ne
+          remplacent ni une expertise professionnelle ni une validation réglementaire.
+        </p>
+        <p>
+          N’envoyez pas de données sensibles, confidentielles ou concernant des tiers à ces fonctions. La
+          disponibilité de l’assistance IA dépend de la configuration du pilote.
         </p>
       </LegalSection>
 
-      <LegalSection title="8. Responsabilité">
+      <LegalSection title="6. Photos et fichiers">
         <p>
-          L'Éditeur ne saurait être tenu responsable des dommages indirects résultant de l'utilisation du
-          Service. Le Service étant un outil d'aide à la gestion de la qualité, il appartient au Client de
-          vérifier l'exactitude et la conformité des données qu'il y saisit au regard de ses propres
-          obligations réglementaires (notamment ISO 9001).
+          Les preuves photographiques ajoutées au pilote sont transférées vers Google Drive lorsqu’une
+          connexion Drive est configurée. D’autres documents peuvent être hébergés par les prestataires
+          techniques du service selon la configuration de l’espace. Assurez-vous d’avoir le droit de
+          téléverser les fichiers et évitez les contenus confidentiels ou identifiants sans autorisation.
         </p>
       </LegalSection>
 
-      <LegalSection title="9. Résiliation">
+      <LegalSection title="7. Propriété intellectuelle">
         <p>
-          Le Client peut à tout moment mettre fin à son abonnement selon les modalités prévues à son contrat.
-          Le Client propriétaire de son espace peut également demander la suppression définitive de son
-          compte et de l'ensemble de ses données depuis les paramètres de son espace, conformément à la{' '}
-          <a href="/legal/confidentialite" className="text-primary hover:underline">
-            politique de confidentialité
-          </a>
-          .
+          Les interfaces, le code et les contenus originaux de QMS SaaS restent protégés par les règles
+          applicables. Les présentes conditions n’accordent qu’un droit personnel, limité, révocable et
+          temporaire d’utiliser le pilote pour son évaluation. L’utilisateur reste responsable des contenus
+          qu’il ajoute et des autorisations nécessaires à leur utilisation.
         </p>
       </LegalSection>
 
-      <LegalSection title="10. Droit applicable et juridiction">
+      <LegalSection title="8. Confidentialité et suppression">
         <p>
-          Les présentes CGU sont soumises au droit [pays/juridiction à préciser]. Tout litige relatif à leur
-          interprétation ou leur exécution relève de la compétence exclusive des tribunaux de [ville à
-          préciser], sauf disposition légale contraire impérative.
+          Les traitements techniques utilisés pour le pilote et leurs limites sont décrits dans la{' '}
+          <a href="/legal/confidentialite" className="text-primary hover:underline">page de confidentialité</a>.
+          Pour demander la suppression d’un compte ou poser une question sur vos données, écrivez à{' '}
+          <a href="mailto:saas.qms@gmail.com" className="text-primary hover:underline">saas.qms@gmail.com</a>.
         </p>
       </LegalSection>
 
-      <LegalSection title="11. Contact">
-        <p>Pour toute question relative aux présentes CGU : [email de contact].</p>
+      <LegalSection title="9. Responsabilité et évolution">
+        <p>
+          Le pilote est fourni à des fins d’évaluation, sans garantie de disponibilité, de conservation des
+          données ou d’adéquation à un usage particulier. Dans les limites autorisées par la loi, l’utilisateur
+          demeure responsable de ses essais et de la sauvegarde des contenus qu’il ajoute.
+        </p>
+        <p>
+          Ces conditions devront être remplacées et validées avant toute ouverture commerciale ou utilisation
+          avec des données réelles.
+        </p>
+      </LegalSection>
+
+      <LegalSection title="10. Contact et droit applicable">
+        <p>
+          Pour toute question concernant le pilote :{' '}
+          <a href="mailto:saas.qms@gmail.com" className="text-primary hover:underline">saas.qms@gmail.com</a>.
+          Le projet est exploité depuis La Possession (97419), La Réunion, France. Les règles impératives
+          applicables demeurent réservées ; les présentes conditions ne désignent pas de tribunal exclusif.
+        </p>
       </LegalSection>
     </LegalPageLayout>
   );

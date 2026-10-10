@@ -482,6 +482,25 @@ export default function GettingStarted() {
         Votre parcours de démarrage, puis un guide des outils accessible à tous les rôles.
       </p>
 
+      <div className="mt-4 flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+        <ShieldAlert size={19} className="mt-0.5 shrink-0" />
+        <div>
+          <p className="font-semibold">Projet personnel en phase pilote</p>
+          <p>
+            Évitez d’enregistrer des informations confidentielles, des données sensibles ou des informations
+            personnelles concernant des tiers sans autorisation. Les contenus du pilote peuvent évoluer.{' '}
+            <Link to="/legal/confidentialite" className="font-semibold underline underline-offset-2">
+              Lire les informations sur le pilote
+            </Link>
+            . Pour toute question, écrivez à{' '}
+            <a href="mailto:saas.qms@gmail.com" className="font-semibold underline underline-offset-2">
+              saas.qms@gmail.com
+            </a>
+            .
+          </p>
+        </div>
+      </div>
+
       <section aria-labelledby="getting-started-checklist" className="mt-5 rounded-xl border border-primary/20 bg-white p-4 shadow-sm sm:p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>

@@ -22,17 +22,18 @@ export default function LegalPageLayout({ title, updatedAt, children }) {
         <h1 className="text-2xl font-semibold text-slate-900 sm:text-3xl">{title}</h1>
         <p className="mt-2 text-sm text-slate-500">Dernière mise à jour : {updatedAt}</p>
 
-        <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          Document de travail fourni à titre indicatif. Les informations entre crochets doivent être
-          complétées et ce texte doit être validé par un professionnel du droit avant toute mise en
-          production réelle.
+        <div className="mt-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+          <strong>Projet personnel en phase pilote, non commercial.</strong> Les informations ci-dessous
+          décrivent le fonctionnement actuel de QMS SaaS. Elles ne constituent pas des conditions validées
+          pour une offre commerciale. Évitez d’y enregistrer des informations sensibles, confidentielles ou
+          concernant des tiers sans leur autorisation.
         </div>
 
         <div className="mt-8 space-y-8">{children}</div>
       </main>
 
       <footer className="border-t border-slate-100 py-8">
-        <div className="mx-auto max-w-3xl px-4 text-sm text-slate-400 sm:px-6">© 2026 QMS SaaS</div>
+        <div className="mx-auto max-w-3xl px-4 text-sm text-slate-500 sm:px-6">© 2026 QMS SaaS · préproduction</div>
       </footer>
     </div>
   );

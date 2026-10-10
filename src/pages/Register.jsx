@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { Mail, Building2, Users, Phone, User } from 'lucide-react';
+import { Mail, ShieldAlert } from 'lucide-react';
 import AppLogo from '../components/AppLogo.jsx';
 
 // Même principe que TeamOff (SaaS_TeamOff/teamoff-frontend/src/pages/Auth/RegisterPage.jsx) :
@@ -7,20 +7,10 @@ import AppLogo from '../components/AppLogo.jsx';
 // suivre et pré-remplit un email pour l'équipe — la création du compte reste un geste du super
 // admin (voir SuperAdmin.jsx#CreateTenantModal), jamais automatique.
 const CONTACT_EMAIL = 'saas.qms@gmail.com';
-const MAILTO_HREF = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Demande de création de compte QMS SaaS')}&body=${encodeURIComponent(
+const MAILTO_HREF = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Demande d’accès au pilote QMS SaaS')}&body=${encodeURIComponent(
   `Bonjour,
 
-Je souhaite créer un compte entreprise sur QMS SaaS.
-
-Nom de l'entreprise :
-Email de l'entreprise :
-Téléphone :
-Nombre d'utilisateurs prévu :
-
-Responsable du compte :
-Prénom :
-Nom :
-Email :
+Je souhaite demander un accès au pilote de QMS SaaS.
 
 Cordialement`
 )}`;
@@ -36,48 +26,33 @@ export default function Register() {
           </p>
         </div>
 
-        <h1 className="text-2xl font-semibold text-primary text-center mb-4">Demande de création de compte</h1>
+        <h1 className="text-2xl font-semibold text-primary text-center mb-4">Demande d’accès au pilote</h1>
 
         <p className="mb-4 text-sm text-slate-600">
-          La création de compte se fait sur demande. Envoyez un email à l'adresse suivante en incluant les
-          informations ci-dessous :
+          QMS SaaS est un projet personnel non commercial en phase pilote, exploité depuis La Possession
+          (97419), La Réunion. L’accès se demande par email ; aucun compte n’est créé automatiquement.
         </p>
+
+        <div className="mb-5 flex gap-3 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm leading-5 text-amber-950">
+          <ShieldAlert size={18} className="mt-0.5 shrink-0" />
+          <p>
+            Vous pouvez utiliser votre propre adresse email pour demander un accès. N’incluez pas de document,
+            mot de passe ou donnée personnelle concernant un salarié, client ou fournisseur dans votre
+            demande.
+          </p>
+        </div>
 
         <a
           href={MAILTO_HREF}
           className="mb-5 flex w-full items-center justify-center gap-2 rounded-md bg-primary px-3 py-3 text-sm font-medium text-white transition-colors hover:bg-primary-700"
         >
           <Mail size={16} />
-          Envoyer un email à {CONTACT_EMAIL}
+          Demander un accès de test
         </a>
 
-        <div className="mb-2 text-sm font-medium text-slate-700">Informations à inclure dans votre email :</div>
-        <ul className="mb-6 space-y-2 text-sm text-slate-600">
-          <li className="flex items-start gap-2">
-            <Building2 size={16} className="mt-0.5 shrink-0 text-primary" />
-            <span>
-              <strong className="text-slate-800">Entreprise :</strong> nom, email, téléphone
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Users size={16} className="mt-0.5 shrink-0 text-primary" />
-            <span>
-              <strong className="text-slate-800">Effectif :</strong> nombre d'utilisateurs prévu
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <User size={16} className="mt-0.5 shrink-0 text-primary" />
-            <span>
-              <strong className="text-slate-800">Responsable du compte :</strong> prénom, nom, email
-            </span>
-          </li>
-          <li className="flex items-start gap-2">
-            <Phone size={16} className="mt-0.5 shrink-0 text-primary" />
-            <span>
-              <strong className="text-slate-800">Numéro de téléphone</strong> pour vous contacter si besoin
-            </span>
-          </li>
-        </ul>
+        <p className="mb-6 text-center text-xs text-slate-500">
+          Contact : <a className="text-primary hover:underline" href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>
+        </p>
 
         <p className="text-center text-sm text-slate-600">
           Déjà un compte ?{' '}
