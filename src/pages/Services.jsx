@@ -7,6 +7,7 @@ import { useCurrentUser } from '../lib/useCurrentUser.js';
 import { useSort } from '../lib/useSort.js';
 import SortSelect from '../components/SortSelect.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 const SERVICE_SORT_OPTIONS = [
   { key: 'name', label: 'nom' },
@@ -231,6 +232,7 @@ function ServiceCard({ service, allManagers, onUpdated, onDeleted }) {
           </span>
         </div>
         <div className="flex shrink-0 gap-1">
+          <ShareRecordPanel resourceType="service" resourceId={service.id} compact />
           <button
             type="button"
             onClick={() => setEditing(true)}

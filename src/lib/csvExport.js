@@ -11,7 +11,15 @@ const BOM = String.fromCharCode(0xfeff);
 // historique inchangé — un fichier pensé pour être réimporté tel quel ne doit pas voir sa
 // première ligne polluée. Pour un vrai export de données, ce bloc donne au CSV la même
 // traçabilité qu'un PDF exporté (voir listReportPdf.js) : qui, quand, sur quel périmètre.
-export function exportToCsv(filename, title, headers, rows, { generatedBy, subtitle } = {}) {
+export async function exportToCsv(filename, title, headers, rows, { generatedBy, subtitle } = {}) {
+  if (title) {
+    try {
+      await api.post('/shares/check-export', { path: window.location.pathname });
+    } catch (error) {
+      window.alert(error.response?.data?.error || 'Impossible de vérifier le droit d’export.');
+      return;
+    }
+  }
   const metaRows = title
     ? [
         [title],
@@ -34,3 +42,4 @@ export function exportToCsv(filename, title, headers, rows, { generatedBy, subti
   document.body.removeChild(link);
   URL.revokeObjectURL(url);
 }
+import { api } from './api.js';

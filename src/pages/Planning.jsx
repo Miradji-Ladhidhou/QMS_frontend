@@ -47,6 +47,7 @@ import SelectAllToggle from '../components/SelectAllToggle.jsx';
 import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 // pdca : le backend agrège aussi les projets PDCA à échéance dans le planning (voir
 // fetchPdcaItems, services/planningItems.js) — bug réel constaté en production (crash de toute
@@ -727,8 +728,9 @@ function PlanningItemCard({ item, currentUser, selected, onToggleSelect, onMarkD
         </div>
       </div>
 
-      {isTask && (editable || deletable) && (
+      {isTask && (editable || deletable || isManagerRole(currentUser?.role)) && (
         <div className="flex shrink-0 gap-1">
+          {isManagerRole(currentUser?.role) && <ShareRecordPanel resourceType="task" resourceId={item.id} compact />}
           {editable && (
             <button
               type="button"

@@ -21,7 +21,7 @@ export const SIDEBAR_CATEGORIES = [
   },
 ];
 
-export const SIDEBAR_PERMANENT_PATHS = ['/settings', '/prise-en-main', '/liens-utiles'];
+export const SIDEBAR_PERMANENT_PATHS = ['/shares', '/settings', '/prise-en-main', '/liens-utiles'];
 export const SIDEBAR_TOP_PATHS = ['/', '/guide-resolution'];
 
 export function isSidebarItemActive(item, pathname) {
@@ -33,6 +33,7 @@ function getVisibleSidebarItems(items, { role, appModules, visibleMenuKeys }) {
     (item) =>
       !item.hiddenFromSidebar &&
       (!item.adminOnly || role === 'admin') &&
+      (!item.managerOnly || ['admin', 'manager'].includes(role)) &&
       (!item.key || appModules?.[item.key] !== false) &&
       (item.adminOnly || item.alwaysVisible || !visibleMenuKeys || visibleMenuKeys.includes(item.key))
   );

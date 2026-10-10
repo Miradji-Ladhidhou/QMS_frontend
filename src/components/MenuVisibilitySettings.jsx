@@ -3,6 +3,7 @@ import { Eye, Loader2 } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useUsers } from '../lib/useUsers.js';
 import { NAV_ITEMS } from './Layout.jsx';
+import { Link } from 'react-router-dom';
 
 const ROLE_COLUMNS = [
   { role: 'manager', label: 'Manager' },
@@ -104,12 +105,19 @@ export default function MenuVisibilitySettings() {
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <div className="flex items-center gap-2">
           <Eye size={18} className="text-slate-400" />
-          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Visibilité du menu</h2>
+          <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Accès aux modules et navigation</h2>
         </div>
         <p className="mt-2 text-sm text-slate-500">
-          Choisissez quelles sections apparaissent dans le menu selon le rôle, avec des exceptions possibles par
-          utilisateur. Un admin voit toujours toutes les sections.
+          Définissez les accès habituels aux modules par rôle et par utilisateur. Masquer un module bloque aussi
+          son accès normal, pas seulement son affichage. Les catégories et workflows conservent leurs règles.
+          Un administrateur garde accès à tous les modules inclus dans le forfait.
         </p>
+        <div className="mt-3 rounded-lg bg-blue-50 p-3 text-sm text-blue-800">
+          Pour donner accès à quelques fiches ou fichiers sans ouvrir tout un module, utilisez Partages.
+          Une fiche partagée reste accessible dans « Mes partages reçus » même si son module est masqué.
+          Le partage ne change pas ces réglages et ne réactive pas un module exclu du forfait.
+          <Link to={selectedUserId ? `/shares?recipient_type=user&subject_id=${selectedUserId}` : '/shares'} className="mt-2 block font-medium underline">Gérer les partages{selectedUser ? ` de ${selectedUser.full_name}` : ''}</Link>
+        </div>
 
         {error && (
           <p className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>
@@ -154,8 +162,8 @@ export default function MenuVisibilitySettings() {
       <div className="rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
         <h3 className="text-sm font-semibold text-slate-900">Exceptions par utilisateur</h3>
         <p className="mt-1 text-sm text-slate-500">
-          Forcer l'affichage ou le masquage d'une section pour une personne précise, quel que soit le réglage de
-          son rôle.
+          Autoriser ou bloquer l'accès habituel à un module pour une personne précise, quel que soit le réglage
+          de son rôle. Ces exceptions ne définissent pas les droits des fiches partagées.
         </p>
 
         {usersWithOverrides.length > 0 && (
@@ -199,7 +207,7 @@ export default function MenuVisibilitySettings() {
           <ul className="mt-4 divide-y divide-slate-100 rounded-md border border-slate-200">
             {configurableNavItems.map((item) => {
               const override = userOverrides[selectedUser.id]?.[item.key];
-              const stateLabel = override === true ? 'Toujours affiché' : override === false ? 'Toujours masqué' : 'Suit le rôle';
+              const stateLabel = override === true ? 'Accès autorisé' : override === false ? 'Accès bloqué' : 'Suit le rôle';
               const stateClass =
                 override === true
                   ? 'bg-emerald-100 text-emerald-700'

@@ -19,6 +19,7 @@ import PageGuide from '../components/PageGuide.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 import ExportMenu from '../components/ExportMenu.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -724,6 +725,7 @@ export default function AccidentDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{accident.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="accident" resourceId={accident.id} compact />}
           <ExportMenu onExportPdf={() => handleExport('pdf')} exportingPdf={exportingPdf} onExportWord={() => handleExport('word')} exportingWord={exportingWord} />
           <AccidentSeverityBadge severity={accident.severity} />
           {canManage ? (

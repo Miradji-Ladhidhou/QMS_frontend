@@ -30,6 +30,7 @@ import SortSelect from '../components/SortSelect.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 const CATEGORIES_BASE_URL = '/module-categories';
 const EMPLOYEE_RESOURCE_TYPE = 'employee';
@@ -175,7 +176,7 @@ function EmployeeModal({ employee, onClose, onSaved }) {
   );
 }
 
-function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit, onDelete, onMove }) {
+function EmployeeCard({ employee, canShare, togglingId, deletingId, onToggleActive, onEdit, onDelete, onMove }) {
   return (
     <div
       className={`flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm ${
@@ -222,6 +223,7 @@ function EmployeeCard({ employee, togglingId, deletingId, onToggleActive, onEdit
         </div>
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
+          {canShare && <ShareRecordPanel resourceType="employee" resourceId={employee.id} compact />}
           <button
             type="button"
             onClick={() => onToggleActive(employee)}
@@ -575,6 +577,7 @@ export default function Employees() {
                 <EmployeeCard
                   key={employee.id}
                   employee={employee}
+                  canShare={currentUser?.role === 'admin'}
                   togglingId={togglingId}
                   deletingId={deletingId}
                   onToggleActive={handleToggleActive}

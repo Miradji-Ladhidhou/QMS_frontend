@@ -80,6 +80,7 @@ import BulkMoveCategoryModal from '../components/BulkMoveCategoryModal.jsx';
 import ManageCategoriesModal from '../components/ManageCategoriesModal.jsx';
 import SortableTh from '../components/SortableTh.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import Pagination from '../components/Pagination.jsx';
 import { evidenceColumnLabel, evidenceValueLabel } from '../lib/moduleKpiEvidence.js';
 import AuditReading from '../components/moduleKpis/AuditReading.jsx';
@@ -3881,6 +3882,7 @@ function KpiCard({
 
         <div className="flex shrink-0 items-start gap-1 self-end lg:self-auto">
           <div className="relative">
+            {canManage && <ShareRecordPanel resourceType="kpi" resourceId={kpi.id} compact />}
             <button
               type="button"
               onClick={() => setExportMenuOpen((prev) => !prev)}

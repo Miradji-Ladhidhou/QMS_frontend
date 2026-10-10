@@ -25,6 +25,7 @@ import {
   Settings,
   ShieldAlert,
   ShieldCheck,
+  Share2,
   Siren,
   Smile,
   CalendarClock,
@@ -298,6 +299,7 @@ export const NAV_ITEMS = [
   // jamais liée) : la politique qualité était donc invisible pour quiconque n'est pas admin,
   // malgré son intention explicite d'être ouverte à tout le tenant.
   { to: '/settings', label: 'Paramètres', icon: Settings, alwaysVisible: true },
+  { to: '/shares', label: 'Partages', icon: Share2, alwaysVisible: true },
 ];
 
 export default function Layout() {

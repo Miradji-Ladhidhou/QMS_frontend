@@ -26,6 +26,7 @@ import { AiModuleGate } from '../lib/aiModules.jsx';
 import ReviewValidateModal from '../components/managementReview/ReviewValidateModal.jsx';
 import ReviewMailingModal from '../components/managementReview/ReviewMailingModal.jsx';
 import ReviewParticipantsField, { parseReviewParticipants } from '../components/managementReview/ReviewParticipantsField.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -1004,6 +1005,7 @@ export default function ManagementReviewDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{review.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="management_review" resourceId={review.id} compact />}
           <ExportMenu
             onExportPdf={handleExportPdf}
             exportingPdf={exportingPdf}

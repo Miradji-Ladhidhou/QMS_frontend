@@ -32,7 +32,7 @@ const TAB_GROUPS = [
       { id: 'company', label: 'Entreprise' },
       { id: 'users', label: 'Utilisateurs' },
       { id: 'groups', label: 'Groupes', adminOnly: true },
-      { id: 'visibility', label: 'Visibilité', adminOnly: true },
+      { id: 'visibility', label: 'Accès aux modules et navigation', adminOnly: true },
       { id: 'quality-policy', label: 'Politique qualité' },
     ],
   },

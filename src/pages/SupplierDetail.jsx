@@ -23,6 +23,7 @@ import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
 import SupplierScoreChart from '../components/suppliers/SupplierScoreChart.jsx';
 import SupplierDocumentsCard from '../components/suppliers/SupplierDocumentsCard.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -657,6 +658,7 @@ export default function SupplierDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{supplier.name}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="supplier" resourceId={supplier.id} compact />}
           <ExportMenu onExportPdf={() => handleExport('pdf')} exportingPdf={exporting.pdf} onExportWord={() => handleExport('word')} exportingWord={exporting.word} />
           <CapaPriorityBadge priority={supplier.criticality} />
           <SupplierStatusBadge status={supplier.status} />

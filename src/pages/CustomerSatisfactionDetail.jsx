@@ -18,6 +18,7 @@ import AutoTextarea from '../components/AutoTextarea.jsx';
 import CategoryVisibilityField from '../components/CategoryVisibilityField.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -505,6 +506,7 @@ export default function CustomerSatisfactionDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{survey.customer_name}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="customer_satisfaction" resourceId={survey.id} compact />}
           <SatisfactionMethodBadge method={survey.method} />
           <SatisfactionScoreBadge score={survey.score} />
           <ExportMenu

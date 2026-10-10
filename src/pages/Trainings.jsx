@@ -53,6 +53,7 @@ import FolderPickerModal from '../components/FolderPickerModal.jsx';
 import NewFolderModal from '../components/NewFolderModal.jsx';
 import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 import ModuleQuickProcedure from '../components/ModuleQuickProcedure.jsx';
 import Pagination from '../components/Pagination.jsx';
 import QuizEditorModal from '../components/trainingQuiz/QuizEditorModal.jsx';
@@ -1995,6 +1996,7 @@ export default function Trainings() {
                         </div>
                         {canManage && (
                           <div className="flex shrink-0 gap-1">
+                            <ShareRecordPanel resourceType="training" resourceId={training.id} compact />
                             <button
                               type="button"
                               onClick={() => setEditingTraining(training)}

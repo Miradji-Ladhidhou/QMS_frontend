@@ -9,13 +9,20 @@ const expectedPaths = [
   ['/trainings', '/employees', '/services', '/suppliers'],
 ];
 const alwaysVisiblePaths = ['/quality-policy', '/settings', '/guide-resolution', '/prise-en-main', '/liens-utiles'];
-const items = ['/', '/guide-resolution', ...expectedPaths.flat(), ...SIDEBAR_PERMANENT_PATHS].map((to) => ({
+const items = ['/', '/guide-resolution', ...expectedPaths.flat(), ...SIDEBAR_PERMANENT_PATHS.filter((path) => path !== '/shares')].map((to) => ({
   to,
   ...(alwaysVisiblePaths.includes(to)
     ? { alwaysVisible: true }
     : { key: to === '/' ? 'dashboard' : to.slice(1) }),
   ...(to === '/' ? { end: true } : {}),
 }));
+
+test('Partages is a permanent link for every role', () => {
+  const withShares = [...items, { to: '/shares', alwaysVisible: true }];
+  for (const role of ['admin', 'manager', 'member']) {
+    assert.equal(getSidebarPermanentItems(withShares, { role, visibleMenuKeys: [] })[0].to, '/shares');
+  }
+});
 
 test('all sidebar links occur exactly once in the requested order', () => {
   const categories = getSidebarCategories(items, { role: 'admin' });

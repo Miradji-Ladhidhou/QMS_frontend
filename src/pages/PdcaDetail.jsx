@@ -23,6 +23,7 @@ import ExportMenu from '../components/ExportMenu.jsx';
 import PageGuide from '../components/PageGuide.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -790,6 +791,7 @@ export default function PdcaDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{pdca.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="pdca" resourceId={pdca.id} compact />}
           <PdcaStatusBadge status={pdca.status} />
           <ExportMenu
             onExportPdf={handleExportPdf}

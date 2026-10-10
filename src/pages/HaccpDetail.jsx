@@ -35,6 +35,7 @@ import HaccpReviewCard from '../components/haccp/HaccpReviewCard.jsx';
 import ReadingForm from '../components/haccp/ReadingForm.jsx';
 import HaccpDossierCard from '../components/haccp/HaccpDossierCard.jsx';
 import CcpApprovalCard from '../components/haccp/CcpApprovalCard.jsx';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 const FIELD_CLASS =
   'w-full rounded-md border border-slate-300 px-3 py-2.5 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary';
@@ -1359,6 +1360,7 @@ export default function HaccpDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{plan.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="haccp_plan" resourceId={plan.id} compact />}
           {canManage ? (
             <select aria-label="Statut du plan" value={plan.status} onChange={handleStatusChange} className="min-h-[40px] rounded-md border border-slate-300 px-2 py-1 text-base focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary sm:min-h-0 sm:text-sm">
               {Object.entries(PLAN_STATUS_LABELS).map(([value, label]) => (

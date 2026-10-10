@@ -24,6 +24,7 @@ import { useAuditorQualifications } from '../lib/useAuditorQualifications.js';
 import { qualificationOf, qualificationOptionSuffix } from '../lib/auditorQualification.js';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -420,6 +421,7 @@ export default function AuditDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-lg font-semibold text-slate-900 sm:text-xl">{audit.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="audit" resourceId={audit.id} compact />}
           <ExportMenu
             onExportPdf={handleExportPdf}
             exportingPdf={exportingPdf}

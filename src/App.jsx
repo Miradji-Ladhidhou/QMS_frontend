@@ -50,6 +50,8 @@ const CapaDetail = lazy(() => import('./pages/CapaDetail.jsx'));
 const Trainings = lazy(() => import('./pages/Trainings.jsx'));
 const Employees = lazy(() => import('./pages/Employees.jsx'));
 const PublicQuiz = lazy(() => import('./pages/PublicQuiz.jsx'));
+const GuestShare = lazy(() => import('./pages/GuestShare.jsx'));
+const Shares = lazy(() => import('./pages/Shares.jsx'));
 const SkillMatrix = lazy(() => import('./pages/SkillMatrix.jsx'));
 const Kpis = lazy(() => import('./pages/Kpis.jsx'));
 const QqoqccpDetail = lazy(() => import('./pages/QqoqccpDetail.jsx'));
@@ -164,6 +166,7 @@ export default function App() {
                     {/* Lien de QCM reçu par email : ouvert sans compte, mais disponible aussi quand la
                         personne est déjà connectée (même page, jamais redirigée vers le tableau de bord). */}
                     <Route path="/quiz/:token" element={<PublicQuiz />} />
+                    <Route path="/guest/:token" element={<GuestShare />} />
                     <Route path="/super-admin" element={<SuperAdmin />} />
                     <Route path="/" element={<Layout />}>
                       <Route index element={<Dashboard />} />
@@ -204,6 +207,7 @@ export default function App() {
                       <Route path="procedures" element={<Procedures />} />
                       <Route path="procedures/:id" element={<ProcedureDetail />} />
                       <Route path="settings" element={<Settings />} />
+                      <Route path="shares" element={<Shares />} />
                       <Route path="quality-policy" element={<QualityPolicy />} />
                       <Route path="services" element={<Services />} />
                       <Route path="employees" element={<Employees />} />
@@ -230,6 +234,7 @@ export default function App() {
             <Route path="/legal/confidentialite" element={<LegalPrivacy />} />
             <Route path="/legal/mentions-legales" element={<LegalNotice />} />
             <Route path="/quiz/:token" element={<PublicQuiz />} />
+            <Route path="/guest/:token" element={<GuestShare />} />
             <Route path="/" element={<Landing />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

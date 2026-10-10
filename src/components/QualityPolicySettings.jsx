@@ -3,6 +3,7 @@ import { Check, Download, FileText, Pencil } from 'lucide-react';
 import { api } from '../lib/api.js';
 import { openBlankTab } from '../lib/openInNewTab.js';
 import AutoTextarea from './AutoTextarea.jsx';
+import ShareRecordPanel from './ShareRecordPanel.jsx';
 
 function formatDateTime(value) {
   if (!value) return '—';
@@ -181,6 +182,7 @@ export default function QualityPolicySettings({ isAdmin, isManager }) {
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-sm font-semibold text-slate-900 sm:text-base">Politique qualité</h2>
         <div className="flex shrink-0 items-center gap-2">
+          {isAdmin && current && <ShareRecordPanel resourceType="quality_policy" resourceId={current.id} compact />}
           {current && !isEditing && (
             <button
               type="button"

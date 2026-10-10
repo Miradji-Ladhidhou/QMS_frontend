@@ -29,6 +29,7 @@ import RiskLinksCard from '../components/risks/RiskLinksCard.jsx';
 import RiskMarkReviewedModal from '../components/risks/RiskMarkReviewedModal.jsx';
 import DriveEvidencePanel from '../components/DriveEvidencePanel.jsx';
 import { useEvidenceExportSelection } from '../lib/useEvidenceExportSelection.js';
+import ShareRecordPanel from '../components/ShareRecordPanel.jsx';
 
 function formatDate(dateStr) {
   if (!dateStr) return '—';
@@ -733,6 +734,7 @@ export default function RiskDetail() {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="min-w-0 break-words text-lg font-semibold text-slate-900 sm:text-xl">{risk.title}</h1>
         <div className="flex flex-wrap items-center gap-2">
+          {canManage && <ShareRecordPanel resourceType="risk" resourceId={risk.id} compact />}
           <ExportMenu
             onExportPdf={() => handleExport('pdf')}
             exportingPdf={exporting.pdf}

@@ -1,5 +1,6 @@
 import { useId, useState } from 'react';
 import { ChevronDown, Cloud, Download, FileSpreadsheet, FileText, FileType, Loader2 } from 'lucide-react';
+import { useShareExportPermission } from '../lib/useShareExportPermission.js';
 
 // Regroupe les 1-5 boutons "Exporter CSV/PDF/Excel/Word/Drive" — jusque-là posés côte à côte sur
 // chaque page de liste — derrière un seul bouton "Exporter" et un petit menu déroulant, même
@@ -22,6 +23,7 @@ export default function ExportMenu({
   exportingDrive,
 }) {
   const [open, setOpen] = useState(false);
+  const permission = useShareExportPermission();
   const formatsId = useId();
   const formats = [
     onExportCsv && 'CSV',
@@ -33,6 +35,7 @@ export default function ExportMenu({
   const anyExporting = exportingCsv || exportingPdf || exportingXlsx || exportingWord || exportingDrive;
 
   function handleSelect(action) {
+    if (!permission.allowed) return;
     setOpen(false);
     action();
   }
@@ -44,7 +47,7 @@ export default function ExportMenu({
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        disabled={disabled}
+        disabled={disabled || !permission.allowed}
         aria-expanded={open}
         aria-describedby={formatsId}
         className="flex w-full items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50 sm:w-auto"
@@ -53,9 +56,9 @@ export default function ExportMenu({
         Exporter
         <ChevronDown size={15} className={`shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      <p id={formatsId} className="mt-1 text-center text-xs text-slate-600">{formats}</p>
+      <p id={formatsId} className="mt-1 text-center text-xs text-slate-600">{permission.loading ? 'Vérification des droits...' : permission.error || formats}</p>
 
-      {open && (
+      {open && permission.allowed && (
         <>
           <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
           {/* max-w garde le menu dans l'écran même quand ce bouton n'est pas collé au bord
