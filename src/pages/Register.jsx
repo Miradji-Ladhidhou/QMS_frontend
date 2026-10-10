@@ -12,6 +12,15 @@ const MAILTO_HREF = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Deman
 
 Je souhaite demander un accès au pilote de QMS SaaS.
 
+Voici les informations concernant ma demande :
+- Nom et prénom :
+- Organisation et secteur d’activité :
+- Fonction :
+- Adresse email à associer à l’accès :
+- Nombre de personnes qui participeront au pilote :
+- Modules ou fonctionnalités que je souhaite tester :
+- Besoins ou cas d’usage prioritaires :
+
 Cordialement`
 )}`;
 
